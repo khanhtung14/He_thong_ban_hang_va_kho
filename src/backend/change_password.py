@@ -21,7 +21,7 @@ class ChangePasswordRequest(BaseModel):
 @router.post("/change-password")
 def change_password(data: ChangePasswordRequest):
 
-    # Kiểm tra mật khẩu hiện tại
+    # 1. Kiểm tra mật khẩu hiện tại
     if not bcrypt.checkpw(
         data.current_password.encode("utf-8"),
         fake_user["password"]
@@ -31,32 +31,42 @@ def change_password(data: ChangePasswordRequest):
             detail="Mật khẩu hiện tại không đúng"
         )
 
-    # Kiểm tra độ dài
+    # 2. Không cho mật khẩu mới giống mật khẩu cũ
+    if data.current_password == data.new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Mật khẩu mới không được giống mật khẩu hiện tại"
+        )
+
+    # 3. Kiểm tra độ dài
     if len(data.new_password) < 8:
         raise HTTPException(
             status_code=400,
             detail="Mật khẩu mới phải có ít nhất 8 ký tự"
         )
 
-    # Phải có chữ
+    # 4. Phải có chữ
     if not any(char.isalpha() for char in data.new_password):
         raise HTTPException(
             status_code=400,
             detail="Mật khẩu mới phải chứa chữ"
         )
 
-    # Phải có số
+    # 5. Phải có số
     if not any(char.isdigit() for char in data.new_password):
         raise HTTPException(
             status_code=400,
             detail="Mật khẩu mới phải chứa số"
         )
 
-    # Đổi mật khẩu
-    fake_user["password"] = bcrypt.hashpw(
+    # 6. Hash mật khẩu mới
+    new_password_hash = bcrypt.hashpw(
         data.new_password.encode("utf-8"),
         bcrypt.gensalt()
     )
+
+    # 7. Lưu mật khẩu mới
+    fake_user["password"] = new_password_hash
 
     return {
         "message": "Đổi mật khẩu thành công"
