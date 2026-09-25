@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.sql": "mysql"
+  },
+  "sqltools.format": {
+    "linesBetweenQueries": 2
+  }
+}

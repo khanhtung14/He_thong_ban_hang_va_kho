@@ -1,0 +1,14 @@
+{
+  "name": "he-thong-ban-hang-va-kho",
+  "version": "1.0.0",
+  "description": "Hệ thống quản lý bán hàng và kho - Sprint 1 (SCRUM-6 / SCRUM-62)",
+  "private": true,
+  "scripts": {
+    "start": "python -m uvicorn src.backend.main:app --reload --port 8000",
+    "test": "pytest tests/test_users.py -v"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
