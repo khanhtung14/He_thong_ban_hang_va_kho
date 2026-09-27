@@ -1,59 +1,129 @@
-import datetime
-from flask import request, jsonify
-# Giả định bạn đã import db và model User
+"""FastAPI login endpoint.
 
-# LƯU Ý: Trong thực tế, bạn nên dùng Redis để lưu cache số lần sai thay vì Dictionary 
-# để tránh mất dữ liệu khi restart server hoặc chạy nhiều worker.
-login_attempts = {}
-lockout_status = {}
+Accounts are supplied through LOGIN_USERS_JSON as a JSON array, for example:
+[{"username":"sales01","password_hash":"$2b$12$...","role_code":"SALES"}]
+Only bcrypt password hashes should be stored in this setting.
+"""
 
-def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+import json
+import os
+import threading
+import time
+from collections import defaultdict
+from typing import Any
 
-    # 1. Kiểm tra trạng thái khóa tài khoản (15 phút)
-    if username in lockout_status:
-        if datetime.datetime.now() < lockout_status[username]:
-            # Vẫn đang trong thời gian khóa. 
-            # Vẫn trả về thông báo chung chung, không tiết lộ là tài khoản đang bị khóa
-            return jsonify({"error": "Tên đăng nhập hoặc mật khẩu không chính xác."}), 401
-        else:
-            # Hết 15 phút, gỡ khóa để cho phép thử lại
-            del lockout_status[username]
-            login_attempts[username] = 0
+import bcrypt
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, Field
 
-    # Lấy thông tin user từ Database
-    user = db.session.query(User).filter_by(username=username).first()
+router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
-    # 2. Xử lý sai thông tin (Không tồn tại user HOẶC sai mật khẩu)
-    if not user or not check_password_hash(user.password_hash, password):
-        # Tăng số lần đếm đăng nhập sai
-        attempts = login_attempts.get(username, 0) + 1
-        login_attempts[username] = attempts
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_SECONDS = 15 * 60
+GENERIC_LOGIN_ERROR = "Tên đăng nhập hoặc mật khẩu không chính xác."
 
-        if attempts >= 5:
-            # Khóa tài khoản 15 phút sau 5 lần sai
-            lockout_status[username] = datetime.datetime.now() + datetime.timedelta(minutes=15)
+_attempts: dict[str, int] = defaultdict(int)
+_locked_until: dict[str, float] = {}
+_attempts_lock = threading.Lock()
 
-        # Trả về thông báo chung chung, tuyệt đối không tiết lộ user có tồn tại hay không
-        return jsonify({"error": "Tên đăng nhập hoặc mật khẩu không chính xác."}), 401
+ROLE_HOME_PAGES = {
+    "CUSTOMER": "/portal/orders",
+    "SALES": "/sales/orders",
+    "SALES_REP": "/sales/orders",
+    "SALES_MANAGER": "/manager/dashboard",
+    "WAREHOUSE": "/inventory/home",
+    "WH_MANAGER": "/inventory/home",
+    "ACCOUNTANT": "/accounting/dashboard",
+    "ADMIN": "/admin/dashboard",
+}
 
-    # 3. Đăng nhập thành công: Reset số lần sai
-    login_attempts[username] = 0
 
-    # Điều hướng trang chủ theo vai trò (Role-based)
-    role_redirects = {
-        "admin": "/admin/dashboard",
-        "sales": "/sales/home",
-        "warehouse": "/inventory/home"
-    }
-    
-    # Mặc định về trang default nếu role không khớp
-    redirect_url = role_redirects.get(user.role, "/default-home")
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=256)
 
-    return jsonify({
+
+def _load_accounts() -> dict[str, dict[str, Any]]:
+    raw_accounts = os.getenv("LOGIN_USERS_JSON", "[]")
+    try:
+        parsed = json.loads(raw_accounts)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dịch vụ đăng nhập chưa được cấu hình đúng.",
+        ) from exc
+
+    if not isinstance(parsed, list):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dịch vụ đăng nhập chưa được cấu hình đúng.",
+        )
+
+    accounts: dict[str, dict[str, Any]] = {}
+    for account in parsed:
+        if not isinstance(account, dict):
+            continue
+        username = account.get("username")
+        password_hash = account.get("password_hash")
+        role_code = account.get("role_code")
+        if isinstance(username, str) and isinstance(password_hash, str) and isinstance(role_code, str):
+            accounts[username.casefold()] = account
+    return accounts
+
+
+@router.post("/login")
+def login(data: LoginRequest):
+    username = data.username.strip()
+    if not username:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
+
+    normalized_username = username.casefold()
+    now = time.monotonic()
+    with _attempts_lock:
+        locked_until = _locked_until.get(normalized_username)
+        if locked_until is not None and now < locked_until:
+            retry_after = max(1, int(locked_until - now))
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail={"message": "Tài khoản tạm thời bị khóa.", "retry_after_seconds": retry_after},
+                headers={"Retry-After": str(retry_after)},
+            )
+        if locked_until is not None:
+            _locked_until.pop(normalized_username, None)
+            _attempts.pop(normalized_username, None)
+
+    account = _load_accounts().get(normalized_username)
+    valid_password = False
+    if account is not None:
+        stored_hash = account["password_hash"].encode("utf-8")
+        try:
+            valid_password = bcrypt.checkpw(data.password.encode("utf-8"), stored_hash)
+        except (ValueError, TypeError):
+            # Invalid hash configuration is treated as an authentication failure.
+            valid_password = False
+
+    if not valid_password or account is None or account.get("status", "ACTIVE") != "ACTIVE":
+        with _attempts_lock:
+            _attempts[normalized_username] += 1
+            if _attempts[normalized_username] >= MAX_FAILED_ATTEMPTS:
+                _locked_until[normalized_username] = time.monotonic() + LOCKOUT_SECONDS
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
+
+    role_code = account["role_code"].strip().upper()
+    redirect_url = ROLE_HOME_PAGES.get(role_code)
+    if redirect_url is None:
+        # Unknown roles are denied access instead of receiving a generic home page.
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vai trò tài khoản chưa được hỗ trợ.")
+
+    with _attempts_lock:
+        _attempts.pop(normalized_username, None)
+        _locked_until.pop(normalized_username, None)
+
+    return {
         "message": "Đăng nhập thành công",
         "redirect_url": redirect_url,
-        "token": "jwt_token_cua_ban_o_day" 
-    }), 200
+        "user": {
+            "username": account["username"],
+            "role_code": role_code,
+        },
+    }

@@ -54,3 +54,15 @@ He_thong_ban_hang_va_kho/
 - **Backend:** Spring Boot (Java) hoặc NestJS (TypeScript).
 - **Cơ sở dữ liệu:** PostgreSQL (Hỗ trợ giao dịch mạnh mẽ cho sổ tồn và công nợ).
 - **Bảo mật & Xác thực:** JWT (Access Token 15 phút + Refresh Token 7 ngày), băm mật khẩu `bcrypt`.
+
+## Chạy backend FastAPI
+
+Tại thư mục gốc dự án, cài thư viện và khởi động server:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m uvicorn src.backend.main:app --reload
+```
+
+Hoặc chạy trực tiếp file `src/backend/main.py`. API mặc định ở `http://127.0.0.1:8000`;
+trang tài liệu ở `http://127.0.0.1:8000/docs`. Server hiện chưa tự kết nối MySQL khi khởi động.
