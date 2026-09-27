@@ -3,3 +3,7 @@ uvicorn[standard]
 bcrypt
 SQLAlchemy>=2.0,<3.0
 PyMySQL>=1.1,<2.0
+pyjwt>=2.8.0
+httpx>=0.28.0
+pytest>=8.0.0
+

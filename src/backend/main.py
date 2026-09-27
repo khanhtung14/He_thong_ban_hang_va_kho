@@ -7,12 +7,18 @@ from fastapi.staticfiles import StaticFiles
 
 try:  # Supports both `python -m src.backend.main` and running this file directly.
     from src.backend.change_password import router as change_password_router
+    from src.backend.inventory import router as inventory_router
     from src.backend.login import router as login_router
+    from src.backend.products import router as products_router
+    from src.backend.reports import router as reports_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
+    from inventory import router as inventory_router
     from login import router as login_router
+    from products import router as products_router
+    from reports import router as reports_router
 
-app = FastAPI()
+app = FastAPI(title="OMS - Order Management System Backend", version="1.0.0")
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 FRONTEND_DIST = FRONTEND_DIR / "dist"
@@ -47,6 +53,9 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 
 app.include_router(change_password_router)
 app.include_router(login_router)
+app.include_router(inventory_router)
+app.include_router(products_router)
+app.include_router(reports_router)
 
 
 @app.get("/")
