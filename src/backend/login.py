@@ -16,6 +16,11 @@ import bcrypt
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+try:
+    from src.backend.rbac import create_access_token, normalize_role
+except ModuleNotFoundError:  # pragma: no cover
+    from rbac import create_access_token, normalize_role
+
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 MAX_FAILED_ATTEMPTS = 5
@@ -33,12 +38,15 @@ _attempts_lock = threading.Lock()
 ROLE_HOME_PAGES = {
     "CUSTOMER": "/portal/orders",
     "SALES": "/sales/orders",
+    "SALES REP": "/sales/orders",
     "SALES_REP": "/sales/orders",
+    "SALES MANAGER": "/manager/dashboard",
     "SALES_MANAGER": "/manager/dashboard",
-    "WAREHOUSE": "/warehouse/picking",
-    "WH_MANAGER": "/warehouse/dashboard",
-    "ACCOUNTANT": "/accounting/debt-book",
-    "ADMIN": "/admin/users",
+    "WAREHOUSE": "/inventory/home",
+    "WH MANAGER": "/inventory/home",
+    "WH_MANAGER": "/inventory/home",
+    "ACCOUNTANT": "/accounting/dashboard",
+    "ADMIN": "/admin/dashboard",
 }
 
 
@@ -77,6 +85,7 @@ def _load_accounts() -> dict[str, dict[str, Any]]:
 
 @router.post("/login")
 def login(data: LoginRequest):
+    print("Danh sách tài khoản hiện có:", _load_accounts())
     username = data.username.strip()
     if not username:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
@@ -121,8 +130,13 @@ def login(data: LoginRequest):
                 )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
 
-    role_code = account["role_code"].strip().upper()
-    redirect_url = ROLE_HOME_PAGES.get(role_code)
+    raw_role = account["role_code"]
+    canonical_role = normalize_role(raw_role)
+    if not canonical_role:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vai trò tài khoản chưa được hỗ trợ.")
+
+    role_key = canonical_role.upper().replace(" ", "_")
+    redirect_url = ROLE_HOME_PAGES.get(role_key) or ROLE_HOME_PAGES.get(canonical_role.upper())
     if redirect_url is None:
         # Unknown roles are denied access instead of receiving a generic home page.
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vai trò tài khoản chưa được hỗ trợ.")
@@ -131,11 +145,18 @@ def login(data: LoginRequest):
         _attempts.pop(normalized_username, None)
         _locked_until.pop(normalized_username, None)
 
+    token = create_access_token({
+        "sub": account["username"],
+        "role": canonical_role,
+    })
+
     return {
         "message": "Đăng nhập thành công",
+        "access_token": token,
+        "token_type": "bearer",
         "redirect_url": redirect_url,
         "user": {
             "username": account["username"],
-            "role_code": role_code,
+            "role_code": canonical_role,
         },
     }
