@@ -717,11 +717,11 @@ Scenario: Hoạt động thuận tiện và không vỡ layout trên màn hình 
 
 ---
 
-#### US-07 — [S1-07] Thông Báo Lỗi Rõ Ràng & Hành Động Khắc Phục
+#### US-07 — [S1-07] Thông Báo Lỗi Rõ Ràng & Hành Động Khắc Phục (Graceful Error Handling UI)
 
 **Epic:** EP-01 / SCRUM-6  
 **Feature:** FEAT-02  
-**Excel Reference:** Sheet `4. Product Backlog`, Row 13 (`S1-07`, 1 Point, Should, Status: Chưa bắt đầu)  
+**Excel Reference:** Sheet `4. Product Backlog`, Row 13 (`S1-07`, 1 Point, Should, Status: In Progress)  
 **Requirement References:** BR-02, FR-07  
 
 ##### User Story
@@ -730,27 +730,90 @@ Scenario: Hoạt động thuận tiện và không vỡ layout trên màn hình 
 > tôi muốn **nhận thông báo rõ ràng khi truy cập nhầm chỗ hoặc không đủ quyền**,  
 > để **biết mình nên làm gì tiếp thay vì gặp một trang trắng**.
 
+##### Business Context
+
+Trong một hệ thống OMS phân quyền đa vai trò (7 vai trò từ Đại lý, Nhân viên kinh doanh, Thủ kho đến Admin), người dùng thường xuyên mở lại bookmark cũ, gõ nhầm đường dẫn hoặc bấm vào các tính năng vượt quá thẩm quyền của mình. Nếu hệ thống để văng lỗi kỹ thuật (như màn hình trắng xoá, lỗi crash component, hoặc trang mặc định của web server `Cannot GET /...`), người dùng sẽ lầm tưởng hệ thống bị sập, hoang mang, liên tục bấm F5 hoặc gọi IT Helpdesk làm tắc nghẽn hỗ trợ kỹ thuật và gián đoạn công việc bán hàng/kho vận.
+
+##### Business Value
+
+- **Trải nghiệm người dùng liền mạch (Graceful Degradation):** Giữ người dùng luôn ở trong luồng làm việc an toàn, biết chính xác lý do gặp sự cố và có sẵn đường dẫn thoát (Call-to-Action) để tiếp tục công việc.
+- **Bảo mật hệ thống (Information Security):** Che giấu hoàn toàn các thông tin kỹ thuật nhạy cảm (Stack trace, Database schema, phiên bản server) khỏi kẻ gian khi quét lỗ hổng hoặc truy cập trái phép.
+- **Tính chuyên nghiệp & Đồng nhất thương hiệu:** Đảm bảo toàn bộ ứng dụng thể hiện chuẩn mực cao cấp của phần mềm doanh nghiệp, không tạo cảm giác chắp vá.
+
 ##### Acceptance Criteria (BDD)
 
 ```gherkin
-Scenario: Trang báo lỗi dùng chung giao diện chuẩn của ứng dụng
-  Given người dùng đã đăng nhập và vô tình truy cập vào đường dẫn không tồn tại "/sales/unknown-path" hoặc không có quyền "/admin/settings"
-  When ứng dụng xử lý yêu cầu
-  Then hệ thống hiển thị trang lỗi 404 (Không tìm thấy) hoặc 403 (Không đủ quyền)
-  And trang lỗi vẫn giữ nguyên khung Header và Navigation chuẩn của ứng dụng thay vì văng ra trang trắng trình duyệt hoặc lỗi code
+Scenario: Người dùng truy cập vào một URL không tồn tại (Lỗi 404 Not Found)
+  Given người dùng đã đăng nhập với vai trò bất kỳ
+  When người dùng truy cập một đường dẫn không có trong định tuyến (ví dụ: "/sales/order-unknown" hoặc bấm link lỗi thời)
+  Then hệ thống không hiển thị màn hình trắng hay lỗi code máy chủ
+  And hiển thị trang thông báo lỗi 404 Not Found với nội dung:
+    | Trường hiển thị | Nội dung kỳ vọng |
+    | Mã lỗi          | "404" |
+    | Tiêu đề         | "Trang không tồn tại hoặc đã bị di dời" |
+    | Thông điệp phụ  | "Đường dẫn bạn vừa truy cập không hợp lệ. Vui lòng kiểm tra lại URL hoặc quay về trang làm việc chính." |
+  And hiển thị nút bấm hành động chính (Primary CTA): "Quay về Trang chủ"
+  And hiển thị nút bấm hành động phụ (Secondary CTA): "Quay lại trang trước"
+  When người dùng nhấn "Quay về Trang chủ"
+  Then hệ thống điều hướng người dùng về đúng trang chủ mặc định theo vai trò của họ
 
-Scenario: Mỗi trang lỗi đều cung cấp hành động gợi ý rõ ràng
-  Given người dùng đang ở trang báo lỗi 403 Forbidden
-  When người dùng đọc thông tin trên trang
-  Then trang hiển thị thông điệp rõ ràng: "Bạn không có quyền truy cập vào chức năng này."
-  And có một nút hành động nổi bật: "Quay lại Trang chủ" hoặc "Quay lại trang trước"
-  When người dùng bấm vào nút này, hệ thống đưa người dùng quay về trang làm việc an toàn
+Scenario: Người dùng truy cập vào trang không đủ quyền (Lỗi 403 Forbidden)
+  Given người dùng đã đăng nhập với vai trò "Sales Rep" (Nhân viên kinh doanh)
+  When người dùng cố tình nhập URL trang quản trị "/admin/users" hoặc trang duyệt giá vốn "/manager/cogs-report"
+  Then hệ thống Router Guard chặn ngay lập tức việc kết xuất nội dung trang đích
+  And hiển thị trang thông báo lỗi 403 Forbidden với nội dung:
+    | Trường hiển thị | Nội dung kỳ vọng |
+    | Mã lỗi          | "403" |
+    | Tiêu đề         | "Truy cập bị từ chối / Không đủ thẩm quyền" |
+    | Thông điệp phụ  | "Bạn không có quyền truy cập vào chức năng này. Nếu đây là sự nhầm lẫn, vui lòng liên hệ Quản trị viên để được cấp quyền." |
+  And tuyệt đối không để lộ bất kỳ dữ liệu nhạy cảm hay cấu trúc nội dung nào của trang bị cấm
+  And hiển thị nút bấm hành động nổi bật: "Về bàn làm việc của tôi"
+  When người dùng nhấn nút "Về bàn làm việc của tôi"
+  Then hệ thống chuyển hướng ngay lập tức về trang "/sales/orders"
+
+Scenario: Giao diện trang lỗi kế thừa Layout chung & Call-to-Action trực quan (UI/UX)
+  Given người dùng đã xác thực phiên làm việc và gặp lỗi 403 hoặc 404
+  When trang lỗi được kết xuất trên trình duyệt
+  Then toàn bộ khung giao diện chuẩn của ứng dụng (App Layout) vẫn được duy trì:
+    - Thanh điều hướng trên cùng (Header): Hiển thị đầy đủ Họ tên, Vai trò, Nút Đăng xuất
+    - Thanh menu bên (Sidebar): Giữ nguyên danh sách các chức năng mà người dùng CÓ QUYỀN thao tác
+  And khu vực nội dung chính (Main Content Area) hiển thị khối minh họa (Illustration vector) và nút CTA
+  When người dùng nhấn nút "Quay lại trang trước" (Back action)
+  Then nếu lịch sử duyệt web (browser history) hợp lệ, trình duyệt quay lại trang thao tác trước đó
+  And nếu không có lịch sử trước đó (mở tab mới), hệ thống tự động fallback đưa về trang chủ mặc định theo vai trò
 ```
+
+##### Non-Functional Requirements & UI/UX Notes
+
+1. **Tính nhất quán giao diện (Design System Consistency):**
+   - Sử dụng bảng màu chuẩn của dự án: Màu cảnh báo thân thiện (Accent warning/info), tránh dùng màu đỏ rực mang cảm giác hệ thống bị sập nghiêm trọng.
+   - Iconography / Illustration: Sử dụng hình minh họa vector SVG tối giản, tải nhanh, đồng bộ style với toàn bộ hệ thống OMS.
+2. **Khả năng tương thích đáp ứng (Responsive 360px):**
+   - Hoạt động mượt mà từ màn hình di động nhỏ nhất **360px** (chuẩn màn hình smartphone của nhân viên kinh doanh đi tuyến thị trường) đến màn hình desktop lớn 1920px.
+   - Nút bấm CTA trên mobile phải có kích thước tối thiểu **44x44px**, nằm trong tầm với của ngón tay cái, không gây vỡ khung hay xuất hiện thanh cuộn ngang (horizontal scrollbar).
+3. **Hiệu năng & Khả năng tiếp cận (Accessibility - A11y):**
+   - Thời gian render trang lỗi: Tức thì (< 100ms phía Client).
+   - Không bị hiện tượng nhảy giao diện (Cumulative Layout Shift - CLS = 0).
+   - Tuân thủ tiêu chuẩn tương phản màu sắc WCAG 2.1 Level AA; có thể điều hướng nút CTA bằng phím Tab và kích hoạt bằng Enter.
+
+##### Technical Notes (Dành cho Developers)
+
+- **Frontend (Client-side Routing & Error Handling):**
+  - **Catch-all Route (404):** Khai báo wildcard route ở cuối file cấu hình router (`path: "*"`). Bọc bên trong `AppLayout` nếu đã đăng nhập; nếu là khách vãng lai (Guest), bọc trong `AuthLayout` kèm nút "Đăng nhập".
+  - **Route Guards / Auth Guard (403):** Khi router guard kiểm tra token & permissions: nếu route yêu cầu quyền mà user trong JWT/Auth Context không đáp ứng -> chuyển hướng sang route `/403` hoặc render component `<ForbiddenError />`.
+  - **Dynamic Home Navigation:** Nút CTA "Về trang chủ" phải đọc từ hàm `getDefaultRouteByRole(user.role)` đã xây dựng ở US-01 để đưa user về đúng trang nghiệp vụ thay vì hardcode về `/`.
+  - **React Error Boundary:** Cài đặt `<ErrorBoundary>` cấp layout để bẫy các lỗi JavaScript unhandled runtime crash (500 client-side), hiển thị fallback UI thân thiện thay vì màn hình trắng xóa.
+- **Backend (API Response & Security):**
+  - Các API trả về chuẩn RESTful HTTP Status Code: `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
+  - Định dạng JSON lỗi chuẩn hóa (Uniform Error Response): `{ "statusCode": 403, "error": "Forbidden", "message": "...", "timestamp": "...", "path": "..." }`.
+  - Tuyệt đối không bật debug mode trên Staging/Production để tránh rò rỉ stack trace và database schema.
 
 ##### Sub-tasks
 
-- [ ] ST-029: Thiết kế các trang thông báo lỗi chuẩn UI (403, 404, 500).
-- [ ] ST-030: Cài đặt React Error Boundary bắt lỗi crash giao diện và hiển thị màn hình fallback thân thiện.
+- [ ] ST-029: Thiết kế và xây dựng UI Component `ErrorPageLayout`, `NotFoundPage (404)` và `ForbiddenPage (403)` đồng bộ Design System, kế thừa App Layout và responsive 360px.
+- [ ] ST-030: Cấu hình Router Wildcard Catch-all (`*`), cài đặt React Error Boundary toàn cục và tích hợp nút CTA điều hướng theo vai trò người dùng.
+- [ ] ST-030-BE: Chuẩn hóa Global Exception Handler phía Backend, đảm bảo mọi lỗi chặn quyền API đều trả về HTTP 403 kèm cấu trúc JSON chuẩn hóa, không lộ stack trace.
+- [ ] ST-030-QA: Xây dựng kịch bản và thực thi kiểm thử 404, 403 (RBAC cross-role check), kiểm tra phản hồi các nút CTA và test hiển thị trên mobile 360px.
 
 ##### Priority & Points
 
