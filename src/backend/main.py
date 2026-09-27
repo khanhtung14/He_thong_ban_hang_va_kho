@@ -49,15 +49,37 @@ app.include_router(change_password_router)
 app.include_router(login_router)
 
 
-@app.get("/")
+def login_page_response() -> HTMLResponse:
+    if not FRONTEND_INDEX.is_file():
+        return HTMLResponse(
+            "React frontend is not built. Run `npm install` and `npm run build` in src/frontend.",
+            status_code=503,
+        )
+    return HTMLResponse(content=FRONTEND_INDEX.read_text(encoding="utf-8"))
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def home():
-    return {"message": "Backend đang chạy"}
+    """Show the login interface as the default application page."""
+    return login_page_response()
 
 
 @app.get("/errors/403", response_class=HTMLResponse, include_in_schema=False)
 def preview_forbidden_page():
     """Preview the 403 page in a browser; the response remains HTTP 403."""
     return forbidden_page()
+
+
+@app.get("/login", response_class=HTMLResponse, include_in_schema=False)
+def login_page():
+    """Serve the React login screen."""
+    return login_page_response()
+
+
+@app.get("/change-password", response_class=HTMLResponse, include_in_schema=False)
+def change_password_page():
+    """Serve the password change screen."""
+    return login_page_response()
 
 
 if __name__ == "__main__":
