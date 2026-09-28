@@ -64,7 +64,7 @@ def lock_user(data: LockUserRequest, db: Session = Depends(get_db)):
         # Thu hồi phiên đăng nhập / hủy token của user bị khóa nếu có bảng user_sessions
         try:
             revoke_stmt = text(
-                "UPDATE user_sessions SET revoked_at = NOW() WHERE user_id = :user_id AND revoked_at IS NULL"
+                "UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = :user_id AND revoked_at IS NULL"
             )
             db.execute(revoke_stmt, {"user_id": user_actual_id})
         except Exception:

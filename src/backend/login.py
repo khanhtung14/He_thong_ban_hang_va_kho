@@ -5,6 +5,8 @@ Accounts are supplied through LOGIN_USERS_JSON as a JSON array, for example:
 Only bcrypt password hashes should be stored in this setting.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import threading
