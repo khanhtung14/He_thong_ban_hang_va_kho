@@ -1,3 +1,6 @@
 fastapi
 uvicorn[standard]
 bcrypt
+email-validator
+pytest
+httpx
