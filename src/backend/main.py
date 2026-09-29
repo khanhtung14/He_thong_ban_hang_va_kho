@@ -82,6 +82,12 @@ def change_password_page():
     return login_page_response()
 
 
+@app.get("/admin/users", response_class=HTMLResponse, include_in_schema=False)
+def admin_users_page():
+    """Serve the React user management screen for administrators (SCRUM-62)."""
+    return login_page_response()
+
+
 if __name__ == "__main__":
     import uvicorn
 

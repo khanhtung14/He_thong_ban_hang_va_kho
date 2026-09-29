@@ -224,7 +224,7 @@ def test_change_password_invalid_request_returns_422(client, payload):
     assert client.post("/change-password", json=payload).status_code == 422
 
 
-@pytest.mark.parametrize("path", ["/", "/login", "/change-password"])
+@pytest.mark.parametrize("path", ["/", "/login", "/change-password", "/admin/users"])
 def test_frontend_pages_are_served(client, path):
     response = client.get(path)
     assert response.status_code == 200
