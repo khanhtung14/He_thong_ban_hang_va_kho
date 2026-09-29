@@ -10,9 +10,14 @@ from fastapi.staticfiles import StaticFiles
 try:  # Supports both `python -m src.backend.main` and running this file directly.
     from src.backend.change_password import router as change_password_router
     from src.backend.login import router as login_router
+    from src.user_routes import router as user_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from login import router as login_router
+    try:
+        from user_routes import router as user_router
+    except ModuleNotFoundError:
+        from ..user_routes import router as user_router
 
 app = FastAPI()
 
@@ -49,6 +54,7 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 
 app.include_router(change_password_router)
 app.include_router(login_router)
+app.include_router(user_router)
 
 
 def login_page_response() -> HTMLResponse:
@@ -81,6 +87,18 @@ def login_page():
 @app.get("/change-password", response_class=HTMLResponse, include_in_schema=False)
 def change_password_page():
     """Serve the password change screen."""
+    return login_page_response()
+
+
+@app.get("/admin/users", response_class=HTMLResponse, include_in_schema=False)
+def admin_users_page():
+    """Serve the admin user management screen."""
+    return login_page_response()
+
+
+@app.get("/admin/territory-handover", response_class=HTMLResponse, include_in_schema=False)
+def territory_handover_page():
+    """Serve the territory handover screen."""
     return login_page_response()
 
 

@@ -1,8 +1,7 @@
 """FastAPI login endpoint.
 
-Accounts are supplied through LOGIN_USERS_JSON as a JSON array, for example:
-[{"username":"sales01","password_hash":"$2b$12$...","role_code":"SALES"}]
-Only bcrypt password hashes should be stored in this setting.
+Accounts can be retrieved from MySQL Database (users table) and/or LOGIN_USERS_JSON.
+When accounts are in the database, is_active and status are checked to reject locked users.
 """
 
 from __future__ import annotations
@@ -15,8 +14,18 @@ from collections import defaultdict
 from typing import Any
 
 import bcrypt
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+try:
+    from src.backend.database import get_db
+except ImportError:
+    try:
+        from backend.database import get_db
+    except ImportError:
+        from .database import get_db
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -27,6 +36,7 @@ LOCKED_LOGIN_ERROR = (
     "Tài khoản đã bị tạm khóa 15 phút do nhập sai thông tin 5 lần liên tiếp. "
     "Vui lòng thử lại sau."
 )
+ACCOUNT_LOCKED_ERROR = "Tài khoản của bạn đã bị khoá. Vui lòng liên hệ Quản trị viên."
 
 _attempts: dict[str, int] = defaultdict(int)
 _locked_until: dict[str, float] = {}
@@ -77,8 +87,69 @@ def _load_accounts() -> dict[str, dict[str, Any]]:
     return accounts
 
 
+def _fetch_db_user(db: Session, username: str) -> dict[str, Any] | None:
+    """Tìm kiếm thông tin người dùng từ cơ sở dữ liệu MySQL / Database."""
+    if db is None:
+        return None
+
+    # Thử truy vấn kết hợp bảng roles
+    try:
+        stmt = text(
+            """
+            SELECT u.id, u.username, u.password_hash,
+                   u.is_active, u.status,
+                   r.code AS role_code
+            FROM users u
+            LEFT JOIN user_roles ur ON u.id = ur.user_id
+            LEFT JOIN roles r ON ur.role_id = r.id
+            WHERE LOWER(u.username) = :uname
+            LIMIT 1
+            """
+        )
+        row = db.execute(stmt, {"uname": username.lower()}).mappings().first()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+
+    # Truy vấn bảng users đơn thuần
+    try:
+        stmt = text(
+            """
+            SELECT id, username, password_hash,
+                   is_active, status
+            FROM users
+            WHERE LOWER(username) = :uname
+            LIMIT 1
+            """
+        )
+        row = db.execute(stmt, {"uname": username.lower()}).mappings().first()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+
+    # Truy vấn tối giản chỉ có id, username, is_active
+    try:
+        stmt = text(
+            """
+            SELECT id, username, is_active
+            FROM users
+            WHERE LOWER(username) = :uname
+            LIMIT 1
+            """
+        )
+        row = db.execute(stmt, {"uname": username.lower()}).mappings().first()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+
+    return None
+
+
 @router.post("/login")
-def login(data: LoginRequest):
+def login(data: LoginRequest, db: Session = Depends(get_db)):
     username = data.username.strip()
     if not username:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
@@ -98,17 +169,57 @@ def login(data: LoginRequest):
             _locked_until.pop(normalized_username, None)
             _attempts.pop(normalized_username, None)
 
-    account = _load_accounts().get(normalized_username)
+    # 1. Đọc thông tin từ MySQL Database
+    db_user = _fetch_db_user(db, normalized_username)
+
+    # 2. Kiểm tra nếu is_active == False (hoặc bị khóa) trong Database thì từ chối đăng nhập với thông báo lỗi rõ ràng
+    if db_user is not None:
+        is_active = db_user.get("is_active")
+        user_status = str(db_user.get("status") or "").upper()
+        if is_active is False or is_active == 0 or user_status == "LOCKED":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ACCOUNT_LOCKED_ERROR,
+            )
+        if user_status == "DISABLED":
+            with _attempts_lock:
+                _attempts[normalized_username] += 1
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
+
+    # 3. Lấy thông tin tài khoản từ cấu hình JSON (nếu có)
+    accounts = _load_accounts()
+    json_account = accounts.get(normalized_username)
+
+    if json_account is not None:
+        if json_account.get("is_active") is False or str(json_account.get("status") or "").upper() == "LOCKED":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ACCOUNT_LOCKED_ERROR,
+            )
+        if json_account.get("status", "ACTIVE") != "ACTIVE":
+            with _attempts_lock:
+                _attempts[normalized_username] += 1
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
+
+    # 4. Xác thực mật khẩu
     valid_password = False
-    if account is not None:
-        stored_hash = account["password_hash"].encode("utf-8")
+    # Thử đối chiếu mật khẩu từ Database nếu có password_hash
+    if db_user is not None and db_user.get("password_hash"):
         try:
+            stored_hash = str(db_user["password_hash"]).encode("utf-8")
             valid_password = bcrypt.checkpw(data.password.encode("utf-8"), stored_hash)
         except (ValueError, TypeError):
-            # Invalid hash configuration is treated as an authentication failure.
             valid_password = False
 
-    if not valid_password or account is None or account.get("status", "ACTIVE") != "ACTIVE":
+    # Nếu chưa xác thực qua DB, thử đối chiếu với JSON account
+    if not valid_password and json_account is not None and json_account.get("password_hash"):
+        try:
+            stored_hash = str(json_account["password_hash"]).encode("utf-8")
+            valid_password = bcrypt.checkpw(data.password.encode("utf-8"), stored_hash)
+        except (ValueError, TypeError):
+            valid_password = False
+
+    if not valid_password:
         with _attempts_lock:
             _attempts[normalized_username] += 1
             if _attempts[normalized_username] >= MAX_FAILED_ATTEMPTS:
@@ -123,21 +234,51 @@ def login(data: LoginRequest):
                 )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
 
-    role_code = account["role_code"].strip().upper()
+    # 5. Phân quyền và chuyển hướng theo vai trò (Role)
+    role_code = None
+    if db_user and db_user.get("role_code"):
+        role_code = str(db_user["role_code"]).strip().upper()
+    elif json_account and json_account.get("role_code"):
+        role_code = str(json_account["role_code"]).strip().upper()
+    else:
+        role_code = "SALES"
+
     redirect_url = ROLE_HOME_PAGES.get(role_code)
     if redirect_url is None:
-        # Unknown roles are denied access instead of receiving a generic home page.
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vai trò tài khoản chưa được hỗ trợ.")
 
+    # 6. Ghi nhận phiên làm việc nếu có bảng user_sessions
+    if db_user and db_user.get("id"):
+        try:
+            db.execute(
+                text(
+                    """
+                    INSERT INTO user_sessions (user_id, revoked_at)
+                    VALUES (:user_id, NULL)
+                    """
+                ),
+                {"user_id": db_user["id"]},
+            )
+            db.commit()
+        except Exception:
+            pass
+
+    # Xóa bộ đếm số lần đăng nhập sai khi thành công
     with _attempts_lock:
         _attempts.pop(normalized_username, None)
         _locked_until.pop(normalized_username, None)
+
+    resolved_username = (
+        db_user.get("username")
+        if db_user and db_user.get("username")
+        else (json_account.get("username") if json_account else data.username)
+    )
 
     return {
         "message": "Đăng nhập thành công",
         "redirect_url": redirect_url,
         "user": {
-            "username": account["username"],
+            "username": resolved_username,
             "role_code": role_code,
         },
     }
