@@ -21,6 +21,10 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_SECONDS = 15 * 60
 GENERIC_LOGIN_ERROR = "Tên đăng nhập hoặc mật khẩu không chính xác."
+LOCKED_LOGIN_ERROR = (
+    "Tài khoản đã bị tạm khóa 15 phút do nhập sai thông tin 5 lần liên tiếp. "
+    "Vui lòng thử lại sau."
+)
 
 _attempts: dict[str, int] = defaultdict(int)
 _locked_until: dict[str, float] = {}
@@ -31,10 +35,10 @@ ROLE_HOME_PAGES = {
     "SALES": "/sales/orders",
     "SALES_REP": "/sales/orders",
     "SALES_MANAGER": "/manager/dashboard",
-    "WAREHOUSE": "/inventory/home",
-    "WH_MANAGER": "/inventory/home",
-    "ACCOUNTANT": "/accounting/dashboard",
-    "ADMIN": "/admin/dashboard",
+    "WAREHOUSE": "/warehouse/picking",
+    "WH_MANAGER": "/warehouse/dashboard",
+    "ACCOUNTANT": "/accounting/debt-book",
+    "ADMIN": "/admin/users",
 }
 
 
@@ -85,7 +89,7 @@ def login(data: LoginRequest):
             retry_after = max(1, int(locked_until - now))
             raise HTTPException(
                 status_code=status.HTTP_423_LOCKED,
-                detail={"message": "Tài khoản tạm thời bị khóa.", "retry_after_seconds": retry_after},
+                detail={"message": LOCKED_LOGIN_ERROR, "retry_after_seconds": retry_after},
                 headers={"Retry-After": str(retry_after)},
             )
         if locked_until is not None:
@@ -107,6 +111,14 @@ def login(data: LoginRequest):
             _attempts[normalized_username] += 1
             if _attempts[normalized_username] >= MAX_FAILED_ATTEMPTS:
                 _locked_until[normalized_username] = time.monotonic() + LOCKOUT_SECONDS
+                raise HTTPException(
+                    status_code=status.HTTP_423_LOCKED,
+                    detail={
+                        "message": LOCKED_LOGIN_ERROR,
+                        "retry_after_seconds": LOCKOUT_SECONDS,
+                    },
+                    headers={"Retry-After": str(LOCKOUT_SECONDS)},
+                )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
 
     role_code = account["role_code"].strip().upper()
