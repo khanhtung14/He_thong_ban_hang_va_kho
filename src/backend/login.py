@@ -6,11 +6,14 @@ When accounts are in the database, is_active and status are checked to reject lo
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import secrets
 import threading
 import time
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
@@ -212,7 +215,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
             valid_password = False
 
     # Nếu chưa xác thực qua DB, thử đối chiếu với JSON account
-    if not valid_password and json_account is not None and json_account.get("password_hash"):
+    if db_user is None and json_account is not None and json_account.get("password_hash"):
         try:
             stored_hash = str(json_account["password_hash"]).encode("utf-8")
             valid_password = bcrypt.checkpw(data.password.encode("utf-8"), stored_hash)
@@ -249,19 +252,32 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
     # 6. Ghi nhận phiên làm việc nếu có bảng user_sessions
     if db_user and db_user.get("id"):
+        session_token = secrets.token_urlsafe(48)
+        session_token_hash = hashlib.sha256(session_token.encode("utf-8")).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=12)
         try:
             db.execute(
                 text(
                     """
-                    INSERT INTO user_sessions (user_id, revoked_at)
-                    VALUES (:user_id, NULL)
+                    INSERT INTO user_sessions (user_id, refresh_token_hash, expires_at, revoked_at)
+                    VALUES (:user_id, :token_hash, :expires_at, NULL)
                     """
                 ),
-                {"user_id": db_user["id"]},
+                {
+                    "user_id": db_user["id"],
+                    "token_hash": session_token_hash,
+                    "expires_at": expires_at,
+                },
             )
             db.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Không thể tạo phiên đăng nhập. Vui lòng thử lại sau.",
+            ) from exc
+    else:
+        session_token = None
 
     # Xóa bộ đếm số lần đăng nhập sai khi thành công
     with _attempts_lock:
@@ -274,7 +290,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         else (json_account.get("username") if json_account else data.username)
     )
 
-    return {
+    response = {
         "message": "Đăng nhập thành công",
         "redirect_url": redirect_url,
         "user": {
@@ -282,3 +298,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
             "role_code": role_code,
         },
     }
+    if session_token is not None:
+        response["session_token"] = session_token
+        response["token_type"] = "bearer"
+        response["expires_in"] = 12 * 60 * 60
+    return response
