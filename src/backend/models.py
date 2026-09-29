@@ -27,6 +27,7 @@ class AccountStatus(str, Enum):
     ACTIVE = "ACTIVE"
     LOCKED = "LOCKED"
     DISABLED = "DISABLED"
+    PENDING_ACTIVATION = "PENDING_ACTIVATION"
 
 
 user_roles = Table(
@@ -69,7 +70,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(254), nullable=False)
-    full_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[AccountStatus] = mapped_column(
@@ -77,6 +78,7 @@ class User(Base):
         default=AccountStatus.ACTIVE,
         nullable=False,
     )
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

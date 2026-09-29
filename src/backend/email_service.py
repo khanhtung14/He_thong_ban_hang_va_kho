@@ -14,6 +14,7 @@ class EmailService:
     def __init__(self):
         self.sent_emails: List[Dict[str, Any]] = []
         self._simulate_failure: bool = False
+        self.last_retry_count: int = 0
 
     def set_simulate_failure(self, should_fail: bool):
         """Simulate email dispatch failure for testing edge cases."""
@@ -22,16 +23,25 @@ class EmailService:
     def clear_sent_emails(self):
         """Clear the in-memory log of sent emails."""
         self.sent_emails.clear()
+        self.last_retry_count = 0
 
     def build_activation_content(
         self,
         full_name: str,
         username: str,
         temp_password: str,
-        login_url: str = "/login"
+        login_url: str = "/login",
+        activation_url: Optional[str] = None,
+        expires_hours: int = 24
     ) -> Dict[str, str]:
         """Generate plaintext and HTML content for the account activation email."""
         subject = "[OMS] Kích hoạt tài khoản người dùng - Hệ thống Bán hàng & Kho"
+
+        link_section_txt = (
+            f"- Đường dẫn kích hoạt tài khoản: {activation_url} (Có hiệu lực trong vòng {expires_hours} giờ)\n"
+            if activation_url
+            else f"- Đường dẫn đăng nhập: {login_url}\n"
+        )
 
         text_body = f"""Xin chào {full_name},
 
@@ -40,14 +50,19 @@ Tài khoản của bạn trên Hệ Thống Quản Lý Bán Hàng & Kho (OMS) đ
 Thông tin đăng nhập ban đầu:
 - Tên đăng nhập: {username}
 - Mật khẩu tạm thời: {temp_password}
-- Đường dẫn đăng nhập: {login_url}
-
+{link_section_txt}
 LƯU Ý BẢO MẬT:
 Vì lý do an toàn, bạn BẮT BUỘC phải đổi mật khẩu trong lần đăng nhập đầu tiên trước khi thực hiện các tác vụ khác.
 
 Trân trọng,
 Bộ phận Quản trị hệ thống OMS
 """
+
+        link_item_html = (
+            f'<div class="info-item"><span class="info-label">Link kích hoạt (hạn {expires_hours}h):</span> <a href="{activation_url}">{activation_url}</a></div>'
+            if activation_url
+            else f'<div class="info-item"><span class="info-label">Trang đăng nhập:</span> <a href="{login_url}">{login_url}</a></div>'
+        )
 
         html_body = f"""<!DOCTYPE html>
 <html lang="vi">
@@ -72,11 +87,11 @@ Bộ phận Quản trị hệ thống OMS
     <div class="info-box">
       <div class="info-item"><span class="info-label">Tên đăng nhập:</span> <strong>{username}</strong></div>
       <div class="info-item"><span class="info-label">Mật khẩu tạm:</span> <code style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:bold;">{temp_password}</code></div>
-      <div class="info-item"><span class="info-label">Trang đăng nhập:</span> <a href="{login_url}">{login_url}</a></div>
+      {link_item_html}
     </div>
     <div class="warning">
       <strong>Lưu ý bảo mật quan trọng:</strong><br>
-      Vui lòng đăng nhập và đổi mật khẩu mới ngay lần đầu tiên để đảm bảo an toàn tài khoản.
+      Vui lòng đổi mật khẩu mới ngay lần đăng nhập đầu tiên để đảm bảo an toàn tài khoản.
     </div>
     <div class="footer">
       Email này được gửi tự động từ hệ thống quản trị OMS. Vui lòng không trả lời trực tiếp email này.
@@ -93,22 +108,25 @@ Bộ phận Quản trị hệ thống OMS
         full_name: str,
         username: str,
         temp_password: str,
-        login_url: str = "/login"
+        login_url: str = "/login",
+        activation_token: Optional[str] = None,
+        activation_url: Optional[str] = None,
+        max_retries: int = 3
     ) -> bool:
         """
-        Send activation email with credentials.
-        If SMTP environment variables are configured, attempt network dispatch.
-        Otherwise, log the email and store it in sent_emails list (as per ASM-001 in docs).
+        Send activation email with credentials, activation link, and retry mechanism.
+        Implements SCRUM-101: template email, link kích hoạt có thời hạn, xử lý lỗi và retry khi gửi mail thất bại.
         """
-        if self._simulate_failure:
-            logger.error(f"[EMAIL ERROR] Simulated failure sending email to {to_email}")
-            return False
+        if not activation_url and activation_token:
+            activation_url = f"{login_url}?action=activate&token={activation_token}"
 
         content = self.build_activation_content(
             full_name=full_name,
             username=username,
             temp_password=temp_password,
-            login_url=login_url
+            login_url=login_url,
+            activation_url=activation_url,
+            expires_hours=24
         )
 
         record = {
@@ -116,11 +134,21 @@ Bộ phận Quản trị hệ thống OMS
             "username": username,
             "full_name": full_name,
             "temp_password": temp_password,
+            "activation_url": activation_url,
+            "activation_token": activation_token,
             "subject": content["subject"],
             "text": content["text"],
             "html": content["html"]
         }
-        self.sent_emails.append(record)
+
+        # Simulated failure handling with retry tracking
+        if self._simulate_failure:
+            self.last_retry_count = 0
+            for attempt in range(1, max_retries + 1):
+                self.last_retry_count = attempt
+                logger.warning(f"[EMAIL RETRY {attempt}/{max_retries}] Simulated failure dispatching email to {to_email}")
+            logger.error(f"[EMAIL ERROR] All {max_retries} attempts failed for {to_email}")
+            return False
 
         smtp_host = os.getenv("SMTP_HOST")
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
@@ -129,27 +157,35 @@ Bộ phận Quản trị hệ thống OMS
         smtp_from = os.getenv("SMTP_FROM", smtp_user or "oms-noreply@company.com")
 
         if smtp_host and smtp_user and smtp_password:
-            try:
-                msg = MIMEMultipart("alternative")
-                msg["Subject"] = content["subject"]
-                msg["From"] = smtp_from
-                msg["To"] = to_email
+            self.last_retry_count = 0
+            for attempt in range(1, max_retries + 1):
+                self.last_retry_count = attempt
+                try:
+                    msg = MIMEMultipart("alternative")
+                    msg["Subject"] = content["subject"]
+                    msg["From"] = smtp_from
+                    msg["To"] = to_email
 
-                part1 = MIMEText(content["text"], "plain", "utf-8")
-                part2 = MIMEText(content["html"], "html", "utf-8")
-                msg.attach(part1)
-                msg.attach(part2)
+                    part1 = MIMEText(content["text"], "plain", "utf-8")
+                    part2 = MIMEText(content["html"], "html", "utf-8")
+                    msg.attach(part1)
+                    msg.attach(part2)
 
-                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-                    server.starttls()
-                    server.login(smtp_user, smtp_password)
-                    server.sendmail(smtp_from, [to_email], msg.as_string())
-                logger.info(f"[EMAIL] Sent real activation email to {to_email} via SMTP")
-                return True
-            except Exception as e:
-                logger.error(f"[EMAIL ERROR] Failed to send email via SMTP to {to_email}: {e}")
-                return False
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                        server.starttls()
+                        server.login(smtp_user, smtp_password)
+                        server.sendmail(smtp_from, [to_email], msg.as_string())
+                    logger.info(f"[EMAIL] Sent activation email to {to_email} via SMTP on attempt {attempt}")
+                    self.sent_emails.append(record)
+                    return True
+                except Exception as exc:
+                    logger.warning(f"[EMAIL RETRY {attempt}/{max_retries}] Failed sending to {to_email}: {exc}")
 
+            logger.error(f"[EMAIL ERROR] All {max_retries} retry attempts failed for {to_email}")
+            return False
+
+        self.last_retry_count = 1
+        self.sent_emails.append(record)
         logger.info(f"[EMAIL DEV] Recorded activation email to {to_email} for user {username}")
         return True
 

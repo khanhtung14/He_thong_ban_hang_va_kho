@@ -12,7 +12,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.backend.email_service import email_service
-from src.backend.models import AccountStatus, Role, User, seed_default_roles
+from src.backend.models import (
+    AccountAuditLog,
+    AccountStatus,
+    Role,
+    User,
+    seed_default_roles,
+)
 from src.backend.schemas import UserCreate, UserUpdate
 
 logger = logging.getLogger("users_service")
@@ -79,7 +85,7 @@ def check_duplicate_user(
     exclude_user_id: Optional[int] = None,
 ):
     """
-    Validate that username, email, and phone are unique in the database.
+    Validate that username, email, and phone are unique in the database (SCRUM-102).
     Raise an informative 400 Bad Request exception if a collision is detected.
     """
     collision_fields = []
@@ -89,7 +95,7 @@ def check_duplicate_user(
         if exclude_user_id is not None:
             query = query.filter(User.id != exclude_user_id)
         if query.first():
-            collision_fields.append("Tên đăng nhập")
+            collision_fields.append("Tên tài khoản")
 
     if email:
         query = db.query(User).filter(func.lower(User.email) == email.strip().lower())
@@ -106,8 +112,8 @@ def check_duplicate_user(
             collision_fields.append("Số điện thoại")
 
     if collision_fields:
-        if "Tên đăng nhập" in collision_fields and "Email" in collision_fields:
-            detail_msg = "Tên đăng nhập hoặc Email đã tồn tại trong hệ thống. Vui lòng kiểm tra lại."
+        if "Tên tài khoản" in collision_fields and "Email" in collision_fields:
+            detail_msg = "Tên tài khoản hoặc Email đã tồn tại trong hệ thống. Vui lòng kiểm tra lại."
         else:
             joined = ", ".join(collision_fields)
             detail_msg = f"{joined} đã tồn tại trong hệ thống. Vui lòng kiểm tra lại."
@@ -187,16 +193,19 @@ def resolve_roles(
 def create_user(
     db: Session,
     user_data: UserCreate,
-    login_url: str = "/login"
+    login_url: str = "/login",
+    actor_user_id: Optional[int] = None
 ) -> Tuple[User, bool, str]:
     """
     Create a new user:
-    1. Check duplicates for username, email, and phone.
-    2. Generate random strong temporary password.
-    3. Hash password with bcrypt.
-    4. Resolve and associate role(s).
-    5. Save User in database.
-    6. Dispatch activation email.
+    1. Check duplicates for username, email, and phone (SCRUM-102).
+    2. Generate random strong temporary password (SCRUM-100).
+    3. Hash password with bcrypt (SCRUM-100).
+    4. Set must_change_password=True and initial status (SCRUM-100).
+    5. Resolve and associate role(s).
+    6. Save User in database.
+    7. Record audit log (SCRUM-106).
+    8. Dispatch activation email with expiring token & retry (SCRUM-101).
     Returns: (new_user, email_sent, temp_password)
     """
     username = user_data.username.strip()
@@ -216,14 +225,16 @@ def create_user(
     # Step 4: Resolve roles
     roles = resolve_roles(db, role_codes=user_data.role_codes, role=user_data.role)
 
-    # Step 5: Save User to DB
+    # Step 5: Save User to DB with must_change_password=True & status
+    initial_status = user_data.status or AccountStatus.PENDING_ACTIVATION
     new_user = User(
         username=username,
         email=email,
         full_name=full_name,
         phone=phone,
         password_hash=password_hash,
-        status=user_data.status or AccountStatus.ACTIVE,
+        status=initial_status,
+        must_change_password=True,
         roles=roles,
     )
 
@@ -236,16 +247,33 @@ def create_user(
         logger.error(f"Database IntegrityError while creating user: {exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tên đăng nhập hoặc Email đã tồn tại trong hệ thống. Vui lòng kiểm tra lại."
+            detail="Tên tài khoản hoặc Email đã tồn tại trong hệ thống. Vui lòng kiểm tra lại."
         ) from exc
 
-    # Step 6: Dispatch activation email
+    # Step 6: Record Audit Log (SCRUM-106)
+    try:
+        audit_log = AccountAuditLog(
+            user_id=new_user.id,
+            actor_user_id=actor_user_id,
+            action="CREATE_USER",
+            reason=f"Khởi tạo tài khoản {new_user.username} với vai trò {[r.code for r in roles]}",
+        )
+        db.add(audit_log)
+        db.commit()
+    except Exception as audit_err:
+        logger.warning(f"Failed to write audit log for user creation: {audit_err}")
+        db.rollback()
+
+    # Step 7: Dispatch activation email with expiration token and retry mechanism (SCRUM-101)
+    activation_token = secrets.token_urlsafe(32)
     email_sent = email_service.send_activation_email(
         to_email=new_user.email,
         full_name=new_user.full_name,
         username=new_user.username,
         temp_password=temp_password,
-        login_url=login_url
+        login_url=login_url,
+        activation_token=activation_token,
+        max_retries=3
     )
 
     return new_user, email_sent, temp_password
@@ -262,9 +290,18 @@ def get_user_by_id(db: Session, user_id: int) -> User:
     return user
 
 
-def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
-    """Update user information: full_name, email, phone, role(s), status."""
+def update_user(
+    db: Session,
+    user_id: int,
+    user_data: UserUpdate,
+    actor_user_id: Optional[int] = None
+) -> User:
+    """
+    Update user information: full_name, email, phone, role(s), status (SCRUM-103).
+    Record audit log for changes including lock/unlock operations (SCRUM-106).
+    """
     user = get_user_by_id(db, user_id)
+    old_status = user.status
 
     new_email = user_data.email.strip().lower() if user_data.email else None
     new_phone = user_data.phone.strip() if user_data.phone is not None else None
@@ -277,21 +314,32 @@ def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
         exclude_user_id=user_id
     )
 
+    updated_fields = []
+
     if user_data.full_name is not None:
         user.full_name = user_data.full_name.strip()
+        updated_fields.append("full_name")
 
     if new_email is not None:
         user.email = new_email
+        updated_fields.append("email")
 
     if user_data.phone is not None:
         user.phone = new_phone
+        updated_fields.append("phone")
 
     if user_data.status is not None:
         user.status = user_data.status
+        updated_fields.append(f"status:{user_data.status.value}")
+
+    if user_data.must_change_password is not None:
+        user.must_change_password = user_data.must_change_password
+        updated_fields.append("must_change_password")
 
     if user_data.role_codes is not None or user_data.role is not None:
         roles = resolve_roles(db, role_codes=user_data.role_codes, role=user_data.role)
         user.roles = roles
+        updated_fields.append(f"roles:{[r.code for r in roles]}")
 
     try:
         db.commit()
@@ -303,6 +351,25 @@ def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
             detail="Thông tin cập nhật bị trùng lặp với người dùng khác."
         ) from exc
 
+    # Determine action for audit log (SCRUM-106)
+    action = "UPDATE_USER"
+    if user_data.status == AccountStatus.LOCKED and old_status != AccountStatus.LOCKED:
+        action = "LOCK_USER"
+    elif user_data.status == AccountStatus.ACTIVE and old_status == AccountStatus.LOCKED:
+        action = "UNLOCK_USER"
+
+    try:
+        audit_log = AccountAuditLog(
+            user_id=user.id,
+            actor_user_id=actor_user_id,
+            action=action,
+            reason=f"Cập nhật tài khoản {user.username}: {', '.join(updated_fields)}",
+        )
+        db.add(audit_log)
+        db.commit()
+    except Exception as audit_err:
+        logger.warning(f"Failed to write audit log for user update: {audit_err}")
+        db.rollback()
     return user
 
 

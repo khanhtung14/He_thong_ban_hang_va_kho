@@ -61,7 +61,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     role_codes: Optional[List[str]] = Field(default=None, description="Danh sách mã vai trò (hoặc vai trò đơn)")
     role: Optional[str] = Field(default=None, description="Mã vai trò đơn (tiện ích cho form)")
-    status: Optional[AccountStatus] = Field(default=AccountStatus.ACTIVE, description="Trạng thái tài khoản ban đầu")
+    status: Optional[AccountStatus] = Field(default=AccountStatus.PENDING_ACTIVATION, description="Trạng thái tài khoản ban đầu (mặc định chờ kích hoạt theo SCRUM-100)")
 
 
 class UserUpdate(BaseModel):
@@ -71,6 +71,7 @@ class UserUpdate(BaseModel):
     role_codes: Optional[List[str]] = None
     role: Optional[str] = None
     status: Optional[AccountStatus] = None
+    must_change_password: Optional[bool] = None
 
     @field_validator("full_name")
     @classmethod
@@ -102,6 +103,7 @@ class UserResponse(BaseModel):
     email: str
     phone: Optional[str] = None
     status: AccountStatus
+    must_change_password: bool = True
     roles: List[RoleResponse] = []
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -119,3 +121,9 @@ class CreateUserResult(BaseModel):
     message: str
     user: UserResponse
     email_sent: bool
+    activation_link: Optional[str] = None
+
+
+class ErrorResponse(BaseModel):
+    detail: str
+    error_code: Optional[str] = None

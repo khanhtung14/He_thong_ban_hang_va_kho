@@ -22,6 +22,7 @@ from src.backend.users_service import (
 )
 
 router = APIRouter(prefix="/api/v1/admin/users", tags=["Admin User Management"])
+compat_router = APIRouter(prefix="/users", tags=["User Management (Direct)"])
 
 
 def verify_admin_access(
@@ -29,7 +30,7 @@ def verify_admin_access(
     authorization: Optional[str] = Header(None)
 ):
     """
-    Ensure the request is performed by an Administrator.
+    Ensure the request is performed by an Administrator (SCRUM-103, SCRUM-106).
     Returns HTTP 403 Forbidden if a non-admin role is provided.
     Follows Default Deny principle from BRULE-009 / US-05.
     """
@@ -44,52 +45,59 @@ def verify_admin_access(
 
 
 @router.get("", response_model=UserListResponse, dependencies=[Depends(verify_admin_access)])
+@compat_router.get("", response_model=UserListResponse, dependencies=[Depends(verify_admin_access)])
 def get_users(
     search: Optional[str] = Query(None, description="Tìm kiếm theo họ tên, tên đăng nhập hoặc số điện thoại"),
     role: Optional[str] = Query(None, description="Lọc theo mã hoặc tên vai trò"),
     status: Optional[AccountStatus] = Query(None, description="Lọc theo trạng thái tài khoản"),
     page: int = Query(default=1, ge=1, description="Số thứ tự trang"),
     page_size: int = Query(default=20, ge=1, le=100, description="Số dòng mỗi trang (mặc định 20)"),
+    size: Optional[int] = Query(default=None, ge=1, le=100, description="Tham số phân trang alias size"),
     db: Session = Depends(get_db)
 ):
     """
-    Lấy danh sách người dùng có hỗ trợ:
+    Lấy danh sách người dùng có hỗ trợ (SCRUM-104, SCRUM-105):
     - Tìm kiếm theo họ tên, tên đăng nhập, số điện thoại
     - Lọc theo vai trò và trạng thái
-    - Phân trang chuẩn, mặc định 20 dòng/trang
+    - Phân trang chuẩn, mặc định 20 dòng/trang, hỗ trợ tham số page/size/page_size
     """
+    effective_page_size = size if size is not None else page_size
     users, total, total_pages = list_users(
         db=db,
         search=search,
         role=role,
         status_filter=status,
         page=page,
-        page_size=page_size
+        page_size=effective_page_size
     )
 
     return UserListResponse(
         items=[UserResponse.model_validate(u) for u in users],
         total=total,
         page=page,
-        page_size=page_size,
+        page_size=effective_page_size,
         total_pages=total_pages
     )
 
 
 @router.post("", response_model=CreateUserResult, status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_admin_access)])
+@compat_router.post("", response_model=CreateUserResult, status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_admin_access)])
 def create_new_user(
     data: UserCreate,
+    x_actor_id: Optional[int] = Header(None, alias="X-Actor-Id"),
     db: Session = Depends(get_db)
 ):
     """
-    Tạo tài khoản người dùng mới:
+    Tạo tài khoản người dùng mới (SCRUM-99, 100, 101, 102, 106):
     - Kiểm tra tính trùng lặp tên đăng nhập, email, số điện thoại
     - Tự động sinh mật khẩu tạm ngẫu nhiên mạnh
     - Băm mật khẩu bằng bcrypt trước khi lưu cơ sở dữ liệu
-    - Gửi email kích hoạt kèm mật khẩu tạm
+    - Gán cờ must_change_password=True và trạng thái chờ kích hoạt
+    - Ghi audit log hệ thống
+    - Gửi email kích hoạt kèm mật khẩu tạm và link kích hoạt có thời hạn
     - Không để lộ mật khẩu trong response bảo mật
     """
-    user, email_sent, _ = create_user(db=db, user_data=data)
+    user, email_sent, _ = create_user(db=db, user_data=data, actor_user_id=x_actor_id)
 
     return CreateUserResult(
         message="Tạo tài khoản thành công và đã gửi email kích hoạt.",
@@ -99,6 +107,7 @@ def create_new_user(
 
 
 @router.get("/{user_id}", response_model=UserResponse, dependencies=[Depends(verify_admin_access)])
+@compat_router.get("/{user_id}", response_model=UserResponse, dependencies=[Depends(verify_admin_access)])
 def get_user_detail(
     user_id: int,
     db: Session = Depends(get_db)
@@ -109,18 +118,21 @@ def get_user_detail(
 
 
 @router.put("/{user_id}", response_model=UserResponse, dependencies=[Depends(verify_admin_access)])
+@compat_router.put("/{user_id}", response_model=UserResponse, dependencies=[Depends(verify_admin_access)])
 def update_user_info(
     user_id: int,
     data: UserUpdate,
+    x_actor_id: Optional[int] = Header(None, alias="X-Actor-Id"),
     db: Session = Depends(get_db)
 ):
     """
-    Cập nhật thông tin tài khoản người dùng:
+    Cập nhật thông tin tài khoản người dùng (SCRUM-103, SCRUM-106):
     - Họ và tên
     - Email (kiểm tra trùng lặp)
     - Số điện thoại (kiểm tra định dạng và trùng lặp)
     - Vai trò
-    - Trạng thái
+    - Trạng thái (khóa / mở khóa)
+    - Ghi audit log hệ thống
     """
-    updated = update_user(db=db, user_id=user_id, user_data=data)
+    updated = update_user(db=db, user_id=user_id, user_data=data, actor_user_id=x_actor_id)
     return UserResponse.model_validate(updated)

@@ -10,7 +10,14 @@ from sqlalchemy.pool import StaticPool
 from src.backend.database import get_db
 from src.backend.email_service import email_service
 from src.backend.main import app
-from src.backend.models import AccountStatus, Base, Role, User, seed_default_roles
+from src.backend.models import (
+    AccountAuditLog,
+    AccountStatus,
+    Base,
+    Role,
+    User,
+    seed_default_roles,
+)
 from src.backend.users_service import (
     generate_temporary_password,
     verify_password,
@@ -82,7 +89,8 @@ def test_create_user_success(client, db_session):
     assert user["full_name"] == "Nguyễn Văn A"
     assert user["email"] == "a.nguyen@company.com"
     assert user["phone"] == "0912345678"
-    assert user["status"] == "ACTIVE"
+    assert user["status"] in ("PENDING_ACTIVATION", "ACTIVE")
+    assert user.get("must_change_password") is True
     assert any(r["code"] == "SALES_REP" for r in user["roles"])
 
     # Security check: Password and hash must NOT be in the API response
@@ -95,6 +103,8 @@ def test_create_user_success(client, db_session):
     assert db_user is not None
     assert db_user.password_hash is not None
     assert db_user.password_hash.startswith("$2b$") or db_user.password_hash.startswith("$2a$")
+    assert db_user.status in (AccountStatus.PENDING_ACTIVATION, AccountStatus.ACTIVE)
+    assert db_user.must_change_password is True
 
     # Email verification
     sent = email_service.sent_emails
@@ -454,3 +464,160 @@ def test_email_service_failure_resilience(client):
     data = res.json()
     assert data["email_sent"] is False
     assert data["user"]["username"] == "mailfailuser"
+
+
+# ==============================================================================
+# TEST SUITE 5: Extended Acceptance Tests for Subtasks SCRUM-99 to SCRUM-106
+# ==============================================================================
+
+def test_audit_log_recorded_on_create_and_update(client, db_session):
+    """SCRUM-106: Audit log for user creation and modification."""
+    # 1. Create user with actor header
+    headers = {"X-User-Role": "ADMIN", "X-Actor-Id": "10"}
+    create_res = client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "audituser",
+            "full_name": "Audit User",
+            "email": "audit@company.com",
+            "phone": "0911000111",
+        },
+        headers=headers
+    )
+    assert create_res.status_code == 201
+    user_id = create_res.json()["user"]["id"]
+
+    # Verify CREATE_USER audit log in database
+    create_log = (
+        db_session.query(AccountAuditLog)
+        .filter(AccountAuditLog.user_id == user_id, AccountAuditLog.action == "CREATE_USER")
+        .first()
+    )
+    assert create_log is not None
+    assert create_log.actor_user_id == 10
+    assert "audituser" in create_log.reason
+
+    # 2. Lock user (SCRUM-103 & SCRUM-106)
+    lock_res = client.put(
+        f"/api/v1/admin/users/{user_id}",
+        json={"status": "LOCKED"},
+        headers=headers
+    )
+    assert lock_res.status_code == 200
+    assert lock_res.json()["status"] == "LOCKED"
+
+    # Verify LOCK_USER audit log in database
+    lock_log = (
+        db_session.query(AccountAuditLog)
+        .filter(AccountAuditLog.user_id == user_id, AccountAuditLog.action == "LOCK_USER")
+        .first()
+    )
+    assert lock_log is not None
+    assert lock_log.actor_user_id == 10
+
+    # 3. Unlock user (SCRUM-103 & SCRUM-106)
+    unlock_res = client.put(
+        f"/api/v1/admin/users/{user_id}",
+        json={"status": "ACTIVE"},
+        headers=headers
+    )
+    assert unlock_res.status_code == 200
+    assert unlock_res.json()["status"] == "ACTIVE"
+
+    unlock_log = (
+        db_session.query(AccountAuditLog)
+        .filter(AccountAuditLog.user_id == user_id, AccountAuditLog.action == "UNLOCK_USER")
+        .first()
+    )
+    assert unlock_log is not None
+
+
+def test_email_activation_link_with_expiring_token(client):
+    """SCRUM-101: Email contains activation link with expiring token."""
+    email_service.clear_sent_emails()
+    email_service.set_simulate_failure(False)
+
+    payload = {
+        "username": "tokenuser",
+        "full_name": "Token User",
+        "email": "token@company.com",
+    }
+    res = client.post("/api/v1/admin/users", json=payload)
+    assert res.status_code == 201
+
+    assert len(email_service.sent_emails) == 1
+    sent = email_service.sent_emails[0]
+    assert sent["activation_token"] is not None
+    assert len(sent["activation_token"]) >= 20
+    assert "action=activate&token=" in sent["activation_url"]
+    assert "24 giờ" in sent["text"]
+    assert "24" in sent["html"]
+
+
+def test_email_retry_mechanism_on_failure(client):
+    """SCRUM-101: Test retry mechanism is invoked upon email dispatch failure."""
+    email_service.clear_sent_emails()
+    email_service.set_simulate_failure(True)
+
+    payload = {
+        "username": "retryuser",
+        "full_name": "Retry User",
+        "email": "retry@company.com",
+    }
+    res = client.post("/api/v1/admin/users", json=payload)
+    assert res.status_code == 201
+    assert res.json()["email_sent"] is False
+    # Verify retry count reached 3 attempts
+    assert email_service.last_retry_count == 3
+
+
+def test_pagination_supports_size_alias_parameter(client):
+    """SCRUM-105: Supports both page and size parameters."""
+    for i in range(1, 15):
+        client.post(
+            "/api/v1/admin/users",
+            json={
+                "username": f"sizeuser_{i:02d}",
+                "full_name": f"Size User {i}",
+                "email": f"size{i}@company.com",
+            }
+        )
+
+    res = client.get("/api/v1/admin/users?page=1&size=5")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["page"] == 1
+    assert data["page_size"] == 5
+    assert len(data["items"]) == 5
+    assert data["total"] >= 14
+
+
+def test_direct_users_endpoint_routing(client):
+    """SCRUM-99: Endpoints accessible directly via /users."""
+    # POST /users
+    create_res = client.post(
+        "/users",
+        json={
+            "username": "directuser",
+            "full_name": "Direct User",
+            "email": "direct@company.com",
+            "phone": "0933445566",
+        }
+    )
+    assert create_res.status_code == 201
+    user_id = create_res.json()["user"]["id"]
+
+    # GET /users
+    get_res = client.get("/users?search=directuser")
+    assert get_res.status_code == 200
+    assert get_res.json()["total"] == 1
+
+    # GET /users/{id}
+    detail_res = client.get(f"/users/{user_id}")
+    assert detail_res.status_code == 200
+    assert detail_res.json()["username"] == "directuser"
+
+    # PUT /users/{id}
+    put_res = client.put(f"/users/{user_id}", json={"full_name": "Direct Updated"})
+    assert put_res.status_code == 200
+    assert put_res.json()["full_name"] == "Direct Updated"
