@@ -11,10 +11,12 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.change_password import router as change_password_router
     from src.backend.forgot_password import router as forgot_password_router
     from src.backend.login import router as login_router
+    from src.backend.user_assignment import router as user_assignment_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
     from login import router as login_router
+    from user_assignment import router as user_assignment_router
 
 
 app = FastAPI(
@@ -79,6 +81,7 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 app.include_router(change_password_router)
 app.include_router(forgot_password_router)
 app.include_router(login_router)
+app.include_router(user_assignment_router)
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
