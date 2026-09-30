@@ -167,8 +167,18 @@ def test_openapi_lists_every_http_api(client):
     response = client.get("/openapi.json")
     assert response.status_code == 200
     actual_paths = set(response.json()["paths"])
+    # Các API gốc của ứng dụng
     assert "/change-password" in actual_paths
     assert "/api/v1/auth/login" in actual_paths
+    # Các API SCRUM-64: Khoá / Mở khoá tài khoản (đăng ký qua user_routes)
+    assert "/api/users/lock" in actual_paths
+    assert "/api/users/unlock/{user_id}" in actual_paths
+    assert "/api/users/{user_id}/handover-status" in actual_paths
+    assert "/api/users/{user_id}/audit-logs" in actual_paths
+    assert "/api/users" in actual_paths
+    # Các API SCRUM-62: Quản lý người dùng (đăng ký qua users)
+    assert "/api/v1/admin/users" in actual_paths
+    assert "/users" in actual_paths
 
 
 def test_change_password_success_updates_hash(client):
