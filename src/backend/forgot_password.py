@@ -15,15 +15,7 @@ from typing import Dict, Any, List, Optional
 import secrets
 import bcrypt
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
-
-try:
-    import email_validator  # noqa: F401
-    from pydantic import EmailStr
-except ImportError:
-    from typing_extensions import Annotated
-    from pydantic import StringConstraints
-    EmailStr = Annotated[str, StringConstraints(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
+from pydantic import BaseModel, EmailStr, Field
 
 router = APIRouter(tags=["Quên & Đặt lại mật khẩu"])
 
