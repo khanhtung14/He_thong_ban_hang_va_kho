@@ -71,6 +71,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(254), nullable=False)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     status: Mapped[AccountStatus] = mapped_column(
         SqlEnum(AccountStatus, native_enum=False, length=20),
         default=AccountStatus.ACTIVE,
@@ -170,3 +171,17 @@ class AccountAuditLog(Base):
     action: Mapped[str] = mapped_column(String(80), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Customer(Base):
+    """Customer / Đại lý model in charge of wholesale orders."""
+    __tablename__ = "customers"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    sales_rep_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    territory_id: Mapped[int | None] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+

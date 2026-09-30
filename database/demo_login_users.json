@@ -1,49 +1,49 @@
 [
   {
     "username": "demo_customer",
-    "password_hash": "$2b$12$uchu/aSZdmziysbLpf4MkOMpNTpXwOWR5QBBVtBr2XbbUIiAq7Kri",
+    "password_hash": "$2b$12$ODtn9gFBlTL16Q2FrY.sDeEVXwFo6ijcRSrHCrfXGvYpXtFtK9Ism",
     "role_code": "CUSTOMER",
     "status": "ACTIVE"
   },
   {
     "username": "demo_sales",
-    "password_hash": "$2b$12$PYRjujBO.mctFZ0jBGtnZObfjCmoUPQXDqh9mwWBIPQkjHh7QJ4d2",
+    "password_hash": "$2b$12$MYm24YX38/FPbhguMw4RAuspkrxoYHs2zypUfWly6n1YmpqiMK5q.",
     "role_code": "SALES",
     "status": "ACTIVE"
   },
   {
     "username": "demo_sales_mgr",
-    "password_hash": "$2b$12$g69itDRRvQ2t/9hzEzIZPedBWboO2cvM8qqFZSgoO79rvFMCyroyO",
+    "password_hash": "$2b$12$DeiFh8T8gXqKSEjkL3ZXD.muNJjTu5IrSYfeY7Q/biacA52rK21uW",
     "role_code": "SALES_MANAGER",
     "status": "ACTIVE"
   },
   {
     "username": "demo_warehouse",
-    "password_hash": "$2b$12$JDuNH.m6LkmEh0MJp/4j3uakTcafh3OBZelqlDykRIgtggsZsvWwa",
+    "password_hash": "$2b$12$Un1RNf7S9K4Zub.kzmRGL.62oalZEs4IBClSJSo3gXm36skSO4viC",
     "role_code": "WAREHOUSE",
     "status": "ACTIVE"
   },
   {
     "username": "demo_wh_mgr",
-    "password_hash": "$2b$12$CfagEp.FRgykpqrIfCg.c.0k.bsUD/IbZoy9Szm3No/juiZOQRwFG",
+    "password_hash": "$2b$12$nEvA.dmLNzHkWW.wxZ5c7eoaAoz5ngJebSn/rBaaH76IkPpuVlwFu",
     "role_code": "WH_MANAGER",
     "status": "ACTIVE"
   },
   {
     "username": "demo_accountant",
-    "password_hash": "$2b$12$IOWA7AZHh9TUGa/UIA1OzueJ8Z7sjTrGHlBI4DB9LLAe8LhjjTKVq",
+    "password_hash": "$2b$12$dwmPG99yj5FFkWl/TJogsuzzS1SYLuGXMyhs8BKhyI2zOvE76k996",
     "role_code": "ACCOUNTANT",
     "status": "ACTIVE"
   },
   {
     "username": "demo_admin",
-    "password_hash": "$2b$12$9LWQAaXv4vupf1q.nv9uT.rIrQtKdXIN66P11oX5YYrsI6C6Br0Nq",
+    "password_hash": "$2b$12$ZfXSeFxebIHPGHZojHDwSOk2fzI8o/H1yIL3yVm34q8HylYtHqXZ2",
     "role_code": "ADMIN",
     "status": "ACTIVE"
   },
   {
     "username": "demo_locked",
-    "password_hash": "$2b$12$G0yBsKsCu6ugOnprpQjOF.Yqc90h3AfEo3rJidPZcUBpSFj6yYnxC",
+    "password_hash": "$2b$12$hJtlTZFFfcYhvas6kXGFIOWtql6WdkufHKYtF1GvVSA8s4jkAj4T6",
     "role_code": "SALES",
     "status": "LOCKED"
   }
