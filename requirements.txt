@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+bcrypt
+SQLAlchemy>=2.0,<3.0
+PyMySQL>=1.1,<2.0
+email-validator
+pytest
+httpx
