@@ -12,9 +12,9 @@ try:
     from src.backend.models import AccountAuditLog, User
     from src.backend.security import require_admin
 except ImportError:  # pragma: no cover - direct script execution
-    from .backend.database import get_db
-    from .backend.models import AccountAuditLog, User
-    from .backend.security import require_admin
+    from .database import get_db
+    from .models import AccountAuditLog, User
+    from .security import require_admin
 
 
 router = APIRouter(tags=["Quản lý tài khoản"])

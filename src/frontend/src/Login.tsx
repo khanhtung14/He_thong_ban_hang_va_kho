@@ -16,6 +16,7 @@ const styles = `
   .password-wrap .login-input { padding-right: 76px; }
   .password-toggle { position: absolute; top: 0; right: 8px; height: 46px; border: 0; color: #2563eb; background: transparent; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .login-error { margin: 0 0 18px; padding: 12px; border: 1px solid #fecaca; border-radius: 8px; color: #991b1b; background: #fef2f2; font-size: 14px; line-height: 1.5; }
+  .login-notice { margin: 0 0 18px; padding: 12px; border: 1px solid #fde68a; border-radius: 8px; color: #854d0e; background: #fffbeb; font-size: 14px; line-height: 1.5; }
   .login-submit { width: 100%; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 8px; color: #fff; background: #2563eb; font: inherit; font-weight: 700; cursor: pointer; }
   .login-submit:hover:not(:disabled) { background: #1d4ed8; }
   .login-submit:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
@@ -27,6 +28,7 @@ const styles = `
 
 type LoginResponse = {
   redirect_url: string;
+  session_token?: string;
 };
 
 type ApiError = {
@@ -39,6 +41,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const sessionExpired = new URLSearchParams(window.location.search).get("session") === "expired";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,6 +63,9 @@ export default function Login() {
 
       if (response.ok) {
         const result = (await response.json()) as LoginResponse;
+        if (result.session_token) {
+          window.sessionStorage.setItem("session_token", result.session_token);
+        }
         window.location.assign(result.redirect_url);
         return;
       }
@@ -89,6 +95,7 @@ export default function Login() {
           <p className="login-brand">OMS · Bán hàng &amp; Kho</p>
           <h1 id="login-title">Đăng nhập</h1>
           <p className="login-subtitle">Đăng nhập để truy cập công việc theo vai trò của bạn.</p>
+          {sessionExpired && <p className="login-notice" role="status">Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.</p>}
           <form onSubmit={handleSubmit}>
             <div className="login-field">
               <label htmlFor="username">Tên đăng nhập</label>

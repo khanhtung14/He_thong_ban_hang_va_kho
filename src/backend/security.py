@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -18,6 +18,7 @@ except ImportError:  # pragma: no cover - direct script execution
 
 
 _bearer = HTTPBearer(auto_error=False)
+SESSION_DURATION = timedelta(hours=12)
 
 
 def require_active_user(
@@ -54,6 +55,10 @@ def require_active_user(
     user = session.user
     if user is None or user.is_active is False or user.status != AccountStatus.ACTIVE:
         raise unauthorized
+
+    # Sliding session: every authenticated request extends the session window.
+    session.expires_at = datetime.now(timezone.utc) + SESSION_DURATION
+    db.commit()
     return user
 
 
