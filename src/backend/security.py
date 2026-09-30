@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -54,6 +54,10 @@ def require_active_user(
     user = session.user
     if user is None or user.is_active is False or user.status != AccountStatus.ACTIVE:
         raise unauthorized
+
+    # Extend the sliding 12-hour session after authenticated activity.
+    session.expires_at = datetime.now(timezone.utc) + timedelta(hours=12)
+    db.commit()
     return user
 
 

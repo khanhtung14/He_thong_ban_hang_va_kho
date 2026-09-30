@@ -27,6 +27,7 @@ const styles = `
 
 type LoginResponse = {
   redirect_url: string;
+  session_token?: string;
 };
 
 type ApiError = {
@@ -38,7 +39,11 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => (
+    new URLSearchParams(window.location.search).get("reason") === "session-expired"
+      ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+      : ""
+  ));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,6 +65,9 @@ export default function Login() {
 
       if (response.ok) {
         const result = (await response.json()) as LoginResponse;
+        if (result.session_token) {
+          sessionStorage.setItem("oms.session_token", result.session_token);
+        }
         window.location.assign(result.redirect_url);
         return;
       }
