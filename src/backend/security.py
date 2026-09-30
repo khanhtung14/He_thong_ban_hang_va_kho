@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -21,7 +22,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def require_active_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
     db: Session = Depends(get_db),
 ) -> User:
     """Resolve a live opaque bearer token to its active database account."""
