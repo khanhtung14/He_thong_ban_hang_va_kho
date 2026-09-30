@@ -4,6 +4,8 @@ import Error403 from "../templates/errors/403";
 import ChangePassword from "./ChangePassword";
 import Login from "./Login";
 
+import Navigation from "./Navigation";
+
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
@@ -15,7 +17,9 @@ const page = currentPath === "/errors/403"
   ? <Error403 />
   : currentPath === "/change-password"
     ? <ChangePassword />
-    : <Login />;
+    : currentPath === "/navigation" || currentPath === "/navigation-ui"
+      ? <Navigation />
+      : <Login />;
 
 createRoot(rootElement).render(
   <StrictMode>
