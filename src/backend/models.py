@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
+from typing import Any, List, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -9,7 +10,9 @@ from sqlalchemy import (
     DateTime,
     Enum as SqlEnum,
     ForeignKey,
+    Integer,
     Index,
+    JSON,
     String,
     Table,
     Text,
@@ -78,17 +81,17 @@ class User(Base):
         nullable=False,
     )
     failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
-    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    password_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    roles: Mapped[list["Role"]] = relationship(secondary=user_roles, back_populates="users")
-    warehouses: Mapped[list["Warehouse"]] = relationship(secondary=user_warehouses)
-    territories: Mapped[list["Territory"]] = relationship(secondary=user_territories)
-    sessions: Mapped[list["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    roles: Mapped[List["Role"]] = relationship(secondary=user_roles, back_populates="users")
+    warehouses: Mapped[List["Warehouse"]] = relationship(secondary=user_warehouses)
+    territories: Mapped[List["Territory"]] = relationship(secondary=user_territories)
+    sessions: Mapped[List["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Role(Base):
@@ -97,10 +100,10 @@ class Role(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    description: Mapped[str | None] = mapped_column(String(255))
+    description: Mapped[Optional[str]] = mapped_column(String(255))
 
-    users: Mapped[list[User]] = relationship(secondary=user_roles, back_populates="roles")
-    permissions: Mapped[list["Permission"]] = relationship(
+    users: Mapped[List[User]] = relationship(secondary=user_roles, back_populates="roles")
+    permissions: Mapped[List["Permission"]] = relationship(
         secondary=role_permissions, back_populates="roles"
     )
 
@@ -110,9 +113,9 @@ class Permission(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    description: Mapped[str | None] = mapped_column(String(255))
+    description: Mapped[Optional[str]] = mapped_column(String(255))
 
-    roles: Mapped[list[Role]] = relationship(secondary=role_permissions, back_populates="permissions")
+    roles: Mapped[List[Role]] = relationship(secondary=role_permissions, back_populates="permissions")
 
 
 class Warehouse(Base):
@@ -121,7 +124,7 @@ class Warehouse(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
-    address: Mapped[str | None] = mapped_column(String(255))
+    address: Mapped[Optional[str]] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
@@ -131,7 +134,7 @@ class Territory(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
-    parent_id: Mapped[int | None] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
 
 
 class UserSession(Base):
@@ -144,7 +147,7 @@ class UserSession(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     refresh_token_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     user: Mapped[User] = relationship(back_populates="sessions")
 
@@ -157,7 +160,7 @@ class PasswordResetToken(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -166,11 +169,31 @@ class AccountAuditLog(Base):
     __table_args__ = (Index("ix_account_audit_logs_user_created", "user_id", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    actor_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     action: Mapped[str] = mapped_column(String(80), nullable=False)
-    reason: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class BusinessAuditLog(Base):
+    """Append-only record of changes to inventory and receivables data."""
+
+    __tablename__ = "business_audit_logs"
+    __table_args__ = (
+        Index("ix_business_audit_logs_actor_created", "actor_user_id", "happened_at"),
+        Index("ix_business_audit_logs_entity_created", "entity_type", "happened_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    actor_user_id: Mapped[Optional[int]] = mapped_column(Integer)
+    actor_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    action: Mapped[str] = mapped_column(String(80), nullable=False)
+    before_value: Mapped[Optional[Any]] = mapped_column(JSON)
+    after_value: Mapped[Optional[Any]] = mapped_column(JSON)
+    happened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class Customer(Base):
@@ -180,8 +203,8 @@ class Customer(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
-    sales_rep_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    territory_id: Mapped[int | None] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
+    sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

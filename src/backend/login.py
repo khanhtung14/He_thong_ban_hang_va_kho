@@ -14,7 +14,7 @@ import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Dict, Optional
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -41,8 +41,8 @@ LOCKED_LOGIN_ERROR = (
 )
 ACCOUNT_LOCKED_ERROR = "Tài khoản của bạn đã bị khoá. Vui lòng liên hệ Quản trị viên."
 
-_attempts: dict[str, int] = defaultdict(int)
-_locked_until: dict[str, float] = {}
+_attempts: Dict[str, int] = defaultdict(int)
+_locked_until: Dict[str, float] = {}
 _attempts_lock = threading.Lock()
 
 ROLE_HOME_PAGES = {
@@ -62,7 +62,7 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
-def _load_accounts() -> dict[str, dict[str, Any]]:
+def _load_accounts() -> Dict[str, Dict[str, Any]]:
     raw_accounts = os.getenv("LOGIN_USERS_JSON", "[]")
     try:
         parsed = json.loads(raw_accounts)
@@ -78,7 +78,7 @@ def _load_accounts() -> dict[str, dict[str, Any]]:
             detail="Dịch vụ đăng nhập chưa được cấu hình đúng.",
         )
 
-    accounts: dict[str, dict[str, Any]] = {}
+    accounts: Dict[str, Dict[str, Any]] = {}
     for account in parsed:
         if not isinstance(account, dict):
             continue
@@ -90,7 +90,7 @@ def _load_accounts() -> dict[str, dict[str, Any]]:
     return accounts
 
 
-def _fetch_db_user(db: Session, username: str) -> dict[str, Any] | None:
+def _fetch_db_user(db: Session, username: str) -> Optional[Dict[str, Any]]:
     """Tìm kiếm thông tin người dùng từ cơ sở dữ liệu MySQL / Database."""
     if db is None:
         return None
