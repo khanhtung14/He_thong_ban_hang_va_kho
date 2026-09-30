@@ -7,6 +7,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from src.backend.models import User
+from src.backend.security import require_admin
 from src.user_routes import get_db, router
 
 
@@ -61,7 +63,9 @@ def db_session_and_client():
         finally:
             session.close()
 
+    admin_mock = User(id=999, username="admin_tester", full_name="Admin Test", is_active=True)
     test_app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[require_admin] = lambda: admin_mock
 
     with TestClient(test_app) as client:
         yield client, engine

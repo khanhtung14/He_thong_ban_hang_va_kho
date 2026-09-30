@@ -11,11 +11,13 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.change_password import router as change_password_router
     from src.backend.forgot_password import router as forgot_password_router
     from src.backend.login import router as login_router
+    from src.backend.users import compat_router as users_compat_router, router as users_router
     from src.user_routes import router as user_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
     from login import router as login_router
+    from users import compat_router as users_compat_router, router as users_router
     try:
         from user_routes import router as user_router
     except ModuleNotFoundError:
@@ -23,8 +25,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
 
 
 app = FastAPI(
-    title="Hệ thống Bán hàng và Kho - Authentication & Password Management",
-    description="Đăng nhập, đổi mật khẩu và quên/đặt lại mật khẩu qua email.",
+    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
+    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
     version="1.0.0",
 )
 
@@ -84,6 +86,8 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 app.include_router(change_password_router)
 app.include_router(forgot_password_router)
 app.include_router(login_router)
+app.include_router(users_router)
+app.include_router(users_compat_router)
 app.include_router(user_router)
 
 

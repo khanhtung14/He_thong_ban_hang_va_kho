@@ -27,6 +27,7 @@ class AccountStatus(str, Enum):
     ACTIVE = "ACTIVE"
     LOCKED = "LOCKED"
     DISABLED = "DISABLED"
+    PENDING_ACTIVATION = "PENDING_ACTIVATION"
 
 
 user_roles = Table(
@@ -69,7 +70,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(254), nullable=False)
-    full_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     status: Mapped[AccountStatus] = mapped_column(
@@ -77,6 +79,7 @@ class User(Base):
         default=AccountStatus.ACTIVE,
         nullable=False,
     )
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -89,6 +92,25 @@ class User(Base):
     warehouses: Mapped[list["Warehouse"]] = relationship(secondary=user_warehouses)
     territories: Mapped[list["Territory"]] = relationship(secondary=user_territories)
     sessions: Mapped[list["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+def seed_default_roles(db):
+    """Seed the 7 canonical roles defined in Sheet 2 (User Roles) if they do not exist."""
+    canonical_roles = [
+        {"code": "ADMIN", "name": "Quản trị hệ thống", "description": "Người vận hành ứng dụng, toàn quyền hệ thống"},
+        {"code": "SALES_REP", "name": "Nhân viên kinh doanh", "description": "Người đi thị trường, chăm sóc đại lý"},
+        {"code": "SALES_MANAGER", "name": "Quản lý kinh doanh", "description": "Phụ trách toàn bộ hoạt động bán hàng"},
+        {"code": "WAREHOUSE", "name": "Nhân viên kho", "description": "Thủ kho, người soạn và xuất hàng"},
+        {"code": "WH_MANAGER", "name": "Quản lý kho", "description": "Phụ trách toàn bộ kho hàng"},
+        {"code": "ACCOUNTANT", "name": "Kế toán công nợ", "description": "Người theo dõi thu tiền và công nợ"},
+        {"code": "CUSTOMER", "name": "Đại lý", "description": "Cửa hàng hoặc đại lý mua sỉ"},
+    ]
+    for r in canonical_roles:
+        existing = db.query(Role).filter((Role.code == r["code"]) | (Role.name == r["name"])).first()
+        if not existing:
+            role_obj = Role(code=r["code"], name=r["name"], description=r["description"])
+            db.add(role_obj)
+    db.commit()
 
 
 class Role(Base):
