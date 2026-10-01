@@ -29,6 +29,7 @@ const styles = `
 type LoginResponse = {
   redirect_url: string;
   session_token?: string;
+  expires_in?: number;
 };
 
 type ApiError = {
@@ -42,6 +43,7 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const sessionExpired = new URLSearchParams(window.location.search).get("session") === "expired";
+  const loggedOut = new URLSearchParams(window.location.search).get("session") === "logged-out";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,8 +67,16 @@ export default function Login() {
         const result = (await response.json()) as LoginResponse;
         if (result.session_token) {
           window.sessionStorage.setItem("session_token", result.session_token);
+          window.sessionStorage.setItem(
+            "session_expires_at",
+            String(Date.now() + (result.expires_in ?? 12 * 60 * 60) * 1000),
+          );
         }
-        window.location.assign(result.redirect_url);
+        const requestedRedirect = new URLSearchParams(window.location.search).get("redirect");
+        const safeRedirect = requestedRedirect?.startsWith("/") && !requestedRedirect.startsWith("//")
+          ? requestedRedirect
+          : result.redirect_url;
+        window.location.assign(safeRedirect);
         return;
       }
 
@@ -96,6 +106,7 @@ export default function Login() {
           <h1 id="login-title">Đăng nhập</h1>
           <p className="login-subtitle">Đăng nhập để truy cập công việc theo vai trò của bạn.</p>
           {sessionExpired && <p className="login-notice" role="status">Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.</p>}
+          {loggedOut && <p className="login-notice" role="status">Bạn đã đăng xuất thành công.</p>}
           <form onSubmit={handleSubmit}>
             <div className="login-field">
               <label htmlFor="username">Tên đăng nhập</label>

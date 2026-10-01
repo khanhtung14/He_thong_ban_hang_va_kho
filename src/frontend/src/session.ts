@@ -1,4 +1,31 @@
 const TOKEN_KEY = "session_token";
+const EXPIRY_KEY = "session_expires_at";
+const REFRESH_BEFORE_MS = 2 * 60 * 1000;
+
+function clearSession(): void {
+  window.sessionStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem(EXPIRY_KEY);
+}
+
+function returnToCurrentPage(): string {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function expireSession(): void {
+  clearSession();
+  window.location.assign(`/login?session=expired&redirect=${encodeURIComponent(returnToCurrentPage())}`);
+}
+
+async function refreshSession(token: string): Promise<boolean> {
+  const response = await fetch("/api/v1/auth/refresh", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return false;
+  const result = await response.json() as { expires_in: number };
+  window.sessionStorage.setItem(EXPIRY_KEY, String(Date.now() + result.expires_in * 1000));
+  return true;
+}
 
 /** Send an API request with the current session and return expired users to login. */
 export async function authenticatedFetch(
@@ -6,13 +33,30 @@ export async function authenticatedFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const headers = new Headers(init.headers);
-  const token = window.sessionStorage.getItem(TOKEN_KEY);
+  let token = window.sessionStorage.getItem(TOKEN_KEY);
+  const expiry = Number(window.sessionStorage.getItem(EXPIRY_KEY) || 0);
+  if (token && expiry && expiry - Date.now() < REFRESH_BEFORE_MS) {
+    try {
+      if (!await refreshSession(token)) {
+        expireSession();
+        return new Response(null, { status: 401 });
+      }
+    } catch {
+      // Keep the session and current work intact while the network is unavailable.
+    }
+    token = window.sessionStorage.getItem(TOKEN_KEY);
+  }
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(input, { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(input, { ...init, headers });
+  } catch (error) {
+    // Network failures do not invalidate the local session or navigate away from a draft.
+    throw error;
+  }
   if (response.status === 401) {
-    window.sessionStorage.removeItem(TOKEN_KEY);
-    window.location.assign("/login?session=expired");
+    expireSession();
   }
   return response;
 }
@@ -26,7 +70,7 @@ export async function logout(): Promise<void> {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
   } finally {
-    window.sessionStorage.removeItem(TOKEN_KEY);
-    window.location.assign("/login");
+    clearSession();
+    window.location.assign("/login?session=logged-out");
   }
 }

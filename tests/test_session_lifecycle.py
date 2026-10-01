@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.backend.models import AccountStatus, Base, User, UserSession
 from src.backend.security import require_active_user
-from src.backend.session import logout
+from src.backend.session import logout, refresh_session
 
 
 @pytest.fixture
@@ -75,4 +75,48 @@ def test_expired_session_is_rejected_without_renewal(session_db):
 
     with pytest.raises(HTTPException) as error:
         require_active_user(credentials, db)
+    assert error.value.status_code == 401
+
+
+def test_refresh_extends_active_session(session_db):
+    db, token = session_db
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+    session = db.query(UserSession).one()
+    old_expiry = session.expires_at
+    if old_expiry.tzinfo is None:
+        old_expiry = old_expiry.replace(tzinfo=timezone.utc)
+
+    result = refresh_session(credentials, db)
+
+    assert result["expires_in"] == 12 * 60 * 60
+    db.refresh(session)
+    expiry = session.expires_at
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+    assert expiry > old_expiry
+    assert expiry > datetime.now(timezone.utc) + timedelta(hours=11)
+
+
+@pytest.mark.parametrize("failure", ["expired", "revoked", "disabled", "missing_credentials", "unknown_token"])
+def test_refresh_rejects_invalid_sessions(session_db, failure):
+    db, token = session_db
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+    session = db.query(UserSession).one()
+
+    if failure == "expired":
+        session.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
+    elif failure == "revoked":
+        session.revoked_at = datetime.now(timezone.utc)
+        db.commit()
+    elif failure == "disabled":
+        session.user.is_active = False
+        db.commit()
+    elif failure == "missing_credentials":
+        credentials = None
+    elif failure == "unknown_token":
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="unknown-token")
+
+    with pytest.raises(HTTPException) as error:
+        refresh_session(credentials, db)
     assert error.value.status_code == 401
