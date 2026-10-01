@@ -14,8 +14,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 import secrets
 import bcrypt
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy.orm import Session
+
+try:
+    from src.backend.database import get_db
+    from src.backend.models import User
+except ImportError:  # pragma: no cover - direct script execution
+    from .database import get_db
+    from .models import User
 
 router = APIRouter(tags=["Quên & Đặt lại mật khẩu"])
 
@@ -103,7 +111,7 @@ class MessageResponse(BaseModel):
     response_model=ForgotPasswordResponse,
     summary="Yêu cầu gửi liên kết đặt lại mật khẩu qua email"
 )
-def forgot_password(data: ForgotPasswordRequest):
+def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """
     Tiêu chí đáp ứng:
     - Nhập email để nhận liên kết đặt lại mật khẩu.
@@ -111,13 +119,21 @@ def forgot_password(data: ForgotPasswordRequest):
     - Bảo mật: Email KHÔNG tồn tại vẫn trả về CÙNG MỘT THÔNG BÁO để chống dò quét tài khoản (User Enumeration).
     """
     normalized_email = data.email.strip().lower()
-    
-    # 1. Kiểm tra tài khoản có tồn tại trong hệ thống không
-    user = fake_users_db.get(normalized_email)
-    
+    try:
+        db_user = db.query(User).filter(User.email.ilike(normalized_email)).first()
+    except Exception:
+        db.rollback()
+        db_user = None
+
+    fake_user = fake_users_db.get(normalized_email)
+    user_exists = db_user is not None or fake_user is not None
+    full_name = db_user.full_name if db_user is not None else (
+        fake_user.get("full_name", normalized_email) if fake_user else normalized_email
+    )
+
     reset_link_preview = None
     
-    if user:
+    if user_exists:
         # 2. Tạo mã token an toàn ngẫu nhiên (URL-safe)
         token = secrets.token_urlsafe(32)
         
@@ -128,6 +144,7 @@ def forgot_password(data: ForgotPasswordRequest):
         reset_tokens_db[token] = {
             "token": token,
             "email": normalized_email,
+            "database_user": db_user is not None,
             "created_at": now,
             "expires_at": expires_at,
             "used": False
@@ -142,7 +159,7 @@ def forgot_password(data: ForgotPasswordRequest):
             "to": normalized_email,
             "subject": "[Hệ thống Bán hàng & Kho] Yêu cầu đặt lại mật khẩu",
             "body": (
-                f"Xin chào {user.get('full_name', normalized_email)},\n\n"
+                f"Xin chào {full_name},\n\n"
                 f"Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản {normalized_email}.\n"
                 f"Vui lòng truy cập đường dẫn sau để đặt lại mật khẩu:\n{reset_link}\n\n"
                 f"Lưu ý: Liên kết này chỉ có hiệu lực trong vòng 30 phút và chỉ được sử dụng một lần duy nhất."
@@ -206,7 +223,7 @@ def verify_reset_token(token: str):
     response_model=MessageResponse,
     summary="Thực hiện đặt lại mật khẩu mới bằng liên kết token"
 )
-def reset_password(data: ResetPasswordRequest):
+def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     """
     Tiêu chí đáp ứng:
     - Xác thực token: tồn tại, chưa hết hạn (< 30 phút), chưa qua sử dụng.
@@ -266,15 +283,27 @@ def reset_password(data: ResetPasswordRequest):
         )
     
     user_email = token_record["email"]
-    user = fake_users_db.get(user_email)
-    if not user:
+    database_user = None
+    if token_record.get("database_user"):
+        try:
+            database_user = db.query(User).filter(User.email.ilike(user_email)).first()
+        except Exception:
+            db.rollback()
+
+    fake_user = fake_users_db.get(user_email) if database_user is None else None
+    if database_user is None and fake_user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Người dùng tương ứng với liên kết không tồn tại."
         )
     
     # 8. Không cho phép mật khẩu mới trùng với mật khẩu hiện tại
-    if bcrypt.checkpw(data.new_password.encode("utf-8"), user["password"]):
+    current_password_hash = (
+        database_user.password_hash.encode("utf-8")
+        if database_user is not None
+        else fake_user["password"]
+    )
+    if bcrypt.checkpw(data.new_password.encode("utf-8"), current_password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Mật khẩu mới không được trùng với mật khẩu cũ."
@@ -287,7 +316,11 @@ def reset_password(data: ResetPasswordRequest):
     )
     
     # Cập nhật mật khẩu người dùng
-    user["password"] = new_password_hash
+    if database_user is not None:
+        database_user.password_hash = new_password_hash.decode("utf-8")
+        db.commit()
+    else:
+        fake_user["password"] = new_password_hash
     
     # 10. Tiêu chí 2: Đánh dấu liên kết đã được sử dụng (One-time use)
     token_record["used"] = True

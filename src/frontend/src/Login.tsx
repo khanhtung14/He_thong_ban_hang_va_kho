@@ -152,7 +152,7 @@ export default function Login() {
             </button>
           </form>
           <p style={{ margin: "18px 0 0", textAlign: "center" }}>
-            <a href="/change-password">Đổi mật khẩu</a>
+            <a href="/forgot-password">Quên mật khẩu?</a>
           </p>
         </section>
       </main>

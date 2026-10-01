@@ -2,10 +2,14 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 import bcrypt
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 from src.backend.main import app
+from src.backend.database import get_db
+from src.backend.models import AccountStatus, Base, User
 from src.backend.forgot_password import (
-    fake_users_db,
     reset_tokens_db,
     mock_outbox,
     GENERIC_SUCCESS_MESSAGE,
@@ -13,23 +17,44 @@ from src.backend.forgot_password import (
 )
 
 client = TestClient(app)
+DEMO_EMAIL = "customer@example.com"
+
+
+@pytest.fixture
+def db_session():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(
+            User(
+                username="demo_customer",
+                email=DEMO_EMAIL,
+                full_name="Demo Customer",
+                password_hash=bcrypt.hashpw(b"Password123", bcrypt.gensalt()).decode("utf-8"),
+                is_active=True,
+                status=AccountStatus.ACTIVE,
+            )
+        )
+        db.commit()
+        yield db
+    Base.metadata.drop_all(engine)
+    engine.dispose()
 
 
 @pytest.fixture(autouse=True)
-def setup_and_teardown():
+def setup_and_teardown(db_session):
     """Reset dữ liệu giả lập trước mỗi test case để đảm bảo tính độc lập."""
     reset_tokens_db.clear()
     mock_outbox.clear()
     
     # Khởi tạo lại user mặc định
-    fake_users_db["nhanvien@congty.com"] = {
-        "email": "nhanvien@congty.com",
-        "full_name": "Nguyễn Văn Thị Trường",
-        "password": bcrypt.hashpw("Password123".encode("utf-8"), bcrypt.gensalt()),
-        "role": "Nhân viên kinh doanh",
-        "active": True
-    }
+    app.dependency_overrides[get_db] = lambda: db_session
     yield
+    app.dependency_overrides.pop(get_db, None)
 
 
 class TestForgotPasswordCriteria:
@@ -51,7 +76,7 @@ class TestForgotPasswordCriteria:
         # 1. Gửi với email tồn tại
         resp_existing = client.post(
             "/forgot-password",
-            json={"email": "nhanvien@congty.com"}
+            json={"email": DEMO_EMAIL}
         )
         assert resp_existing.status_code == 200
         data_existing = resp_existing.json()
@@ -83,7 +108,7 @@ class TestForgotPasswordCriteria:
         - Token được tạo kèm thời gian hết hạn đúng 30 phút.
         - Email được ghi nhận vào outbox kèm liên kết đặt lại mật khẩu.
         """
-        email = "nhanvien@congty.com"
+        email = DEMO_EMAIL
         response = client.post("/forgot-password", json={"email": email})
         assert response.status_code == 200
         assert response.json()["message"] == GENERIC_SUCCESS_MESSAGE
@@ -108,18 +133,18 @@ class TestForgotPasswordCriteria:
     def test_ac1_lien_ket_con_trong_han_30_phut_la_hop_le(self):
         """Token trong vòng 30 phút phải xác thực hợp lệ."""
         # Tạo token
-        client.post("/forgot-password", json={"email": "nhanvien@congty.com"})
+        client.post("/forgot-password", json={"email": DEMO_EMAIL})
         token = next(iter(reset_tokens_db.keys()))
 
         # Xác thực token
         verify_resp = client.get(f"/verify-reset-token/{token}")
         assert verify_resp.status_code == 200
         assert verify_resp.json()["valid"] is True
-        assert verify_resp.json()["email"] == "nhanvien@congty.com"
+        assert verify_resp.json()["email"] == DEMO_EMAIL
 
     def test_ac1_lien_ket_qua_30_phut_bi_tu_choi_het_han(self):
         """Token quá hạn 30 phút sẽ bị từ chối xác thực và không cho đặt lại mật khẩu."""
-        client.post("/forgot-password", json={"email": "nhanvien@congty.com"})
+        client.post("/forgot-password", json={"email": DEMO_EMAIL})
         token = next(iter(reset_tokens_db.keys()))
 
         # Chỉnh thời gian hết hạn lùi về quá khứ 35 phút trước
@@ -142,13 +167,13 @@ class TestForgotPasswordCriteria:
     # -------------------------------------------------------------
     # Tiêu chí 2: "Liên kết được sử dụng chỉ một lần"
     # -------------------------------------------------------------
-    def test_ac2_lien_ket_duoc_su_dung_chi_mot_lan(self):
+    def test_ac2_lien_ket_duoc_su_dung_chi_mot_lan(self, db_session):
         """
         Kiểm tra liên kết chỉ được sử dụng một lần:
         - Lần đầu đặt lại mật khẩu bằng token: Thành công.
         - Lần thứ hai dùng lại cùng token đó: Bị từ chối (400) với thông báo đã sử dụng.
         """
-        client.post("/forgot-password", json={"email": "nhanvien@congty.com"})
+        client.post("/forgot-password", json={"email": DEMO_EMAIL})
         token = next(iter(reset_tokens_db.keys()))
 
         # Lần 1: Đặt lại mật khẩu thành công
@@ -161,8 +186,8 @@ class TestForgotPasswordCriteria:
         assert "thành công" in resp_1.json()["message"].lower()
 
         # Kiểm tra mật khẩu trong DB đã thay đổi và mã hóa bcrypt
-        user = fake_users_db["nhanvien@congty.com"]
-        assert bcrypt.checkpw("NewSecretPass123".encode("utf-8"), user["password"])
+        user = db_session.query(User).filter(User.email == DEMO_EMAIL).one()
+        assert bcrypt.checkpw("NewSecretPass123".encode("utf-8"), user.password_hash.encode("utf-8"))
 
         # Kiểm tra token đã được đánh dấu used=True
         assert reset_tokens_db[token]["used"] is True
@@ -186,7 +211,7 @@ class TestForgotPasswordCriteria:
     # -------------------------------------------------------------
     def test_validation_mat_khau_khong_khop(self):
         """Mật khẩu xác nhận không khớp thì báo lỗi."""
-        client.post("/forgot-password", json={"email": "nhanvien@congty.com"})
+        client.post("/forgot-password", json={"email": DEMO_EMAIL})
         token = next(iter(reset_tokens_db.keys()))
 
         resp = client.post("/reset-password", json={
@@ -199,7 +224,7 @@ class TestForgotPasswordCriteria:
 
     def test_validation_mat_khau_ngan_hon_8_ky_tu(self):
         """Mật khẩu ngắn hơn 8 ký tự bị từ chối."""
-        client.post("/forgot-password", json={"email": "nhanvien@congty.com"})
+        client.post("/forgot-password", json={"email": DEMO_EMAIL})
         token = next(iter(reset_tokens_db.keys()))
 
         resp = client.post("/reset-password", json={
@@ -212,7 +237,7 @@ class TestForgotPasswordCriteria:
 
     def test_validation_mat_khau_thieu_chu_hoac_so(self):
         """Mật khẩu không chứa số hoặc không chứa chữ bị từ chối."""
-        client.post("/forgot-password", json={"email": "nhanvien@congty.com"})
+        client.post("/forgot-password", json={"email": DEMO_EMAIL})
         token = next(iter(reset_tokens_db.keys()))
 
         # Toàn chữ cái, không có số
@@ -235,7 +260,7 @@ class TestForgotPasswordCriteria:
 
     def test_validation_mat_khau_moi_trung_mat_khau_cu(self):
         """Không cho phép đặt mật khẩu mới trùng mật khẩu hiện tại."""
-        client.post("/forgot-password", json={"email": "nhanvien@congty.com"})
+        client.post("/forgot-password", json={"email": DEMO_EMAIL})
         token = next(iter(reset_tokens_db.keys()))
 
         resp = client.post("/reset-password", json={
