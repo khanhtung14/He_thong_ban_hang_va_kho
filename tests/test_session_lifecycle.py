@@ -78,6 +78,31 @@ def test_expired_session_is_rejected_without_renewal(session_db):
     assert error.value.status_code == 401
 
 
+@pytest.mark.parametrize("failure", ["revoked", "disabled", "locked", "missing_credentials", "unknown_token"])
+def test_authenticated_request_rejects_invalid_session(session_db, failure):
+    db, token = session_db
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+    session = db.query(UserSession).one()
+
+    if failure == "revoked":
+        session.revoked_at = datetime.now(timezone.utc)
+        db.commit()
+    elif failure == "disabled":
+        session.user.is_active = False
+        db.commit()
+    elif failure == "locked":
+        session.user.status = AccountStatus.LOCKED
+        db.commit()
+    elif failure == "missing_credentials":
+        credentials = None
+    elif failure == "unknown_token":
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="unknown-token")
+
+    with pytest.raises(HTTPException) as error:
+        require_active_user(credentials, db)
+    assert error.value.status_code == 401
+
+
 def test_refresh_extends_active_session(session_db):
     db, token = session_db
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
@@ -95,6 +120,21 @@ def test_refresh_extends_active_session(session_db):
         expiry = expiry.replace(tzinfo=timezone.utc)
     assert expiry > old_expiry
     assert expiry > datetime.now(timezone.utc) + timedelta(hours=11)
+
+
+def test_logout_revokes_session_idempotently(session_db):
+    db, token = session_db
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+    session = db.query(UserSession).one()
+
+    assert logout(credentials, db)["message"] == "Đăng xuất thành công"
+    db.refresh(session)
+    first_revocation = session.revoked_at
+    assert first_revocation is not None
+
+    assert logout(credentials, db)["message"] == "Đăng xuất thành công"
+    db.refresh(session)
+    assert session.revoked_at == first_revocation
 
 
 @pytest.mark.parametrize("failure", ["expired", "revoked", "disabled", "missing_credentials", "unknown_token"])

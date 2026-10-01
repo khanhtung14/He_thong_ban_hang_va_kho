@@ -7,13 +7,10 @@ function clearSession(): void {
   window.sessionStorage.removeItem(EXPIRY_KEY);
 }
 
-function returnToCurrentPage(): string {
-  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
-}
-
 function expireSession(): void {
+  const currentPage = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   clearSession();
-  window.location.assign(`/login?session=expired&redirect=${encodeURIComponent(returnToCurrentPage())}`);
+  window.location.assign(`/login?session=expired&redirect=${encodeURIComponent(currentPage)}`);
 }
 
 async function refreshSession(token: string): Promise<boolean> {
@@ -48,16 +45,8 @@ export async function authenticatedFetch(
   }
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  let response: Response;
-  try {
-    response = await fetch(input, { ...init, headers });
-  } catch (error) {
-    // Network failures do not invalidate the local session or navigate away from a draft.
-    throw error;
-  }
-  if (response.status === 401) {
-    expireSession();
-  }
+  const response = await fetch(input, { ...init, headers });
+  if (response.status === 401) expireSession();
   return response;
 }
 
