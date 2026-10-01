@@ -18,7 +18,6 @@ from typing import Any
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -35,7 +34,6 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_SECONDS = 15 * 60
-_bearer = HTTPBearer(auto_error=False)
 GENERIC_LOGIN_ERROR = "Tên đăng nhập hoặc mật khẩu không chính xác."
 LOCKED_LOGIN_ERROR = (
     "Tài khoản đã bị tạm khóa 15 phút do nhập sai thông tin 5 lần liên tiếp. "
@@ -305,28 +303,3 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         response["token_type"] = "bearer"
         response["expires_in"] = 12 * 60 * 60
     return response
-
-
-@router.post("/logout")
-def logout(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: Session = Depends(get_db),
-):
-    """Revoke the current bearer session immediately on the server."""
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Vui lòng đăng nhập để tiếp tục.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token_hash = hashlib.sha256(credentials.credentials.encode("utf-8")).hexdigest()
-    db.execute(
-        text(
-            "UPDATE user_sessions SET revoked_at = CURRENT_TIMESTAMP "
-            "WHERE refresh_token_hash = :token_hash AND revoked_at IS NULL"
-        ),
-        {"token_hash": token_hash},
-    )
-    db.commit()
-    return {"message": "Đã đăng xuất thành công."}
