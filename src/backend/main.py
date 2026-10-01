@@ -11,15 +11,23 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.change_password import router as change_password_router
     from src.backend.forgot_password import router as forgot_password_router
     from src.backend.login import router as login_router
-    from src.user_routes import router as user_router
+    from src.backend.session import router as session_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
     from login import router as login_router
+    from session import router as session_router
+
+try:
+    from src.user_routes import router as user_router
+except ModuleNotFoundError:
     try:
-        from user_routes import router as user_router
+        from src.backend.user_routes import router as user_router
     except ModuleNotFoundError:
-        from ..user_routes import router as user_router
+        try:
+            from user_routes import router as user_router
+        except ModuleNotFoundError:  # pragma: no cover - direct script execution
+            from backend.user_routes import router as user_router
 
 
 app = FastAPI(
@@ -84,6 +92,7 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 app.include_router(change_password_router)
 app.include_router(forgot_password_router)
 app.include_router(login_router)
+app.include_router(session_router)
 app.include_router(user_router)
 
 
