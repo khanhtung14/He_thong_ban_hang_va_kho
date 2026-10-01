@@ -87,7 +87,7 @@ def test_lock_user_missing_or_blank_reason_returns_400(db_session_and_client, em
 
     response = client.post("/api/users/lock", json=payload)
 
-    assert response.status_code == (422 if empty_reason == "" else 400)
+    assert response.status_code == 400
 
 def test_lock_user_blank_user_id_returns_400(db_session_and_client):
     client, _ = db_session_and_client

@@ -25,13 +25,15 @@ def require_active_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
 ) -> User:
-    """Resolve a live opaque bearer token to its active database account."""
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Vui lòng đăng nhập để tiếp tục.",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    if credentials is None:
+        raise unauthorized
+
+    if credentials.scheme.lower() != "bearer":
         raise unauthorized
 
     token_hash = hashlib.sha256(credentials.credentials.encode("utf-8")).hexdigest()
