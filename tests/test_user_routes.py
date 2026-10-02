@@ -3,18 +3,12 @@ from __future__ import annotations
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from types import SimpleNamespace
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from types import SimpleNamespace
 
-<<<<<<< HEAD
-from src.backend.security import require_admin
-from src.user_routes import get_db, router
-=======
 from src.backend.user_routes import get_db, require_admin, router
->>>>>>> origin/dev
 
 
 @pytest.fixture
@@ -69,12 +63,8 @@ def db_session_and_client():
             session.close()
 
     test_app.dependency_overrides[get_db] = override_get_db
-<<<<<<< HEAD
-    test_app.dependency_overrides[require_admin] = lambda: SimpleNamespace(id=99)
-=======
     # Keep these route tests focused on lock/unlock behavior, not authentication.
     test_app.dependency_overrides[require_admin] = lambda: SimpleNamespace(id=999)
->>>>>>> origin/dev
 
     with TestClient(test_app) as client:
         yield client, engine
@@ -98,11 +88,8 @@ def test_lock_user_missing_or_blank_reason_returns_400(db_session_and_client, em
     response = client.post("/api/users/lock", json=payload)
 
     assert response.status_code == 400
-<<<<<<< HEAD
-    assert response.json()["detail"] == "Vui lòng nhập lý do khóa tài khoản."
+    assert response.json()["detail"] == "Bắt buộc phải nhập lý do khóa tài khoản."
 
-=======
->>>>>>> origin/dev
 
 def test_lock_user_blank_user_id_returns_400(db_session_and_client):
     client, _ = db_session_and_client
@@ -111,12 +98,8 @@ def test_lock_user_blank_user_id_returns_400(db_session_and_client):
     response = client.post("/api/users/lock", json=payload)
 
     assert response.status_code == 400
-<<<<<<< HEAD
-    assert response.json()["detail"] == "Vui lòng cung cấp ID hoặc username người dùng."
+    assert response.json()["detail"] == "Vui lòng cung cấp ID hoặc username của người dùng."
 
-=======
-    assert response.json()["detail"]
->>>>>>> origin/dev
 
 # =====================================================================
 # 2. Test khóa tài khoản thành công và xác nhận UPDATE is_active = False
@@ -182,11 +165,7 @@ def test_unlock_user_success_updates_is_active_to_true(db_session_and_client):
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-<<<<<<< HEAD
     assert "đã được mở khóa" in data["message"]
-=======
-    assert data["message"]
->>>>>>> origin/dev
 
     # Xác nhận trực tiếp trong Database: is_active đã được cập nhật thành True (1)
     with engine.connect() as conn:
