@@ -29,6 +29,48 @@ class AccountStatus(str, Enum):
     DISABLED = "DISABLED"
 
 
+class RoleCode(str, Enum):
+    CUSTOMER = "Customer"
+    SALES_REP = "Sales Rep"
+    SALES_MANAGER = "Sales Manager"
+    WAREHOUSE = "Warehouse"
+    WH_MANAGER = "WH Manager"
+    ACCOUNTANT = "Accountant"
+    ADMIN = "Admin"
+
+
+ROLE_DEFINITIONS: dict[RoleCode, dict[str, str]] = {
+    RoleCode.CUSTOMER: {
+        "name": "Đại lý",
+        "description": "Tự đặt hàng, theo dõi trạng thái đơn và công nợ của mình.",
+    },
+    RoleCode.SALES_REP: {
+        "name": "Nhân viên kinh doanh",
+        "description": "Gõ đơn tại cửa hàng, xem tồn khả dụng, theo dõi công nợ khách mình phụ trách, thu tiền theo tuyến.",
+    },
+    RoleCode.SALES_MANAGER: {
+        "name": "Quản lý kinh doanh",
+        "description": "Phụ trách toàn bộ hoạt động bán hàng, duyệt đơn vượt hạn mức/dưới giá sàn, phân công địa bàn, theo dõi doanh số và biên lợi nhuận.",
+    },
+    RoleCode.WAREHOUSE: {
+        "name": "Nhân viên kho",
+        "description": "Soạn hàng theo lô, ghi nhận nhập kho, kiểm kê.",
+    },
+    RoleCode.WH_MANAGER: {
+        "name": "Quản lý kho",
+        "description": "Duyệt điều chỉnh tồn, chuyển kho, chốt kiểm kê, theo dõi tồn tối thiểu và hạn sử dụng.",
+    },
+    RoleCode.ACCOUNTANT: {
+        "name": "Kế toán công nợ",
+        "description": "Phát hành hóa đơn, ghi nhận thanh toán, đối chiếu công nợ với đại lý.",
+    },
+    RoleCode.ADMIN: {
+        "name": "Quản trị hệ thống",
+        "description": "Quản lý tài khoản, vai trò, danh mục dùng chung, xem nhật ký hệ thống.",
+    },
+}
+
+
 user_roles = Table(
     "user_roles",
     Base.metadata,
