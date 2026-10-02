@@ -12,18 +12,27 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.change_password import router as change_password_router
     from src.backend.audit_logs import router as audit_logs_router
     from src.backend.forgot_password import router as forgot_password_router
+    from src.backend.inventory import router as inventory_router
     from src.backend.login import router as login_router
-    from src.user_routes import router as user_router
+    from src.backend.products import router as products_router
+    from src.backend.price_lists import router as price_lists_router
+    from src.backend.reports import router as reports_router
+    from src.backend.session import router as session_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from audit_logs import router as audit_logs_router
     from forgot_password import router as forgot_password_router
+    from inventory import router as inventory_router
     from login import router as login_router
-    try:
-        from user_routes import router as user_router
-    except ModuleNotFoundError:
-        from ..user_routes import router as user_router
+    from products import router as products_router
+    from price_lists import router as price_lists_router
+    from reports import router as reports_router
+    from session import router as session_router
 
+try:
+    from src.backend.user_routes import router as user_router
+except ModuleNotFoundError:  # pragma: no cover - direct script execution
+    from user_routes import router as user_router
 
 app = FastAPI(
     title="Hệ thống Bán hàng và Kho - Authentication & Password Management",
@@ -88,6 +97,11 @@ app.include_router(change_password_router)
 app.include_router(audit_logs_router)
 app.include_router(forgot_password_router)
 app.include_router(login_router)
+app.include_router(session_router)
+app.include_router(inventory_router)
+app.include_router(products_router)
+app.include_router(price_lists_router)
+app.include_router(reports_router)
 app.include_router(user_router)
 
 

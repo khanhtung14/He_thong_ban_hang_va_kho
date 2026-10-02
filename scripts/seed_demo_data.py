@@ -86,14 +86,14 @@ TERRITORY_DEFINITIONS = [
 # All accounts use DEMO_PASSWORD. The locked account is useful for checking
 # that login rejects a non-ACTIVE account.
 ACCOUNT_DEFINITIONS = [
-    ("demo_customer", "customer@demo.local", "Nguyễn Đại Lý", "CUSTOMER", "ACTIVE"),
-    ("demo_sales", "sales@demo.local", "Trần Kinh Doanh", "SALES", "ACTIVE"),
-    ("demo_sales_mgr", "sales.manager@demo.local", "Lê Quản Lý Kinh Doanh", "SALES_MANAGER", "ACTIVE"),
-    ("demo_warehouse", "warehouse@demo.local", "Phạm Thủ Kho", "WAREHOUSE", "ACTIVE"),
-    ("demo_wh_mgr", "warehouse.manager@demo.local", "Võ Quản Lý Kho", "WH_MANAGER", "ACTIVE"),
-    ("demo_accountant", "accountant@demo.local", "Đặng Kế Toán", "ACCOUNTANT", "ACTIVE"),
-    ("demo_admin", "admin@demo.local", "Bùi Quản Trị", "ADMIN", "ACTIVE"),
-    ("demo_locked", "locked@demo.local", "Tài Khoản Đang Khóa", "SALES", "LOCKED"),
+    ("demo_customer", "customer@example.com", "Nguyễn Đại Lý", "CUSTOMER", "ACTIVE"),
+    ("demo_sales", "sales@example.com", "Trần Kinh Doanh", "SALES", "ACTIVE"),
+    ("demo_sales_mgr", "sales.manager@example.com", "Lê Quản Lý Kinh Doanh", "SALES_MANAGER", "ACTIVE"),
+    ("demo_warehouse", "warehouse@example.com", "Phạm Thủ Kho", "WAREHOUSE", "ACTIVE"),
+    ("demo_wh_mgr", "warehouse.manager@example.com", "Võ Quản Lý Kho", "WH_MANAGER", "ACTIVE"),
+    ("demo_accountant", "accountant@example.com", "Đặng Kế Toán", "ACCOUNTANT", "ACTIVE"),
+    ("demo_admin", "admin@example.com", "Bùi Quản Trị", "ADMIN", "ACTIVE"),
+    ("demo_locked", "locked@example.com", "Tài Khoản Đang Khóa", "SALES", "LOCKED"),
 ]
 
 
@@ -179,6 +179,7 @@ def seed() -> Path:
             login_accounts.append(
                 {
                     "username": username,
+                    "email": email,
                     "password_hash": password_hash,
                     "role_code": role_code,
                     "status": status_value,

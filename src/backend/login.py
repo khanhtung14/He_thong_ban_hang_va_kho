@@ -30,6 +30,11 @@ except ImportError:
     except ImportError:
         from .database import get_db
 
+try:
+    from src.backend.rbac import create_access_token, normalize_role
+except ModuleNotFoundError:  # pragma: no cover
+    from rbac import create_access_token, normalize_role
+
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 MAX_FAILED_ATTEMPTS = 5
@@ -47,13 +52,24 @@ _attempts_lock = threading.Lock()
 
 ROLE_HOME_PAGES = {
     "CUSTOMER": "/portal/orders",
+    "Customer": "/portal/orders",
     "SALES": "/sales/orders",
+    "Sales": "/sales/orders",
+    "SALES REP": "/sales/orders",
     "SALES_REP": "/sales/orders",
+    "Sales Rep": "/sales/orders",
+    "SALES MANAGER": "/manager/dashboard",
     "SALES_MANAGER": "/manager/dashboard",
+    "Sales Manager": "/manager/dashboard",
     "WAREHOUSE": "/warehouse/picking",
+    "Warehouse": "/warehouse/picking",
+    "WH MANAGER": "/warehouse/dashboard",
     "WH_MANAGER": "/warehouse/dashboard",
+    "WH Manager": "/warehouse/dashboard",
     "ACCOUNTANT": "/accounting/debt-book",
+    "Accountant": "/accounting/debt-book",
     "ADMIN": "/admin/users",
+    "Admin": "/admin/users",
 }
 
 
@@ -92,7 +108,7 @@ def _load_accounts() -> Dict[str, Dict[str, Any]]:
 
 def _fetch_db_user(db: Session, username: str) -> Optional[Dict[str, Any]]:
     """Tìm kiếm thông tin người dùng từ cơ sở dữ liệu MySQL / Database."""
-    if db is None:
+    if db is None or not isinstance(db, Session):
         return None
 
     # Thử truy vấn kết hợp bảng roles
@@ -238,20 +254,30 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
 
     # 5. Phân quyền và chuyển hướng theo vai trò (Role)
-    role_code = None
+    raw_role = None
     if db_user and db_user.get("role_code"):
-        role_code = str(db_user["role_code"]).strip().upper()
+        raw_role = str(db_user["role_code"]).strip()
     elif json_account and json_account.get("role_code"):
-        role_code = str(json_account["role_code"]).strip().upper()
+        raw_role = str(json_account["role_code"]).strip()
     else:
-        role_code = "SALES"
+        raw_role = "SALES"
 
-    redirect_url = ROLE_HOME_PAGES.get(role_code)
+    canonical_role = normalize_role(raw_role)
+    if not canonical_role:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vai trò tài khoản chưa được hỗ trợ.")
+
+    role_key = canonical_role.upper().replace(" ", "_")
+    redirect_url = (
+        ROLE_HOME_PAGES.get(role_key)
+        or ROLE_HOME_PAGES.get(canonical_role)
+        or ROLE_HOME_PAGES.get(raw_role.upper())
+        or ROLE_HOME_PAGES.get(raw_role)
+    )
     if redirect_url is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vai trò tài khoản chưa được hỗ trợ.")
 
     # 6. Ghi nhận phiên làm việc nếu có bảng user_sessions
-    if db_user and db_user.get("id"):
+    if db_user and db_user.get("id") and isinstance(db, Session):
         session_token = secrets.token_urlsafe(48)
         session_token_hash = hashlib.sha256(session_token.encode("utf-8")).hexdigest()
         expires_at = datetime.now(timezone.utc) + timedelta(hours=12)
@@ -290,16 +316,22 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         else (json_account.get("username") if json_account else data.username)
     )
 
+    token = create_access_token({
+        "sub": resolved_username,
+        "role": canonical_role,
+    })
+
     response = {
         "message": "Đăng nhập thành công",
+        "access_token": token,
+        "token_type": "bearer",
         "redirect_url": redirect_url,
         "user": {
             "username": resolved_username,
-            "role_code": role_code,
+            "role_code": raw_role,
         },
     }
     if session_token is not None:
         response["session_token"] = session_token
-        response["token_type"] = "bearer"
         response["expires_in"] = 12 * 60 * 60
     return response

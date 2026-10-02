@@ -1,12 +1,13 @@
 """SQLAlchemy models for the OMS account, access-control, and session domain."""
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Enum as SqlEnum,
     ForeignKey,
@@ -30,6 +31,48 @@ class AccountStatus(str, Enum):
     ACTIVE = "ACTIVE"
     LOCKED = "LOCKED"
     DISABLED = "DISABLED"
+
+
+class RoleCode(str, Enum):
+    CUSTOMER = "Customer"
+    SALES_REP = "Sales Rep"
+    SALES_MANAGER = "Sales Manager"
+    WAREHOUSE = "Warehouse"
+    WH_MANAGER = "WH Manager"
+    ACCOUNTANT = "Accountant"
+    ADMIN = "Admin"
+
+
+ROLE_DEFINITIONS: Dict[RoleCode, Dict[str, str]] = {
+    RoleCode.CUSTOMER: {
+        "name": "Đại lý",
+        "description": "Tự đặt hàng, theo dõi trạng thái đơn và công nợ của mình.",
+    },
+    RoleCode.SALES_REP: {
+        "name": "Nhân viên kinh doanh",
+        "description": "Gõ đơn tại cửa hàng, xem tồn khả dụng, theo dõi công nợ khách mình phụ trách, thu tiền theo tuyến.",
+    },
+    RoleCode.SALES_MANAGER: {
+        "name": "Quản lý kinh doanh",
+        "description": "Phụ trách toàn bộ hoạt động bán hàng, duyệt đơn vượt hạn mức/dưới giá sàn, phân công địa bàn, theo dõi doanh số và biên lợi nhuận.",
+    },
+    RoleCode.WAREHOUSE: {
+        "name": "Nhân viên kho",
+        "description": "Soạn hàng theo lô, ghi nhận nhập kho, kiểm kê.",
+    },
+    RoleCode.WH_MANAGER: {
+        "name": "Quản lý kho",
+        "description": "Duyệt điều chỉnh tồn, chuyển kho, chốt kiểm kê, theo dõi tồn tối thiểu và hạn sử dụng.",
+    },
+    RoleCode.ACCOUNTANT: {
+        "name": "Kế toán công nợ",
+        "description": "Phát hành hóa đơn, ghi nhận thanh toán, đối chiếu công nợ với đại lý.",
+    },
+    RoleCode.ADMIN: {
+        "name": "Quản trị hệ thống",
+        "description": "Quản lý tài khoản, vai trò, danh mục dùng chung, xem nhật ký hệ thống.",
+    },
+}
 
 
 user_roles = Table(
@@ -207,4 +250,40 @@ class Customer(Base):
     territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PriceList(Base):
+    """A customer-segment price list; published versions are immutable."""
+    __tablename__ = "price_lists"
+    __table_args__ = (
+        UniqueConstraint("code", "version", name="uq_price_lists_code_version"),
+        Index("ix_price_lists_segment_period", "customer_group", "start_date", "end_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    customer_group: Mapped[str] = mapped_column(String(30), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    items: Mapped[List["PriceListItem"]] = relationship(
+        back_populates="price_list", cascade="all, delete-orphan"
+    )
+
+
+class PriceListItem(Base):
+    __tablename__ = "price_list_items"
+    __table_args__ = (
+        UniqueConstraint("price_list_id", "sku", name="uq_price_list_items_list_sku"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    price_list_id: Mapped[int] = mapped_column(ForeignKey("price_lists.id", ondelete="CASCADE"), nullable=False)
+    sku: Mapped[str] = mapped_column(String(80), nullable=False)
+    sale_price: Mapped[int] = mapped_column(Integer, nullable=False)
+    floor_price: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_list: Mapped[PriceList] = relationship(back_populates="items")
 

@@ -51,6 +51,21 @@ Invoke-RestMethod -Method Post `
 
 ## Quên mật khẩu
 
-Module quên mật khẩu hiện có dữ liệu giả lập riêng trong bộ nhớ, chưa đọc tài khoản từ seed database. Hai email demo được hỗ trợ là `nhanvien@congty.com` và `admin@congty.com`. Gửi yêu cầu tại `POST /forgot-password`; link test xuất hiện trong response demo hoặc tại `GET /dev/mock-outbox`. Giao diện ở `http://127.0.0.1:8000/forgot-password`.
+The forgot-password flow looks up each account email in the `users` table and records a demo reset link in `GET /dev/mock-outbox`. Seed the demo database before requesting a reset for a seeded account.
 
 > Bộ dữ liệu chỉ dành cho phát triển cục bộ. Không dùng mật khẩu mẫu hay tài khoản này trên môi trường thật.
+
+### Demo account emails
+
+| Username | Email |
+|---|---|
+| `demo_customer` | `customer@example.com` |
+| `demo_sales` | `sales@example.com` |
+| `demo_sales_mgr` | `sales.manager@example.com` |
+| `demo_warehouse` | `warehouse@example.com` |
+| `demo_wh_mgr` | `warehouse.manager@example.com` |
+| `demo_accountant` | `accountant@example.com` |
+| `demo_admin` | `admin@example.com` |
+| `demo_locked` | `locked@example.com` |
+
+These addresses are stored in the `users` table and `database/demo_login_users.json`. Run `scripts/seed_demo_data.py` to refresh the demo database and regenerate the fixture.
