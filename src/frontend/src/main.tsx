@@ -4,8 +4,8 @@ import Error403 from "../templates/errors/403";
 import ChangePassword from "./ChangePassword";
 import ForgotPassword from "./ForgotPassword";
 import Login from "./Login";
-
 import Navigation from "./Navigation";
+import Categories from "./Categories";
 
 const rootElement = document.getElementById("root");
 
@@ -22,6 +22,8 @@ const page = currentPath === "/errors/403"
       ? <ForgotPassword />
     : currentPath === "/navigation" || currentPath === "/navigation-ui"
       ? <Navigation />
+    : currentPath === "/manager/categories"
+      ? <Categories />
     : <Login />;
 
 createRoot(rootElement).render(

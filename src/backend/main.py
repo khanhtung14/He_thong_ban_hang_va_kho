@@ -13,6 +13,7 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.inventory import router as inventory_router
     from src.backend.login import router as login_router
     from src.backend.navigation import router as navigation_router
+    from src.backend.product_categories import router as product_categories_router
     from src.backend.products import router as products_router
     from src.backend.reports import router as reports_router
     from src.backend.session import router as session_router
@@ -22,6 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from inventory import router as inventory_router
     from login import router as login_router
     from navigation import router as navigation_router
+    from product_categories import router as product_categories_router
     from products import router as products_router
     from reports import router as reports_router
     from session import router as session_router
@@ -96,6 +98,7 @@ app.include_router(login_router)
 app.include_router(session_router)
 app.include_router(inventory_router)
 app.include_router(products_router)
+app.include_router(product_categories_router)
 app.include_router(reports_router)
 app.include_router(navigation_router)
 app.include_router(user_router)
@@ -139,6 +142,12 @@ def admin_users_page():
 @app.get("/admin/territory-handover", response_class=HTMLResponse, include_in_schema=False)
 def territory_handover_page():
     """Serve the territory handover screen."""
+    return login_page_response()
+
+
+@app.get("/manager/categories", response_class=HTMLResponse, include_in_schema=False)
+def manager_categories_page():
+    """Serve the product categories management screen (SCRUM-76)."""
     return login_page_response()
 
 
