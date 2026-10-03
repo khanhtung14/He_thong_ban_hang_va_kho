@@ -28,6 +28,7 @@ const styles = `
 
 type LoginResponse = {
   redirect_url: string;
+  access_token: string;
   session_token?: string;
   expires_in?: number;
 };
@@ -65,6 +66,7 @@ export default function Login() {
 
       if (response.ok) {
         const result = (await response.json()) as LoginResponse;
+        window.sessionStorage.setItem("access_token", result.access_token);
         if (result.session_token) {
           window.sessionStorage.setItem("session_token", result.session_token);
           window.sessionStorage.setItem(

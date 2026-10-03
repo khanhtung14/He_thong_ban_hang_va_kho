@@ -1,9 +1,11 @@
 const TOKEN_KEY = "session_token";
+const ACCESS_TOKEN_KEY = "access_token";
 const EXPIRY_KEY = "session_expires_at";
 const REFRESH_BEFORE_MS = 2 * 60 * 1000;
 
 function clearSession(): void {
   window.sessionStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   window.sessionStorage.removeItem(EXPIRY_KEY);
 }
 
@@ -30,20 +32,21 @@ export async function authenticatedFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const headers = new Headers(init.headers);
-  let token = window.sessionStorage.getItem(TOKEN_KEY);
+  const refreshToken = window.sessionStorage.getItem(TOKEN_KEY);
+  let accessToken = window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
   const expiry = Number(window.sessionStorage.getItem(EXPIRY_KEY) || 0);
-  if (token && expiry && expiry - Date.now() < REFRESH_BEFORE_MS) {
+  if (refreshToken && expiry && expiry - Date.now() < REFRESH_BEFORE_MS) {
     try {
-      if (!await refreshSession(token)) {
+      if (!await refreshSession(refreshToken)) {
         expireSession();
         return new Response(null, { status: 401 });
       }
     } catch {
       // Keep the session and current work intact while the network is unavailable.
     }
-    token = window.sessionStorage.getItem(TOKEN_KEY);
+    accessToken = window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
   }
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
 
   const response = await fetch(input, { ...init, headers });
   if (response.status === 401) expireSession();

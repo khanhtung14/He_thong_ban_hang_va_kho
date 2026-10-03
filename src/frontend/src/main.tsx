@@ -4,6 +4,7 @@ import Error403 from "../templates/errors/403";
 import ChangePassword from "./ChangePassword";
 import ForgotPassword from "./ForgotPassword";
 import Login from "./Login";
+import ProductImport from "./ProductImport";
 
 import Navigation from "./Navigation";
 
@@ -14,7 +15,10 @@ if (!rootElement) {
 }
 
 const currentPath = window.location.pathname;
-const page = currentPath === "/errors/403"
+const currentView = new URLSearchParams(window.location.search).get("view");
+const page = currentPath === "/" && currentView === "product-import"
+  ? <ProductImport />
+  : currentPath === "/errors/403"
   ? <Error403 />
   : currentPath === "/change-password"
     ? <ChangePassword />

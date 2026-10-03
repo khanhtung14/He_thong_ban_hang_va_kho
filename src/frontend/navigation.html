@@ -919,6 +919,23 @@
       sidebarNav.appendChild(link);
     });
 
+    if (["SALES_MANAGER", "ADMIN"].includes(currentRole)) {
+      const importLink = document.createElement("a");
+      importLink.href = "/?view=product-import";
+      importLink.className = "nav-item";
+      importLink.id = "nav-products-import";
+      importLink.setAttribute("role", "button");
+      importLink.innerHTML = `
+        <span class="nav-icon">${ICON_SVGS["arrow-down-to-bracket"] || ""}</span>
+        <span>Nhập sản phẩm từ Excel</span>
+      `;
+      importLink.onclick = (event) => {
+        event.preventDefault();
+        window.location.assign(importLink.href);
+      };
+      sidebarNav.appendChild(importLink);
+    }
+
     // 3. Update Summary & Acceptance Criteria Tags
     document.getElementById("visibleCount").textContent = items.length;
     const visibleTagsContainer = document.getElementById("visibleTags");
