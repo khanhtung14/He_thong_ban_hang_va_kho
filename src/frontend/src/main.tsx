@@ -2,10 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import Error403 from "../templates/errors/403";
 import ChangePassword from "./ChangePassword";
-import ForgotPassword from "./ForgotPassword";
+import InventoryForm from "./InventoryForm";
 import Login from "./Login";
-
-import Navigation from "./Navigation";
 
 const rootElement = document.getElementById("root");
 
@@ -18,11 +16,9 @@ const page = currentPath === "/errors/403"
   ? <Error403 />
   : currentPath === "/change-password"
     ? <ChangePassword />
-    : currentPath === "/forgot-password"
-      ? <ForgotPassword />
-    : currentPath === "/navigation" || currentPath === "/navigation-ui"
-      ? <Navigation />
-    : <Login />;
+    : currentPath === "/login"
+      ? <Login />
+      : <InventoryForm />;
 
 createRoot(rootElement).render(
   <StrictMode>
