@@ -70,6 +70,7 @@ PERM_INVENTORY_PICK = "inventory:pick"
 
 PERM_PRODUCTS_VIEW = "products:view"
 PERM_PRODUCTS_VIEW_FINANCIALS = "products:view_financials"  # Cost price & Margin
+PERM_PRODUCTS_IMPORT = "products:import"
 
 PERM_ORDERS_CREATE = "orders:create"
 PERM_ORDERS_APPROVE = "orders:approve"
@@ -107,6 +108,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
     RoleCode.SALES_MANAGER.value: {
         PERM_PRODUCTS_VIEW,
         PERM_PRODUCTS_VIEW_FINANCIALS,  # Cho phép xem giá vốn & biên lợi nhuận
+        PERM_PRODUCTS_IMPORT,
         PERM_INVENTORY_VIEW,
         PERM_ORDERS_CREATE,
         PERM_ORDERS_APPROVE,
@@ -143,6 +145,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
     RoleCode.ADMIN.value: {
         PERM_SYSTEM_ADMIN,
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_IMPORT,
         PERM_INVENTORY_VIEW,
         PERM_INVENTORY_ADJUST,
         PERM_INVENTORY_TRANSFER,
