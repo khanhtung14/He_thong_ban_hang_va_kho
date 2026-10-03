@@ -10,7 +10,7 @@ Enforces:
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Dict, Optional, Set, Union
 
 import jwt
 from fastapi import Depends, Header, HTTPException, status
@@ -28,7 +28,7 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # Normalization mapping for standard roles
-ROLE_CANONICAL_MAP: dict[str, RoleCode] = {
+ROLE_CANONICAL_MAP: Dict[str, RoleCode] = {
     "customer": RoleCode.CUSTOMER,
     "sales rep": RoleCode.SALES_REP,
     "sales_rep": RoleCode.SALES_REP,
@@ -45,7 +45,7 @@ ROLE_CANONICAL_MAP: dict[str, RoleCode] = {
 }
 
 
-def normalize_role(role_name: str | None) -> str | None:
+def normalize_role(role_name: Optional[str]) -> Optional[str]:
     """Normalize any role string representation to standard RoleCode value."""
     if not role_name:
         return None
@@ -88,7 +88,7 @@ PERM_SYSTEM_ADMIN = "system:admin"
 
 
 # Role-Permissions Matrix (Default-Deny)
-ROLE_PERMISSIONS: dict[str, set[str]] = {
+ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     RoleCode.CUSTOMER.value: {
         PERM_PRODUCTS_VIEW,
         PERM_ORDERS_CREATE,
@@ -163,9 +163,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 class AuthenticatedUser(BaseModel):
     username: str
     role: str
-    full_name: str | None = None
-    warehouse_id: int | None = None
-    territory_id: int | None = None
+    full_name: Optional[str] = None
+    warehouse_id: Optional[int] = None
+    territory_id: Optional[int] = None
 
     def has_permission(self, permission: str) -> bool:
         normalized_role = normalize_role(self.role)
@@ -192,7 +192,7 @@ SENSITIVE_FINANCIAL_FIELDS = {
 }
 
 
-def can_view_financials(role_name: str | None) -> bool:
+def can_view_financials(role_name: Optional[str]) -> bool:
     """Return True only for the Sales Manager role."""
     normalized = normalize_role(role_name)
     if not normalized:
@@ -201,7 +201,7 @@ def can_view_financials(role_name: str | None) -> bool:
     return PERM_PRODUCTS_VIEW_FINANCIALS in perms
 
 
-def sanitize_financial_data(data: Any, user_or_role: AuthenticatedUser | str | None) -> Any:
+def sanitize_financial_data(data: Any, user_or_role: Optional[Union[AuthenticatedUser, str]]) -> Any:
     """Recursively filter out cost_price and margin if user role is not authorized."""
     role = user_or_role.role if isinstance(user_or_role, AuthenticatedUser) else user_or_role
     if can_view_financials(role):
@@ -219,7 +219,7 @@ def sanitize_financial_data(data: Any, user_or_role: AuthenticatedUser | str | N
 
 
 # JWT Token creation and decoding
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -228,7 +228,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> dict[str, Any]:
+def decode_access_token(token: str) -> Dict[str, Any]:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError as exc:
@@ -243,9 +243,9 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
-    auth: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    auth: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name"),
 ) -> AuthenticatedUser:
     """Dependency that extracts and validates user identity and role.
 
@@ -299,7 +299,7 @@ def get_current_user(
     )
 
 
-def require_roles(*allowed_roles: str | RoleCode):
+def require_roles(*allowed_roles: Union[str, RoleCode]):
     """Enforce role check with Default Deny."""
     normalized_allowed = {
         normalize_role(r.value if isinstance(r, RoleCode) else r)

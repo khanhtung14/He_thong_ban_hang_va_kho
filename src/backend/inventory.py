@@ -1,6 +1,6 @@
 """Inventory endpoints with RBAC enforcement and financial data protection."""
 
-from typing import Any
+from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -90,7 +90,7 @@ def adjust_inventory(
 
 @router.get("/items")
 def list_inventory_items(
-    warehouse_id: int | None = None,
+    warehouse_id: Optional[int] = None,
     user: AuthenticatedUser = Depends(require_permissions(PERM_INVENTORY_VIEW)),
 ) -> Any:
     """List inventory items.

@@ -1,6 +1,6 @@
 """Products endpoints with RBAC enforcement and sensitive financial data masking."""
 
-from typing import Any
+from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 
 try:
@@ -21,7 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover
 router = APIRouter(prefix="/api/v1/products", tags=["Products"])
 
 # Mock products database
-MOCK_PRODUCTS: dict[str, dict[str, Any]] = {
+MOCK_PRODUCTS: Dict[str, Dict[str, Any]] = {
     "SKU-001": {
         "sku": "SKU-001",
         "name": "Nước tăng lực Red Bull 250ml",

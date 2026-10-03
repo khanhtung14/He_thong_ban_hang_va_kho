@@ -9,6 +9,7 @@ Covers:
 """
 
 import pytest
+from typing import Dict
 from fastapi.testclient import TestClient
 
 from src.backend.main import app
@@ -18,7 +19,7 @@ from src.backend.rbac import create_access_token
 client = TestClient(app)
 
 
-def make_auth_header_for_role(role: str, username: str = "test_user") -> dict[str, str]:
+def make_auth_header_for_role(role: str, username: str = "test_user") -> Dict[str, str]:
     """Helper to generate JWT Bearer Authorization header."""
     token = create_access_token({"sub": username, "role": role})
     return {"Authorization": f"Bearer {token}"}

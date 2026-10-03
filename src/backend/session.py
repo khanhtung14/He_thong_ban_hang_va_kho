@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timezone
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -25,9 +26,9 @@ _bearer = HTTPBearer(auto_error=False)
 
 @router.post("/refresh")
 def refresh_session(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> dict[str, int]:
+) -> Dict[str, int]:
     """Extend an active session; revoked, expired, or disabled sessions stay invalid."""
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Phiên làm việc đã hết hạn.")
@@ -53,9 +54,9 @@ def refresh_session(
 
 @router.post("/logout")
 def logout(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> dict[str, str]:
+) -> Dict[str, str]:
     """Revoke the server-side session before confirming logout."""
     if credentials is not None and credentials.scheme.lower() == "bearer":
         token_hash = hashlib.sha256(credentials.credentials.encode("utf-8")).hexdigest()

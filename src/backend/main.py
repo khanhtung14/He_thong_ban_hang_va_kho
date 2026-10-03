@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler
@@ -9,20 +10,24 @@ from fastapi.staticfiles import StaticFiles
 
 try:  # Supports both `python -m src.backend.main` and running this file directly.
     from src.backend.change_password import router as change_password_router
+    from src.backend.audit_logs import router as audit_logs_router
     from src.backend.forgot_password import router as forgot_password_router
     from src.backend.inventory import router as inventory_router
     from src.backend.login import router as login_router
     from src.backend.navigation import router as navigation_router
     from src.backend.products import router as products_router
+    from src.backend.price_lists import router as price_lists_router
     from src.backend.reports import router as reports_router
     from src.backend.session import router as session_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
+    from audit_logs import router as audit_logs_router
     from forgot_password import router as forgot_password_router
     from inventory import router as inventory_router
     from login import router as login_router
     from navigation import router as navigation_router
     from products import router as products_router
+    from price_lists import router as price_lists_router
     from reports import router as reports_router
     from session import router as session_router
 
@@ -67,7 +72,7 @@ def login_page_response(status_code: int = 200) -> HTMLResponse:
     return HTMLResponse(content=FRONTEND_INDEX.read_text(encoding="utf-8"), status_code=status_code)
 
 
-def forbidden_page(headers: dict[str, str] | None = None) -> Response:
+def forbidden_page(headers: Optional[Dict[str, str]] = None) -> Response:
     if not FRONTEND_INDEX.is_file():
         return HTMLResponse(
             "React frontend is not built. Run `npm install` and `npm run build` in src/frontend.",
@@ -91,11 +96,13 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 
 
 app.include_router(change_password_router)
+app.include_router(audit_logs_router)
 app.include_router(forgot_password_router)
 app.include_router(login_router)
 app.include_router(session_router)
 app.include_router(inventory_router)
 app.include_router(products_router)
+app.include_router(price_lists_router)
 app.include_router(reports_router)
 app.include_router(navigation_router)
 app.include_router(user_router)
