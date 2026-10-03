@@ -8,8 +8,10 @@ from sqlalchemy import (
     Column,
     DateTime,
     Enum as SqlEnum,
+    Float,
     ForeignKey,
     Index,
+    Integer,
     String,
     Table,
     Text,
@@ -27,48 +29,6 @@ class AccountStatus(str, Enum):
     ACTIVE = "ACTIVE"
     LOCKED = "LOCKED"
     DISABLED = "DISABLED"
-
-
-class RoleCode(str, Enum):
-    CUSTOMER = "Customer"
-    SALES_REP = "Sales Rep"
-    SALES_MANAGER = "Sales Manager"
-    WAREHOUSE = "Warehouse"
-    WH_MANAGER = "WH Manager"
-    ACCOUNTANT = "Accountant"
-    ADMIN = "Admin"
-
-
-ROLE_DEFINITIONS: dict[RoleCode, dict[str, str]] = {
-    RoleCode.CUSTOMER: {
-        "name": "Đại lý",
-        "description": "Tự đặt hàng, theo dõi trạng thái đơn và công nợ của mình.",
-    },
-    RoleCode.SALES_REP: {
-        "name": "Nhân viên kinh doanh",
-        "description": "Gõ đơn tại cửa hàng, xem tồn khả dụng, theo dõi công nợ khách mình phụ trách, thu tiền theo tuyến.",
-    },
-    RoleCode.SALES_MANAGER: {
-        "name": "Quản lý kinh doanh",
-        "description": "Phụ trách toàn bộ hoạt động bán hàng, duyệt đơn vượt hạn mức/dưới giá sàn, phân công địa bàn, theo dõi doanh số và biên lợi nhuận.",
-    },
-    RoleCode.WAREHOUSE: {
-        "name": "Nhân viên kho",
-        "description": "Soạn hàng theo lô, ghi nhận nhập kho, kiểm kê.",
-    },
-    RoleCode.WH_MANAGER: {
-        "name": "Quản lý kho",
-        "description": "Duyệt điều chỉnh tồn, chuyển kho, chốt kiểm kê, theo dõi tồn tối thiểu và hạn sử dụng.",
-    },
-    RoleCode.ACCOUNTANT: {
-        "name": "Kế toán công nợ",
-        "description": "Phát hành hóa đơn, ghi nhận thanh toán, đối chiếu công nợ với đại lý.",
-    },
-    RoleCode.ADMIN: {
-        "name": "Quản trị hệ thống",
-        "description": "Quản lý tài khoản, vai trò, danh mục dùng chung, xem nhật ký hệ thống.",
-    },
-}
 
 
 user_roles = Table(
@@ -226,4 +186,29 @@ class Customer(Base):
     territory_id: Mapped[int | None] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProductUnit(Base):
+    """Mô hình quy đổi đơn vị tính cho sản phẩm."""
+
+    __tablename__ = "product_units"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id"), nullable=False)
+    unit_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    conversion_rate: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class InventoryTransaction(Base):
+    """Mô hình ghi nhận giao dịch nhập/xuất kho và biến động tồn kho theo đơn vị quy đổi."""
+
+    __tablename__ = "inventory_transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id"), nullable=False)
+    unit_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    conversion_rate_snapshot: Mapped[float] = mapped_column(Float, nullable=False)
+    base_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+
 
