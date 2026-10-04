@@ -21,7 +21,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.user_routes import get_db, router
+from src.backend.user_routes import get_db, router
 
 # 1. Khởi tạo ứng dụng FastAPI và gán router
 app = FastAPI(title="OMS Lock/Unlock Test App")
