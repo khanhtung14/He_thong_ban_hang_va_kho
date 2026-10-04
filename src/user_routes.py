@@ -24,13 +24,13 @@ class LockUserRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     user_id: str = Field(min_length=1, max_length=100)
-    reason: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(default="", max_length=2000)
 
 
 def _find_user(db: Session, user_id: str) -> Any | None:
     user_id_clean = user_id.strip()
     if not user_id_clean:
-        raise HTTPException(status_code=400, detail="Vui lòng cung cấp ID hoặc username người dùng.")
+        raise HTTPException(status_code=400, detail="Vui lòng cung cấp ID hoặc username của người dùng.")
     if user_id_clean.isdigit():
         return db.execute(
             text("SELECT id, username FROM users WHERE id = :uid_int OR username = :uid_str LIMIT 1"),
@@ -89,7 +89,7 @@ def lock_user(
 ):
     reason = data.reason.strip()
     if not reason:
-        raise HTTPException(status_code=400, detail="Vui lòng nhập lý do khóa tài khoản.")
+        raise HTTPException(status_code=400, detail="Bắt buộc phải nhập lý do khóa tài khoản.")
 
     user = _find_user(db, data.user_id)
     if user is None:
@@ -186,7 +186,7 @@ def unlock_user(
 
     return {
         "success": True,
-        "message": f"Tài khoản {username} đã được mở khóa.",
+        "message": f"Tài khoản {username} đã được mở khóa thành công.",
         "user_id": user_actual_id,
         "username": username,
         "is_active": True,

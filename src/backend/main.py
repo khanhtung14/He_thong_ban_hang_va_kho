@@ -11,11 +11,13 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.change_password import router as change_password_router
     from src.backend.forgot_password import router as forgot_password_router
     from src.backend.login import router as login_router
+    from src.backend.products import router as products_router
     from src.user_routes import router as user_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
     from login import router as login_router
+    from products import router as products_router
     try:
         from user_routes import router as user_router
     except ModuleNotFoundError:
@@ -84,6 +86,7 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 app.include_router(change_password_router)
 app.include_router(forgot_password_router)
 app.include_router(login_router)
+app.include_router(products_router)
 app.include_router(user_router)
 
 
@@ -119,6 +122,12 @@ def admin_users_page():
 def territory_handover_page():
     """Serve the territory handover screen."""
     return login_page_response()
+
+
+@app.get("/products", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/products-ui", response_class=HTMLResponse, include_in_schema=False)
+def get_products_page():
+    return read_frontend_page("products.html")
 
 
 @app.get("/forgot-password", response_class=HTMLResponse, include_in_schema=False)

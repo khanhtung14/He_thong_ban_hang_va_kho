@@ -8,8 +8,10 @@ from sqlalchemy import (
     Column,
     DateTime,
     Enum as SqlEnum,
+    Float,
     ForeignKey,
     Index,
+    Numeric,
     String,
     Table,
     Text,
@@ -23,10 +25,26 @@ class Base(DeclarativeBase):
     pass
 
 
+class RoleCode(str, Enum):
+    CUSTOMER = "CUSTOMER"
+    SALES = "SALES"
+    SALES_REP = "SALES_REP"
+    SALES_MANAGER = "SALES_MANAGER"
+    WAREHOUSE = "WAREHOUSE"
+    WH_MANAGER = "WH_MANAGER"
+    ACCOUNTANT = "ACCOUNTANT"
+    ADMIN = "ADMIN"
+
+
 class AccountStatus(str, Enum):
     ACTIVE = "ACTIVE"
     LOCKED = "LOCKED"
     DISABLED = "DISABLED"
+
+
+class ProductStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
 
 
 user_roles = Table(
@@ -184,4 +202,69 @@ class Customer(Base):
     territory_id: Mapped[int | None] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProductCategory(Base):
+    __tablename__ = "product_categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("product_categories.id", ondelete="SET NULL"))
+    description: Mapped[str | None] = mapped_column(String(255))
+
+    products: Mapped[list["Product"]] = relationship(back_populates="category")
+
+
+class Product(Base):
+    __tablename__ = "products"
+    __table_args__ = (
+        UniqueConstraint("sku", name="uq_products_sku"),
+        Index("ix_products_sku", "sku"),
+        Index("ix_products_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    sku: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("product_categories.id", ondelete="SET NULL"))
+    category_name: Mapped[str | None] = mapped_column(String(150))
+    base_unit: Mapped[str] = mapped_column(String(50), nullable=False)
+    packaging_spec: Mapped[str | None] = mapped_column(String(100))
+    cost_price: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    sale_price: Mapped[float | None] = mapped_column(Float, default=0.0)
+    image_url: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(20), default=ProductStatus.ACTIVE.value, nullable=False)
+    has_transactions: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    category: Mapped[ProductCategory | None] = relationship(back_populates="products")
+    transactions: Mapped[list["ProductTransaction"]] = relationship(
+        back_populates="product", cascade="all, delete-orphan"
+    )
+
+
+class ProductTransaction(Base):
+    __tablename__ = "product_transactions"
+    __table_args__ = (
+        Index("ix_product_transactions_product_id", "product_id"),
+        Index("ix_product_transactions_sku", "sku"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    sku: Mapped[str] = mapped_column(String(50), nullable=False)
+    transaction_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    reference_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    quantity: Mapped[int] = mapped_column(nullable=False)
+    unit: Mapped[str] = mapped_column(String(50), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    product: Mapped[Product] = relationship(back_populates="transactions")
+
 

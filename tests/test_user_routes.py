@@ -61,7 +61,11 @@ def db_session_and_client():
         finally:
             session.close()
 
+    from types import SimpleNamespace
+    from src.user_routes import require_admin
+
     test_app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[require_admin] = lambda: SimpleNamespace(id=999, username="admin")
 
     with TestClient(test_app) as client:
         yield client, engine
