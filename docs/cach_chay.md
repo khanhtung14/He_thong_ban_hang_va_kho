@@ -10,6 +10,12 @@ nhập: python -m pip install -r requirements.txt     để tải các thư vi�
 
 nhập: .venv\Scripts\python.exe -m uvicorn src.backend.main:app --reload   
 sau khi nhập hết lệnh, những lần sau chỉ cần nhập lệnh cuối để chạy
-For deployed environments, configure a stable, randomly generated `JWT_SECRET`
-environment variable before starting the backend. Without it, local development
-uses an ephemeral key and existing login tokens become invalid after restart.
+
+
+lệnh chạy testcase: 
+python -m pytest -q
+
+
+chạy lại frontend khi thay đổi frontend:
+cd C:\Users\Admin\He_thong_ban_hang_va_kho\src\frontend
+npm.cmd run build
