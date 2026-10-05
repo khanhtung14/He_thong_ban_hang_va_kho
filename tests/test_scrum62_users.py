@@ -122,6 +122,26 @@ def test_create_user_success(client, db_session):
     assert verify_password(temp_pass, db_user.password_hash) is True
 
 
+def test_create_sales_rep_accepts_legacy_sales_role_code(client, db_session):
+    """Existing demo DBs use SALES while the new user form sends SALES_REP."""
+    sales_rep_role = db_session.query(Role).filter(Role.code == "SALES_REP").one()
+    sales_rep_role.code = "SALES"
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "legacy_sales_user",
+            "full_name": "Legacy Sales User",
+            "email": "legacy.sales@example.com",
+            "role": "SALES_REP",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["user"]["roles"][0]["code"] == "SALES"
+
+
 def test_create_user_duplicate_username(client):
     """AC2: Reject duplicate username with specific error message."""
     client.post(

@@ -157,6 +157,8 @@ def resolve_roles(
             # Map common human readable variants
             variant_map = {
                 "SALES": "SALES_REP",
+                # Older demo databases store the same role under the code SALES.
+                "SALES_REP": "SALES",
                 "SALES REP": "SALES_REP",
                 "NHAN VIEN KINH DOANH": "SALES_REP",
                 "NHÂN VIÊN KINH DOANH": "SALES_REP",
