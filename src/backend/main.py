@@ -145,9 +145,30 @@ def change_password_page():
     return login_page_response()
 
 
+@app.get("/profile", response_class=HTMLResponse, include_in_schema=False)
+def profile_page():
+    return login_page_response()
+
+
 @app.get("/admin/users", response_class=HTMLResponse, include_in_schema=False)
 def admin_users_page():
     """Serve the admin user management screen."""
+    return login_page_response()
+
+
+@app.get("/admin/users/create", response_class=HTMLResponse, include_in_schema=False)
+def admin_create_user_page():
+    return login_page_response()
+
+
+@app.get("/portal/orders", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/sales/orders", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/manager/dashboard", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/picking", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/dashboard", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/debt-book", response_class=HTMLResponse, include_in_schema=False)
+def role_home_page():
+    """Serve the role landing page after login."""
     return login_page_response()
 
 
