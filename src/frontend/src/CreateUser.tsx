@@ -52,7 +52,9 @@ export default function CreateUser() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState(roles[0].code);
+  const requestedRole = new URLSearchParams(window.location.search).get("role");
+  const initialRole = roles.some((option) => option.code === requestedRole) ? requestedRole! : roles[0].code;
+  const [role, setRole] = useState(initialRole);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<CreateUserResponse | null>(null);
@@ -89,7 +91,7 @@ export default function CreateUser() {
       setUsername("");
       setEmail("");
       setPhone("");
-      setRole(roles[0].code);
+      setRole(initialRole);
     } catch {
       setError("Không thể kết nối đến máy chủ. Vui lòng thử lại.");
     } finally {
