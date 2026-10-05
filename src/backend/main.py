@@ -6,24 +6,29 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 try:  # Supports both `python -m src.backend.main` and running this file directly.
     from src.backend.change_password import router as change_password_router
     from src.backend.forgot_password import router as forgot_password_router
     from src.backend.inventory import router as inventory_router
     from src.backend.login import router as login_router
+    from src.backend.navigation import router as navigation_router
     from src.backend.products import router as products_router
     from src.backend.reports import router as reports_router
     from src.backend.session import router as session_router
+    from src.backend.profile import migrate_profile_schema, router as profile_router
     from src.backend.users import compat_router as users_compat_router, router as users_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
     from inventory import router as inventory_router
     from login import router as login_router
+    from navigation import router as navigation_router
     from products import router as products_router
     from reports import router as reports_router
     from session import router as session_router
+    from profile import migrate_profile_schema, router as profile_router
     from users import compat_router as users_compat_router, router as users_router
 
 try:
@@ -35,6 +40,19 @@ app = FastAPI(
     title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
     description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
     version="1.0.0",
+)
+
+
+@app.on_event("startup")
+def migrate_profile_database() -> None:
+    migrate_profile_schema()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
@@ -64,7 +82,10 @@ def login_page_response(status_code: int = 200) -> HTMLResponse:
             "React frontend is not built. Run `npm install` and `npm run build` in src/frontend.",
             status_code=503,
         )
-    return HTMLResponse(content=FRONTEND_INDEX.read_text(encoding="utf-8"), status_code=status_code)
+    return HTMLResponse(
+        content=FRONTEND_INDEX.read_text(encoding="utf-8"),
+        status_code=status_code,
+    )
 
 
 def forbidden_page(headers: dict[str, str] | None = None) -> Response:
@@ -97,15 +118,24 @@ app.include_router(session_router)
 app.include_router(inventory_router)
 app.include_router(products_router)
 app.include_router(reports_router)
+app.include_router(navigation_router)
 app.include_router(users_router)
 app.include_router(users_compat_router)
 app.include_router(user_router)
+app.include_router(profile_router)
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def home():
     """Show the login interface as the default application page."""
     return login_page_response()
+
+
+@app.get("/navigation", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/navigation-ui", response_class=HTMLResponse, include_in_schema=False)
+def get_navigation_page():
+    """Giao diện menu điều hướng động theo quyền (SCRUM-60)."""
+    return read_frontend_page("navigation.html")
 
 
 @app.get("/errors/403", response_class=HTMLResponse, include_in_schema=False)
@@ -121,6 +151,11 @@ def login_page():
 
 @app.get("/change-password", response_class=HTMLResponse, include_in_schema=False)
 def change_password_page():
+    return login_page_response()
+
+
+@app.get("/profile", response_class=HTMLResponse, include_in_schema=False)
+def profile_page():
     return login_page_response()
 
 

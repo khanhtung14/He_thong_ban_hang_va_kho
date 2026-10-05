@@ -71,6 +71,9 @@ export default function Login() {
 
       if (response.ok) {
         const result = (await response.json()) as LoginResponse;
+        for (const key of ["session_token", "session_expires_at", "access_token", "access_token_expires_at", "user_role", "user_name"]) {
+          window.sessionStorage.removeItem(key);
+        }
         if (result.session_token) {
           window.sessionStorage.setItem("session_token", result.session_token);
           window.sessionStorage.setItem(

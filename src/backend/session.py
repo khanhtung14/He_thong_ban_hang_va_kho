@@ -50,7 +50,7 @@ def refresh_session(
 
     session.expires_at = now + SESSION_DURATION
     db.commit()
-    role = next((item.code for item in user.roles if normalize_role(item.code)), None)
+    role = next((normalize_role(item.code) for item in user.roles if normalize_role(item.code)), None)
     if role is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tài khoản chưa được gán vai trò hợp lệ.")
     return {

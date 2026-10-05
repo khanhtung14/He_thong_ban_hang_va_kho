@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { authenticatedFetch, logout } from "./session";
+import Profile from "./Profile";
 import "./RoleWorkspace.css";
 
 type RoleKey = "customer" | "sales" | "salesManager" | "warehouse" | "warehouseManager" | "accountant" | "admin";
@@ -183,6 +184,7 @@ export default function RoleWorkspace() {
   const [lockReason, setLockReason] = useState("");
   const [userActionBusy, setUserActionBusy] = useState(false);
   const [auditModal, setAuditModal] = useState<{ title: string; rows: Array<Record<string, unknown>> } | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const onPopState = () => setView(new URLSearchParams(window.location.search).get("view") ?? details?.views[0]?.id ?? "overview");
@@ -401,7 +403,7 @@ export default function RoleWorkspace() {
       </aside>
 
       <div className="workspace-main-column">
-        <header className="workspace-topbar"><div className="workspace-breadcrumb"><span>OMS</span><span>/</span><strong>{heading}</strong></div><div className="workspace-top-actions"><div className="workspace-quick-actions"><button type="button" onClick={() => goBack(role)}>← <span>Quay lại</span></button><button type="button" onClick={() => window.location.assign("/change-password")}>Đổi mật khẩu</button>{role === "admin" && <button type="button" className="is-primary" onClick={() => window.location.assign("/admin/users/create?role=ADMIN")}>Tạo tài khoản Admin</button>}</div><span className="workspace-env"><i /> Hệ thống hoạt động</span><button className="workspace-icon-button" aria-label="Thông báo">♧<i /></button><span className="workspace-top-divider" /><button className="workspace-user-chip" onClick={() => navigate(role === "customer" ? "profile" : details.views[0].id)}><span className="workspace-avatar">{details.initials}</span><span><strong>{username}</strong><small>{details.name}</small></span><span className="workspace-chevron">⌄</span></button></div></header>
+        <header className="workspace-topbar"><div className="workspace-breadcrumb"><span>OMS</span><span>/</span><strong>{heading}</strong></div><div className="workspace-top-actions"><div className="workspace-quick-actions"><button type="button" onClick={() => goBack(role)}>← <span>Quay lại</span></button><button type="button" onClick={() => window.location.assign("/change-password")}>Đổi mật khẩu</button>{role === "admin" && <button type="button" className="is-primary" onClick={() => window.location.assign("/admin/users/create?role=ADMIN")}>Tạo tài khoản Admin</button>}</div><span className="workspace-env"><i /> Hệ thống hoạt động</span><button className="workspace-icon-button" aria-label="Thông báo">♧<i /></button><span className="workspace-top-divider" /><button type="button" className="workspace-user-chip" aria-label="Mở thông tin cá nhân" onClick={() => setProfileOpen(true)}><span className="workspace-avatar">{details.initials}</span><span><strong>{username}</strong><small>{details.name}</small></span><span className="workspace-chevron">⌄</span></button></div></header>
         <main className="workspace-content">
           {notice && <div className="workspace-alert" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Đóng thông báo">×</button></div>}
           {renderContent()}
@@ -411,6 +413,7 @@ export default function RoleWorkspace() {
 
       {lockTarget && <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLockTarget(null); }}><section className="workspace-modal" role="dialog" aria-modal="true" aria-labelledby="lock-title"><button className="workspace-modal-close" onClick={() => setLockTarget(null)} aria-label="Đóng">×</button><span className="workspace-modal-icon">!</span><h2 id="lock-title">Khóa tài khoản</h2><p>Phiên đăng nhập của <strong>{lockTarget.username}</strong> sẽ bị thu hồi ngay sau khi khóa.</p><form onSubmit={submitLock}><label htmlFor="lock-reason">Lý do khóa <span>*</span></label><textarea id="lock-reason" value={lockReason} minLength={3} onChange={(event) => setLockReason(event.target.value)} placeholder="Ví dụ: Nhân sự đã nghỉ việc" required /><div className="workspace-modal-actions"><button type="button" className="workspace-button is-ghost" onClick={() => setLockTarget(null)}>Hủy</button><button type="submit" className="workspace-button is-danger" disabled={userActionBusy}>{userActionBusy ? "Đang xử lý…" : "Xác nhận khóa"}</button></div></form></section></div>}
       {auditModal && <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAuditModal(null); }}><section className="workspace-modal is-wide" role="dialog" aria-modal="true" aria-labelledby="audit-modal-title"><button className="workspace-modal-close" onClick={() => setAuditModal(null)} aria-label="Đóng">×</button><h2 id="audit-modal-title">{auditModal.title}</h2>{auditModal.rows.length ? <div className="workspace-audit-list">{auditModal.rows.map((row, index) => <div key={index}><StatusPill tone="blue">{String(row.action ?? "SỰ KIỆN")}</StatusPill><p>{String(row.reason ?? "Không có ghi chú")}</p><small>{String(row.created_at ?? "")}</small></div>)}</div> : <div className="workspace-empty">Chưa có nhật ký cho tài khoản này.</div>}</section></div>}
+      {profileOpen && <Profile embedded onClose={() => setProfileOpen(false)} />}
     </div>
   );
 }

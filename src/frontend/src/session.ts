@@ -42,17 +42,17 @@ export async function authenticatedFetch(
   const headers = new Headers(init.headers);
   const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
   const pathname = new URL(requestUrl, window.location.origin).pathname;
-  const needsAccessToken = ["/api/v1/products", "/api/v1/inventory", "/api/v1/reports"].some(
+  const usesAccessToken = ["/api/v1/products", "/api/v1/inventory", "/api/v1/reports"].some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
   const sessionToken = window.sessionStorage.getItem(TOKEN_KEY);
   const sessionExpiry = Number(window.sessionStorage.getItem(EXPIRY_KEY) || 0);
   const accessExpiry = Number(window.sessionStorage.getItem(ACCESS_EXPIRY_KEY) || 0);
-  const refreshNeeded = sessionToken && (
+  const needsRefresh = Boolean(sessionToken && (
     (sessionExpiry && sessionExpiry - Date.now() < REFRESH_BEFORE_MS)
-    || (needsAccessToken && accessExpiry && accessExpiry - Date.now() < REFRESH_BEFORE_MS)
-  );
-  if (refreshNeeded) {
+    || (usesAccessToken && (!accessExpiry || accessExpiry - Date.now() < REFRESH_BEFORE_MS))
+  ));
+  if (needsRefresh && sessionToken) {
     try {
       if (!await refreshSession(sessionToken)) {
         expireSession();
@@ -62,7 +62,9 @@ export async function authenticatedFetch(
       // Keep the session and current work intact while the network is unavailable.
     }
   }
-  const token = needsAccessToken ? window.sessionStorage.getItem(ACCESS_TOKEN_KEY) : sessionToken;
+  const token = usesAccessToken
+    ? window.sessionStorage.getItem(ACCESS_TOKEN_KEY)
+    : window.sessionStorage.getItem(TOKEN_KEY);
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
   const response = await fetch(input, { ...init, headers });

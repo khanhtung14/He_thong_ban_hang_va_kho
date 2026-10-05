@@ -5,6 +5,8 @@ import ChangePassword from "./ChangePassword";
 import CreateUser from "./CreateUser";
 import ForgotPassword from "./ForgotPassword";
 import Login from "./Login";
+import Navigation from "./Navigation";
+import Profile from "./Profile";
 import RoleWorkspace from "./RoleWorkspace";
 
 const rootElement = document.getElementById("root");
@@ -28,13 +30,17 @@ const page = currentPath === "/errors/403"
   ? <Error403 />
   : currentPath === "/admin/users/create"
     ? <CreateUser />
-    : roleWorkspacePaths.includes(currentPath)
-      ? <RoleWorkspace />
-  : currentPath === "/change-password"
-    ? <ChangePassword />
-    : currentPath === "/forgot-password"
-      ? <ForgotPassword />
-    : <Login />;
+    : currentPath === "/change-password"
+      ? <ChangePassword />
+      : currentPath === "/profile"
+        ? <Profile />
+        : currentPath === "/forgot-password"
+          ? <ForgotPassword />
+          : currentPath === "/navigation" || currentPath === "/navigation-ui"
+            ? <Navigation />
+            : roleWorkspacePaths.includes(currentPath)
+              ? <RoleWorkspace />
+              : <Login />;
 
 createRoot(rootElement).render(
   <StrictMode>
