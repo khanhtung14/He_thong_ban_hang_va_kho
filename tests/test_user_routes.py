@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -7,7 +9,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.user_routes import get_db, router
+from src.backend.security import require_admin
+from backend.user_routes import get_db, router
 
 
 @pytest.fixture
@@ -62,6 +65,12 @@ def db_session_and_client():
             session.close()
 
     test_app.dependency_overrides[get_db] = override_get_db
+    # These tests exercise route behavior as an authenticated administrator.
+    # Production requests still use require_admin and must present a valid session.
+    test_app.dependency_overrides[require_admin] = lambda: SimpleNamespace(
+        id=999,
+        roles=[SimpleNamespace(code="ADMIN")],
+    )
 
     with TestClient(test_app) as client:
         yield client, engine
