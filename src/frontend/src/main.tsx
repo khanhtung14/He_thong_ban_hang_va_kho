@@ -5,6 +5,7 @@ import ChangePassword from "./ChangePassword";
 import CreateUser from "./CreateUser";
 import ForgotPassword from "./ForgotPassword";
 import Login from "./Login";
+import RoleWorkspace from "./RoleWorkspace";
 
 const rootElement = document.getElementById("root");
 
@@ -13,13 +14,22 @@ if (!rootElement) {
 }
 
 const currentPath = window.location.pathname;
-if (currentPath === "/admin/users") {
-  document.title = "Tạo tài khoản | OMS";
-}
+const roleWorkspacePaths = [
+  "/portal/orders",
+  "/sales/orders",
+  "/manager/dashboard",
+  "/warehouse/picking",
+  "/warehouse/dashboard",
+  "/accounting/debt-book",
+  "/admin/users",
+];
+if (currentPath.startsWith("/admin/users")) document.title = "Quản trị tài khoản | OMS";
 const page = currentPath === "/errors/403"
   ? <Error403 />
-  : currentPath === "/admin/users"
+  : currentPath === "/admin/users/create"
     ? <CreateUser />
+    : roleWorkspacePaths.includes(currentPath)
+      ? <RoleWorkspace />
   : currentPath === "/change-password"
     ? <ChangePassword />
     : currentPath === "/forgot-password"

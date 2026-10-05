@@ -126,7 +126,23 @@ def change_password_page():
 
 @app.get("/admin/users", response_class=HTMLResponse, include_in_schema=False)
 def admin_users_page():
-    """Serve the admin user management screen."""
+    """Serve the admin dashboard and account list."""
+    return login_page_response()
+
+
+@app.get("/admin/users/create", response_class=HTMLResponse, include_in_schema=False)
+def admin_create_user_page():
+    return login_page_response()
+
+
+@app.get("/portal/orders", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/sales/orders", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/manager/dashboard", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/picking", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/dashboard", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/debt-book", response_class=HTMLResponse, include_in_schema=False)
+def role_workspace_page():
+    """Serve the React role workspace selected by the login redirect."""
     return login_page_response()
 
 

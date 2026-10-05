@@ -34,6 +34,8 @@ type LoginResponse = {
   redirect_url: string;
   session_token?: string;
   expires_in?: number;
+  access_token?: string;
+  user?: { username?: string; role_code?: string };
 };
 
 type ApiError = {
@@ -76,6 +78,12 @@ export default function Login() {
             String(Date.now() + (result.expires_in ?? 12 * 60 * 60) * 1000),
           );
         }
+        if (result.access_token) {
+          window.sessionStorage.setItem("access_token", result.access_token);
+          window.sessionStorage.setItem("access_token_expires_at", String(Date.now() + 58 * 60 * 1000));
+        }
+        if (result.user?.username) window.sessionStorage.setItem("user_name", result.user.username);
+        if (result.user?.role_code) window.sessionStorage.setItem("user_role", result.user.role_code);
         const requestedRedirect = new URLSearchParams(window.location.search).get("redirect");
         const safeRedirect = requestedRedirect?.startsWith("/") && !requestedRedirect.startsWith("//")
           ? requestedRedirect
