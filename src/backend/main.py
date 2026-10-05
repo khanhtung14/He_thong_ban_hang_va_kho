@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 try:  # Supports both `python -m src.backend.main` and running this file directly.
     from src.backend.change_password import router as change_password_router
@@ -17,6 +18,8 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.products import router as products_router
     from src.backend.reports import router as reports_router
     from src.backend.session import router as session_router
+    from src.backend.profile import migrate_profile_schema, router as profile_router
+    from src.backend.users import compat_router as users_compat_router, router as users_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
@@ -27,6 +30,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from products import router as products_router
     from reports import router as reports_router
     from session import router as session_router
+    from profile import migrate_profile_schema, router as profile_router
+    from users import compat_router as users_compat_router, router as users_router
 
 try:
     from src.backend.user_routes import router as user_router
@@ -34,9 +39,22 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from user_routes import router as user_router
 
 app = FastAPI(
-    title="Hệ thống Bán hàng và Kho - Authentication & Password Management",
-    description="Đăng nhập, đổi mật khẩu và quên/đặt lại mật khẩu qua email.",
+    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
+    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
     version="1.0.0",
+)
+
+
+@app.on_event("startup")
+def migrate_profile_database() -> None:
+    migrate_profile_schema()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
@@ -66,7 +84,10 @@ def login_page_response(status_code: int = 200) -> HTMLResponse:
             "React frontend is not built. Run `npm install` and `npm run build` in src/frontend.",
             status_code=503,
         )
-    return HTMLResponse(content=FRONTEND_INDEX.read_text(encoding="utf-8"), status_code=status_code)
+    return HTMLResponse(
+        content=FRONTEND_INDEX.read_text(encoding="utf-8"),
+        status_code=status_code,
+    )
 
 
 def forbidden_page(headers: dict[str, str] | None = None) -> Response:
@@ -101,7 +122,10 @@ app.include_router(inventory_router)
 app.include_router(products_router)
 app.include_router(reports_router)
 app.include_router(navigation_router)
+app.include_router(users_router)
+app.include_router(users_compat_router)
 app.include_router(user_router)
+app.include_router(profile_router)
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -133,9 +157,30 @@ def change_password_page():
     return login_page_response()
 
 
+@app.get("/profile", response_class=HTMLResponse, include_in_schema=False)
+def profile_page():
+    return login_page_response()
+
+
 @app.get("/admin/users", response_class=HTMLResponse, include_in_schema=False)
 def admin_users_page():
-    """Serve the admin user management screen."""
+    """Serve the admin dashboard and account list."""
+    return login_page_response()
+
+
+@app.get("/admin/users/create", response_class=HTMLResponse, include_in_schema=False)
+def admin_create_user_page():
+    return login_page_response()
+
+
+@app.get("/portal/orders", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/sales/orders", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/manager/dashboard", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/picking", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/dashboard", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/debt-book", response_class=HTMLResponse, include_in_schema=False)
+def role_workspace_page():
+    """Serve the React role workspace selected by the login redirect."""
     return login_page_response()
 
 
