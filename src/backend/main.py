@@ -17,7 +17,7 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.products import router as products_router
     from src.backend.reports import router as reports_router
     from src.backend.session import router as session_router
-    from src.backend.profile import router as profile_router
+    from src.backend.profile import migrate_profile_schema, router as profile_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
@@ -27,7 +27,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from products import router as products_router
     from reports import router as reports_router
     from session import router as session_router
-    from profile import router as profile_router
+    from profile import migrate_profile_schema, router as profile_router
 
 try:
     from src.backend.user_routes import router as user_router
@@ -39,6 +39,11 @@ app = FastAPI(
     description="Đăng nhập, đổi mật khẩu và quên/đặt lại mật khẩu qua email.",
     version="1.0.0",
 )
+
+
+@app.on_event("startup")
+def migrate_profile_database() -> None:
+    migrate_profile_schema()
 
 app.add_middleware(
     CORSMiddleware,

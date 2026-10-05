@@ -112,6 +112,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(254), nullable=False)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(20))
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     status: Mapped[AccountStatus] = mapped_column(
