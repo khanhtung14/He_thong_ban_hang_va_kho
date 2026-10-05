@@ -15,6 +15,7 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.products import router as products_router
     from src.backend.reports import router as reports_router
     from src.backend.session import router as session_router
+    from src.backend.users import compat_router as users_compat_router, router as users_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
@@ -23,6 +24,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from products import router as products_router
     from reports import router as reports_router
     from session import router as session_router
+    from users import compat_router as users_compat_router, router as users_router
 
 try:
     from src.backend.user_routes import router as user_router
@@ -30,8 +32,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from user_routes import router as user_router
 
 app = FastAPI(
-    title="Hệ thống Bán hàng và Kho - Authentication & Password Management",
-    description="Đăng nhập, đổi mật khẩu và quên/đặt lại mật khẩu qua email.",
+    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
+    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
     version="1.0.0",
 )
 
@@ -95,6 +97,8 @@ app.include_router(session_router)
 app.include_router(inventory_router)
 app.include_router(products_router)
 app.include_router(reports_router)
+app.include_router(users_router)
+app.include_router(users_compat_router)
 app.include_router(user_router)
 
 

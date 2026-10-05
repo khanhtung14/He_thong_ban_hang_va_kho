@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.backend.security import require_admin
-from backend.user_routes import get_db, router
+from src.backend.user_routes import get_db, router
 
 
 @pytest.fixture

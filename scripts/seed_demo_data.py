@@ -23,7 +23,7 @@ DATABASE_DIR.mkdir(exist_ok=True)
 os.environ.setdefault("DATABASE_URL", "sqlite:///./database/demo.db")
 sys.path.insert(0, str(ROOT))
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import inspect, select  # noqa: E402
 
 from src.backend.database import SessionLocal, engine  # noqa: E402
 from src.backend.models import (  # noqa: E402
@@ -98,6 +98,7 @@ ACCOUNT_DEFINITIONS = [
 
 
 def seed() -> Path:
+    _upgrade_legacy_demo_schema()
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -217,6 +218,28 @@ def seed() -> Path:
         raise
     finally:
         db.close()
+
+
+def _upgrade_legacy_demo_schema() -> None:
+    """Add columns introduced after an existing local SQLite demo DB was created."""
+    if engine.dialect.name != "sqlite":
+        return
+
+    inspector = inspect(engine)
+    if not inspector.has_table("users"):
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("users")}
+    with engine.begin() as connection:
+        if "phone" not in existing_columns:
+            connection.exec_driver_sql("ALTER TABLE users ADD COLUMN phone VARCHAR(20)")
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_users_phone ON users (phone)"
+            )
+        if "must_change_password" not in existing_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 1"
+            )
 
 
 if __name__ == "__main__":
