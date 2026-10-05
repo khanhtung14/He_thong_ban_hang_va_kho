@@ -26,7 +26,6 @@ const roleWorkspacePaths = [
   "/admin/users",
 ];
 if (currentPath.startsWith("/admin/users")) document.title = "Quản trị tài khoản | OMS";
-
 const page = currentPath === "/errors/403"
   ? <Error403 />
   : currentPath === "/admin/users/create"

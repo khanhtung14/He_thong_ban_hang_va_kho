@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { authenticatedFetch } from "./session";
 
 type ApiError = { detail?: string };
 
@@ -34,7 +35,7 @@ export default function ChangePassword() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/change-password", {
+      const response = await authenticatedFetch("/api/v1/auth/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -102,10 +103,22 @@ export default function ChangePassword() {
             </button>
           </form>
           <p style={{ margin: "18px 0 0", textAlign: "center" }}>
-            <a href="/login">Quay lại đăng nhập</a>
+            <a href={getRoleHome()}>Quay lại giao diện trước</a>
           </p>
         </section>
       </main>
     </>
   );
+}
+
+function getRoleHome(): string {
+  const role = window.sessionStorage.getItem("user_role")?.toUpperCase();
+  if (role === "CUSTOMER") return "/portal/orders";
+  if (role === "SALES" || role === "SALES_REP") return "/sales/orders";
+  if (role === "SALES_MANAGER") return "/manager/dashboard";
+  if (role === "WAREHOUSE") return "/warehouse/picking";
+  if (role === "WH_MANAGER" || role === "WAREHOUSE_MANAGER") return "/warehouse/dashboard";
+  if (role === "ACCOUNTANT") return "/accounting/debt-book";
+  if (role === "ADMIN" || role === "ADMINISTRATOR") return "/admin/users";
+  return "/login";
 }

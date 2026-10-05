@@ -40,13 +40,21 @@ class UpdateProfileRequest(BaseModel):
 
 
 def migrate_profile_schema() -> None:
-    """Add the profile field to databases created before this feature."""
+    """Add columns used by profile/auth features to databases created earlier."""
     if not inspect(engine).has_table("users"):
         return
     columns = {column["name"] for column in inspect(engine).get_columns("users")}
-    if "phone" not in columns:
+    additions = {
+        "phone": "VARCHAR(20) NULL",
+        # Existing demo databases predate the temporary-password workflow.
+        # New users must change their initial password after first login.
+        "must_change_password": "BOOLEAN NOT NULL DEFAULT 1",
+    }
+    missing = [(name, definition) for name, definition in additions.items() if name not in columns]
+    if missing:
         with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL"))
+            for name, definition in missing:
+                connection.execute(text(f"ALTER TABLE users ADD COLUMN {name} {definition}"))
 
 
 def _serialize_profile(user: User) -> dict:

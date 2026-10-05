@@ -10,6 +10,10 @@ const styles = `
   .login-subtitle { margin: 10px 0 28px; color: #6b7280; line-height: 1.5; }
   .login-field { display: grid; gap: 8px; margin-bottom: 18px; }
   .login-field label { font-size: 14px; font-weight: 600; }
+  .login-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .login-forgot-link { color: #2563eb; font-size: 13px; font-weight: 600; text-decoration: none; }
+  .login-forgot-link:hover { text-decoration: underline; }
+  .login-forgot-link:focus-visible { outline: 3px solid #bfdbfe; outline-offset: 2px; border-radius: 2px; }
   .login-input { width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; color: inherit; background: #fff; font: inherit; }
   .login-input:focus { outline: 3px solid #bfdbfe; border-color: #2563eb; }
   .password-wrap { position: relative; }
@@ -133,7 +137,10 @@ export default function Login() {
               />
             </div>
             <div className="login-field">
-              <label htmlFor="password">Mật khẩu</label>
+              <div className="login-field-heading">
+                <label htmlFor="password">Mật khẩu</label>
+                <a className="login-forgot-link" href="/forgot-password">Quên mật khẩu?</a>
+              </div>
               <div className="password-wrap">
                 <input
                   className="login-input"
@@ -162,9 +169,6 @@ export default function Login() {
               {isSubmitting ? "Đang đăng nhập…" : "Đăng nhập"}
             </button>
           </form>
-          <p style={{ margin: "18px 0 0", textAlign: "center" }}>
-            <a href="/forgot-password">Quên mật khẩu?</a>
-          </p>
         </section>
       </main>
     </>
