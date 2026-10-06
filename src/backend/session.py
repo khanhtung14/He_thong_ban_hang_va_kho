@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -30,7 +30,7 @@ _bearer = HTTPBearer(auto_error=False)
 def refresh_session(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> dict[str, int | str]:
+) -> Dict[str, Union[int, str]]:
     """Extend an active session; revoked, expired, or disabled sessions stay invalid."""
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Phiên làm việc đã hết hạn.")

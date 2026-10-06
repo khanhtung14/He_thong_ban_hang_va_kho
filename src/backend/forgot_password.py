@@ -6,7 +6,7 @@ import secrets
 import smtplib
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
-from typing import Any
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 
 import bcrypt
@@ -31,7 +31,7 @@ GENERIC_SUCCESS_MESSAGE = (
 )
 
 # Only used when SMTP is not configured, for local development and demos.
-mock_outbox: list[dict[str, Any]] = []
+mock_outbox: List[Dict[str, Any]] = []
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -105,7 +105,9 @@ def _send_reset_email(to_email: str, full_name: str, reset_link: str) -> None:
         smtp.send_message(message)
 
 
-def _load_valid_token(db: Session, token: str) -> tuple[PasswordResetToken, User] | None:
+def _load_valid_token(
+    db: Session, token: str
+) -> Optional[Tuple[PasswordResetToken, User]]:
     record = (
         db.query(PasswordResetToken)
         .filter(PasswordResetToken.token_hash == _token_hash(token))

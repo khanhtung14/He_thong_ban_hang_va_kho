@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/v1/navigation", tags=["Navigation"])
 # 1. Role & Display Name Definitions
 # ---------------------------------------------------------------------------
 
-ROLE_DISPLAY_NAMES: dict[str, str] = {
+ROLE_DISPLAY_NAMES: Dict[str, str] = {
     "WAREHOUSE": "Nhân viên kho",
     "WH_MANAGER": "Quản lý kho",
     "SALES": "Nhân viên kinh doanh",
@@ -55,12 +55,12 @@ class MenuItem(BaseModel):
     title: str
     path: str
     icon: str
-    roles: list[str]
+    roles: List[str]
     order: int
     category: str = "Chức năng chính"
 
 
-MENU_REGISTRY: list[MenuItem] = [
+MENU_REGISTRY: List[MenuItem] = [
     # Kho hàng (Warehouse & WH Manager)
     MenuItem(
         id="warehouse-picking",
@@ -220,7 +220,7 @@ MENU_REGISTRY: list[MenuItem] = [
 # 3. Demo / Fixture Profiles (Used when testing or running standalone demo)
 # ---------------------------------------------------------------------------
 
-DEMO_PROFILES: dict[str, dict[str, Any]] = {
+DEMO_PROFILES: Dict[str, Dict[str, Any]] = {
     "WAREHOUSE": {
         "username": "tranvankho",
         "full_name": "Trần Văn Kho",
@@ -283,7 +283,7 @@ DEMO_PROFILES: dict[str, dict[str, Any]] = {
 # 4. Helper Functions
 # ---------------------------------------------------------------------------
 
-def normalize_role(role: str | None) -> str:
+def normalize_role(role: Optional[str]) -> str:
     if not role:
         return "SALES"
     r = role.strip().upper()
@@ -292,7 +292,7 @@ def normalize_role(role: str | None) -> str:
     return r
 
 
-def get_menu_items_for_role(role_code: str) -> list[dict[str, Any]]:
+def get_menu_items_for_role(role_code: str) -> List[Dict[str, Any]]:
     """Return strictly the menu items allowed for the specified role.
     
     Menu items not authorized for this role are completely excluded.
@@ -306,7 +306,7 @@ def get_menu_items_for_role(role_code: str) -> list[dict[str, Any]]:
     return filtered
 
 
-def get_hidden_menu_items_for_role(role_code: str) -> list[dict[str, Any]]:
+def get_hidden_menu_items_for_role(role_code: str) -> List[Dict[str, Any]]:
     """Return menu items that this role is NOT allowed to see."""
     normalized = normalize_role(role_code)
     hidden = [
@@ -358,8 +358,8 @@ def resolve_user_scope(user: Any) -> str:
 
 def build_navigation_context(
     user_or_profile: Any,
-    override_role: str | None = None,
-) -> dict[str, Any]:
+    override_role: Optional[str] = None,
+) -> Dict[str, Any]:
     """Build the complete navigation response for a user or demo profile."""
     # Xử lý trường hợp đối tượng User model của SQLAlchemy
     if hasattr(user_or_profile, "username"):

@@ -23,7 +23,7 @@ def payload(**overrides):
 
 
 def manager(client):
-    token = create_access_token({"sub": "manager_user", "role": "Sales Manager"})
+    token = create_access_token({"sub": "price-list-manager", "role": "Sales Manager"})
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -106,11 +106,11 @@ def test_effective_price_requires_published_matching_group_and_date(client):
 
 
 def test_price_list_management_requires_sales_manager_or_admin(client):
-    sales_rep_token = create_access_token({"sub": "sales_rep_01", "role": "Sales Rep"})
+    token = create_access_token({"sub": "sales-rep", "role": "Sales Rep"})
     response = client.post(
         "/api/v1/price-lists",
         json=payload(),
-        headers={"Authorization": f"Bearer {sales_rep_token}"},
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
     assert client.post("/api/v1/price-lists", json=payload()).status_code == 401

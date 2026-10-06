@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Set, Union
 
 import jwt
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -247,8 +247,9 @@ def get_current_user(
 ) -> AuthenticatedUser:
     """Dependency that extracts and validates user identity and role.
 
-    Only a signed JWT bearer token establishes identity and role. Requests
-    without a valid token are rejected by default.
+    Supports:
+    1. Standard JWT Bearer token via `Authorization: Bearer <token>`
+    Default-Deny: Returns 401 if no valid bearer token is supplied.
     """
     # 1. Bearer token
     if auth and auth.credentials:

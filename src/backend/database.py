@@ -4,6 +4,7 @@ import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 DATABASE_URL = os.getenv(
@@ -12,10 +13,15 @@ DATABASE_URL = os.getenv(
 )
 
 connect_args = {}
+engine_options = {"pool_pre_ping": True}
 if "sqlite" in DATABASE_URL:
     connect_args = {"check_same_thread": False}
+    engine_options["connect_args"] = connect_args
+    if DATABASE_URL.endswith(":memory:") or DATABASE_URL == "sqlite://":
+        # Keep one in-memory database shared by the app and TestClient threads.
+        engine_options["poolclass"] = StaticPool
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, **engine_options)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
