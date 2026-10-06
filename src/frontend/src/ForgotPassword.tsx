@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 
 type ForgotPasswordResponse = {
   message?: string;
-  reset_link_preview?: string | null;
+  demo_mode?: boolean;
 };
 
 type ApiError = { detail?: string };
@@ -30,14 +30,14 @@ const styles = `
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
-  const [resetLink, setResetLink] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
-    setResetLink("");
+    setDemoMode(false);
     setIsError(false);
     setIsSubmitting(true);
 
@@ -54,7 +54,7 @@ export default function ForgotPassword() {
         return;
       }
       setMessage(result.message ?? "Nếu email tồn tại trong hệ thống, liên kết đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn.");
-      setResetLink(result.reset_link_preview ?? "");
+      setDemoMode(result.demo_mode === true);
     } catch {
       setIsError(true);
       setMessage("Không thể kết nối đến máy chủ. Vui lòng thử lại.");
@@ -87,8 +87,7 @@ export default function ForgotPassword() {
               />
             </div>
             {message && <p className={`forgot-message${isError ? " forgot-error" : ""}`} role={isError ? "alert" : "status"}>{message}</p>}
-            {resetLink && <p className="forgot-message">Liên kết demo: <a href={resetLink}>Đặt lại mật khẩu</a></p>}
-            {message && !isError && !resetLink && (
+            {message && !isError && demoMode && (
               <p className="forgot-subtitle" role="note">
                 Môi trường demo chưa gửi email thật. Nếu không thấy liên kết, hãy kiểm tra database demo đã được seed và xem hộp thư giả lập tại <code>/dev/mock-outbox</code>.
               </p>
