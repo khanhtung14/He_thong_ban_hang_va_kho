@@ -38,6 +38,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     # SCRUM-71: Avatar
     from avatar import router as avatar_router
 
+
 try:
     from src.backend.user_routes import router as user_router
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
@@ -83,13 +84,8 @@ def read_frontend_page(filename: str) -> HTMLResponse:
     """Serve a standalone password page from the frontend directory."""
     page_path = FRONTEND_DIR / filename
     if not page_path.is_file():
-        return HTMLResponse(
-            f"Không tìm thấy giao diện {filename}.",
-            status_code=404,
-        )
-    return HTMLResponse(
-        content=page_path.read_text(encoding="utf-8")
-    )
+        return HTMLResponse(f"Không tìm thấy giao diện {filename}.", status_code=404)
+    return HTMLResponse(content=page_path.read_text(encoding="utf-8"))
 
 
 def login_page_response(status_code: int = 200) -> HTMLResponse:

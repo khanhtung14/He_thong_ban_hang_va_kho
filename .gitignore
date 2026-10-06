@@ -1,14 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
-
-# Uploaded files
+.pytest_cache/
+# Local/generated files
+node_modules/
 uploads/
-
-# Frontend
-frontend/node_modules/
-frontend/.vscode/
-
-# VS Code
-.vscode/
-src/backend/.vscode/

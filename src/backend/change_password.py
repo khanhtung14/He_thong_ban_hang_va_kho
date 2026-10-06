@@ -1,6 +1,16 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 import bcrypt
+
+try:
+    from src.backend.database import get_db
+    from src.backend.models import User
+    from src.backend.security import require_active_user
+except ImportError:  # pragma: no cover - direct script execution
+    from .database import get_db
+    from .models import User
+    from .security import require_active_user
 
 router = APIRouter()
 
@@ -14,8 +24,44 @@ fake_user = {
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=1, max_length=128)
+
+
+@router.post("/api/v1/auth/change-password")
+def change_authenticated_password(
+    data: ChangePasswordRequest,
+    user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+):
+    """Change the password for the currently authenticated account."""
+    try:
+        current_matches = bcrypt.checkpw(
+            data.current_password.encode("utf-8"),
+            user.password_hash.encode("utf-8"),
+        )
+    except (ValueError, TypeError):
+        current_matches = False
+    if not current_matches:
+        raise HTTPException(status_code=400, detail="Mật khẩu hiện tại không đúng")
+    if data.current_password == data.new_password:
+        raise HTTPException(status_code=400, detail="Mật khẩu mới không được giống mật khẩu hiện tại")
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Mật khẩu mới phải có ít nhất 8 ký tự")
+    if not any(char.isalpha() for char in data.new_password):
+        raise HTTPException(status_code=400, detail="Mật khẩu mới phải chứa chữ")
+    if not any(char.isdigit() for char in data.new_password):
+        raise HTTPException(status_code=400, detail="Mật khẩu mới phải chứa số")
+
+    from datetime import datetime, timezone
+
+    user.password_hash = bcrypt.hashpw(
+        data.new_password.encode("utf-8"), bcrypt.gensalt()
+    ).decode("utf-8")
+    user.must_change_password = False
+    user.password_changed_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Đổi mật khẩu thành công"}
 
 
 @router.post("/change-password")

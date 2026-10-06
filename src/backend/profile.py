@@ -35,9 +35,7 @@ class UpdateProfileRequest(BaseModel):
     def validate_vietnamese_phone(cls, value: str) -> str:
         value = value.strip()
         if not re.fullmatch(r"0[0-9]{9}", value):
-            raise ValueError(
-                "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0."
-            )
+            raise ValueError("Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0.")
         return value
 
 
@@ -45,55 +43,32 @@ def migrate_profile_schema() -> None:
     """Add columns used by profile/auth features to databases created earlier."""
     if not inspect(engine).has_table("users"):
         return
-
-    columns = {
-        column["name"]
-        for column in inspect(engine).get_columns("users")
-    }
-
+    columns = {column["name"] for column in inspect(engine).get_columns("users")}
     additions = {
         "phone": "VARCHAR(20) NULL",
+        # Existing demo databases predate the temporary-password workflow.
+        # New users must change their initial password after first login.
         "must_change_password": "BOOLEAN NOT NULL DEFAULT 1",
     }
-
-    missing = [
-        (name, definition)
-        for name, definition in additions.items()
-        if name not in columns
-    ]
-
+    missing = [(name, definition) for name, definition in additions.items() if name not in columns]
     if missing:
         with engine.begin() as connection:
             for name, definition in missing:
-                connection.execute(
-                    text(
-                        f"ALTER TABLE users ADD COLUMN "
-                        f"{name} {definition}"
-                    )
-                )
+                connection.execute(text(f"ALTER TABLE users ADD COLUMN {name} {definition}"))
 
 
 def _serialize_profile(user: User) -> dict:
     role = user.roles[0] if user.roles else None
     warehouses = [warehouse.name for warehouse in user.warehouses]
     territories = [territory.name for territory in user.territories]
-
     return {
         "username": user.username,
         "email": user.email,
         "full_name": user.full_name,
         "phone": user.phone or "",
         "role": role.name if role else "Chưa gán vai trò",
-        "warehouse": (
-            ", ".join(warehouses)
-            if warehouses
-            else "Chưa phân kho"
-        ),
-        "area": (
-            ", ".join(territories)
-            if territories
-            else "Chưa phân địa bàn"
-        ),
+        "warehouse": ", ".join(warehouses) if warehouses else "Chưa phân kho",
+        "area": ", ".join(territories) if territories else "Chưa phân địa bàn",
     }
 
 
@@ -101,6 +76,7 @@ def _serialize_profile(user: User) -> dict:
 def get_profile(
     user: User = Depends(require_active_user),
 ) -> dict:
+    # The startup migration runs before auth queries load the newly mapped field.
     return _serialize_profile(user)
 
 
@@ -112,7 +88,6 @@ def update_profile(
 ) -> dict:
     user.full_name = request.full_name
     user.phone = request.phone
-
     try:
         db.commit()
     except Exception as exc:
@@ -121,10 +96,5 @@ def update_profile(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Không thể lưu hồ sơ lúc này. Vui lòng thử lại.",
         ) from exc
-
     db.refresh(user)
-
-    return {
-        "message": "Cập nhật hồ sơ thành công.",
-        "profile": _serialize_profile(user),
-    }
+    return {"message": "Cập nhật hồ sơ thành công.", "profile": _serialize_profile(user)}
