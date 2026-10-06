@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.orm import Session
 
 from src.backend.database import get_db
-from src.backend.models import AccountStatus
+from src.backend.models import AccountStatus, User
 from src.backend.schemas import (
     CreateUserResult,
     UserCreate,
@@ -104,7 +104,7 @@ def get_user_detail(
 def update_user_info(
     user_id: int,
     data: UserUpdate,
-    x_actor_id: Optional[int] = Header(None, alias="X-Actor-Id"),
+    current_admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -116,5 +116,5 @@ def update_user_info(
     - Trạng thái (khóa / mở khóa)
     - Ghi audit log hệ thống
     """
-    updated = update_user(db=db, user_id=user_id, user_data=data, actor_user_id=x_actor_id)
+    updated = update_user(db=db, user_id=user_id, user_data=data, actor_user_id=current_admin.id)
     return UserResponse.model_validate(updated)

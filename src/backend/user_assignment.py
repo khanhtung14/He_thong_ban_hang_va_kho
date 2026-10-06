@@ -1,103 +1,131 @@
-"""API endpoints and business logic for SCRUM-63: Assign roles, warehouses, and territories."""
+"""Admin APIs for assigning user roles and operating scopes."""
 
 from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .database import get_db
-from .models import User, Role, Warehouse, Territory, AccountAuditLog
-from .login import get_current_user
+try:
+    from src.backend.database import get_db
+    from src.backend.models import AccountAuditLog, Role, Territory, User, Warehouse
+    from src.backend.security import require_admin
+except ImportError:  # pragma: no cover - direct script execution
+    from database import get_db
+    from models import AccountAuditLog, Role, Territory, User, Warehouse
+    from security import require_admin
 
 
-router = APIRouter(prefix="/api/admin/users", tags=["User Assignment"])
+router = APIRouter(prefix="/api/v1/admin", tags=["Admin User Assignments"])
 
 
 class AssignmentUpdateRequest(BaseModel):
-    role_ids: List[int]
-    warehouse_ids: List[int] = []
-    territory_ids: List[int] = []
+    role_ids: List[int] = Field(default_factory=list)
+    warehouse_ids: List[int] = Field(default_factory=list)
+    territory_ids: List[int] = Field(default_factory=list)
 
 
-ADMIN_ROLE_CODE = "ADMIN"
-WAREHOUSE_ROLE_CODES = ["WAREHOUSE_KEEPER", "THU_KHO", "WAREHOUSE_STAFF"]
+WAREHOUSE_ROLE_CODES = {"WAREHOUSE", "WH_MANAGER", "WAREHOUSE_KEEPER", "THU_KHO", "WAREHOUSE_STAFF"}
 
 
-@router.put("/{user_id}/assignments")
+def _assignment_payload(user: User) -> dict:
+    return {
+        "user_id": user.id,
+        "role_ids": [role.id for role in user.roles],
+        "warehouse_ids": [warehouse.id for warehouse in user.warehouses],
+        "territory_ids": [territory.id for territory in user.territories],
+    }
+
+
+@router.get("/assignment-options")
+def get_assignment_options(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    return {
+        "roles": [
+            {"id": role.id, "code": role.code, "name": role.name}
+            for role in db.query(Role).order_by(Role.name).all()
+        ],
+        "warehouses": [
+            {"id": warehouse.id, "code": warehouse.code, "name": warehouse.name}
+            for warehouse in db.query(Warehouse)
+            .filter(Warehouse.is_active.is_(True))
+            .order_by(Warehouse.name)
+            .all()
+        ],
+        "territories": [
+            {"id": territory.id, "code": territory.code, "name": territory.name}
+            for territory in db.query(Territory).order_by(Territory.name).all()
+        ],
+    }
+
+
+@router.get("/users/{user_id}/assignments")
+def get_user_assignments(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy người dùng.")
+    return _assignment_payload(user)
+
+
+@router.put("/users/{user_id}/assignments")
 def update_user_assignments(
     user_id: int,
     payload: AssignmentUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_admin: User = Depends(require_admin),
 ):
     target_user = db.query(User).filter(User.id == user_id).first()
-    if not target_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Người dùng không tồn tại",
-        )
+    if target_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy người dùng.")
 
-    new_roles = db.query(Role).filter(Role.id.in_(payload.role_ids)).all()
-    new_role_codes = {r.code.upper() for r in new_roles}
+    role_ids = set(payload.role_ids)
+    warehouse_ids = set(payload.warehouse_ids)
+    territory_ids = set(payload.territory_ids)
+    new_roles = db.query(Role).filter(Role.id.in_(role_ids)).all() if role_ids else []
+    if not new_roles:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Người dùng phải có ít nhất một vai trò.")
+    if len(new_roles) != len(role_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Có vai trò được chọn không tồn tại.")
 
-    # 1. Không thể tự thu hồi vai trò quản trị của chính mình
-    if current_user.id == target_user.id:
-        has_admin_currently = any(r.code.upper() == ADMIN_ROLE_CODE for r in target_user.roles)
-        will_have_admin = ADMIN_ROLE_CODE in new_role_codes
-        if has_admin_currently and not will_have_admin:
+    new_role_codes = {role.code.upper() for role in new_roles}
+    if target_user.id == current_admin.id:
+        currently_admin = any(role.code.upper() == "ADMIN" for role in target_user.roles)
+        if currently_admin and "ADMIN" not in new_role_codes:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Không thể tự thu hồi vai trò quản trị của chính mình.",
             )
 
-    # 2. Người dùng thuộc vai trò kho phải gắn với ít nhất một kho cụ thể
-    is_warehouse_user = any(code in new_role_codes for code in WAREHOUSE_ROLE_CODES)
-    if is_warehouse_user:
-        if not payload.warehouse_ids or len(payload.warehouse_ids) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Người dùng thuộc vai trò kho phải gắn với ít nhất một kho cụ thể.",
-            )
-        new_warehouses = (
-            db.query(Warehouse)
-            .filter(Warehouse.id.in_(payload.warehouse_ids), Warehouse.is_active == True)
-            .all()
-        )
-        if len(new_warehouses) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Kho được gán không tồn tại hoặc không còn hoạt động.",
-            )
-    else:
-        new_warehouses = []
-
-    # 3. Gán địa bàn
-    new_territories = []
-    if payload.territory_ids:
-        new_territories = (
-            db.query(Territory).filter(Territory.id.in_(payload.territory_ids)).all()
+    new_warehouses = db.query(Warehouse).filter(
+        Warehouse.id.in_(warehouse_ids), Warehouse.is_active.is_(True)
+    ).all() if warehouse_ids else []
+    if len(new_warehouses) != len(warehouse_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Có kho được chọn không tồn tại hoặc đã ngừng hoạt động.")
+    if new_role_codes & WAREHOUSE_ROLE_CODES and not new_warehouses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Người dùng thuộc vai trò kho phải được gắn với ít nhất một kho đang hoạt động.",
         )
 
-    # 4. Gán vai trò (nhiều vai trò cùng lúc)
+    new_territories = db.query(Territory).filter(Territory.id.in_(territory_ids)).all() if territory_ids else []
+    if len(new_territories) != len(territory_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Có địa bàn được chọn không tồn tại.")
+
     target_user.roles = new_roles
     target_user.warehouses = new_warehouses
     target_user.territories = new_territories
-
-    audit_log = AccountAuditLog(
+    db.add(AccountAuditLog(
         user_id=target_user.id,
-        actor_user_id=current_user.id,
+        actor_user_id=current_admin.id,
         action="UPDATE_USER_ASSIGNMENTS",
-        reason=f"Roles: {list(new_role_codes)}, Warehouses: {payload.warehouse_ids}",
-    )
-    db.add(audit_log)
-
+        reason=f"Roles: {sorted(new_role_codes)}, Warehouses: {sorted(warehouse_ids)}, Territories: {sorted(territory_ids)}",
+    ))
     db.commit()
     db.refresh(target_user)
-
-    return {
-        "message": "Gán vai trò và phạm vi hoạt động thành công!",
-        "user_id": target_user.id,
-        "roles": [r.code for r in target_user.roles],
-        "warehouses": [w.code for w in target_user.warehouses],
-        "territories": [t.code for t in target_user.territories],
-    }
+    return {"message": "Đã cập nhật vai trò và phạm vi hoạt động.", **_assignment_payload(target_user)}

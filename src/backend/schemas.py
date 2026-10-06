@@ -21,6 +21,14 @@ class RoleResponse(BaseModel):
     description: Optional[str] = None
 
 
+class TerritoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+
+
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, description="Tên đăng nhập")
     full_name: str = Field(..., min_length=1, max_length=150, description="Họ và tên")
@@ -61,6 +69,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     role_codes: Optional[List[str]] = Field(default=None, description="Danh sách mã vai trò (hoặc vai trò đơn)")
     role: Optional[str] = Field(default=None, description="Mã vai trò đơn (tiện ích cho form)")
+    warehouse_ids: List[int] = Field(default_factory=list)
+    territory_ids: List[int] = Field(default_factory=list)
     status: Optional[AccountStatus] = Field(default=AccountStatus.PENDING_ACTIVATION, description="Trạng thái tài khoản ban đầu (mặc định chờ kích hoạt theo SCRUM-100)")
 
 
@@ -105,6 +115,7 @@ class UserResponse(BaseModel):
     status: AccountStatus
     must_change_password: bool = True
     roles: List[RoleResponse] = []
+    territories: List[TerritoryResponse] = Field(default_factory=list)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
