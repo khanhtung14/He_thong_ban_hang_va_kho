@@ -42,9 +42,16 @@ export async function authenticatedFetch(
   const headers = new Headers(init.headers);
   const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
   const pathname = new URL(requestUrl, window.location.origin).pathname;
-  const usesAccessToken = ["/api/v1/products", "/api/v1/inventory", "/api/v1/reports"].some(
+  const usesAccessToken = [
+    "/api/v1/products",
+    "/api/v1/inventory",
+    "/api/v1/reports",
+    "/api/v1/customers",
+    "/api/v1/orders",
+  ].some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+
   const sessionToken = window.sessionStorage.getItem(TOKEN_KEY);
   const sessionExpiry = Number(window.sessionStorage.getItem(EXPIRY_KEY) || 0);
   const accessExpiry = Number(window.sessionStorage.getItem(ACCESS_EXPIRY_KEY) || 0);
