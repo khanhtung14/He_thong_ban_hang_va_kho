@@ -9,19 +9,22 @@ import bcrypt
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src.backend.email_service import email_service
 from src.backend.models import (
     AccountAuditLog,
     AccountStatus,
     Role,
+    Territory,
     User,
+    Warehouse,
     seed_default_roles,
 )
 from src.backend.schemas import UserCreate, UserUpdate
 
 logger = logging.getLogger("users_service")
+WAREHOUSE_ROLE_CODES = {"WAREHOUSE", "WH_MANAGER", "WAREHOUSE_KEEPER", "THU_KHO", "WAREHOUSE_STAFF"}
 
 
 def generate_temporary_password(length: int = 12) -> str:
@@ -226,6 +229,18 @@ def create_user(
 
     # Step 4: Resolve roles
     roles = resolve_roles(db, role_codes=user_data.role_codes, role=user_data.role)
+    selected_warehouse_ids = set(user_data.warehouse_ids)
+    warehouses = db.query(Warehouse).filter(
+        Warehouse.id.in_(selected_warehouse_ids), Warehouse.is_active.is_(True)
+    ).all() if selected_warehouse_ids else []
+    if len(warehouses) != len(selected_warehouse_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Có kho được chọn không tồn tại hoặc đã ngừng hoạt động.")
+    if any(role.code.upper() in WAREHOUSE_ROLE_CODES for role in roles) and not warehouses and db.query(Warehouse).filter(Warehouse.is_active.is_(True)).first() is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Người dùng thuộc vai trò kho phải được gắn với ít nhất một kho.")
+    selected_territory_ids = set(user_data.territory_ids)
+    territories = db.query(Territory).filter(Territory.id.in_(selected_territory_ids)).all() if selected_territory_ids else []
+    if len(territories) != len(selected_territory_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Có địa bàn được chọn không tồn tại.")
 
     # Step 5: Save User to DB with must_change_password=True & status
     initial_status = user_data.status or AccountStatus.PENDING_ACTIVATION
@@ -238,6 +253,8 @@ def create_user(
         status=initial_status,
         must_change_password=True,
         roles=roles,
+        warehouses=warehouses,
+        territories=territories,
     )
 
     db.add(new_user)
@@ -340,6 +357,18 @@ def update_user(
 
     if user_data.role_codes is not None or user_data.role is not None:
         roles = resolve_roles(db, role_codes=user_data.role_codes, role=user_data.role)
+        current_admin = any(role.code.upper() == "ADMIN" for role in user.roles)
+        assigned_admin = any(role.code.upper() == "ADMIN" for role in roles)
+        if actor_user_id == user.id and current_admin and not assigned_admin:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không thể tự thu hồi vai trò quản trị của chính mình.",
+            )
+        if any(role.code.upper() in WAREHOUSE_ROLE_CODES for role in roles) and not user.warehouses and db.query(Warehouse).filter(Warehouse.is_active.is_(True)).first() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Người dùng thuộc vai trò kho phải được gắn với ít nhất một kho.",
+            )
         user.roles = roles
         updated_fields.append(f"roles:{[r.code for r in roles]}")
 
@@ -423,6 +452,7 @@ def list_users(
 
     users = (
         query.distinct()
+        .options(selectinload(User.roles), selectinload(User.territories))
         .order_by(User.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)

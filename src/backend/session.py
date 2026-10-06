@@ -56,7 +56,11 @@ def refresh_session(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tài khoản chưa được gán vai trò hợp lệ.")
     return {
         "expires_in": int(SESSION_DURATION.total_seconds()),
-        "access_token": create_access_token({"sub": user.username, "role": role}),
+        "access_token": create_access_token({
+            "sub": user.username,
+            "role": role,
+            "warehouse_ids": [warehouse.id for warehouse in user.warehouses],
+        }),
     }
 
 

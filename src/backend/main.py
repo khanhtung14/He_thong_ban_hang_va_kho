@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 if __package__:
     # Package import is used by `uvicorn src.backend.main:app` from the project root.
+    from src.backend.avatar import router as avatar_router
     from src.backend.change_password import router as change_password_router
     from src.backend.audit_logs import router as audit_logs_router
     from src.backend.forgot_password import router as forgot_password_router
@@ -19,14 +20,14 @@ if __package__:
     from src.backend.navigation import router as navigation_router
     from src.backend.products import router as products_router
     from src.backend.price_lists import router as price_lists_router
+    from src.backend.profile import migrate_profile_schema, router as profile_router
     from src.backend.reports import router as reports_router
     from src.backend.session import router as session_router
-    from src.backend.profile import migrate_profile_schema, router as profile_router
+    from src.backend.user_assignment import router as user_assignment_router
+    from src.backend.user_routes import router as user_router
     from src.backend.users import compat_router as users_compat_router, router as users_router
-
-    # SCRUM-71: Avatar
-    from src.backend.avatar import router as avatar_router
 else:  # pragma: no cover - direct script execution from src/backend
+    from avatar import router as avatar_router
     from change_password import router as change_password_router
     from audit_logs import router as audit_logs_router
     from forgot_password import router as forgot_password_router
@@ -35,19 +36,12 @@ else:  # pragma: no cover - direct script execution from src/backend
     from navigation import router as navigation_router
     from products import router as products_router
     from price_lists import router as price_lists_router
+    from profile import migrate_profile_schema, router as profile_router
     from reports import router as reports_router
     from session import router as session_router
-    from profile import migrate_profile_schema, router as profile_router
-    from users import compat_router as users_compat_router, router as users_router
-
-    # SCRUM-71: Avatar
-    from avatar import router as avatar_router
-
-
-if __package__:
-    from src.backend.user_routes import router as user_router
-else:  # pragma: no cover - direct script execution from src/backend
+    from user_assignment import router as user_assignment_router
     from user_routes import router as user_router
+    from users import compat_router as users_compat_router, router as users_router
 
 
 app = FastAPI(
@@ -141,6 +135,7 @@ app.include_router(products_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
 app.include_router(navigation_router)
+app.include_router(user_assignment_router)
 app.include_router(users_router)
 app.include_router(users_compat_router)
 app.include_router(user_router)

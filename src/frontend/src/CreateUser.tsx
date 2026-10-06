@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { authenticatedFetch } from "./session";
 import "./CreateUser.css";
 
@@ -7,6 +7,8 @@ type RoleOption = {
   label: string;
   description: string;
 };
+type AssignmentOption = { id: number; code: string; name: string };
+type AssignmentOptions = { roles: AssignmentOption[]; warehouses: AssignmentOption[]; territories: AssignmentOption[] };
 
 type CreatedUser = {
   id: number;
@@ -54,17 +56,53 @@ export default function CreateUser() {
   const [phone, setPhone] = useState("");
   const requestedRole = new URLSearchParams(window.location.search).get("role");
   const initialRole = roles.some((option) => option.code === requestedRole) ? requestedRole! : roles[0].code;
-  const [role, setRole] = useState(initialRole);
+  const [roleCodes, setRoleCodes] = useState<string[]>([initialRole]);
+  const [scopeOptions, setScopeOptions] = useState<AssignmentOptions>({ roles: [], warehouses: [], territories: [] });
+  const [warehouseIds, setWarehouseIds] = useState<number[]>([]);
+  const [territoryIds, setTerritoryIds] = useState<number[]>([]);
+  const [openAssignment, setOpenAssignment] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<CreateUserResponse | null>(null);
 
-  const selectedRole = roles.find((option) => option.code === role) ?? roles[0];
+  const selectedRole = roles.find((option) => option.code === roleCodes[0]) ?? roles[0];
+
+  useEffect(() => {
+    if (!openAssignment) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(".assignment-hover-list.is-open")) {
+        setOpenAssignment(null);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [openAssignment]);
+
+  useEffect(() => {
+    let active = true;
+    authenticatedFetch("/api/v1/admin/assignment-options")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Không tải được danh sách vai trò, kho và địa bàn.");
+        return response.json() as Promise<AssignmentOptions>;
+      })
+      .then((data) => { if (active) setScopeOptions(data); })
+      .catch((error: Error) => { if (active) setError(error.message); });
+    return () => { active = false; };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setCreated(null);
+    const includesWarehouseRole = roleCodes.some((code) => ["WAREHOUSE", "WH_MANAGER"].includes(code));
+    if (!roleCodes.length) {
+      setError("Hãy chọn ít nhất một vai trò.");
+      return;
+    }
+    if (includesWarehouseRole && !warehouseIds.length) {
+      setError("Người dùng thuộc vai trò kho phải được gắn với ít nhất một kho.");
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -76,7 +114,9 @@ export default function CreateUser() {
           username: username.trim(),
           email: email.trim(),
           phone: phone.trim() || null,
-          role,
+          role_codes: roleCodes,
+          warehouse_ids: warehouseIds,
+          territory_ids: territoryIds,
         }),
       });
 
@@ -91,7 +131,9 @@ export default function CreateUser() {
       setUsername("");
       setEmail("");
       setPhone("");
-      setRole(initialRole);
+      setRoleCodes([initialRole]);
+      setWarehouseIds([]);
+      setTerritoryIds([]);
     } catch {
       setError("Không thể kết nối đến máy chủ. Vui lòng thử lại.");
     } finally {
@@ -242,12 +284,26 @@ export default function CreateUser() {
                 <span className="create-user-hint">Thông tin kích hoạt và mật khẩu tạm sẽ được gửi đến địa chỉ này.</span>
               </div>
 
-              <div className="create-user-field create-user-field-wide">
-                <label htmlFor="role">Vai trò <span className="required-mark">*</span></label>
-                <select id="role" name="role" value={role} onChange={(event) => setRole(event.target.value)} required>
-                  {roles.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
-                </select>
-                <span className="create-user-role-description">{selectedRole.description}</span>
+              <div className={`create-user-field create-user-field-wide assignment-hover-list${openAssignment === "roles" ? " is-open" : ""}`}>
+                <button className="create-user-assignment-trigger" type="button" aria-expanded={openAssignment === "roles"} aria-controls="create-user-roles-options" onClick={() => setOpenAssignment((current) => current === "roles" ? null : "roles")}>
+                  <span className="create-user-field-label">Vai trò (chọn một hoặc nhiều)</span>
+                  <span className="create-user-assignment-summary">{roles.filter((option) => roleCodes.includes(option.code)).map((option) => option.label).join(", ") || "Chưa chọn"}</span>
+                </button>
+                <div className={`create-user-assignment-list${openAssignment === "roles" ? " is-open" : ""}`} id="create-user-roles-options">{roles.map((option) => <label key={option.code}><input type="checkbox" checked={roleCodes.includes(option.code)} onChange={(event) => setRoleCodes((current) => event.target.checked ? [...current, option.code] : current.filter((code) => code !== option.code))} /><span>{option.label}</span></label>)}</div>
+              </div>
+              <div className={`create-user-field create-user-field-wide assignment-hover-list${openAssignment === "warehouses" ? " is-open" : ""}`}>
+                <button className="create-user-assignment-trigger" type="button" aria-expanded={openAssignment === "warehouses"} aria-controls="create-user-warehouses-options" onClick={() => setOpenAssignment((current) => current === "warehouses" ? null : "warehouses")}>
+                  <span className="create-user-field-label">Kho được phụ trách{roleCodes.some((code) => ["WAREHOUSE", "WH_MANAGER"].includes(code)) ? " *" : ""}</span>
+                  <span className="create-user-assignment-summary">{scopeOptions.warehouses.filter((option) => warehouseIds.includes(option.id)).map((option) => option.name).join(", ") || "Chưa chọn"}</span>
+                </button>
+                <div className={`create-user-assignment-list${openAssignment === "warehouses" ? " is-open" : ""}`} id="create-user-warehouses-options">{scopeOptions.warehouses.length ? scopeOptions.warehouses.map((option) => <label key={option.id}><input type="checkbox" checked={warehouseIds.includes(option.id)} onChange={(event) => setWarehouseIds((current) => event.target.checked ? [...current, option.id] : current.filter((id) => id !== option.id))} /><span>{option.name}</span></label>) : <span>Chưa có kho đang hoạt động.</span>}</div>
+              </div>
+              <div className={`create-user-field create-user-field-wide assignment-hover-list${openAssignment === "territories" ? " is-open" : ""}`}>
+                <button className="create-user-assignment-trigger" type="button" aria-expanded={openAssignment === "territories"} aria-controls="create-user-territories-options" onClick={() => setOpenAssignment((current) => current === "territories" ? null : "territories")}>
+                  <span className="create-user-field-label">Địa bàn phụ trách</span>
+                  <span className="create-user-assignment-summary">{scopeOptions.territories.filter((option) => territoryIds.includes(option.id)).map((option) => option.name).join(", ") || "Chưa chọn"}</span>
+                </button>
+                <div className={`create-user-assignment-list${openAssignment === "territories" ? " is-open" : ""}`} id="create-user-territories-options">{scopeOptions.territories.length ? scopeOptions.territories.map((option) => <label key={option.id}><input type="checkbox" checked={territoryIds.includes(option.id)} onChange={(event) => setTerritoryIds((current) => event.target.checked ? [...current, option.id] : current.filter((id) => id !== option.id))} /><span>{option.name}</span></label>) : <span>Chưa có địa bàn.</span>}</div>
               </div>
             </div>
 
@@ -257,7 +313,6 @@ export default function CreateUser() {
             </div>
 
             <div className="create-user-actions">
-              <a className="create-user-cancel" href="/">Hủy</a>
               <button className="create-user-primary" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <><span className="create-user-spinner" aria-hidden="true" /> Đang tạo tài khoản…</> : <>Tạo tài khoản <span aria-hidden="true">→</span></>}
               </button>
