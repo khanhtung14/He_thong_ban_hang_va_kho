@@ -22,7 +22,7 @@ async def upload_avatar(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(
             status_code=400,
-            detail="Vui lòng chọn ảnh."
+            detail="Vui lòng chọn ảnh.",
         )
 
     content = await file.read()
@@ -30,7 +30,7 @@ async def upload_avatar(file: UploadFile = File(...)):
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail="Ảnh đại diện không được vượt quá 2 MB."
+            detail="Ảnh đại diện không được vượt quá 2 MB.",
         )
 
     try:
@@ -40,12 +40,11 @@ async def upload_avatar(file: UploadFile = File(...)):
         if image_format not in ALLOWED_FORMATS:
             raise HTTPException(
                 status_code=400,
-                detail="Chỉ chấp nhận ảnh JPG hoặc PNG."
+                detail="Chỉ chấp nhận ảnh JPG hoặc PNG.",
             )
 
         image = image.convert("RGB")
 
-        # Cắt ảnh thành hình vuông từ chính giữa
         width, height = image.size
         side = min(width, height)
 
@@ -56,44 +55,38 @@ async def upload_avatar(file: UploadFile = File(...)):
             (left, top, left + side, top + side)
         )
 
-        # Resize thành 256 x 256
         image = image.resize(
             (256, 256),
-            Image.Resampling.LANCZOS
+            Image.Resampling.LANCZOS,
         )
 
     except UnidentifiedImageError:
         raise HTTPException(
             status_code=400,
-            detail="File tải lên không phải ảnh hợp lệ."
+            detail="File tải lên không phải ảnh hợp lệ.",
         )
 
     old_filename = ""
 
-    # Đọc tên ảnh đại diện cũ
     if CURRENT_AVATAR_FILE.exists():
         old_filename = CURRENT_AVATAR_FILE.read_text(
             encoding="utf-8"
         ).strip()
 
-    # Tạo tên file mới
     filename = f"{uuid4().hex}.jpg"
     file_path = AVATAR_DIR / filename
 
-    # Lưu ảnh mới
     image.save(
         file_path,
         format="JPEG",
-        quality=90
+        quality=90,
     )
 
-    # Lưu tên ảnh hiện tại
     CURRENT_AVATAR_FILE.write_text(
         filename,
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
-    # Xóa ảnh cũ
     if old_filename:
         old_file_path = AVATAR_DIR / old_filename
 
@@ -106,8 +99,8 @@ async def upload_avatar(file: UploadFile = File(...)):
         "avatar_url": f"/profile/avatar/{filename}",
         "size": {
             "width": 256,
-            "height": 256
-        }
+            "height": 256,
+        },
     }
 
 
@@ -116,7 +109,7 @@ def get_current_avatar():
     if not CURRENT_AVATAR_FILE.exists():
         raise HTTPException(
             status_code=404,
-            detail="Chưa có ảnh đại diện."
+            detail="Chưa có ảnh đại diện.",
         )
 
     filename = CURRENT_AVATAR_FILE.read_text(
@@ -126,7 +119,7 @@ def get_current_avatar():
     if not filename:
         raise HTTPException(
             status_code=404,
-            detail="Chưa có ảnh đại diện."
+            detail="Chưa có ảnh đại diện.",
         )
 
     return get_avatar(filename)
@@ -139,10 +132,10 @@ def get_avatar(filename: str):
     if not file_path.is_file():
         raise HTTPException(
             status_code=404,
-            detail="Không tìm thấy ảnh đại diện."
+            detail="Không tìm thấy ảnh đại diện.",
         )
 
     return FileResponse(
         file_path,
-        media_type="image/jpeg"
+        media_type="image/jpeg",
     )
