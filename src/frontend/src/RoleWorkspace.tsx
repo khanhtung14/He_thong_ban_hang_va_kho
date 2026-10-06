@@ -8,7 +8,7 @@ type ViewItem = { id: string; label: string; icon: string; section?: string };
 type Product = { sku: string; name: string; category?: string; sale_price: number; stock_available?: number; unit?: string; cost_price?: number; margin?: string };
 type InventoryItem = { sku: string; name: string; warehouse_id: number; warehouse_name: string; quantity_available: number };
 type UserRole = string | { code: string; name: string };
-type UserRow = { id: number; username: string; full_name: string; status: string; is_active?: boolean; roles: UserRole[]; assigned_dealers_count?: number };
+type UserRow = { id: number; username: string; full_name: string; email?: string; phone?: string | null; status: string; is_active?: boolean; roles: UserRole[]; assigned_dealers_count?: number };
 type SalesReport = { total_revenue: number; total_cogs: number; gross_profit: number; margin: string; period: string };
 
 const roleByPath: Record<string, RoleKey> = {
@@ -86,8 +86,9 @@ const roleDetails: Record<RoleKey, { name: string; eyebrow: string; title: strin
     views: [
       { id: "overview", label: "Tổng quan", icon: "⌂", section: "HỆ THỐNG" },
       { id: "users", label: "Tài khoản người dùng", icon: "♧" },
-      { id: "audit", label: "Nhật ký & bảo mật", icon: "◷", section: "QUẢN TRỊ" },
+      { id: "rbac", label: "Ma trận phân quyền (RBAC)", icon: "⬡", section: "QUẢN TRỊ" },
       { id: "configuration", label: "Danh mục hệ thống", icon: "⚙" },
+      { id: "audit", label: "Nhật ký hệ thống", icon: "◷" },
     ],
   },
 };
@@ -174,6 +175,10 @@ export default function RoleWorkspace() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [userFilter, setUserFilter] = useState("ALL");
+  const [userRoleFilter, setUserRoleFilter] = useState("ALL");
+  const [userPage, setUserPage] = useState(1);
+  const [userTotal, setUserTotal] = useState(0);
+  const [userTotalPages, setUserTotalPages] = useState(1);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
@@ -181,6 +186,8 @@ export default function RoleWorkspace() {
   const [adjustment, setAdjustment] = useState({ sku: "SKU-001", quantity_delta: "", reason: "" });
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [lockTarget, setLockTarget] = useState<UserRow | null>(null);
+  const [editTarget, setEditTarget] = useState<UserRow | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", phone: "", role: "", status: "ACTIVE" });
   const [lockReason, setLockReason] = useState("");
   const [userActionBusy, setUserActionBusy] = useState(false);
   const [auditModal, setAuditModal] = useState<{ title: string; rows: Array<Record<string, unknown>> } | null>(null);
@@ -208,14 +215,16 @@ export default function RoleWorkspace() {
     if (shouldInventory) requests.push(readResponse<InventoryItem[]>("/api/v1/inventory/items").then((data) => { if (!cancelled) setInventory(data); }).catch((error: Error) => { if (!cancelled) setLoadError(error.message); }));
     if (shouldReport) requests.push(readResponse<SalesReport>("/api/v1/reports/sales-margin").then((data) => { if (!cancelled) setReport(data); }).catch((error: Error) => { if (!cancelled) setLoadError(error.message); }));
     if (shouldUsers) {
-      const params = new URLSearchParams({ page: "1", page_size: "100" });
-      if (userSearch.trim()) params.set("search", userSearch.trim());
-      if (userFilter !== "ALL") params.set("status", userFilter);
-      requests.push(readResponse<{ items: UserRow[] }>(`/api/v1/admin/users?${params}`).then((data) => { if (!cancelled) setUsers(data.items); }).catch((error: Error) => { if (!cancelled) setLoadError(error.message); }));
+      const isUsersPage = view === "users";
+      const params = new URLSearchParams({ page: String(isUsersPage ? userPage : 1), page_size: isUsersPage ? "20" : "100" });
+      if (isUsersPage && userSearch.trim()) params.set("search", userSearch.trim());
+      if (isUsersPage && userFilter !== "ALL") params.set("status", userFilter);
+      if (isUsersPage && userRoleFilter !== "ALL") params.set("role", userRoleFilter);
+      requests.push(readResponse<{ items: UserRow[]; total: number; total_pages: number }>(`/api/v1/admin/users?${params}`).then((data) => { if (!cancelled) { setUsers(data.items); setUserTotal(data.total); setUserTotalPages(data.total_pages); } }).catch((error: Error) => { if (!cancelled) setLoadError(error.message); }));
     }
     Promise.all(requests).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [role, view, userSearch, userFilter]);
+  }, [role, view, userSearch, userFilter, userRoleFilter, userPage]);
 
   const heading = useMemo(() => details?.views.find((item) => item.id === view)?.label ?? details?.views[0]?.label ?? "Tổng quan", [details, view]);
   const username = window.sessionStorage.getItem("user_name") || "Người dùng";
@@ -250,13 +259,51 @@ export default function RoleWorkspace() {
   }
 
   async function refreshUsers() {
-    const params = new URLSearchParams({ page: "1", page_size: "100" });
+    const params = new URLSearchParams({ page: String(userPage), page_size: "20" });
     if (userSearch.trim()) params.set("search", userSearch.trim());
     if (userFilter !== "ALL") params.set("status", userFilter);
+    if (userRoleFilter !== "ALL") params.set("role", userRoleFilter);
     try {
-      const data = await readResponse<{ items: UserRow[] }>(`/api/v1/admin/users?${params}`);
+      const data = await readResponse<{ items: UserRow[]; total: number; total_pages: number }>(`/api/v1/admin/users?${params}`);
       setUsers(data.items);
+      setUserTotal(data.total);
+      setUserTotalPages(data.total_pages);
     } catch (error) { setLoadError(error instanceof Error ? error.message : "Không tải được tài khoản."); }
+  }
+
+  function openEditUser(user: UserRow) {
+    const assignedRole = user.roles[0];
+    const rawRoleCode = typeof assignedRole === "string" ? assignedRole : assignedRole?.code ?? "SALES_REP";
+    const roleCode = rawRoleCode.toUpperCase() === "SALES" ? "SALES_REP" : rawRoleCode.toUpperCase().replace(/[ -]/g, "_");
+    setEditTarget(user);
+    setEditForm({ full_name: user.full_name, email: user.email ?? "", phone: user.phone ?? "", role: roleCode, status: user.status });
+  }
+
+  async function submitUserUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editTarget) return;
+    setUserActionBusy(true);
+    setNotice("");
+    try {
+      const response = await authenticatedFetch(`/api/v1/admin/users/${editTarget.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: editForm.full_name.trim(),
+          email: editForm.email.trim(),
+          phone: editForm.phone.trim() || null,
+          role: editForm.role,
+          status: editForm.status,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "Không thể cập nhật tài khoản.");
+      setNotice(`Đã cập nhật tài khoản ${editTarget.username}.`);
+      setEditTarget(null);
+      await refreshUsers();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Không thể kết nối máy chủ.");
+    } finally { setUserActionBusy(false); }
   }
 
   async function submitLock(event: FormEvent<HTMLFormElement>) {
@@ -383,18 +430,19 @@ export default function RoleWorkspace() {
     }
 
     if (role === "admin") {
-      if (view === "users") return <AdminUsers users={users} loading={loading} error={loadError} search={userSearch} setSearch={setUserSearch} filter={userFilter} setFilter={setUserFilter} onCreate={() => { window.location.assign("/admin/users/create"); }} onLock={(user) => { setLockTarget(user); setLockReason(""); }} onUnlock={unlockUser} onAudit={showAudit} busy={userActionBusy} />;
+      if (view === "users") return <AdminUsers users={users} loading={loading} error={loadError} search={userSearch} setSearch={(value) => { setUserSearch(value); setUserPage(1); }} filter={userFilter} setFilter={(value) => { setUserFilter(value); setUserPage(1); }} roleFilter={userRoleFilter} setRoleFilter={(value) => { setUserRoleFilter(value); setUserPage(1); }} page={userPage} total={userTotal} totalPages={userTotalPages} setPage={setUserPage} onCreate={() => { window.location.assign("/admin/users/create"); }} onEdit={openEditUser} onLock={(user) => { setLockTarget(user); setLockReason(""); }} onUnlock={unlockUser} onAudit={showAudit} busy={userActionBusy} />;
       if (view === "audit") return <><PageHeading title="Nhật ký & bảo mật" subtitle="Theo dõi thao tác quản trị, khóa tài khoản và phiên đăng nhập." /><PrototypeBanner text="Các sự kiện ở màn hình này là ví dụ giao diện; nhật ký chi tiết theo user mới được đọc từ API." /><div className="workspace-two-columns"><section className="workspace-panel"><PanelHeading title="Sự kiện bảo mật" /><AuditSummary /></section><section className="workspace-panel"><PanelHeading title="Tài khoản cần chú ý" /><div className="workspace-attention"><span className="workspace-attention-icon">!</span><div><strong>Kiểm tra định kỳ tài khoản khóa</strong><p>Mở mục tài khoản để xem nhật ký và trạng thái bàn giao của user.</p><button className="workspace-link-button" onClick={() => navigate("users")}>Đi tới tài khoản →</button></div></div></section></div></>;
       if (view === "configuration") return <><PageHeading title="Danh mục hệ thống" subtitle="Vai trò chuẩn, địa bàn và kho được cấp cho user." /><PrototypeBanner text="Ma trận vai trò đang cấu hình tĩnh phía backend; màn hình chỉnh sửa danh mục chưa có API." /><ConfigurationCards /></>;
-      return <><WelcomeCard eyebrow="SYSTEM OVERVIEW" title="Quản trị người dùng & truy cập" text="Tạo tài khoản, theo dõi trạng thái và kiểm soát phiên của nhân sự." action={<button className="workspace-button" onClick={() => window.location.assign("/admin/users/create")}>＋ Tạo tài khoản</button>} /><Metrics items={[["Tổng tài khoản", String(users.length), "♧", "blue"], ["Đang hoạt động", String(users.filter(isUserActive).length), "✓", "green"], ["Khóa / chờ kích hoạt", String(users.filter((user) => !isUserActive(user) || user.status === "PENDING_ACTIVATION").length), "◷", "amber"]]} /><section className="workspace-panel"><PanelHeading title="Tài khoản gần đây" link="Quản lý tài khoản" onClick={() => navigate("users")} />{users.length ? <AdminUserTable users={users.slice(0, 5)} onLock={(user) => { setLockTarget(user); setLockReason(""); }} onUnlock={unlockUser} onAudit={showAudit} busy={userActionBusy} /> : <PrototypeBanner text={loadError || "Đang tải tài khoản từ API quản trị."} />}</section><div className="workspace-two-columns"><section className="workspace-panel"><PanelHeading title="Bảo mật" link="Mở nhật ký" onClick={() => navigate("audit")} /><AuditSummary compact /></section><section className="workspace-panel"><PanelHeading title="Vai trò & phạm vi" link="Xem danh mục" onClick={() => navigate("configuration")} /><RoleSummary /></section></div></>;
+      if (view === "rbac") return <><PageHeading title="Ma trận phân quyền (RBAC)" subtitle="Tổng quan vai trò nghiệp vụ và các khu vực truy cập được cấu hình." /><PrototypeBanner text="Quyền truy cập được máy chủ xác thực. Màn hình này hiển thị danh mục vai trò; thay đổi quyền được quản lý theo chính sách hệ thống." /><RoleSummary /></>;
+      return <><WelcomeCard eyebrow="QUẢN TRỊ HỆ THỐNG" title={`Xin chào, ${username} 👋`} text="Trung tâm quản lý tài khoản, vai trò và bảo mật hệ thống." action={<button className="workspace-button" onClick={() => window.location.assign("/admin/users/create")}>＋ Tạo tài khoản mới</button>} /><Metrics items={[["Tổng người dùng", String(userTotal), "♧", "blue"], ["Đang hoạt động", String(users.filter(isUserActive).length), "◷", "green"], ["Khóa / chờ kích hoạt", String(users.filter((user) => !isUserActive(user) || user.status === "PENDING_ACTIVATION").length), "♢", "amber"], ["Vai trò nghiệp vụ", "7", "⌘", "violet"]]} /><div className="workspace-admin-overview-grid"><section className="workspace-panel"><PanelHeading title="Tài khoản gần đây" link="Quản lý tài khoản" onClick={() => navigate("users")} />{users.length ? <AdminUserTable users={users.slice(0, 5)} onEdit={openEditUser} onLock={(user) => { setLockTarget(user); setLockReason(""); }} onUnlock={unlockUser} onAudit={showAudit} busy={userActionBusy} /> : <PrototypeBanner text={loadError || "Đang tải tài khoản từ API quản trị."} />}<button className="workspace-link-button workspace-admin-detail-link" onClick={() => navigate("users")}>Mở danh sách tài khoản →</button></section><div className="workspace-admin-overview-stack"><section className="workspace-panel"><PanelHeading title="Nhật ký thao tác gần nhất" link="Xem tất cả" onClick={() => navigate("audit")} /><AuditSummary compact /></section><section className="workspace-panel"><PanelHeading title="Vai trò & phạm vi" link="Ma trận RBAC" onClick={() => navigate("rbac")} /><RoleSummary /></section></div></div></>;
     }
     return null;
   }
 
   return (
-    <div className="role-workspace">
+    <div className={`role-workspace${role === "admin" ? " is-admin" : ""}`}>
       <aside className="workspace-sidebar">
-        <a className="workspace-brand" href={details.views[0]?.id ? `${window.location.pathname}` : "/"}><span className="workspace-brand-mark">O</span><span>OMS <small>OPERATIONS</small></span></a>
+        <a className="workspace-brand" href={details.views[0]?.id ? `${window.location.pathname}` : "/"}><span className="workspace-brand-mark">{role === "admin" ? "⌂" : "O"}</span><span>{role === "admin" ? "WMS" : "OMS"} <small>{role === "admin" ? "HỆ THỐNG QUẢN LÝ KHO & BÁN HÀNG" : "OPERATIONS"}</small></span></a>
         <div className="workspace-sidebar-role"><span className="workspace-avatar is-sidebar">{details.initials}</span><span><small>ĐANG ĐĂNG NHẬP</small><strong>{details.name}</strong></span><span className="workspace-chevron">⌄</span></div>
         <nav className="workspace-nav" aria-label="Điều hướng nghiệp vụ">
           {details.views.map((item, index) => <div key={item.id}>{item.section && <div className={`workspace-nav-section ${index ? "has-gap" : ""}`}>{item.section}</div>}<button className={`workspace-nav-item ${view === item.id ? "is-active" : ""}`} onClick={() => navigate(item.id)} aria-current={view === item.id ? "page" : undefined}><span className="workspace-nav-icon">{item.icon}</span><span>{item.label}</span>{item.id === "new-order" && <span className="workspace-nav-plus">+</span>}</button></div>)}
@@ -403,7 +451,7 @@ export default function RoleWorkspace() {
       </aside>
 
       <div className="workspace-main-column">
-        <header className="workspace-topbar"><div className="workspace-breadcrumb"><span>OMS</span><span>/</span><strong>{heading}</strong></div><div className="workspace-top-actions"><div className="workspace-quick-actions"><button type="button" onClick={() => goBack(role)}>← <span>Quay lại</span></button><button type="button" onClick={() => window.location.assign("/change-password")}>Đổi mật khẩu</button>{role === "admin" && <button type="button" className="is-primary" onClick={() => window.location.assign("/admin/users/create?role=ADMIN")}>Tạo tài khoản Admin</button>}</div><span className="workspace-env"><i /> Hệ thống hoạt động</span><button className="workspace-icon-button" aria-label="Thông báo">♧<i /></button><span className="workspace-top-divider" /><button type="button" className="workspace-user-chip" aria-label="Mở thông tin cá nhân" onClick={() => setProfileOpen(true)}><span className="workspace-avatar">{details.initials}</span><span><strong>{username}</strong><small>{details.name}</small></span><span className="workspace-chevron">⌄</span></button></div></header>
+        <header className="workspace-topbar"><div className="workspace-breadcrumb"><span>{role === "admin" ? "Quản trị hệ thống" : "OMS"}</span><span>/</span><strong>{heading}</strong></div><div className="workspace-top-actions"><div className="workspace-quick-actions"><button type="button" onClick={() => goBack(role)}>← <span>Quay lại</span></button></div><span className="workspace-env"><i /> Hệ thống hoạt động</span><button className="workspace-icon-button" aria-label="Thông báo">♧<i /></button><span className="workspace-top-divider" /><button type="button" className="workspace-user-chip" aria-label="Mở thông tin cá nhân" onClick={() => setProfileOpen(true)}><span className="workspace-avatar">{details.initials}</span><span><strong>{username}</strong><small>{details.name}</small></span><span className="workspace-chevron">⌄</span></button></div></header>
         <main className="workspace-content">
           {notice && <div className="workspace-alert" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Đóng thông báo">×</button></div>}
           {renderContent()}
@@ -412,6 +460,7 @@ export default function RoleWorkspace() {
       </div>
 
       {lockTarget && <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setLockTarget(null); }}><section className="workspace-modal" role="dialog" aria-modal="true" aria-labelledby="lock-title"><button className="workspace-modal-close" onClick={() => setLockTarget(null)} aria-label="Đóng">×</button><span className="workspace-modal-icon">!</span><h2 id="lock-title">Khóa tài khoản</h2><p>Phiên đăng nhập của <strong>{lockTarget.username}</strong> sẽ bị thu hồi ngay sau khi khóa.</p><form onSubmit={submitLock}><label htmlFor="lock-reason">Lý do khóa <span>*</span></label><textarea id="lock-reason" value={lockReason} minLength={3} onChange={(event) => setLockReason(event.target.value)} placeholder="Ví dụ: Nhân sự đã nghỉ việc" required /><div className="workspace-modal-actions"><button type="button" className="workspace-button is-ghost" onClick={() => setLockTarget(null)}>Hủy</button><button type="submit" className="workspace-button is-danger" disabled={userActionBusy}>{userActionBusy ? "Đang xử lý…" : "Xác nhận khóa"}</button></div></form></section></div>}
+      {editTarget && <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !userActionBusy) setEditTarget(null); }}><section className="workspace-modal is-wide" role="dialog" aria-modal="true" aria-labelledby="edit-user-title"><button className="workspace-modal-close" onClick={() => setEditTarget(null)} aria-label="Đóng" disabled={userActionBusy}>×</button><h2 id="edit-user-title">Cập nhật tài khoản</h2><p>Chỉnh sửa thông tin, vai trò và trạng thái của <strong>{editTarget.username}</strong>.</p><form className="workspace-edit-user-form" onSubmit={submitUserUpdate}><label>Họ và tên<input value={editForm.full_name} maxLength={150} onChange={(event) => setEditForm({ ...editForm, full_name: event.target.value })} required /></label><label>Email<input type="email" value={editForm.email} maxLength={254} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} required /></label><label>Số điện thoại<input type="tel" value={editForm.phone} maxLength={10} pattern="0[0-9]{9}" onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} /></label><label>Vai trò<select value={editForm.role} onChange={(event) => setEditForm({ ...editForm, role: event.target.value })}><option value="CUSTOMER">Đại lý</option><option value="SALES_REP">Nhân viên kinh doanh</option><option value="SALES_MANAGER">Quản lý kinh doanh</option><option value="WAREHOUSE">Thủ kho</option><option value="WH_MANAGER">Quản lý kho</option><option value="ACCOUNTANT">Kế toán</option><option value="ADMIN">Quản trị hệ thống</option></select></label><label>Trạng thái<select value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })}><option value="ACTIVE">Đang hoạt động</option><option value="PENDING_ACTIVATION">Chờ kích hoạt</option><option value="LOCKED">Đã khóa</option><option value="DISABLED">Đã vô hiệu hóa</option></select></label><div className="workspace-modal-actions"><button type="button" className="workspace-button is-ghost" onClick={() => setEditTarget(null)} disabled={userActionBusy}>Hủy</button><button type="submit" className="workspace-button" disabled={userActionBusy}>{userActionBusy ? "Đang lưu…" : "Lưu thay đổi"}</button></div></form></section></div>}
       {auditModal && <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAuditModal(null); }}><section className="workspace-modal is-wide" role="dialog" aria-modal="true" aria-labelledby="audit-modal-title"><button className="workspace-modal-close" onClick={() => setAuditModal(null)} aria-label="Đóng">×</button><h2 id="audit-modal-title">{auditModal.title}</h2>{auditModal.rows.length ? <div className="workspace-audit-list">{auditModal.rows.map((row, index) => <div key={index}><StatusPill tone="blue">{String(row.action ?? "SỰ KIỆN")}</StatusPill><p>{String(row.reason ?? "Không có ghi chú")}</p><small>{String(row.created_at ?? "")}</small></div>)}</div> : <div className="workspace-empty">Chưa có nhật ký cho tài khoản này.</div>}</section></div>}
       {profileOpen && <Profile embedded onClose={() => setProfileOpen(false)} />}
     </div>
@@ -496,12 +545,12 @@ function ProfileCard({ username, roleName }: { username: string; roleName: strin
   return <section className="workspace-panel workspace-profile"><span className="workspace-avatar is-large">ĐL</span><div><h3>{username}</h3><p>{roleName} · Tài khoản đang hoạt động</p><button className="workspace-button is-secondary" onClick={() => window.location.assign("/change-password")}>Đổi mật khẩu</button></div></section>;
 }
 
-function AdminUsers({ users, loading, error, search, setSearch, filter, setFilter, onCreate, onLock, onUnlock, onAudit, busy }: { users: UserRow[]; loading: boolean; error: string; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; onCreate: () => void; onLock: (user: UserRow) => void; onUnlock: (user: UserRow) => void; onAudit: (user: UserRow) => void; busy: boolean }) {
-  return <><PageHeading title="Tài khoản người dùng" subtitle="Tạo user, kiểm soát trạng thái và xem phạm vi cần bàn giao." action={<button className="workspace-button" onClick={onCreate}>＋ Tạo tài khoản</button>} /><div className="workspace-admin-tools"><label className="workspace-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm tên, username…" /></label><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">Mọi trạng thái</option><option value="ACTIVE">Đang hoạt động</option><option value="LOCKED">Đã khóa</option><option value="PENDING_ACTIVATION">Chờ kích hoạt</option><option value="DISABLED">Vô hiệu hóa</option></select></div>{error && <div className="workspace-alert is-error">{error}</div>}<AdminUserTable users={users} onLock={onLock} onUnlock={onUnlock} onAudit={onAudit} busy={busy} />{loading && <div className="workspace-loading">Đang tải tài khoản…</div>}{!loading && users.length === 0 && <div className="workspace-empty">Không tìm thấy tài khoản phù hợp.</div>}</>;
+function AdminUsers({ users, loading, error, search, setSearch, filter, setFilter, roleFilter, setRoleFilter, page, total, totalPages, setPage, onCreate, onEdit, onLock, onUnlock, onAudit, busy }: { users: UserRow[]; loading: boolean; error: string; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; roleFilter: string; setRoleFilter: (value: string) => void; page: number; total: number; totalPages: number; setPage: (value: number) => void; onCreate: () => void; onEdit: (user: UserRow) => void; onLock: (user: UserRow) => void; onUnlock: (user: UserRow) => void; onAudit: (user: UserRow) => void; busy: boolean }) {
+  return <><PageHeading title="Tài khoản người dùng" subtitle="Tìm kiếm, cập nhật thông tin, vai trò và trạng thái tài khoản." action={<button className="workspace-button" onClick={onCreate}>＋ Tạo tài khoản</button>} /><div className="workspace-admin-tools"><label className="workspace-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên, tài khoản, số điện thoại…" /></label><select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} aria-label="Lọc theo vai trò"><option value="ALL">Mọi vai trò</option><option value="CUSTOMER">Đại lý</option><option value="SALES_REP">Nhân viên kinh doanh</option><option value="SALES_MANAGER">Quản lý kinh doanh</option><option value="WAREHOUSE">Thủ kho</option><option value="WH_MANAGER">Quản lý kho</option><option value="ACCOUNTANT">Kế toán</option><option value="ADMIN">Quản trị hệ thống</option></select><select value={filter} onChange={(event) => setFilter(event.target.value)} aria-label="Lọc theo trạng thái"><option value="ALL">Mọi trạng thái</option><option value="ACTIVE">Đang hoạt động</option><option value="LOCKED">Đã khóa</option><option value="PENDING_ACTIVATION">Chờ kích hoạt</option><option value="DISABLED">Vô hiệu hóa</option></select></div>{error && <div className="workspace-alert is-error">{error}</div>}<AdminUserTable users={users} onEdit={onEdit} onLock={onLock} onUnlock={onUnlock} onAudit={onAudit} busy={busy} />{loading && <div className="workspace-loading">Đang tải tài khoản…</div>}{!loading && users.length === 0 && <div className="workspace-empty">Không tìm thấy tài khoản phù hợp.</div>}<div className="workspace-pagination"><span>{total} tài khoản · Trang {page} / {Math.max(totalPages, 1)}</span><div><button type="button" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1 || loading}>← Trước</button><button type="button" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages || loading}>Sau →</button></div></div></>;
 }
 
-function AdminUserTable({ users, onLock, onUnlock, onAudit, busy }: { users: UserRow[]; onLock: (user: UserRow) => void; onUnlock: (user: UserRow) => void; onAudit: (user: UserRow) => void; busy: boolean }) {
-  return <TableShell headers={["Người dùng", "Vai trò", "Trạng thái", "Đại lý phụ trách", "Thao tác"]}>{users.map((user) => <tr key={user.id}><td><strong>{user.full_name}</strong><small className="workspace-cell-subtitle">{user.username}</small></td><td>{user.roles.map((item) => typeof item === "string" ? item : item.name || item.code).join(", ") || "Chưa gán"}</td><td><StatusPill tone={isUserActive(user) ? "green" : "red"}>{user.status}</StatusPill></td><td>{user.assigned_dealers_count ?? "—"}</td><td><div className="workspace-row-actions"><button onClick={() => onAudit(user)} title="Nhật ký">Nhật ký</button>{isUserActive(user) ? <button className="is-danger-text" disabled={busy} onClick={() => onLock(user)}>Khóa</button> : <button disabled={busy} onClick={() => onUnlock(user)}>Mở khóa</button>}</div></td></tr>)}</TableShell>;
+function AdminUserTable({ users, onEdit, onLock, onUnlock, onAudit, busy }: { users: UserRow[]; onEdit: (user: UserRow) => void; onLock: (user: UserRow) => void; onUnlock: (user: UserRow) => void; onAudit: (user: UserRow) => void; busy: boolean }) {
+  return <TableShell headers={["Người dùng", "Vai trò", "Trạng thái", "Đại lý phụ trách", "Thao tác"]}>{users.map((user) => <tr key={user.id}><td><strong>{user.full_name}</strong><small className="workspace-cell-subtitle">{user.username}</small></td><td>{user.roles.map((item) => typeof item === "string" ? item : item.name || item.code).join(", ") || "Chưa gán"}</td><td><StatusPill tone={isUserActive(user) ? "green" : "red"}>{user.status}</StatusPill></td><td>{user.assigned_dealers_count ?? "—"}</td><td><div className="workspace-row-actions"><button onClick={() => onEdit(user)} disabled={busy}>Cập nhật</button><button onClick={() => onAudit(user)} title="Nhật ký">Nhật ký</button>{isUserActive(user) ? <button className="is-danger-text" disabled={busy} onClick={() => onLock(user)}>Khóa</button> : <button disabled={busy} onClick={() => onUnlock(user)}>Mở khóa</button>}</div></td></tr>)}</TableShell>;
 }
 
 function isUserActive(user: UserRow): boolean {

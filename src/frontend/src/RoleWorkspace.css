@@ -180,6 +180,15 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
 .workspace-row-actions button:hover { text-decoration: underline; }
 .workspace-row-actions button:disabled { opacity: .5; cursor: wait; }
 .workspace-row-actions button.is-danger-text { color: #c65059; }
+.workspace-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 15px; color: #8290a5; font-size: 10px; }
+.workspace-pagination > div { display: flex; gap: 7px; }
+.workspace-pagination button { min-height: 32px; padding: 0 11px; border: 1px solid #dfe6f0; border-radius: 7px; color: #425572; background: #fff; font: inherit; font-size: 10px; cursor: pointer; }
+.workspace-pagination button:disabled { opacity: .45; cursor: not-allowed; }
+.workspace-edit-user-form { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.workspace-edit-user-form label { display: grid !important; gap: 6px; margin: 0 !important; }
+.workspace-edit-user-form input, .workspace-edit-user-form select { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #dfe4ed; border-radius: 7px; color: #34435b; background: #fff; font: inherit; font-size: 11px; }
+.workspace-edit-user-form input:focus, .workspace-edit-user-form select:focus { outline: 3px solid #dbeafe; border-color: #6c91e5; }
+.workspace-edit-user-form .workspace-modal-actions { grid-column: 1 / -1; }
 .workspace-audit-summary > div { display: flex; align-items: flex-start; gap: 9px; padding: 10px 0; border-bottom: 1px solid #f0f2f6; }
 .workspace-audit-summary > div:last-child { border: 0; }
 .workspace-audit-summary > div > span:last-child { flex: 1; }
@@ -296,4 +305,83 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
   .workspace-quick-actions button { min-height: 27px; padding: 0 5px; font-size: 8px; }
   .workspace-quick-actions button:first-child span { display: none; }
   .workspace-env, .workspace-top-divider, .workspace-user-chip { display: none; }
+}
+
+/* Admin workspace follows the light, blue framed console in the design reference. */
+.role-workspace.is-admin { min-height: 100vh; display: block; padding-top: 68px; color: #17233d; background: #deebf8; }
+.is-admin .workspace-sidebar { position: fixed; inset: 84px auto 20px 20px; width: 200px; padding: 13px 12px; border: 1px solid #e8eef6; border-radius: 15px; color: #475873; background: #fff; box-shadow: 0 4px 14px rgb(33 65 103 / 4%); }
+.is-admin .workspace-brand { position: fixed; inset: 12px auto auto 30px; z-index: 12; align-items: center; padding: 0; color: #1475d1; }
+.is-admin .workspace-brand-mark { width: 34px; height: 34px; border-radius: 10px; background: #0879dc; }
+.is-admin .workspace-brand small { max-width: 190px; color: #66819f; font-size: 7px; letter-spacing: 0; }
+.is-admin .workspace-sidebar-role { display: none; }
+.is-admin .workspace-nav { margin: 0; padding: 6px 0; }
+.is-admin .workspace-nav-section { margin: 7px 9px 9px; color: #8c9db4; font-size: 8px; }
+.is-admin .workspace-nav-section.has-gap { margin-top: 22px; }
+.is-admin .workspace-nav-item { min-height: 37px; gap: 9px; margin: 3px 0; padding: 0 9px; color: #52627a; font-size: 10px; }
+.is-admin .workspace-nav-item:hover { color: #076fc7; background: #f3f8ff; }
+.is-admin .workspace-nav-item.is-active { color: #0875d1; background: #eaf4ff; box-shadow: none; font-weight: 700; }
+.is-admin .workspace-nav-item.is-active .workspace-nav-icon { color: #0875d1; }
+.is-admin .workspace-nav-icon { width: 16px; color: #8093ad; font-size: 14px; }
+.is-admin .workspace-sidebar-bottom { padding-top: 9px; border-color: #edf1f6; }
+.is-admin .workspace-help { display: none; }
+.is-admin .workspace-logout { color: #53647c; font-size: 10px; }
+.is-admin .workspace-logout:hover { color: #086dbf; background: #f1f7ff; }
+.is-admin .workspace-main-column { width: 100%; min-height: calc(100vh - 68px); margin: 0; }
+.is-admin .workspace-topbar { position: fixed; inset: 0 0 auto; z-index: 11; height: 68px; padding: 0 27px 0 265px; border-bottom-color: #e9eff6; }
+.is-admin .workspace-breadcrumb { color: #657792; }
+.is-admin .workspace-breadcrumb strong { color: #17233d; }
+.is-admin .workspace-content { width: auto; max-width: none; min-height: calc(100vh - 108px); margin: 16px 20px 20px 240px; padding: 24px; border: 1px solid #e8eef6; border-radius: 16px; background: #fff; }
+.is-admin .workspace-footer { color: #8492a6; }
+.is-admin .workspace-welcome { min-height: 112px; margin-bottom: 15px; padding: 20px 22px; border-color: #e8eef6; border-radius: 13px; background: #fff; }
+.is-admin .workspace-welcome-copy > span { color: #607994; font-size: 8px; }
+.is-admin .workspace-welcome-copy h2 { margin: 6px 0 4px; font-size: 21px; }
+.is-admin .workspace-welcome-copy p { font-size: 10px; }
+.is-admin .workspace-metrics { gap: 10px; margin-bottom: 15px; }
+.is-admin .workspace-metric { min-height: 97px; padding: 13px; border-radius: 11px; box-shadow: none; }
+.is-admin .workspace-metric-icon { float: right; width: 23px; height: 23px; margin: 0; font-size: 12px; }
+.is-admin .workspace-metric-label { max-width: calc(100% - 29px); font-size: 8px; line-height: 1.4; text-transform: uppercase; }
+.is-admin .workspace-metric-value { margin-top: 9px; font-size: 18px; }
+.is-admin .workspace-metric-change { font-size: 8px; }
+.is-admin .workspace-panel { padding: 15px; border-color: #e8eef6; border-radius: 12px; box-shadow: none; }
+.is-admin .workspace-panel-heading h3, .is-admin .workspace-section-heading h3 { font-size: 11px; }
+.is-admin .workspace-table th { font-size: 7px; }
+.is-admin .workspace-table td { padding: 9px 8px; font-size: 9px; }
+.is-admin .workspace-status { font-size: 8px; }
+.is-admin .workspace-two-columns { gap: 12px; margin-bottom: 12px; }
+.is-admin .workspace-admin-overview-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(250px, .8fr); gap: 14px; }
+.is-admin .workspace-admin-overview-grid > .workspace-panel { margin: 0; }
+.is-admin .workspace-admin-overview-stack { display: grid; align-content: start; gap: 12px; }
+.is-admin .workspace-admin-overview-stack .workspace-panel { margin: 0; }
+.is-admin .workspace-admin-detail-link { display: flex; margin: 10px auto 0; }
+.is-admin .workspace-admin-tools > select { width: 190px; }
+.is-admin .workspace-admin-tools > .workspace-search { flex: 1; }
+.is-admin .workspace-pagination { padding-top: 11px; border-top: 1px solid #edf1f6; }
+.is-admin .workspace-audit-summary > div { padding: 9px 0; }
+.is-admin .workspace-audit-summary strong { font-size: 9px; }
+.is-admin .workspace-audit-summary small { font-size: 8px; }
+.is-admin .workspace-role-summary > div { padding: 7px 0; }
+.is-admin .workspace-role-summary strong { font-size: 9px; }
+.is-admin .workspace-role-summary small { font-size: 8px; }
+
+@media (max-width: 760px) {
+  .role-workspace.is-admin { padding-top: 58px; }
+  .is-admin .workspace-sidebar { inset: 70px auto 12px 10px; width: 54px; height: auto; padding: 8px 5px; }
+  .is-admin .workspace-brand { inset: 11px auto auto 12px; }
+  .is-admin .workspace-brand > span:last-child { display: none; }
+  .is-admin .workspace-topbar { height: 58px; padding: 0 10px 0 77px; }
+  .is-admin .workspace-top-actions { gap: 6px; }
+  .is-admin .workspace-quick-actions button { min-height: 26px; padding: 0 5px; font-size: 7px; }
+  .is-admin .workspace-quick-actions button:first-child span { display: none; }
+  .is-admin .workspace-content { min-height: calc(100vh - 82px); margin: 12px 10px 12px 72px; padding: 14px; }
+  .is-admin .workspace-sidebar-role, .is-admin .workspace-nav-item > span:not(.workspace-nav-icon), .is-admin .workspace-nav-section, .is-admin .workspace-sidebar-bottom { display: none; }
+  .is-admin .workspace-nav { display: block; margin: 7px 0; }
+  .is-admin .workspace-nav-item { justify-content: center; padding: 0; }
+  .is-admin .workspace-two-columns { grid-template-columns: 1fr; }
+  .is-admin .workspace-admin-overview-grid { grid-template-columns: 1fr; }
+  .is-admin .workspace-admin-tools > select { width: 100%; }
+}
+@media (max-width: 600px) {
+  .workspace-edit-user-form { grid-template-columns: 1fr; }
+  .workspace-edit-user-form .workspace-modal-actions { grid-column: 1; }
+  .workspace-pagination { align-items: flex-start; flex-direction: column; }
 }

@@ -106,6 +106,7 @@ class User(Base):
     __table_args__ = (
         UniqueConstraint("username", name="uq_users_username"),
         UniqueConstraint("email", name="uq_users_email"),
+        UniqueConstraint("phone", name="uq_users_phone"),
         Index("ix_users_status", "status"),
     )
 

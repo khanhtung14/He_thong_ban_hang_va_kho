@@ -4,18 +4,19 @@ body { margin: 0; }
 .create-user-page {
   min-height: 100vh;
   color: #172033;
-  background:
-    radial-gradient(ellipse at 82% 0%, rgb(219 234 254 / 48%), transparent 35rem),
-    #f5f7fb;
+  background: #deebf8;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .create-user-topbar {
-  height: 72px;
+  position: fixed;
+  z-index: 5;
+  inset: 0 0 auto;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 clamp(20px, 6vw, 88px);
+  padding: 0 28px;
   border-bottom: 1px solid #e7ebf2;
   background: rgb(255 255 255 / 88%);
 }
@@ -45,6 +46,30 @@ body { margin: 0; }
 }
 
 .create-user-brand-muted { color: #778197; font-weight: 550; }
+.create-user-brand-muted { display: block; margin-top: 2px; font-size: 8px; font-weight: 550; letter-spacing: 0; }
+
+.create-user-sidebar {
+  position: fixed;
+  z-index: 4;
+  inset: 84px auto 20px 20px;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+  border: 1px solid #e8eef6;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(33 65 103 / 4%);
+}
+
+.create-user-sidebar-label { margin: 2px 9px 7px; color: #8c9db4; font-size: 8px; font-weight: 750; letter-spacing: .08em; }
+.create-user-sidebar-label.is-system { margin-top: 19px; }
+.create-user-sidebar a { min-height: 37px; display: flex; align-items: center; gap: 9px; padding: 0 9px; border-radius: 8px; color: #52627a; font-size: 10px; line-height: 1.35; text-decoration: none; }
+.create-user-sidebar a:hover, .create-user-sidebar a.is-active { color: #0875d1; background: #eaf4ff; }
+.create-user-sidebar a.is-active { font-weight: 700; }
+.create-user-sidebar-status { display: flex; align-items: center; gap: 7px; margin-top: auto; padding: 10px 7px 2px; color: #7d8ba0; font-size: 8px; }
+.create-user-sidebar-status i { width: 6px; height: 6px; border-radius: 50%; background: #22b77a; }
 
 .create-user-admin-label {
   display: inline-flex;
@@ -58,9 +83,14 @@ body { margin: 0; }
 .create-user-admin-label span { color: #22a06b; font-size: 9px; }
 
 .create-user-content {
-  width: min(100% - 40px, 900px);
-  margin: 0 auto;
-  padding: 54px 0 36px;
+  width: auto;
+  max-width: none;
+  min-height: calc(100vh - 108px);
+  margin: 84px 20px 20px 240px;
+  padding: clamp(24px, 4vw, 42px);
+  border: 1px solid #e8eef6;
+  border-radius: 16px;
+  background: #fff;
 }
 
 .create-user-heading {
@@ -282,8 +312,11 @@ body { margin: 0; }
 .create-user-email-note.is-warning { color: #9a6114; }
 
 @media (max-width: 640px) {
-  .create-user-topbar { height: 62px; padding: 0 18px; }
-  .create-user-content { width: min(100% - 28px, 900px); padding-top: 34px; }
+  .create-user-topbar { height: 58px; padding: 0 12px; }
+  .create-user-sidebar { inset: 70px auto 12px 10px; width: 54px; padding: 10px 5px; }
+  .create-user-sidebar-label, .create-user-sidebar a span, .create-user-sidebar-status { display: none; }
+  .create-user-sidebar a { justify-content: center; padding: 0; font-size: 15px; }
+  .create-user-content { min-height: calc(100vh - 82px); margin: 70px 10px 12px 72px; padding: 19px 14px; }
   .create-user-heading { align-items: flex-start; flex-direction: column; gap: 16px; margin-bottom: 20px; }
   .create-user-step { align-self: flex-start; }
   .create-user-fields { grid-template-columns: 1fr; gap: 18px; }

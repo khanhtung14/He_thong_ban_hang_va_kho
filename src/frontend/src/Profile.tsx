@@ -29,6 +29,10 @@ const styles = `
   .profile-card { overflow: hidden; border: 1px solid #e0e6ef; border-radius: 16px; background: white; box-shadow: 0 12px 30px rgb(22 34 55 / 5%); }
   .profile-card-title { padding: 22px 26px; border-bottom: 1px solid #edf0f5; }
   .profile-card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+  .profile-card-actions { display: flex; align-items: center; gap: 9px; }
+  .profile-change-password { min-height: 38px; display: inline-flex; align-items: center; padding: 0 14px; border: 1px solid #d7deea; border-radius: 8px; color: #3f5f99; background: white; font-size: 13px; font-weight: 650; text-decoration: none; }
+  .profile-change-password:hover { color: #1d4ed8; border-color: #b8c9e8; background: #f8faff; }
+  .profile-change-password:focus-visible { outline: 3px solid #bfdbfe; outline-offset: 2px; }
   .profile-card-title h2 { margin: 0; font-size: 18px; }
   .profile-card-title p { margin: 5px 0 0; color: #718096; font-size: 14px; }
   .profile-form { display: grid; gap: 20px; padding: 26px; }
@@ -53,7 +57,7 @@ const styles = `
   .profile-dialog { position: relative; width: min(100%, 880px); max-height: calc(100vh - 48px); overflow-y: auto; padding: 27px; border: 1px solid #e0e6ef; border-radius: 16px; background: #f5f7fb; box-shadow: 0 22px 70px rgb(16 29 51 / 22%); }
   .profile-dialog-close { position: absolute; z-index: 1; top: 18px; right: 19px; width: 36px; height: 36px; border: 1px solid #d7deea; border-radius: 9px; color: #475569; background: white; font-size: 21px; cursor: pointer; }
   .role-profile-embedded .profile-heading { padding-right: 45px; }
-  @media (max-width: 600px) { .profile-page { padding: 22px 14px 36px; } .profile-topbar { margin-bottom: 24px; } .profile-card-title, .profile-form { padding: 20px; } .profile-grid { grid-template-columns: 1fr; gap: 16px; } .profile-actions, .profile-submit { width: 100%; } }
+  @media (max-width: 600px) { .profile-page { padding: 22px 14px 36px; } .profile-topbar { margin-bottom: 24px; } .profile-card-title, .profile-form { padding: 20px; } .profile-grid { grid-template-columns: 1fr; gap: 16px; } .profile-actions, .profile-submit { width: 100%; } .profile-card-title-row { align-items: flex-start; flex-direction: column; } .profile-card-actions { flex-wrap: wrap; } }
 `;
 
 function errorMessage(error: ApiError): string {
@@ -111,7 +115,7 @@ export default function Profile({ embedded = false, onClose }: { embedded?: bool
 
   const profileCard = (
     <section className="profile-card" aria-labelledby="profile-card-title">
-      <header className="profile-card-title"><div className="profile-card-title-row"><h2 id="profile-card-title">Thông tin tài khoản</h2>{profile && !isEditing && <button type="button" className="profile-update-trigger" onClick={() => { setMessage(""); setIsSuccess(false); setIsEditing(true); }}>Cập nhật hồ sơ</button>}</div><p>Họ tên và số điện thoại là thông tin có thể cập nhật.</p></header>
+      <header className="profile-card-title"><div className="profile-card-title-row"><h2 id="profile-card-title">Thông tin tài khoản</h2><div className="profile-card-actions"><a className="profile-change-password" href="/change-password">Đổi mật khẩu</a>{profile && !isEditing && <button type="button" className="profile-update-trigger" onClick={() => { setMessage(""); setIsSuccess(false); setIsEditing(true); }}>Cập nhật hồ sơ</button>}</div></div><p>Họ tên và số điện thoại là thông tin có thể cập nhật.</p></header>
       {isLoading ? <div className="profile-loading" role="status">Đang tải hồ sơ…</div> : profile ? (
         <form className="profile-form" onSubmit={handleSubmit}>
           <div className="profile-grid">

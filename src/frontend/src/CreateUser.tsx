@@ -108,12 +108,24 @@ export default function CreateUser() {
   return (
     <main className="create-user-page">
       <header className="create-user-topbar">
-        <a className="create-user-brand" href="/admin/users" aria-label="OMS quản trị tài khoản">
-          <span className="create-user-brand-mark" aria-hidden="true">O</span>
-          <span>OMS <span className="create-user-brand-muted">/ Quản trị</span></span>
+        <a className="create-user-brand" href="/admin/users" aria-label="WMS quản trị tài khoản">
+          <span className="create-user-brand-mark" aria-hidden="true">⌂</span>
+          <span>WMS <span className="create-user-brand-muted">Hệ thống quản lý kho & bán hàng</span></span>
         </a>
         <span className="create-user-admin-label"><span aria-hidden="true">●</span> Tạo tài khoản</span>
       </header>
+
+      <aside className="create-user-sidebar" aria-label="Điều hướng quản trị">
+        <span className="create-user-sidebar-label">MENU</span>
+        <a href="/admin/users?view=overview">⌂ <span>Trang chủ</span></a>
+        <a className="is-active" href="/admin/users?view=users">♧ <span>Quản lý tài khoản & Vai trò</span></a>
+        <a href="/admin/users?view=rbac">⬡ <span>Ma trận phân quyền (RBAC)</span></a>
+        <a href="/admin/users?view=configuration">⚙ <span>Danh mục hệ thống</span></a>
+        <a href="/admin/users?view=audit">◷ <span>Nhật ký hệ thống</span></a>
+        <span className="create-user-sidebar-label is-system">HỆ THỐNG</span>
+        <a href="/login">↪ <span>Đăng xuất</span></a>
+        <div className="create-user-sidebar-status"><i /> Core Engine · OMS</div>
+      </aside>
 
       <section className="create-user-content" aria-labelledby="create-user-title">
         <div className="create-user-heading">
