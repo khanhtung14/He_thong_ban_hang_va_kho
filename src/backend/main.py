@@ -23,6 +23,7 @@ if __package__:
     from src.backend.user_assignment import router as user_assignment_router
     from src.backend.user_routes import router as user_router
     from src.backend.users import compat_router as users_compat_router, router as users_router
+    from src.backend.customer_lock_routes import router as customer_lock_router
 else:  # pragma: no cover - direct script execution from src/backend
     from avatar import router as avatar_router
     from change_password import router as change_password_router
@@ -37,6 +38,8 @@ else:  # pragma: no cover - direct script execution from src/backend
     from user_assignment import router as user_assignment_router
     from user_routes import router as user_router
     from users import compat_router as users_compat_router, router as users_router
+    from customer_lock_routes import router as customer_lock_router
+
 
 
 app = FastAPI(
@@ -130,8 +133,10 @@ app.include_router(users_router)
 app.include_router(users_compat_router)
 app.include_router(user_router)
 app.include_router(profile_router)
+app.include_router(customer_lock_router)
 
 # SCRUM-71: Avatar
+
 app.include_router(avatar_router)
 
 

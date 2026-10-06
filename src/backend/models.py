@@ -239,8 +239,16 @@ class AccountAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class OrderStatus(str, Enum):
+    DRAFT = "DRAFT"              # Đơn nháp / đang dở
+    PENDING = "PENDING"          # Chờ duyệt / xử lý
+    PROCESSING = "PROCESSING"    # Đang soạn / xử lý kho
+    COMPLETED = "COMPLETED"      # Hoàn tất
+    CANCELLED = "CANCELLED"      # Đã hủy
+
+
 class Customer(Base):
-    """Customer / Đại lý model in charge of wholesale orders."""
+    """Customer / Đại lý model in charge of wholesale orders (SCRUM-85)."""
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -249,5 +257,53 @@ class Customer(Base):
     sales_rep_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     territory_id: Mapped[int | None] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    
+    # SCRUM-85: Khóa/mở giao dịch với đại lý cho Kế toán công nợ
+    is_locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    lock_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    locked_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+
+
+class Order(Base):
+    """Đơn hàng bán sỉ của đại lý (SCRUM-85)."""
+    __tablename__ = "orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    order_code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[OrderStatus] = mapped_column(
+        SqlEnum(OrderStatus, native_enum=False, length=20),
+        default=OrderStatus.DRAFT,
+        nullable=False,
+    )
+    total_amount: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    customer: Mapped[Customer] = relationship(back_populates="orders")
+    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+
+
+class OrderItem(Base):
+    """Chi tiết sản phẩm trong đơn hàng."""
+    __tablename__ = "order_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    sku: Mapped[str] = mapped_column(String(50), nullable=False)
+    product_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    quantity: Mapped[int] = mapped_column(default=1, nullable=False)
+    unit_price: Mapped[float] = mapped_column(default=0.0, nullable=False)
+
+    order: Mapped[Order] = relationship(back_populates="items")
+
 
