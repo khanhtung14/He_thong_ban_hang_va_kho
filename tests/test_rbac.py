@@ -58,6 +58,24 @@ class TestRBACDefaultDeny:
         response = client.get("/api/v1/products/SKU-001")
         assert response.status_code == 401
 
+    def test_role_headers_cannot_authenticate_or_escalate_privileges(self):
+        # A caller must not be able to choose an identity by sending headers.
+        response = client.get(
+            "/api/v1/products/SKU-001",
+            headers={"X-User-Role": "Sales Manager", "X-User-Name": "attacker"},
+        )
+        assert response.status_code == 401
+
+        # A role header must not override the role in a signed bearer token.
+        sales_token = make_auth_header_for_role(RoleCode.SALES_REP.value)
+        response = client.get(
+            "/api/v1/products/SKU-001",
+            headers={**sales_token, "X-User-Role": "Sales Manager"},
+        )
+        assert response.status_code == 200
+        assert "cost_price" not in response.json()
+        assert "margin" not in response.json()
+
     def test_invalid_role_rejected(self):
         headers = make_auth_header_for_role("HackerRole")
         response = client.get("/api/v1/products/SKU-001", headers=headers)

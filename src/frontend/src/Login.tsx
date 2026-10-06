@@ -10,6 +10,10 @@ const styles = `
   .login-subtitle { margin: 10px 0 28px; color: #6b7280; line-height: 1.5; }
   .login-field { display: grid; gap: 8px; margin-bottom: 18px; }
   .login-field label { font-size: 14px; font-weight: 600; }
+  .login-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .login-forgot-link { color: #2563eb; font-size: 13px; font-weight: 600; text-decoration: none; }
+  .login-forgot-link:hover { text-decoration: underline; }
+  .login-forgot-link:focus-visible { outline: 3px solid #bfdbfe; outline-offset: 2px; border-radius: 2px; }
   .login-input { width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; color: inherit; background: #fff; font: inherit; }
   .login-input:focus { outline: 3px solid #bfdbfe; border-color: #2563eb; }
   .password-wrap { position: relative; }
@@ -30,6 +34,8 @@ type LoginResponse = {
   redirect_url: string;
   session_token?: string;
   expires_in?: number;
+  access_token?: string;
+  user?: { username?: string; role_code?: string };
 };
 
 type ApiError = {
@@ -65,6 +71,9 @@ export default function Login() {
 
       if (response.ok) {
         const result = (await response.json()) as LoginResponse;
+        for (const key of ["session_token", "session_expires_at", "access_token", "access_token_expires_at", "user_role", "user_name"]) {
+          window.sessionStorage.removeItem(key);
+        }
         if (result.session_token) {
           window.sessionStorage.setItem("session_token", result.session_token);
           window.sessionStorage.setItem(
@@ -72,6 +81,12 @@ export default function Login() {
             String(Date.now() + (result.expires_in ?? 12 * 60 * 60) * 1000),
           );
         }
+        if (result.access_token) {
+          window.sessionStorage.setItem("access_token", result.access_token);
+          window.sessionStorage.setItem("access_token_expires_at", String(Date.now() + 58 * 60 * 1000));
+        }
+        if (result.user?.username) window.sessionStorage.setItem("user_name", result.user.username);
+        if (result.user?.role_code) window.sessionStorage.setItem("user_role", result.user.role_code);
         const requestedRedirect = new URLSearchParams(window.location.search).get("redirect");
         const safeRedirect = requestedRedirect?.startsWith("/") && !requestedRedirect.startsWith("//")
           ? requestedRedirect
@@ -122,7 +137,10 @@ export default function Login() {
               />
             </div>
             <div className="login-field">
-              <label htmlFor="password">Mật khẩu</label>
+              <div className="login-field-heading">
+                <label htmlFor="password">Mật khẩu</label>
+                <a className="login-forgot-link" href="/forgot-password">Quên mật khẩu?</a>
+              </div>
               <div className="password-wrap">
                 <input
                   className="login-input"
@@ -151,9 +169,6 @@ export default function Login() {
               {isSubmitting ? "Đang đăng nhập…" : "Đăng nhập"}
             </button>
           </form>
-          <p style={{ margin: "18px 0 0", textAlign: "center" }}>
-            <a href="/forgot-password">Quên mật khẩu?</a>
-          </p>
         </section>
       </main>
     </>

@@ -3,6 +3,7 @@
 import pytest
 
 from src.backend import price_lists
+from src.backend.rbac import create_access_token
 
 
 @pytest.fixture(autouse=True)
@@ -22,7 +23,8 @@ def payload(**overrides):
 
 
 def manager(client):
-    return {"X-User-Role": "Sales Manager"}
+    token = create_access_token({"sub": "price-list-manager", "role": "Sales Manager"})
+    return {"Authorization": "Bearer {}".format(token)}
 
 
 def create_and_publish(client, data=None):
@@ -104,6 +106,11 @@ def test_effective_price_requires_published_matching_group_and_date(client):
 
 
 def test_price_list_management_requires_sales_manager_or_admin(client):
-    response = client.post("/api/v1/price-lists", json=payload(), headers={"X-User-Role": "Sales Rep"})
+    token = create_access_token({"sub": "sales-rep", "role": "Sales Rep"})
+    response = client.post(
+        "/api/v1/price-lists",
+        json=payload(),
+        headers={"Authorization": "Bearer {}".format(token)},
+    )
     assert response.status_code == 403
     assert client.post("/api/v1/price-lists", json=payload()).status_code == 401

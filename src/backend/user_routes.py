@@ -23,8 +23,8 @@ router = APIRouter(tags=["Quản lý tài khoản"])
 class LockUserRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    user_id: str = Field(min_length=1, max_length=100)
-    reason: str = Field(max_length=2000)
+    user_id: str = Field(default="", max_length=100)
+    reason: str = Field(default="", max_length=2000)
 
 
 def _find_user(db: Session, user_id: str) -> Optional[Any]:

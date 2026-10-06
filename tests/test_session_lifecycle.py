@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from src.backend.models import AccountStatus, Base, User, UserSession
+from src.backend.models import AccountStatus, Base, Role, User, UserSession
 from src.backend.security import require_active_user
 from src.backend.session import logout, refresh_session
 
@@ -29,6 +29,7 @@ def session_db():
             password_hash="unused",
             is_active=True,
             status=AccountStatus.ACTIVE,
+            roles=[Role(code="SALES_REP", name="Sales Rep")],
         )
         db.add(user)
         db.flush()
