@@ -186,11 +186,24 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
 .workspace-pagination > div { display: flex; gap: 7px; }
 .workspace-pagination button { min-height: 32px; padding: 0 11px; border: 1px solid #dfe6f0; border-radius: 7px; color: #425572; background: #fff; font: inherit; font-size: 10px; cursor: pointer; }
 .workspace-pagination button:disabled { opacity: .45; cursor: not-allowed; }
-.workspace-edit-user-form { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.workspace-edit-user-form { min-height: 0; flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 13px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 6px 2px 0; }
 .workspace-edit-user-form label { display: grid !important; gap: 6px; margin: 0 !important; }
 .workspace-edit-user-form input, .workspace-edit-user-form select { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #dfe4ed; border-radius: 7px; color: #34435b; background: #fff; font: inherit; font-size: 11px; }
 .workspace-edit-user-form input:focus, .workspace-edit-user-form select:focus { outline: 3px solid #dbeafe; border-color: #6c91e5; }
-.workspace-edit-user-form .workspace-modal-actions { grid-column: 1 / -1; }
+.workspace-edit-user-form .workspace-modal-actions { position: sticky; bottom: 0; z-index: 1; grid-column: 1 / -1; margin: 0; padding: 12px 0 2px; border-top: 1px solid #edf0f5; background: #fff; }
+.workspace-assignment-group { position: relative; z-index: 1; grid-column: 1 / -1; min-width: 0; height: 56px; box-sizing: border-box; overflow: visible; margin: 0; padding: 5px 10px; border: 1px solid #dfe4ed; border-radius: 8px; cursor: pointer; }
+.workspace-assignment-group.is-open { z-index: 20; }
+.workspace-assignment-group legend { padding: 0 5px; color: #53617a; font-size: 11px; font-weight: 700; }
+.workspace-assignment-trigger { padding: 0; border: 0; color: inherit; background: transparent; font: inherit; font-weight: inherit; text-align: left; cursor: pointer; }
+.workspace-assignment-trigger::after { content: "  · Chọn⌄"; color: #8791a3; font-size: 10px; font-weight: 500; }
+.workspace-assignment-trigger[aria-expanded="true"]::after { content: "  · Đóng⌃"; }
+.workspace-assignment-trigger:focus-visible { outline: 2px solid #93b4f5; outline-offset: 2px; border-radius: 3px; }
+.workspace-assignment-summary { display: block; max-width: 100%; overflow: hidden; color: #8290a5; font-size: 10px; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-assignment-options { position: absolute; top: calc(100% + 3px); left: -1px; right: -1px; z-index: 30; display: block; max-height: 0; overflow: hidden; visibility: hidden; opacity: 0; pointer-events: none; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: #fff; box-shadow: 0 12px 26px rgb(31 48 77 / 16%); transition: max-height .18s ease, padding .18s ease, opacity .15s ease, visibility .18s; }
+.workspace-assignment-options.is-open { max-height: 190px; overflow-y: auto; visibility: visible; opacity: 1; pointer-events: auto; padding-top: 8px; padding-bottom: 8px; border-color: #dfe4ed; }
+.workspace-assignment-group .workspace-check-option { display: flex !important; align-items: center; gap: 8px; margin: 0 !important; padding: 5px 2px; color: #53617a; font-size: 11px; font-weight: 500; }
+.workspace-assignment-group .workspace-check-option input { width: 14px; min-height: 14px; margin: 0; accent-color: #2563eb; }
+.workspace-assignment-group:disabled { opacity: .6; }
 .workspace-audit-summary > div { display: flex; align-items: flex-start; gap: 9px; padding: 10px 0; border-bottom: 1px solid #f0f2f6; }
 .workspace-audit-summary > div:last-child { border: 0; }
 .workspace-audit-summary > div > span:last-child { flex: 1; }
@@ -227,7 +240,7 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
 .workspace-invalid { max-width: 500px; margin: 80px auto; padding: 30px; border: 1px solid #e7ebf2; border-radius: 14px; background: #fff; color: #37445a; font-family: system-ui, sans-serif; }
 .workspace-modal-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(17 29 49 / 46%); backdrop-filter: blur(3px); }
 .workspace-modal { position: relative; width: min(100%, 440px); padding: 27px; border: 1px solid #e8ecf2; border-radius: 15px; background: #fff; box-shadow: 0 22px 70px rgb(16 29 51 / 22%); }
-.workspace-modal.is-wide { width: min(100%, 650px); }
+.workspace-modal.is-wide { width: min(100%, 780px); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; overflow: hidden; }
 .workspace-modal-close { position: absolute; top: 13px; right: 15px; border: 0; color: #8f99a8; background: transparent; font-size: 23px; cursor: pointer; }
 .workspace-modal-icon { width: 34px; height: 34px; display: grid; place-items: center; margin-bottom: 15px; border-radius: 50%; color: #a87924; background: #fff4dc; font-size: 15px; font-weight: 750; }
 .workspace-modal h2 { margin: 0; color: #34435b; font-size: 17px; }
@@ -364,6 +377,74 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
 .is-admin .workspace-role-summary > div { padding: 7px 0; }
 .is-admin .workspace-role-summary strong { font-size: 9px; }
 .is-admin .workspace-role-summary small { font-size: 8px; }
+
+/* Keep admin text readable across the dashboard, user list, and settings views. */
+.role-workspace.is-admin { font-size: 14px; }
+.is-admin .workspace-brand small,
+.is-admin .workspace-nav-section,
+.is-admin .workspace-breadcrumb,
+.is-admin .workspace-env,
+.is-admin .workspace-user-profile small,
+.is-admin .workspace-page-heading p,
+.is-admin .workspace-welcome-copy > span,
+.is-admin .workspace-welcome-copy p,
+.is-admin .workspace-metric-label,
+.is-admin .workspace-table,
+.is-admin .workspace-table th,
+.is-admin .workspace-cell-subtitle,
+.is-admin .workspace-admin-tools input,
+.is-admin .workspace-admin-tools select,
+.is-admin .workspace-row-actions button,
+.is-admin .workspace-pagination,
+.is-admin .workspace-pagination button,
+.is-admin .workspace-audit-summary small,
+.is-admin .workspace-role-summary small,
+.is-admin .workspace-configuration-grid small,
+.is-admin .workspace-configuration-grid p,
+.is-admin .workspace-footer,
+.is-admin .workspace-assignment-summary,
+.is-admin .workspace-assignment-trigger::after { color: #1f2937; }
+.is-admin .workspace-brand small { font-size: 9px; }
+.is-admin .workspace-nav-section { font-size: 9px; }
+.is-admin .workspace-nav-item, .is-admin .workspace-logout { font-size: 12px; }
+.is-admin .workspace-breadcrumb, .is-admin .workspace-env { font-size: 12px; }
+.is-admin .workspace-user-profile small { font-size: 11px; }
+.is-admin .workspace-page-heading p, .is-admin .workspace-welcome-copy p { font-size: 13px; }
+.is-admin .workspace-welcome-copy > span { font-size: 10px; }
+.is-admin .workspace-metric-label, .is-admin .workspace-metric-change { font-size: 10px; }
+.is-admin .workspace-panel-heading h3, .is-admin .workspace-section-heading h3 { font-size: 13px; }
+.is-admin .workspace-table { color: #1f2937; font-size: 12px; }
+.is-admin .workspace-table th { color: #1f2937; font-size: 10px; }
+.is-admin .workspace-table td { font-size: 11px; }
+.is-admin .workspace-cell-subtitle { font-size: 11px; }
+.is-admin .workspace-admin-tools input, .is-admin .workspace-admin-tools select { font-size: 12px; }
+.is-admin .workspace-row-actions button { font-size: 11px; }
+.is-admin .workspace-status { font-size: 10px; }
+.is-admin .workspace-pagination, .is-admin .workspace-pagination button { font-size: 12px; }
+.is-admin .workspace-audit-summary strong, .is-admin .workspace-role-summary strong { color: #1f2937; font-size: 11px; }
+.is-admin .workspace-audit-summary small, .is-admin .workspace-role-summary small,
+.is-admin .workspace-configuration-grid small, .is-admin .workspace-configuration-grid p,
+.is-admin .workspace-footer { font-size: 10px; }
+.is-admin .workspace-assignment-group legend { color: #1f2937; font-size: 12px; }
+.is-admin .workspace-assignment-summary { font-size: 11px; }
+.is-admin .workspace-assignment-trigger::after { font-size: 11px; }
+.is-admin .workspace-modal > p,
+.is-admin .workspace-modal form label,
+.is-admin .workspace-modal .workspace-assignment-group legend,
+.is-admin .workspace-modal .workspace-assignment-summary,
+.is-admin .workspace-modal .workspace-check-option,
+.is-admin .workspace-empty,
+.is-admin .workspace-loading,
+.is-admin .workspace-data-source { color: #1f2937; }
+.is-admin .workspace-modal > p,
+.is-admin .workspace-modal form label,
+.is-admin .workspace-modal textarea,
+.is-admin .workspace-modal input,
+.is-admin .workspace-modal select { font-size: 12px; }
+.is-admin .workspace-modal .workspace-assignment-summary,
+.is-admin .workspace-modal .workspace-check-option { font-size: 12px; }
+.is-admin .workspace-empty, .is-admin .workspace-loading { font-size: 13px; }
+.is-admin .workspace-search input::placeholder { color: #374151; opacity: 1; }
 
 @media (max-width: 760px) {
   .role-workspace.is-admin { padding-top: 58px; }

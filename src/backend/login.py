@@ -316,9 +316,24 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         else (json_account.get("username") if json_account else data.username)
     )
 
+    warehouse_ids: list[int] = []
+    if db_user is not None and db_user.get("id") and isinstance(db, Session):
+        try:
+            warehouse_ids = [
+                int(row[0])
+                for row in db.execute(
+                    text("SELECT warehouse_id FROM user_warehouses WHERE user_id = :user_id"),
+                    {"user_id": db_user["id"]},
+                ).fetchall()
+            ]
+        except Exception:
+            # Keep login working on older demo schemas that have not created assignment tables yet.
+            warehouse_ids = []
+
     token = create_access_token({
         "sub": resolved_username,
         "role": canonical_role,
+        "warehouse_ids": warehouse_ids,
     })
 
     response = {

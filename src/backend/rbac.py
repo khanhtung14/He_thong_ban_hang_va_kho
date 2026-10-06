@@ -15,7 +15,7 @@ from typing import Any
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 try:
     from src.backend.models import RoleCode
@@ -165,6 +165,7 @@ class AuthenticatedUser(BaseModel):
     role: str
     full_name: str | None = None
     warehouse_id: int | None = None
+    warehouse_ids: list[int] = Field(default_factory=list)
     territory_id: int | None = None
 
     def has_permission(self, permission: str) -> bool:
@@ -275,6 +276,7 @@ def get_current_user(
             role=normalized,
             full_name=payload.get("full_name"),
             warehouse_id=payload.get("warehouse_id"),
+            warehouse_ids=payload.get("warehouse_ids") or ([payload["warehouse_id"]] if payload.get("warehouse_id") else []),
             territory_id=payload.get("territory_id"),
         )
 
