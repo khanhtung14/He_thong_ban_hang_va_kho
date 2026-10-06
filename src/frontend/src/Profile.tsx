@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { authenticatedFetch, logout } from "./session";
+import ProfileAvatar from "./ProfileAvatar";
 
 type ProfileData = {
   username: string;
   email: string;
   full_name: string;
+  avatar_url?: string | null;
   phone: string;
   role: string;
   warehouse: string;
@@ -29,6 +31,9 @@ const styles = `
   .profile-card { overflow: hidden; border: 1px solid #e0e6ef; border-radius: 16px; background: white; box-shadow: 0 12px 30px rgb(22 34 55 / 5%); }
   .profile-card-title { padding: 22px 26px; border-bottom: 1px solid #edf0f5; }
   .profile-card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+  .profile-identity { min-width: 0; display: flex; align-items: center; gap: 14px; }
+  .profile-identity h2 { margin: 0; }
+  .profile-identity p { margin: 5px 0 0; color: #718096; font-size: 13px; }
   .profile-card-actions { display: flex; align-items: center; gap: 9px; }
   .profile-change-password { min-height: 38px; display: inline-flex; align-items: center; padding: 0 14px; border: 1px solid #d7deea; border-radius: 8px; color: #3f5f99; background: white; font-size: 13px; font-weight: 650; text-decoration: none; }
   .profile-change-password:hover { color: #1d4ed8; border-color: #b8c9e8; background: #f8faff; }
@@ -57,7 +62,7 @@ const styles = `
   .profile-dialog { position: relative; width: min(100%, 880px); max-height: calc(100vh - 48px); overflow-y: auto; padding: 27px; border: 1px solid #e0e6ef; border-radius: 16px; background: #f5f7fb; box-shadow: 0 22px 70px rgb(16 29 51 / 22%); }
   .profile-dialog-close { position: absolute; z-index: 1; top: 18px; right: 19px; width: 36px; height: 36px; border: 1px solid #d7deea; border-radius: 9px; color: #475569; background: white; font-size: 21px; cursor: pointer; }
   .role-profile-embedded .profile-heading { padding-right: 45px; }
-  @media (max-width: 600px) { .profile-page { padding: 22px 14px 36px; } .profile-topbar { margin-bottom: 24px; } .profile-card-title, .profile-form { padding: 20px; } .profile-grid { grid-template-columns: 1fr; gap: 16px; } .profile-actions, .profile-submit { width: 100%; } .profile-card-title-row { align-items: flex-start; flex-direction: column; } .profile-card-actions { flex-wrap: wrap; } }
+  @media (max-width: 600px) { .profile-page { padding: 22px 14px 36px; } .profile-topbar { margin-bottom: 24px; } .profile-card-title, .profile-form { padding: 20px; } .profile-grid { grid-template-columns: 1fr; gap: 16px; } .profile-actions, .profile-submit { width: 100%; } .profile-card-title-row { align-items: flex-start; flex-direction: column; } .profile-card-actions { flex-wrap: wrap; } .profile-identity { align-items: flex-start; } }
 `;
 
 function errorMessage(error: ApiError): string {
@@ -75,6 +80,8 @@ export default function Profile({ embedded = false, onClose }: { embedded?: bool
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const avatarName = profile?.full_name || window.sessionStorage.getItem("user_name") || "?";
+  const avatarInitials = avatarName.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join("").toUpperCase() || "?";
 
   useEffect(() => {
     authenticatedFetch("/api/v1/profile")
@@ -102,7 +109,10 @@ export default function Profile({ embedded = false, onClose }: { embedded?: bool
       });
       const result = await response.json() as ApiError & { profile?: ProfileData; message?: string };
       if (!response.ok) throw new Error(errorMessage(result));
-      if (result.profile) setProfile(result.profile);
+      if (result.profile) {
+        setProfile(result.profile);
+        window.dispatchEvent(new Event("oms:profile-avatar-updated"));
+      }
       setMessage(result.message ?? "Cập nhật hồ sơ thành công.");
       setIsSuccess(true);
       setIsEditing(false);
@@ -115,7 +125,7 @@ export default function Profile({ embedded = false, onClose }: { embedded?: bool
 
   const profileCard = (
     <section className="profile-card" aria-labelledby="profile-card-title">
-      <header className="profile-card-title"><div className="profile-card-title-row"><h2 id="profile-card-title">Thông tin tài khoản</h2><div className="profile-card-actions"><a className="profile-change-password" href="/change-password">Đổi mật khẩu</a>{profile && !isEditing && <button type="button" className="profile-update-trigger" onClick={() => { setMessage(""); setIsSuccess(false); setIsEditing(true); }}>Cập nhật hồ sơ</button>}</div></div><p>Họ tên và số điện thoại là thông tin có thể cập nhật.</p></header>
+      <header className="profile-card-title"><div className="profile-card-title-row"><div className="profile-identity"><ProfileAvatar initials={avatarInitials} /><div><h2 id="profile-card-title">Thông tin tài khoản</h2><p>Nhấn vào ảnh để xem hoặc cập nhật ảnh đại diện.</p></div></div><div className="profile-card-actions"><a className="profile-change-password" href="/change-password">Đổi mật khẩu</a>{profile && !isEditing && <button type="button" className="profile-update-trigger" onClick={() => { setMessage(""); setIsSuccess(false); setIsEditing(true); }}>Cập nhật hồ sơ</button>}</div></div></header>
       {isLoading ? <div className="profile-loading" role="status">Đang tải hồ sơ…</div> : profile ? (
         <form className="profile-form" onSubmit={handleSubmit}>
           <div className="profile-grid">

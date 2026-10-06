@@ -46,6 +46,7 @@ def migrate_profile_schema() -> None:
     columns = {column["name"] for column in inspect(engine).get_columns("users")}
     additions = {
         "phone": "VARCHAR(20) NULL",
+        "avatar_url": "VARCHAR(255) NULL",
         # Existing demo databases predate the temporary-password workflow.
         # New users must change their initial password after first login.
         "must_change_password": "BOOLEAN NOT NULL DEFAULT 1",
@@ -65,6 +66,7 @@ def _serialize_profile(user: User) -> dict:
         "username": user.username,
         "email": user.email,
         "full_name": user.full_name,
+        "avatar_url": user.avatar_url,
         "phone": user.phone or "",
         "role": role.name if role else "Chưa gán vai trò",
         "warehouse": ", ".join(warehouses) if warehouses else "Chưa phân kho",

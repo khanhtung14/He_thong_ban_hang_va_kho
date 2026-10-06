@@ -2,56 +2,56 @@
   {
     "username": "demo_customer",
     "email": "customer@example.com",
-    "password_hash": "$2b$12$wDxQs964kSoB85Bdp/wz6Os2ABoJ8W0C59wPWJH54VSDxaoAdCLBi",
+    "password_hash": "$2b$12$qtPO95BWs905zhsYcpQ3NONW88waucZkWwYHMcgoJPPaImomctaSi",
     "role_code": "CUSTOMER",
     "status": "ACTIVE"
   },
   {
     "username": "demo_sales",
     "email": "sales@example.com",
-    "password_hash": "$2b$12$QpAqQeLhRJ9kejrmhq9fGunVLLx2wvxHpeAobXcQeV64ovFmfREh6",
+    "password_hash": "$2b$12$c7FiWOP.HL4pfV9yWehfD.YZDqiVwehbRjX4AvF743Va2O8Tr8E5q",
     "role_code": "SALES",
     "status": "ACTIVE"
   },
   {
     "username": "demo_sales_mgr",
     "email": "sales.manager@example.com",
-    "password_hash": "$2b$12$YBGwFsFNhv0W3LyS7nB0CeIFAkQ5P3zLGHCEcL6zbhLSmbAHBZwCO",
+    "password_hash": "$2b$12$j4dDCl104kN3CJigAUlFMOrb2RCN6M4sMzUuAb3a.2AecBDg9ZPIy",
     "role_code": "SALES_MANAGER",
     "status": "ACTIVE"
   },
   {
     "username": "demo_warehouse",
     "email": "warehouse@example.com",
-    "password_hash": "$2b$12$pUnQBjcFHfw07rP2Q9nXh.qTJ8NbYHnnSGVHv4jbQLFzjoEKVPAQa",
+    "password_hash": "$2b$12$LpkUeIwMuko70NJeNFg1zem.wm.Eg/m7Bt0V6EjIxQLGbpsvChvdm",
     "role_code": "WAREHOUSE",
     "status": "ACTIVE"
   },
   {
     "username": "demo_wh_mgr",
     "email": "warehouse.manager@example.com",
-    "password_hash": "$2b$12$aZWJ8i7AgIkY1UntDlAE7esSbKDiTBzkEmA0WXXfqnoes2Yg/gI0u",
+    "password_hash": "$2b$12$tfYijZAjHWd17CD7nOTUTOKjrOLcfHvMYWgJxvJUF/7fGT3Sp9cjG",
     "role_code": "WH_MANAGER",
     "status": "ACTIVE"
   },
   {
     "username": "demo_accountant",
     "email": "accountant@example.com",
-    "password_hash": "$2b$12$8kl6U6x8YqnAh6wOq8btNu4cpnx4bQ3LoCcUU2EJq21hCukMKa2mm",
+    "password_hash": "$2b$12$UBaK7o6QTfH0QL.IAr8rB..HirhGPPqHiEdCU6P9Lz.2LaixA13ZO",
     "role_code": "ACCOUNTANT",
     "status": "ACTIVE"
   },
   {
     "username": "demo_admin",
     "email": "admin@example.com",
-    "password_hash": "$2b$12$E7xpPNNSIobzCrwr3KjrSuEb1aXweD2TYfeHWltCSgvmyQf8jLll2",
+    "password_hash": "$2b$12$2LXpNYc0ZRTH6dKwNyzuO.8E3hMU0vXZ1qrs/O3Qgwoj7DbSYNJxG",
     "role_code": "ADMIN",
     "status": "ACTIVE"
   },
   {
     "username": "demo_locked",
     "email": "locked@example.com",
-    "password_hash": "$2b$12$52qVPhcogYxOkYb9GMB3P.s4bg26IC5BwYc/0qdhLBXKD7tmYcKeS",
+    "password_hash": "$2b$12$5KIghw2FbPMCFNW7UsP5R.AvDGVkV.ZlvaAzd0Lac081MsARdVTTi",
     "role_code": "SALES",
     "status": "LOCKED"
   }

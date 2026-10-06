@@ -8,7 +8,8 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-try:  # Supports both `python -m src.backend.main` and running this file directly.
+if __package__:
+    # Package import is used by `uvicorn src.backend.main:app` from the project root.
     from src.backend.change_password import router as change_password_router
     from src.backend.forgot_password import router as forgot_password_router
     from src.backend.inventory import router as inventory_router
@@ -19,7 +20,10 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
     from src.backend.session import router as session_router
     from src.backend.profile import migrate_profile_schema, router as profile_router
     from src.backend.users import compat_router as users_compat_router, router as users_router
-except ModuleNotFoundError:  # pragma: no cover - direct script execution
+
+    # SCRUM-71: Avatar
+    from src.backend.avatar import router as avatar_router
+else:  # pragma: no cover - direct script execution from src/backend
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
     from inventory import router as inventory_router
@@ -31,10 +35,15 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from profile import migrate_profile_schema, router as profile_router
     from users import compat_router as users_compat_router, router as users_router
 
-try:
+    # SCRUM-71: Avatar
+    from avatar import router as avatar_router
+
+
+if __package__:
     from src.backend.user_routes import router as user_router
-except ModuleNotFoundError:  # pragma: no cover - direct script execution
+else:  # pragma: no cover - direct script execution from src/backend
     from user_routes import router as user_router
+
 
 app = FastAPI(
     title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
@@ -47,6 +56,7 @@ app = FastAPI(
 def migrate_profile_database() -> None:
     migrate_profile_schema()
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -55,9 +65,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 FRONTEND_DIST = FRONTEND_DIR / "dist"
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
+
 
 # Vite emits the React bundle here. check_dir=False allows the backend module
 # to be imported before the first frontend build.
@@ -123,6 +135,9 @@ app.include_router(users_router)
 app.include_router(users_compat_router)
 app.include_router(user_router)
 app.include_router(profile_router)
+
+# SCRUM-71: Avatar
+app.include_router(avatar_router)
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
