@@ -13,6 +13,7 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
 .workspace-avatar { width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid #dbe5ff; border-radius: 50%; color: #355dba; background: #edf3ff; font-size: 10px; font-weight: 780; }
 .workspace-avatar.is-sidebar { width: 31px; height: 31px; border: 0; color: #cdddff; background: #314769; }
 .workspace-avatar.is-large { width: 70px; height: 70px; font-size: 20px; }
+.profile-avatar-trigger.workspace-avatar.is-large { width: 70px; height: 70px; font-size: 20px; }
 .workspace-chevron { color: #8491a7; font-size: 16px; }
 .workspace-nav { flex: 1; overflow-y: auto; margin: 25px -5px 10px; padding: 0 5px; }
 .workspace-nav-section { margin: 0 10px 9px; color: #73839d; font-size: 9px; font-weight: 780; letter-spacing: .12em; }
@@ -45,10 +46,11 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
 .workspace-icon-button:hover { background: #f2f5fa; }
 .workspace-icon-button i { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border: 1px solid #fff; border-radius: 50%; background: #ed7077; }
 .workspace-top-divider { width: 1px; height: 28px; background: #e7ebf2; }
-.workspace-user-chip { display: flex; align-items: center; gap: 9px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
-.workspace-user-chip strong, .workspace-user-chip small { display: block; }
-.workspace-user-chip strong { max-width: 140px; overflow: hidden; color: #34425a; font-size: 11px; font-weight: 690; text-overflow: ellipsis; white-space: nowrap; }
-.workspace-user-chip small { margin-top: 3px; color: #929bad; font-size: 9px; }
+.workspace-user-chip { display: flex; align-items: center; gap: 9px; color: inherit; }
+.workspace-user-profile { display: block; min-width: 0; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.workspace-user-profile strong, .workspace-user-profile small { display: block; }
+.workspace-user-profile strong { max-width: 140px; overflow: hidden; color: #34425a; font-size: 11px; font-weight: 690; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-user-profile small { margin-top: 3px; color: #929bad; font-size: 9px; }
 .workspace-content { width: min(100%, 1480px); margin: auto; padding: 31px 34px 20px; }
 .workspace-page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin: 3px 0 22px; }
 .workspace-page-heading h2 { margin: 0; color: #202d43; font-size: 22px; font-weight: 730; letter-spacing: -.035em; }
@@ -260,7 +262,7 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
   .workspace-main-column { width: calc(100% - 61px); margin-left: 0; }
   .workspace-topbar { height: 58px; padding: 0 14px; }
   .workspace-top-actions { gap: 9px; }
-  .workspace-env, .workspace-top-divider, .workspace-user-chip > span:nth-child(2), .workspace-user-chip > .workspace-chevron { display: none; }
+  .workspace-env, .workspace-top-divider, .workspace-user-profile, .workspace-user-chip > .workspace-chevron { display: none; }
   .workspace-content { padding: 22px 14px 18px; }
   .workspace-two-columns { grid-template-columns: 1fr; }
   .workspace-welcome { min-height: 0; align-items: flex-start; flex-direction: column; padding: 21px; }
@@ -304,7 +306,7 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
   .workspace-quick-actions { gap: 3px; }
   .workspace-quick-actions button { min-height: 27px; padding: 0 5px; font-size: 8px; }
   .workspace-quick-actions button:first-child span { display: none; }
-  .workspace-env, .workspace-top-divider, .workspace-user-chip { display: none; }
+  .workspace-env, .workspace-top-divider, .workspace-user-profile, .workspace-user-chip > .workspace-chevron { display: none; }
 }
 
 /* Admin workspace follows the light, blue framed console in the design reference. */
@@ -372,6 +374,7 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
   .is-admin .workspace-top-actions { gap: 6px; }
   .is-admin .workspace-quick-actions button { min-height: 26px; padding: 0 5px; font-size: 7px; }
   .is-admin .workspace-quick-actions button:first-child span { display: none; }
+  .is-admin .workspace-user-profile, .is-admin .workspace-user-chip > .workspace-chevron { display: none; }
   .is-admin .workspace-content { min-height: calc(100vh - 82px); margin: 12px 10px 12px 72px; padding: 14px; }
   .is-admin .workspace-sidebar-role, .is-admin .workspace-nav-item > span:not(.workspace-nav-icon), .is-admin .workspace-nav-section, .is-admin .workspace-sidebar-bottom { display: none; }
   .is-admin .workspace-nav { display: block; margin: 7px 0; }

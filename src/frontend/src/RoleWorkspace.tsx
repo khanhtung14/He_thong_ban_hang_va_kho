@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { authenticatedFetch, logout } from "./session";
 import Profile from "./Profile";
+import ProfileAvatar from "./ProfileAvatar";
 import "./RoleWorkspace.css";
 
 type RoleKey = "customer" | "sales" | "salesManager" | "warehouse" | "warehouseManager" | "accountant" | "admin";
@@ -451,7 +452,7 @@ export default function RoleWorkspace() {
       </aside>
 
       <div className="workspace-main-column">
-        <header className="workspace-topbar"><div className="workspace-breadcrumb"><span>{role === "admin" ? "Quản trị hệ thống" : "OMS"}</span><span>/</span><strong>{heading}</strong></div><div className="workspace-top-actions"><div className="workspace-quick-actions"><button type="button" onClick={() => goBack(role)}>← <span>Quay lại</span></button></div><span className="workspace-env"><i /> Hệ thống hoạt động</span><button className="workspace-icon-button" aria-label="Thông báo">♧<i /></button><span className="workspace-top-divider" /><button type="button" className="workspace-user-chip" aria-label="Mở thông tin cá nhân" onClick={() => setProfileOpen(true)}><span className="workspace-avatar">{details.initials}</span><span><strong>{username}</strong><small>{details.name}</small></span><span className="workspace-chevron">⌄</span></button></div></header>
+        <header className="workspace-topbar"><div className="workspace-breadcrumb"><span>{role === "admin" ? "Quản trị hệ thống" : "OMS"}</span><span>/</span><strong>{heading}</strong></div><div className="workspace-top-actions"><div className="workspace-quick-actions"><button type="button" onClick={() => goBack(role)}>← <span>Quay lại</span></button></div><span className="workspace-env"><i /> Hệ thống hoạt động</span><button className="workspace-icon-button" aria-label="Thông báo">♧<i /></button><span className="workspace-top-divider" /><div className="workspace-user-chip"><ProfileAvatar initials={details.initials} className="workspace-avatar" editable={false} /><button type="button" className="workspace-user-profile" aria-label="Mở hồ sơ cá nhân" onClick={() => setProfileOpen(true)}><strong>{username}</strong><small>{details.name}</small></button><span className="workspace-chevron">⌄</span></div></div></header>
         <main className="workspace-content">
           {notice && <div className="workspace-alert" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Đóng thông báo">×</button></div>}
           {renderContent()}
@@ -542,7 +543,8 @@ function ReconciliationPanel() {
 }
 
 function ProfileCard({ username, roleName }: { username: string; roleName: string }) {
-  return <section className="workspace-panel workspace-profile"><span className="workspace-avatar is-large">ĐL</span><div><h3>{username}</h3><p>{roleName} · Tài khoản đang hoạt động</p><button className="workspace-button is-secondary" onClick={() => window.location.assign("/change-password")}>Đổi mật khẩu</button></div></section>;
+  const initials = username.slice(0, 2).toUpperCase();
+  return <section className="workspace-panel workspace-profile"><ProfileAvatar initials={initials} className="workspace-avatar is-large" editable={false} /><div><h3>{username}</h3><p>{roleName} · Tài khoản đang hoạt động</p><button className="workspace-button is-secondary" onClick={() => window.location.assign("/change-password")}>Đổi mật khẩu</button></div></section>;
 }
 
 function AdminUsers({ users, loading, error, search, setSearch, filter, setFilter, roleFilter, setRoleFilter, page, total, totalPages, setPage, onCreate, onEdit, onLock, onUnlock, onAudit, busy }: { users: UserRow[]; loading: boolean; error: string; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; roleFilter: string; setRoleFilter: (value: string) => void; page: number; total: number; totalPages: number; setPage: (value: number) => void; onCreate: () => void; onEdit: (user: UserRow) => void; onLock: (user: UserRow) => void; onUnlock: (user: UserRow) => void; onAudit: (user: UserRow) => void; busy: boolean }) {

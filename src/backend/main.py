@@ -8,7 +8,8 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-try:  # Supports both `python -m src.backend.main` and running this file directly.
+if __package__:
+    # Package import is used by `uvicorn src.backend.main:app` from the project root.
     from src.backend.change_password import router as change_password_router
     from src.backend.forgot_password import router as forgot_password_router
     from src.backend.inventory import router as inventory_router
@@ -22,8 +23,7 @@ try:  # Supports both `python -m src.backend.main` and running this file directl
 
     # SCRUM-71: Avatar
     from src.backend.avatar import router as avatar_router
-
-except ModuleNotFoundError:  # pragma: no cover - direct script execution
+else:  # pragma: no cover - direct script execution from src/backend
     from change_password import router as change_password_router
     from forgot_password import router as forgot_password_router
     from inventory import router as inventory_router
@@ -39,9 +39,9 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from avatar import router as avatar_router
 
 
-try:
+if __package__:
     from src.backend.user_routes import router as user_router
-except ModuleNotFoundError:  # pragma: no cover - direct script execution
+else:  # pragma: no cover - direct script execution from src/backend
     from user_routes import router as user_router
 
 
