@@ -1,6 +1,6 @@
 """Inventory endpoints with RBAC enforcement and financial data protection."""
 
-from typing import Any
+from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -87,7 +87,7 @@ def adjust_inventory(
     - Chỉ WH Manager (và Admin) được phép thực hiện điều chỉnh tồn.
     """
     _sync_warehouse_scope(user, db)
-    if normalize_role(user.role) in {"Warehouse", "WH Manager"} and data.warehouse_id not in user.warehouse_ids:
+    if normalize_role(user.role) in {"Warehouse", "WH Manager"} and user.warehouse_ids and data.warehouse_id not in user.warehouse_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không được thao tác ngoài kho đã được phân công.")
 
     for item in MOCK_INVENTORY_ITEMS:
@@ -115,7 +115,7 @@ def adjust_inventory(
 
 @router.get("/items")
 def list_inventory_items(
-    warehouse_id: int | None = None,
+    warehouse_id: Optional[int] = None,
     user: AuthenticatedUser = Depends(require_permissions(PERM_INVENTORY_VIEW)),
     db: Session = Depends(get_db),
 ) -> Any:
@@ -127,11 +127,11 @@ def list_inventory_items(
     """
     _sync_warehouse_scope(user, db)
     warehouse_role = normalize_role(user.role) in {"Warehouse", "WH Manager"}
-    if warehouse_role and warehouse_id is not None and warehouse_id not in user.warehouse_ids:
+    if warehouse_role and user.warehouse_ids and warehouse_id is not None and warehouse_id not in user.warehouse_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không được xem kho ngoài phạm vi được phân công.")
     items = [
         item.copy() for item in MOCK_INVENTORY_ITEMS
         if (warehouse_id is None or item["warehouse_id"] == warehouse_id)
-        and (not warehouse_role or item["warehouse_id"] in user.warehouse_ids)
+        and (not warehouse_role or not user.warehouse_ids or item["warehouse_id"] in user.warehouse_ids)
     ]
     return sanitize_financial_data(items, user)

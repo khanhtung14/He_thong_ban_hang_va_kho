@@ -1,131 +1,99 @@
 import { useEffect, useState } from "react";
-import "./App.css";
+import Login from "./auth/Login";
+import ForgotPassword from "./auth/ForgotPassword";
+import ChangePassword from "./auth/ChangePassword";
+import CreateUser from "./CreateUser";
+import Profile from "./Profile";
+import Navigation from "./Navigation";
+import RoleWorkspace from "./RoleWorkspace";
+import Error403 from "./Error403";
+import {
+  hasValidSession,
+  getCurrentUserRole,
+} from "./session";
 
-type Profile = {
-  username: string;
-  full_name: string;
-  phone: string;
-  role: string;
-  warehouse: string;
-  area: string;
-};
+const roleWorkspacePaths = [
+  "/portal/orders",
+  "/sales/orders",
+  "/sales/customers",
+  "/manager/dashboard",
+  "/manager/orders/approval",
+  "/manager/pricing",
+  "/manager/reports",
+  "/warehouse/picking",
+  "/warehouse/receiving",
+  "/warehouse/inventory",
+  "/warehouse/dashboard",
+  "/accounting/debt-book",
+  "/accounting/invoices",
+  "/admin/users",
+];
 
-function App() {
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+export default function App() {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const isAuthenticated = hasValidSession();
+  const userRole = getCurrentUserRole();
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8001/profile")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Không thể lấy thông tin hồ sơ");
-        }
-        return response.json();
-      })
-      .then((data) => {
-        setProfile(data);
-        setFullName(data.full_name);
-        setPhone(data.phone);
-      })
-      .catch(() => {
-        setError("Không thể kết nối đến Backend.");
-      });
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    setMessage("");
-    setError("");
-
-    if (!fullName.trim()) {
-      setError("Họ và tên không được để trống.");
-      return;
-    }
-
-    if (!/^0\d{9}$/.test(phone.trim())) {
-      setError(
-        "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng số 0."
-      );
-      return;
-    }
-
-    try {
-      const response = await fetch("http://127.0.0.1:8001/profile", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          full_name: fullName.trim(),
-          phone: phone.trim(),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.detail || "Cập nhật hồ sơ thất bại.");
-        return;
-      }
-
-      setProfile(data.profile);
-      setMessage("Cập nhật hồ sơ thành công.");
-    } catch {
-      setError("Không thể kết nối đến Backend.");
-    }
-  };
-
-  if (!profile) {
-    return (
-      <div className="container">
-        <h1>Hồ sơ cá nhân</h1>
-        <p>{error || "Đang tải thông tin..."}</p>
-      </div>
-    );
+  if (currentPath.startsWith("/admin/users")) {
+    document.title = "Quản trị tài khoản | OMS";
   }
 
-  return (
-    <div className="container">
-      <div className="profile-card">
-        <h1>Hồ sơ cá nhân</h1>
+  // 1. Public routes (accessible without login)
+  if (currentPath === "/login") {
+    return <Login />;
+  }
+  if (currentPath === "/forgot-password") {
+    return <ForgotPassword />;
+  }
+  if (currentPath === "/errors/403") {
+    return <Error403 />;
+  }
 
-        <form onSubmit={handleSubmit}>
-          <label>Tài khoản</label>
-          <input value={profile.username} disabled />
+  // 2. Unauthenticated check:
+  // If not logged in (no token / valid session / valid role), MUST display Login screen.
+  // Never hardcode SalesManagerDashboard on root (/) or protected routes.
+  if (!isAuthenticated || !userRole) {
+    return <Login />;
+  }
 
-          <label>Họ và tên</label>
-          <input
-            value={fullName}
-            onChange={(event) => setFullName(event.target.value)}
-          />
+  // 3. Authenticated: on root (/) or /workspace, render user's role workspace
+  if (currentPath === "/" || currentPath === "/workspace") {
+    return <RoleWorkspace />;
+  }
 
-          <label>Số điện thoại</label>
-          <input
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-          />
+  // 4. Admin create user route
+  if (currentPath === "/admin/users/create") {
+    const normalized = (userRole ?? "").trim().toUpperCase().replace(/[ -]/g, "_");
+    if (["ADMIN", "ADMINISTRATOR"].includes(normalized)) {
+      return <CreateUser />;
+    }
+    return <Error403 />;
+  }
 
-          <label>Vai trò</label>
-          <input value={profile.role} disabled />
+  // 5. User settings / common routes
+  if (currentPath === "/change-password") {
+    return <ChangePassword />;
+  }
+  if (currentPath === "/profile") {
+    return <Profile />;
+  }
+  if (currentPath === "/navigation" || currentPath === "/navigation-ui") {
+    return <Navigation />;
+  }
 
-          <label>Kho</label>
-          <input value={profile.warehouse} disabled />
+  // 6. Role workspace routes (e.g. /manager/dashboard, /sales/orders, etc.)
+  if (roleWorkspacePaths.includes(currentPath) || currentPath.startsWith("/admin/")) {
+    return <RoleWorkspace />;
+  }
 
-          <label>Địa bàn</label>
-          <input value={profile.area} disabled />
-
-          {error && <p className="error">{error}</p>}
-          {message && <p className="success">{message}</p>}
-
-          <button type="submit">Cập nhật hồ sơ</button>
-        </form>
-      </div>
-    </div>
-  );
+  // Fallback for any other route when authenticated
+  return <RoleWorkspace />;
 }
-
-export default App;

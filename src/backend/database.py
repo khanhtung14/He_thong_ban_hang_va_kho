@@ -1,10 +1,16 @@
 """MySQL engine and SQLAlchemy session factory."""
 
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
+
+# Load the project-level .env while allowing explicit shell variables to win.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -12,10 +18,15 @@ DATABASE_URL = os.getenv(
 )
 
 connect_args = {}
+engine_options = {"pool_pre_ping": True}
 if "sqlite" in DATABASE_URL:
     connect_args = {"check_same_thread": False}
+    engine_options["connect_args"] = connect_args
+    if DATABASE_URL.endswith(":memory:") or DATABASE_URL == "sqlite://":
+        # Keep one in-memory database shared by the app and TestClient threads.
+        engine_options["poolclass"] = StaticPool
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, **engine_options)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

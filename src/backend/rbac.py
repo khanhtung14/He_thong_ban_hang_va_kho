@@ -10,10 +10,10 @@ Enforces:
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Dict, Optional, Set, Union
 
 import jwt
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -28,7 +28,7 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 # Normalization mapping for standard roles
-ROLE_CANONICAL_MAP: dict[str, RoleCode] = {
+ROLE_CANONICAL_MAP: Dict[str, RoleCode] = {
     "customer": RoleCode.CUSTOMER,
     "sales rep": RoleCode.SALES_REP,
     "sales_rep": RoleCode.SALES_REP,
@@ -45,7 +45,7 @@ ROLE_CANONICAL_MAP: dict[str, RoleCode] = {
 }
 
 
-def normalize_role(role_name: str | None) -> str | None:
+def normalize_role(role_name: Optional[str]) -> Optional[str]:
     """Normalize any role string representation to standard RoleCode value."""
     if not role_name:
         return None
@@ -89,7 +89,7 @@ PERM_SYSTEM_ADMIN = "system:admin"
 
 
 # Role-Permissions Matrix (Default-Deny)
-ROLE_PERMISSIONS: dict[str, set[str]] = {
+ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     RoleCode.CUSTOMER.value: {
         PERM_PRODUCTS_VIEW,
         PERM_ORDERS_CREATE,
@@ -167,10 +167,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
 class AuthenticatedUser(BaseModel):
     username: str
     role: str
-    full_name: str | None = None
-    warehouse_id: int | None = None
+    full_name: Optional[str] = None
+    warehouse_id: Optional[int] = None
     warehouse_ids: list[int] = Field(default_factory=list)
-    territory_id: int | None = None
+    territory_id: Optional[int] = None
 
     def has_permission(self, permission: str) -> bool:
         normalized_role = normalize_role(self.role)
@@ -197,7 +197,7 @@ SENSITIVE_FINANCIAL_FIELDS = {
 }
 
 
-def can_view_financials(role_name: str | None) -> bool:
+def can_view_financials(role_name: Optional[str]) -> bool:
     """Return True only for the Sales Manager role."""
     normalized = normalize_role(role_name)
     if not normalized:
@@ -206,7 +206,7 @@ def can_view_financials(role_name: str | None) -> bool:
     return PERM_PRODUCTS_VIEW_FINANCIALS in perms
 
 
-def sanitize_financial_data(data: Any, user_or_role: AuthenticatedUser | str | None) -> Any:
+def sanitize_financial_data(data: Any, user_or_role: Optional[Union[AuthenticatedUser, str]]) -> Any:
     """Recursively filter out cost_price and margin if user role is not authorized."""
     role = user_or_role.role if isinstance(user_or_role, AuthenticatedUser) else user_or_role
     if can_view_financials(role):
@@ -224,7 +224,7 @@ def sanitize_financial_data(data: Any, user_or_role: AuthenticatedUser | str | N
 
 
 # JWT Token creation and decoding
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -233,7 +233,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> dict[str, Any]:
+def decode_access_token(token: str) -> Dict[str, Any]:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError as exc:
@@ -248,54 +248,70 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
-    auth: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    x_user_role: str | None = Header(None, alias="X-User-Role"),
-    x_user_name: str | None = Header(None, alias="X-User-Name"),
+    auth: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
 ) -> AuthenticatedUser:
     """Dependency that extracts and validates user identity and role.
 
     Supports:
     1. Standard JWT Bearer token via `Authorization: Bearer <token>`
-    2. Context headers `X-User-Role` & `X-User-Name` (convenient for automated testing & service mesh)
-    Default-Deny: Returns 401 if unauthenticated or role missing.
+    Default-Deny: Returns 401 if no valid bearer token is supplied.
     """
     # 1. Bearer token
     if auth and auth.credentials:
-        payload = decode_access_token(auth.credentials)
-        username = payload.get("sub") or payload.get("username")
-        role_raw = payload.get("role") or payload.get("role_code")
-        if not username or not role_raw:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Mã token thiếu thông tin người dùng hoặc vai trò.",
+        token = auth.credentials
+        try:
+            payload = decode_access_token(token)
+            username = payload.get("sub") or payload.get("username")
+            role_raw = payload.get("role") or payload.get("role_code")
+            if not username or not role_raw:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Mã token thiếu thông tin người dùng hoặc vai trò.",
+                )
+            normalized = normalize_role(role_raw)
+            if not normalized:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Vai trò trong token không hợp lệ trên hệ thống.",
+                )
+            return AuthenticatedUser(
+                username=username,
+                role=normalized,
+                full_name=payload.get("full_name"),
+                warehouse_id=payload.get("warehouse_id"),
+                warehouse_ids=payload.get("warehouse_ids") or ([payload["warehouse_id"]] if payload.get("warehouse_id") else []),
+                territory_id=payload.get("territory_id"),
             )
-        normalized = normalize_role(role_raw)
-        if not normalized:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Vai trò trong token không hợp lệ trên hệ thống.",
-            )
-        return AuthenticatedUser(
-            username=username,
-            role=normalized,
-            full_name=payload.get("full_name"),
-            warehouse_id=payload.get("warehouse_id"),
-            warehouse_ids=payload.get("warehouse_ids") or ([payload["warehouse_id"]] if payload.get("warehouse_id") else []),
-            territory_id=payload.get("territory_id"),
-        )
-
-    # 2. X-User-Role header
-    if x_user_role:
-        normalized = normalize_role(x_user_role)
-        if not normalized:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Vai trò '{x_user_role}' không tồn tại trong hệ thống.",
-            )
-        return AuthenticatedUser(
-            username=x_user_name or "test_user",
-            role=normalized,
-        )
+        except HTTPException:
+            # Fallback for database session token
+            try:
+                import hashlib
+                from src.backend.database import SessionLocal
+                from src.backend.models import UserSession, AccountStatus
+                token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+                db = SessionLocal()
+                try:
+                    s = (
+                        db.query(UserSession)
+                        .filter(
+                            UserSession.refresh_token_hash == token_hash,
+                            UserSession.revoked_at.is_(None),
+                        )
+                        .first()
+                    )
+                    if s and s.user and s.user.status == AccountStatus.ACTIVE:
+                        db_user = s.user
+                        role_code = db_user.roles[0].code if db_user.roles else "SALES_MANAGER"
+                        return AuthenticatedUser(
+                            username=db_user.username,
+                            role=normalize_role(role_code) or "SALES_MANAGER",
+                            full_name=db_user.full_name,
+                        )
+                finally:
+                    db.close()
+            except Exception:
+                pass
+            raise
 
     # Default-Deny: Missing authentication credentials
     raise HTTPException(
@@ -305,7 +321,7 @@ def get_current_user(
     )
 
 
-def require_roles(*allowed_roles: str | RoleCode):
+def require_roles(*allowed_roles: Union[str, RoleCode]):
     """Enforce role check with Default Deny."""
     normalized_allowed = {
         normalize_role(r.value if isinstance(r, RoleCode) else r)

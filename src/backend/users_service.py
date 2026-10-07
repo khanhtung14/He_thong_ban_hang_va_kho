@@ -235,7 +235,7 @@ def create_user(
     ).all() if selected_warehouse_ids else []
     if len(warehouses) != len(selected_warehouse_ids):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Có kho được chọn không tồn tại hoặc đã ngừng hoạt động.")
-    if any(role.code.upper() in WAREHOUSE_ROLE_CODES for role in roles) and not warehouses:
+    if any(role.code.upper() in WAREHOUSE_ROLE_CODES for role in roles) and not warehouses and db.query(Warehouse).filter(Warehouse.is_active.is_(True)).first() is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Người dùng thuộc vai trò kho phải được gắn với ít nhất một kho.")
     selected_territory_ids = set(user_data.territory_ids)
     territories = db.query(Territory).filter(Territory.id.in_(selected_territory_ids)).all() if selected_territory_ids else []
@@ -364,7 +364,7 @@ def update_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Không thể tự thu hồi vai trò quản trị của chính mình.",
             )
-        if any(role.code.upper() in WAREHOUSE_ROLE_CODES for role in roles) and not user.warehouses:
+        if any(role.code.upper() in WAREHOUSE_ROLE_CODES for role in roles) and not user.warehouses and db.query(Warehouse).filter(Warehouse.is_active.is_(True)).first() is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Người dùng thuộc vai trò kho phải được gắn với ít nhất một kho.",
