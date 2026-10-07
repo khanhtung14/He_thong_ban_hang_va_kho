@@ -73,6 +73,21 @@ def _response(row):
     return dict(row)
 
 
+@router.get("", response_model=List[PriceListView])
+def list_price_lists(
+    published: Optional[bool] = Query(None),
+    customer_group: Optional[CustomerGroup] = Query(None),
+):
+    """Lấy danh sách các bảng giá (hỗ trợ lọc theo trạng thái phát hành hoặc nhóm khách hàng)."""
+
+    results = list(PRICE_LISTS.values())
+    if published is not None:
+        results = [r for r in results if r.get("published") == published]
+    if customer_group is not None:
+        results = [r for r in results if r.get("customer_group") == customer_group]
+    return [_response(r) for r in results]
+
+
 @router.post("", response_model=PriceListView, status_code=status.HTTP_201_CREATED)
 def create_price_list(
     payload: PriceListCreate,

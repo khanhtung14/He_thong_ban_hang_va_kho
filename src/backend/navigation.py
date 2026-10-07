@@ -201,7 +201,7 @@ MENU_REGISTRY: List[MenuItem] = [
         title="Phân bổ địa bàn",
         path="/admin/territory-handover",
         icon="map-pin",
-        roles=["ADMIN", "SALES_MANAGER"],
+        roles=["ADMIN"],
         order=150,
         category="Quản trị",
     ),

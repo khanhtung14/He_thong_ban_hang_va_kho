@@ -254,28 +254,60 @@ def get_current_user(
     """
     # 1. Bearer token
     if auth and auth.credentials:
-        payload = decode_access_token(auth.credentials)
-        username = payload.get("sub") or payload.get("username")
-        role_raw = payload.get("role") or payload.get("role_code")
-        if not username or not role_raw:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Mã token thiếu thông tin người dùng hoặc vai trò.",
+        token = auth.credentials
+        try:
+            payload = decode_access_token(token)
+            username = payload.get("sub") or payload.get("username")
+            role_raw = payload.get("role") or payload.get("role_code")
+            if not username or not role_raw:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Mã token thiếu thông tin người dùng hoặc vai trò.",
+                )
+            normalized = normalize_role(role_raw)
+            if not normalized:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Vai trò trong token không hợp lệ trên hệ thống.",
+                )
+            return AuthenticatedUser(
+                username=username,
+                role=normalized,
+                full_name=payload.get("full_name"),
+                warehouse_id=payload.get("warehouse_id"),
+                warehouse_ids=payload.get("warehouse_ids") or ([payload["warehouse_id"]] if payload.get("warehouse_id") else []),
+                territory_id=payload.get("territory_id"),
             )
-        normalized = normalize_role(role_raw)
-        if not normalized:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Vai trò trong token không hợp lệ trên hệ thống.",
-            )
-        return AuthenticatedUser(
-            username=username,
-            role=normalized,
-            full_name=payload.get("full_name"),
-            warehouse_id=payload.get("warehouse_id"),
-            warehouse_ids=payload.get("warehouse_ids") or ([payload["warehouse_id"]] if payload.get("warehouse_id") else []),
-            territory_id=payload.get("territory_id"),
-        )
+        except HTTPException:
+            # Fallback for database session token
+            try:
+                import hashlib
+                from src.backend.database import SessionLocal
+                from src.backend.models import UserSession, AccountStatus
+                token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+                db = SessionLocal()
+                try:
+                    s = (
+                        db.query(UserSession)
+                        .filter(
+                            UserSession.refresh_token_hash == token_hash,
+                            UserSession.revoked_at.is_(None),
+                        )
+                        .first()
+                    )
+                    if s and s.user and s.user.status == AccountStatus.ACTIVE:
+                        db_user = s.user
+                        role_code = db_user.roles[0].code if db_user.roles else "SALES_MANAGER"
+                        return AuthenticatedUser(
+                            username=db_user.username,
+                            role=normalize_role(role_code) or "SALES_MANAGER",
+                            full_name=db_user.full_name,
+                        )
+                finally:
+                    db.close()
+            except Exception:
+                pass
+            raise
 
     # Default-Deny: Missing authentication credentials
     raise HTTPException(

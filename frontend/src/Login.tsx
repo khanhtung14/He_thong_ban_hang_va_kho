@@ -136,22 +136,11 @@ export default function Login() {
       <style>{styles}</style>
       <main className="login-page">
         <section className="login-card" aria-labelledby="login-title">
-          <p className="login-brand">OMS · Bán hàng & Kho</p>
+          <p className="login-brand">OMS · Bán hàng &amp; Kho</p>
           <h1 id="login-title">Đăng nhập</h1>
           <p className="login-subtitle">Đăng nhập để truy cập công việc theo vai trò của bạn.</p>
-
-          {sessionExpired && (
-            <p className="login-notice" role="status">
-              Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.
-            </p>
-          )}
-
-          {loggedOut && (
-            <p className="login-notice" role="status">
-              Bạn đã đăng xuất thành công.
-            </p>
-          )}
-
+          {sessionExpired && <p className="login-notice" role="status">Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.</p>}
+          {loggedOut && <p className="login-notice" role="status">Bạn đã đăng xuất thành công.</p>}
           <form onSubmit={handleSubmit}>
             <div className="login-field">
               <label htmlFor="username">Tên đăng nhập</label>
@@ -166,13 +155,10 @@ export default function Login() {
                 required
               />
             </div>
-
             <div className="login-field">
               <div className="login-field-heading">
                 <label htmlFor="password">Mật khẩu</label>
-                <a className="login-forgot-link" href="/forgot-password">
-                  Quên mật khẩu?
-                </a>
+                <a className="login-forgot-link" href="/forgot-password">Quên mật khẩu?</a>
               </div>
               <div className="password-wrap">
                 <input
@@ -190,19 +176,13 @@ export default function Login() {
                   className="password-toggle"
                   type="button"
                   aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                  onClick={() => setShowPassword((prev) => !prev)}
+                  onClick={() => setShowPassword((visible) => !visible)}
                 >
                   {showPassword ? "Ẩn" : "Hiện"}
                 </button>
               </div>
             </div>
-
-            {error && (
-              <p className="login-error" role="alert">
-                {error}
-              </p>
-            )}
-
+            {error && <p className="login-error" role="alert">{error}</p>}
             <button className="login-submit" type="submit" disabled={isSubmitting}>
               {isSubmitting && <span className="login-spinner" aria-hidden="true" />}
               {isSubmitting ? "Đang đăng nhập…" : "Đăng nhập"}

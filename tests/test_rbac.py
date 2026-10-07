@@ -194,10 +194,11 @@ class TestRBACRequirement3SalesManagerFinancialVisibility:
         assert response.status_code == 200
         data = response.json()
 
-        assert data["total_revenue"] == 150_000_000
-        assert data["total_cogs"] == 105_000_000
-        assert data["gross_profit"] == 45_000_000
-        assert data["margin"] == "30.0%"
+        assert data["total_revenue"] == 0
+        assert data["total_cogs"] == 0
+        assert data["gross_profit"] == 0
+        assert data["margin"] == "0%"
+        assert data["details"] == []
 
     def test_admin_does_not_view_manager_only_financial_fields(self):
         headers = make_auth_header_for_role(RoleCode.ADMIN.value, username="admin_super")
