@@ -15,7 +15,7 @@ from typing import Any
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 try:
     from src.backend.models import RoleCode
@@ -84,6 +84,7 @@ PERM_DEBT_RECONCILE = "debt:reconcile"
 
 PERM_INVOICE_MANAGE = "invoice:manage"
 PERM_PAYMENT_RECORD = "payment:record"
+PERM_CUSTOMERS_LOCK = "customers:lock"  # SCRUM-85: Quyền khóa/mở khóa giao dịch đại lý
 PERM_SYSTEM_ADMIN = "system:admin"
 
 
@@ -138,6 +139,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PERM_PAYMENT_RECORD,
         PERM_DEBT_RECONCILE,
         PERM_DEBT_VIEW_ALL,
+        PERM_CUSTOMERS_LOCK,  # SCRUM-85: Kế toán công nợ được phép khóa/mở giao dịch đại lý
         # TUYỆT ĐỐI KHÔNG có PERM_PRODUCTS_VIEW_FINANCIALS
     },
     RoleCode.ADMIN.value: {
@@ -156,8 +158,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PERM_DEBT_RECONCILE,
         PERM_INVOICE_MANAGE,
         PERM_PAYMENT_RECORD,
+        PERM_CUSTOMERS_LOCK,
     },
 }
+
 
 
 class AuthenticatedUser(BaseModel):
@@ -165,6 +169,7 @@ class AuthenticatedUser(BaseModel):
     role: str
     full_name: str | None = None
     warehouse_id: int | None = None
+    warehouse_ids: list[int] = Field(default_factory=list)
     territory_id: int | None = None
 
     def has_permission(self, permission: str) -> bool:
@@ -275,6 +280,7 @@ def get_current_user(
             role=normalized,
             full_name=payload.get("full_name"),
             warehouse_id=payload.get("warehouse_id"),
+            warehouse_ids=payload.get("warehouse_ids") or ([payload["warehouse_id"]] if payload.get("warehouse_id") else []),
             territory_id=payload.get("territory_id"),
         )
 
