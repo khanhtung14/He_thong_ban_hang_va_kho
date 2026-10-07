@@ -2,9 +2,16 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { authenticatedFetch, logout, getCurrentUserRole, hasValidSession } from "./session";
 import Profile from "./Profile";
 import ProfileAvatar from "./ProfileAvatar";
+<<<<<<< HEAD
 import SalesManagerDashboard from "./roles/sales_manager/SalesManagerDashboard";
 import Error403 from "./Error403";
+=======
+import CustomerManagement from "./CustomerManagement";
+import CreateOrder from "./CreateOrder";
+import OrderManagement from "./OrderManagement";
+>>>>>>> 4249a2e86b6fb9367f19bb4b1525258ca6e73ecb
 import "./RoleWorkspace.css";
+
 
 type RoleKey = "customer" | "sales" | "salesManager" | "warehouse" | "warehouseManager" | "accountant" | "admin";
 type ViewItem = { id: string; label: string; icon: string; section?: string };
@@ -107,12 +114,15 @@ const roleDetails: Record<RoleKey, { name: string; eyebrow: string; title: strin
     name: "Kế toán công nợ", eyebrow: "FINANCE WORKSPACE", title: "Sổ công nợ & hóa đơn", description: "Đối soát khoản phải thu, thanh toán và chứng từ.", initials: "KT",
     views: [
       { id: "overview", label: "Tổng quan công nợ", icon: "⌂", section: "KẾ TOÁN" },
-      { id: "debts", label: "Sổ công nợ", icon: "◷" },
+      { id: "customers", label: "Đại lý & Khóa GD", icon: "🔒", section: "QUẢN LÝ ĐỐI TÁC" },
+      { id: "orders", label: "Đơn hàng & Đơn dở", icon: "▤" },
+      { id: "debts", label: "Sổ công nợ", icon: "◷", section: "SỔ SÁCH" },
       { id: "invoices", label: "Hóa đơn", icon: "▤", section: "CHỨNG TỪ" },
       { id: "payments", label: "Thanh toán", icon: "₫" },
       { id: "reconciliation", label: "Đối soát", icon: "⇄" },
     ],
   },
+
   admin: {
     name: "Quản trị hệ thống", eyebrow: "SYSTEM ADMINISTRATION", title: "Quản trị hệ thống", description: "Quản lý tài khoản, trạng thái truy cập và nhật ký bảo mật.", initials: "AD",
     views: [
@@ -460,12 +470,23 @@ export default function RoleWorkspace() {
       case "salesManager":
         return <SalesManagerDashboard />;
 
+<<<<<<< HEAD
       case "customer":
         if (view === "products") return <><PageHeading title="Danh mục sản phẩm" subtitle="Giá bán và tồn khả dụng được tải từ API sản phẩm." />{renderProducts(true)}</>;
         if (view === "orders") return <><PageHeading title="Đơn hàng của tôi" subtitle="Theo dõi trạng thái xử lý và giao nhận." /><PrototypeBanner /><OrdersTable /></>;
         if (view === "debt") return <><PageHeading title="Công nợ & hóa đơn" subtitle="Tra cứu khoản phải trả và chứng từ của đại lý." /><PrototypeBanner /><Metrics items={[["Dư nợ hiện tại", "12,400,000 ₫", "◷", "amber"], ["Đến hạn tuần này", "1 hóa đơn", "!", "blue"], ["Đã thanh toán tháng này", "24,800,000 ₫", "✓", "green"]]} /><DebtTable /></>;
         if (view === "profile") return <><PageHeading title="Tài khoản đại lý" subtitle="Thông tin liên hệ và bảo mật tài khoản." /><ProfileCard username={username} roleName={details?.name ?? "Đại lý"} /></>;
         return <><WelcomeCard eyebrow="CỔNG ĐẠI LÝ" title={`Xin chào, ${username}`} text="Đặt hàng nhanh, theo dõi giao nhận và chủ động quản lý công nợ của cửa hàng." action={<button className="workspace-button" onClick={() => navigate("products")}>Khám phá sản phẩm <span>→</span></button>} /><Metrics items={[["Đơn đang xử lý", "03", "▤", "blue"], ["Công nợ hiện tại", "12,400,000 ₫", "◷", "amber"], ["Đơn đã giao tháng này", "18", "✓", "green"]]} /><div className="workspace-section-heading"><h3>Đơn hàng gần đây</h3><button className="workspace-link-button" onClick={() => navigate("orders")}>Xem tất cả →</button></div><OrdersTable compact /><PrototypeBanner text="Đơn hàng và công nợ đang dùng dữ liệu giao diện mẫu; API nghiệp vụ chưa được kết nối." /><div className="workspace-section-heading"><h3>Sản phẩm nổi bật</h3><button className="workspace-link-button" onClick={() => navigate("products")}>Xem danh mục →</button></div>{renderProducts(true)}</>;
+=======
+    if (role === "sales") {
+      if (view === "customers") return <CustomerManagement userRole="sales" />;
+      if (view === "orders") return <OrderManagement userRole="sales" onNewOrderClick={() => navigate("new-order")} />;
+      if (view === "collections") return <><PageHeading title="Thu tiền theo tuyến" subtitle="Theo dõi khoản cần thu và ghi nhận giao dịch tại điểm bán." /><PrototypeBanner /><Metrics items={[["Cần thu hôm nay", "21,000,000 ₫", "₫", "amber"], ["Đã thu", "8,400,000 ₫", "✓", "green"], ["Đại lý quá hạn", "02", "!", "red"]]} /><DebtTable /></>;
+      if (view === "new-order") return <CreateOrder products={products} onOrderCreated={() => navigate("orders")} onCancel={() => navigate("orders")} />;
+      if (view === "products") return <><PageHeading title="Sản phẩm & tồn khả dụng" subtitle="Giá bán và số lượng khả dụng tại các kho." />{renderProducts()}</>;
+      return <><WelcomeCard eyebrow="TUYẾN HÀ NỘI · THỨ HAI, 15/06" title={`Chào ${username}, bắt đầu ngày mới`} text="Tập trung đơn cần xử lý và các đại lý cần chăm sóc trong tuyến." action={<button className="workspace-button" onClick={() => navigate("new-order")}>＋ Tạo đơn hàng</button>} /><Metrics items={[["Đại lý được giao", "42", "♧", "blue"], ["Đơn cần theo dõi", "08", "▤", "violet"], ["Công nợ cần thu", "21,000,000 ₫", "₫", "amber"]]} /><div className="workspace-two-columns"><section className="workspace-panel"><PanelHeading title="Đại lý cần chăm sóc" link="Xem tuyến" onClick={() => navigate("customers")} /><CustomersTable compact /></section><section className="workspace-panel"><PanelHeading title="Đơn hàng gần đây" link="Tất cả đơn" onClick={() => navigate("orders")} /><OrdersTable compact /></section></div><PrototypeBanner text="Khách hàng, đơn hàng và công nợ của tuyến hiện là dữ liệu giao diện mẫu; API tác nghiệp chưa kết nối." /></>;
+    }
+>>>>>>> 4249a2e86b6fb9367f19bb4b1525258ca6e73ecb
 
       case "sales":
         if (view === "customers") return <><PageHeading title="Đại lý phụ trách" subtitle="Danh sách đại lý theo địa bàn được phân công." /><PrototypeBanner /><CustomersTable /></>;
@@ -488,12 +509,24 @@ export default function RoleWorkspace() {
         if (view === "stocktakes") return <><PageHeading title="Kế hoạch kiểm kê" subtitle="Chốt số đếm, xem chênh lệch và lập yêu cầu xử lý." /><PrototypeBanner /><StocktakeTable /></>;
         return <><WelcomeCard eyebrow="2 KHO ĐANG KẾT NỐI" title="Kiểm soát kho vận" text="Theo dõi mức tồn, mặt hàng cần chú ý và các tác vụ chờ phê duyệt." action={<button className="workspace-button is-secondary" onClick={() => navigate("adjustments")}>＋ Điều chỉnh tồn</button>} /><Metrics items={[["Mã hàng đang theo dõi", String(inventory.length || 24), "▦", "blue"], ["Sắp chạm tồn tối thiểu", "03", "!", "amber"], ["Phiếu chờ duyệt", "05", "◷", "violet"]]} /><section className="workspace-panel"><PanelHeading title="Tồn kho gần đây" link="Mở sổ tồn" onClick={() => navigate("inventory")} />{renderInventoryTable()}</section><div className="workspace-two-columns"><section className="workspace-panel"><PanelHeading title="Cần quyết định" link="Xem điều chỉnh" onClick={() => navigate("adjustments")} /><ApprovalTable compact /></section><section className="workspace-panel"><PanelHeading title="Cảnh báo hạn dùng" /><ExpiryList /></section></div><p className="workspace-data-source">Danh sách tồn lấy từ API demo; cảnh báo và yêu cầu duyệt là dữ liệu giao diện mẫu.</p></>;
 
+<<<<<<< HEAD
       case "accountant":
         if (view === "debts") return <><PageHeading title="Sổ công nợ" subtitle="Theo dõi dư nợ, hạn thanh toán và tuổi nợ theo đại lý." /><PrototypeBanner /><Metrics items={[["Tổng phải thu", "286,400,000 ₫", "₫", "blue"], ["Quá hạn", "42,800,000 ₫", "!", "red"], ["Đến hạn 7 ngày", "68,200,000 ₫", "◷", "amber"]]} /><DebtTable /></>;
         if (view === "invoices") return <><PageHeading title="Hóa đơn" subtitle="Tra cứu chứng từ, phát hành và theo dõi trạng thái thanh toán." /><PrototypeBanner /><InvoiceTable /></>;
         if (view === "payments") return <><PageHeading title="Ghi nhận thanh toán" subtitle="Đối chiếu khoản thu với hóa đơn và tài khoản đại lý." /><PrototypeBanner /><PaymentForm /></>;
         if (view === "reconciliation") return <><PageHeading title="Đối soát công nợ" subtitle="So sánh số liệu theo kỳ trước khi chốt sổ." /><PrototypeBanner /><ReconciliationPanel /></>;
         return <><WelcomeCard eyebrow="KỲ KẾ TOÁN · THÁNG 06/2026" title="Tổng quan công nợ" text="Nắm các khoản phải thu, hóa đơn đến hạn và giao dịch cần đối soát." action={<button className="workspace-button" onClick={() => navigate("payments")}>＋ Ghi nhận thanh toán</button>} /><Metrics items={[["Tổng phải thu", "286,400,000 ₫", "₫", "blue"], ["Quá hạn", "42,800,000 ₫", "!", "red"], ["Đã thu tháng này", "194,200,000 ₫", "✓", "green"]]} /><div className="workspace-two-columns"><section className="workspace-panel"><PanelHeading title="Khoản cần theo dõi" link="Mở sổ công nợ" onClick={() => navigate("debts")} /><DebtTable compact /></section><section className="workspace-panel"><PanelHeading title="Hóa đơn gần đến hạn" link="Tất cả hóa đơn" onClick={() => navigate("invoices")} /><InvoiceTable compact /></section></div><PrototypeBanner text="Hóa đơn, thanh toán và công nợ đang là giao diện mẫu; chưa có API kế toán." /></>;
+=======
+    if (role === "accountant") {
+      if (view === "customers") return <CustomerManagement userRole="accountant" />;
+      if (view === "orders") return <OrderManagement userRole="accountant" onNewOrderClick={() => navigate("new-order")} />;
+      if (view === "debts") return <><PageHeading title="Sổ công nợ" subtitle="Theo dõi dư nợ, hạn thanh toán và tuổi nợ theo đại lý." /><PrototypeBanner /><Metrics items={[["Tổng phải thu", "286,400,000 ₫", "₫", "blue"], ["Quá hạn", "42,800,000 ₫", "!", "red"], ["Đến hạn 7 ngày", "68,200,000 ₫", "◷", "amber"]]} /><DebtTable /></>;
+      if (view === "invoices") return <><PageHeading title="Hóa đơn" subtitle="Tra cứu chứng từ, phát hành và theo dõi trạng thái thanh toán." /><PrototypeBanner /><InvoiceTable /></>;
+      if (view === "payments") return <><PageHeading title="Ghi nhận thanh toán" subtitle="Đối chiếu khoản thu với hóa đơn và tài khoản đại lý." /><PrototypeBanner /><PaymentForm /></>;
+      if (view === "reconciliation") return <><PageHeading title="Đối soát công nợ" subtitle="So sánh số liệu theo kỳ trước khi chốt sổ." /><PrototypeBanner /><ReconciliationPanel /></>;
+      return <><WelcomeCard eyebrow="KỲ KẾ TOÁN · THÁNG 06/2026" title="Tổng quan công nợ & giao dịch" text="Nắm các khoản phải thu, hóa đơn đến hạn, trạng thái khóa đại lý và giao dịch cần đối soát." action={<button className="workspace-button" onClick={() => navigate("customers")}>🔒 Quản lý đại lý & Khóa GD</button>} /><Metrics items={[["Tổng phải thu", "286,400,000 ₫", "₫", "blue"], ["Quá hạn", "42,800,000 ₫", "!", "red"], ["Đã thu tháng này", "194,200,000 ₫", "✓", "green"]]} /><div className="workspace-two-columns"><section className="workspace-panel"><PanelHeading title="Khoản cần theo dõi" link="Mở sổ công nợ" onClick={() => navigate("debts")} /><DebtTable compact /></section><section className="workspace-panel"><PanelHeading title="Hóa đơn gần đến hạn" link="Tất cả hóa đơn" onClick={() => navigate("invoices")} /><InvoiceTable compact /></section></div><PrototypeBanner text="Hóa đơn, thanh toán và công nợ đang là giao diện mẫu; Quản lý đại lý & Đơn hàng đã kết nối API thực tế." /></>;
+    }
+>>>>>>> 4249a2e86b6fb9367f19bb4b1525258ca6e73ecb
 
       case "admin":
         if (view === "users") return <AdminUsers users={users} loading={loading} error={loadError} search={userSearch} setSearch={(value) => { setUserSearch(value); setUserPage(1); }} filter={userFilter} setFilter={(value) => { setUserFilter(value); setUserPage(1); }} roleFilter={userRoleFilter} setRoleFilter={(value) => { setUserRoleFilter(value); setUserPage(1); }} page={userPage} total={userTotal} totalPages={userTotalPages} setPage={setUserPage} onCreate={() => { window.location.assign("/admin/users/create"); }} onEdit={openEditUser} onLock={(user) => { setLockTarget(user); setLockReason(""); }} onUnlock={unlockUser} onAudit={showAudit} busy={userActionBusy} />;

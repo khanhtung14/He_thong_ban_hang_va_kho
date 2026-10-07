@@ -117,9 +117,16 @@ export async function authenticatedFetch(
   const headers = new Headers(init.headers);
   const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
   const pathname = new URL(requestUrl, window.location.origin).pathname;
-  const usesAccessToken = ["/api/v1/products", "/api/v1/inventory", "/api/v1/reports"].some(
+  const usesAccessToken = [
+    "/api/v1/products",
+    "/api/v1/inventory",
+    "/api/v1/reports",
+    "/api/v1/customers",
+    "/api/v1/orders",
+  ].some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+<<<<<<< HEAD
   const sessionToken =
     window.sessionStorage?.getItem(TOKEN_KEY) ||
     window.localStorage?.getItem(TOKEN_KEY) ||
@@ -139,6 +146,16 @@ export async function authenticatedFetch(
       ((sessionExpiry && sessionExpiry - Date.now() < REFRESH_BEFORE_MS) ||
         (usesAccessToken && (!accessExpiry || accessExpiry - Date.now() < REFRESH_BEFORE_MS))),
   );
+=======
+
+  const sessionToken = window.sessionStorage.getItem(TOKEN_KEY);
+  const sessionExpiry = Number(window.sessionStorage.getItem(EXPIRY_KEY) || 0);
+  const accessExpiry = Number(window.sessionStorage.getItem(ACCESS_EXPIRY_KEY) || 0);
+  const needsRefresh = Boolean(sessionToken && (
+    (sessionExpiry && sessionExpiry - Date.now() < REFRESH_BEFORE_MS)
+    || (usesAccessToken && (!accessExpiry || accessExpiry - Date.now() < REFRESH_BEFORE_MS))
+  ));
+>>>>>>> 4249a2e86b6fb9367f19bb4b1525258ca6e73ecb
   if (needsRefresh && sessionToken) {
     try {
       if (!(await refreshSession(sessionToken))) {

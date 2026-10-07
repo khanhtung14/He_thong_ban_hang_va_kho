@@ -84,6 +84,7 @@ PERM_DEBT_RECONCILE = "debt:reconcile"
 
 PERM_INVOICE_MANAGE = "invoice:manage"
 PERM_PAYMENT_RECORD = "payment:record"
+PERM_CUSTOMERS_LOCK = "customers:lock"  # SCRUM-85: Quyền khóa/mở khóa giao dịch đại lý
 PERM_SYSTEM_ADMIN = "system:admin"
 
 
@@ -138,6 +139,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PERM_PAYMENT_RECORD,
         PERM_DEBT_RECONCILE,
         PERM_DEBT_VIEW_ALL,
+        PERM_CUSTOMERS_LOCK,  # SCRUM-85: Kế toán công nợ được phép khóa/mở giao dịch đại lý
         # TUYỆT ĐỐI KHÔNG có PERM_PRODUCTS_VIEW_FINANCIALS
     },
     RoleCode.ADMIN.value: {
@@ -156,8 +158,10 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PERM_DEBT_RECONCILE,
         PERM_INVOICE_MANAGE,
         PERM_PAYMENT_RECORD,
+        PERM_CUSTOMERS_LOCK,
     },
 }
+
 
 
 class AuthenticatedUser(BaseModel):
