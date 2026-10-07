@@ -1,11 +1,16 @@
 """MySQL engine and SQLAlchemy session factory."""
 
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+
+# Load the project-level .env while allowing explicit shell variables to win.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

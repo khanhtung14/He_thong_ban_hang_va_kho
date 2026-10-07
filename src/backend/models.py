@@ -290,6 +290,7 @@ class Customer(Base):
     locked_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
 
 
 class PriceList(Base):
@@ -326,8 +327,6 @@ class PriceListItem(Base):
     sale_price: Mapped[int] = mapped_column(Integer, nullable=False)
     floor_price: Mapped[int] = mapped_column(Integer, nullable=False)
     price_list: Mapped[PriceList] = relationship(back_populates="items")
-
-    orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
 
 
 class Order(Base):
