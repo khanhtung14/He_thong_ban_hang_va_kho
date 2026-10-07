@@ -243,7 +243,6 @@ class AccountAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-<<<<<<< HEAD
 class BusinessAuditLog(Base):
     """Append-only record of changes to inventory and receivables data."""
 
@@ -262,14 +261,15 @@ class BusinessAuditLog(Base):
     before_value: Mapped[Optional[Any]] = mapped_column(JSON)
     after_value: Mapped[Optional[Any]] = mapped_column(JSON)
     happened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-=======
+
 class OrderStatus(str, Enum):
     DRAFT = "DRAFT"              # Đơn nháp / đang dở
     PENDING = "PENDING"          # Chờ duyệt / xử lý
     PROCESSING = "PROCESSING"    # Đang soạn / xử lý kho
     COMPLETED = "COMPLETED"      # Hoàn tất
     CANCELLED = "CANCELLED"      # Đã hủy
->>>>>>> 4249a2e86b6fb9367f19bb4b1525258ca6e73ecb
+
+
 
 
 class Customer(Base):
@@ -282,7 +282,7 @@ class Customer(Base):
     sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    
+
     # SCRUM-85: Khóa/mở giao dịch với đại lý cho Kế toán công nợ
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     lock_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -291,7 +291,6 @@ class Customer(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-<<<<<<< HEAD
 
 class PriceList(Base):
     """A customer-segment price list; published versions are immutable."""
@@ -327,7 +326,7 @@ class PriceListItem(Base):
     sale_price: Mapped[int] = mapped_column(Integer, nullable=False)
     floor_price: Mapped[int] = mapped_column(Integer, nullable=False)
     price_list: Mapped[PriceList] = relationship(back_populates="items")
-=======
+
     orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
 
 
@@ -367,6 +366,3 @@ class OrderItem(Base):
     unit_price: Mapped[float] = mapped_column(default=0.0, nullable=False)
 
     order: Mapped[Order] = relationship(back_populates="items")
-
->>>>>>> 4249a2e86b6fb9367f19bb4b1525258ca6e73ecb
-
