@@ -33,7 +33,7 @@ export const HeaderTailwind: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full border border-emerald-100">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Hệ thống trực tuyến · {roleName}</span>
+          {/* <span>Hệ thống trực tuyến · {roleName}</span> */}
         </div>
       </div>
 
@@ -115,7 +115,7 @@ export const HeaderTailwind: React.FC<HeaderProps> = ({
         </button>
 
         {/* Logout button */}
-        {onLogout && (
+        {/* {onLogout && (
           <button
             onClick={onLogout}
             title="Đăng xuất"
@@ -127,7 +127,7 @@ export const HeaderTailwind: React.FC<HeaderProps> = ({
             </svg>
             <span className="hidden md:inline">Đăng xuất</span>
           </button>
-        )}
+        )} */}
       </div>
     </header>
   );

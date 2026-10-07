@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
-import HeaderTailwind from "../Header/HeaderTailwind";
-import SidebarTailwind from "../Sidebar/SidebarTailwind";
-import StatCard from "./StatCard";
+import HeaderTailwind from "../../components/Header/HeaderTailwind";
+import SidebarTailwind from "../../components/Sidebar/SidebarTailwind";
+import StatCard from "../../components/StatCard";
 import ApprovalList, { type ApprovalItem } from "./ApprovalList";
 import TerritoryProgress from "./TerritoryProgress";
 import CreatePriceListModal from "./CreatePriceListModal";

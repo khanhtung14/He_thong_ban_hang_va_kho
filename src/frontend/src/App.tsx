@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import Login from "./Login";
-import ForgotPassword from "./ForgotPassword";
-import ChangePassword from "./ChangePassword";
+import Login from "./auth/Login";
+import ForgotPassword from "./auth/ForgotPassword";
+import ChangePassword from "./auth/ChangePassword";
 import CreateUser from "./CreateUser";
 import Profile from "./Profile";
 import Navigation from "./Navigation";
