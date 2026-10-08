@@ -18,12 +18,20 @@ import {
   PlusOutlined,
   DeleteOutlined,
   FileProtectOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { createPriceList, getProducts, type Product } from "../../api";
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
+
+// Hàm tạo mã bảng giá tự động theo ngày hiện tại và 4 số ngẫu nhiên
+const generatePriceListCode = () => {
+  const dateStr = dayjs().format("YYYYMMDD");
+  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+  return `PL-${dateStr}-${randomSuffix}`;
+};
 
 export interface CreatePriceListModalProps {
   isOpen: boolean;
@@ -43,9 +51,17 @@ export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
-  // Tải danh mục sản phẩm từ CSDL Backend khi mở modal
+  // Tự động sinh mã bảng giá & tải danh mục sản phẩm khi mở modal
   useEffect(() => {
     if (isOpen) {
+      form.setFieldsValue({
+        code: generatePriceListCode(),
+        customer_group: "DEALER_LEVEL_1",
+        items: [
+          { sku: undefined, sale_price: undefined, floor_price: undefined },
+        ],
+      });
+
       setLoadingProducts(true);
       getProducts()
         .then((data) => {
@@ -55,8 +71,10 @@ export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
           message.error("Lỗi khi tải danh mục sản phẩm: " + err.message);
         })
         .finally(() => setLoadingProducts(false));
+    } else {
+      form.resetFields();
     }
-  }, [isOpen]);
+  }, [isOpen, form]);
 
   const handleFinish = async (values: any) => {
     setErrorMsg("");
@@ -152,6 +170,7 @@ export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
         layout="vertical"
         onFinish={handleFinish}
         initialValues={{
+          code: generatePriceListCode(), // Tự gán mã ngay từ lúc Form khởi tạo
           customer_group: "DEALER_LEVEL_1",
           items: [
             { sku: undefined, sale_price: undefined, floor_price: undefined },
@@ -166,18 +185,21 @@ export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
             gap: "0 16px",
           }}
         >
+          {/* Ô Mã bảng giá tự động sinh, chỉ đọc (readOnly) */}
           <Form.Item
             name="code"
-            label="Mã bảng giá"
-            rules={[
-              { required: true, message: "Vui lòng nhập mã bảng giá!" },
-              { whitespace: true, message: "Mã không được để trống!" },
-            ]}
+            label="Mã bảng giá (Tự động)"
+            rules={[{ required: true, message: "Mã bảng giá là bắt buộc!" }]}
           >
             <Input
-              placeholder="VD: PL-DEALER1-Q4"
-              style={{ textTransform: "uppercase" }}
-              allowClear
+              readOnly
+              prefix={<LockOutlined style={{ color: "#8c8c8c" }} />}
+              style={{
+                backgroundColor: "#f5f5f5",
+                cursor: "not-allowed",
+                fontWeight: 600,
+                color: "#1677ff",
+              }}
             />
           </Form.Item>
 
