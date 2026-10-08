@@ -1,1 +1,1 @@
-export { default } from "./auth/ChangePassword";
+export { default } from "./components/ChangePasswordModal";

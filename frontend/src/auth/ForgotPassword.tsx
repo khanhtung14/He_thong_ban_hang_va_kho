@@ -1,4 +1,14 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
+import { Form, Input, Button, Alert, Typography } from "antd";
+import {
+  MailOutlined,
+  ArrowLeftOutlined,
+  SendOutlined,
+} from "@ant-design/icons";
+// Dùng chung ảnh banner với trang Login
+import loginBanner from "../assets/login-banner.png";
+
+const { Title, Text, Link } = Typography;
 
 type ForgotPasswordResponse = {
   message?: string;
@@ -7,35 +17,14 @@ type ForgotPasswordResponse = {
 
 type ApiError = { detail?: string };
 
-const styles = `
-  * { box-sizing: border-box; }
-  body { min-width: 320px; min-height: 100vh; margin: 0; background: #f8fafc; color: #1f2937; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  .forgot-page { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
-  .forgot-card { width: min(100%, 440px); padding: clamp(24px, 6vw, 40px); border: 1px solid #e5e7eb; border-radius: 16px; background: #fff; box-shadow: 0 12px 32px rgb(15 23 42 / 8%); }
-  .forgot-brand { margin: 0 0 8px; color: #2563eb; font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-  .forgot-card h1 { margin: 0; font-size: 28px; line-height: 1.25; }
-  .forgot-subtitle { margin: 10px 0 28px; color: #6b7280; line-height: 1.5; }
-  .forgot-field { display: grid; gap: 8px; margin-bottom: 18px; }
-  .forgot-field label { font-size: 14px; font-weight: 600; }
-  .forgot-field input { width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; color: inherit; background: #fff; font: inherit; }
-  .forgot-field input:focus { outline: 3px solid #bfdbfe; border-color: #2563eb; }
-  .forgot-message { margin: 0 0 18px; padding: 12px; border: 1px solid #bbf7d0; border-radius: 8px; color: #166534; background: #f0fdf4; font-size: 14px; line-height: 1.5; }
-  .forgot-error { border-color: #fecaca; color: #991b1b; background: #fef2f2; }
-  .forgot-submit { width: 100%; min-height: 48px; border: 0; border-radius: 8px; color: #fff; background: #2563eb; font: inherit; font-weight: 700; cursor: pointer; }
-  .forgot-submit:hover:not(:disabled) { background: #1d4ed8; }
-  .forgot-submit:disabled { cursor: wait; opacity: .7; }
-  .forgot-back { margin: 18px 0 0; text-align: center; }
-`;
-
 export default function ForgotPassword() {
-  const [email, setEmail] = useState("");
+  const [form] = Form.useForm();
   const [message, setMessage] = useState("");
   const [demoMode, setDemoMode] = useState(false);
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const handleFinish = async (values: any) => {
     setMessage("");
     setDemoMode(false);
     setIsError(false);
@@ -45,15 +34,26 @@ export default function ForgotPassword() {
       const response = await fetch("/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: values.email?.trim() }),
       });
-      const result = await response.json().catch(() => ({})) as ForgotPasswordResponse & ApiError;
+
+      const result = (await response
+        .json()
+        .catch(() => ({}))) as ForgotPasswordResponse & ApiError;
+
       if (!response.ok) {
         setIsError(true);
-        setMessage(result.detail ?? "Không thể gửi yêu cầu. Vui lòng kiểm tra địa chỉ email.");
+        setMessage(
+          result.detail ??
+            "Không thể gửi yêu cầu. Vui lòng kiểm tra địa chỉ email.",
+        );
         return;
       }
-      setMessage(result.message ?? "Nếu email tồn tại trong hệ thống, liên kết đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn.");
+
+      setMessage(
+        result.message ??
+          "Nếu email tồn tại trong hệ thống, liên kết đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn.",
+      );
       setDemoMode(result.demo_mode === true);
     } catch {
       setIsError(true);
@@ -61,44 +61,282 @@ export default function ForgotPassword() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   return (
-    <>
-      <style>{styles}</style>
-      <main className="forgot-page">
-        <section className="forgot-card" aria-labelledby="forgot-title">
-          <p className="forgot-brand">OMS · Bán hàng &amp; Kho</p>
-          <h1 id="forgot-title">Quên mật khẩu</h1>
-          <p className="forgot-subtitle">Nhập email tài khoản. Nếu email tồn tại, bạn sẽ nhận được liên kết đặt lại mật khẩu có hiệu lực trong 30 phút.</p>
-          <form onSubmit={handleSubmit}>
-            <div className="forgot-field">
-              <label htmlFor="forgot-email">Email tài khoản</label>
-              <input
-                id="forgot-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                maxLength={254}
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="ban@example.com"
-                required
-              />
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background:
+          "linear-gradient(135deg, #e0e7ff 0%, #dbeafe 50%, #eff6ff 100%)",
+        padding: "32px 20px",
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      {/* Khung Canvas Tròn Viền Nổi Đồng Bộ Hoàn Toàn Với Login */}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 1100,
+          minHeight: 640,
+          backgroundColor: "#ffffff",
+          borderRadius: 36,
+          boxShadow:
+            "0 24px 60px -15px rgba(37, 99, 235, 0.18), 0 0 0 1px rgba(37, 99, 235, 0.08)",
+          display: "flex",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Background đốm mây trang trí nhẹ */}
+        <div
+          style={{
+            position: "absolute",
+            width: 500,
+            height: 500,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(191, 219, 254, 0.45) 0%, rgba(255, 255, 255, 0) 70%)",
+            top: -120,
+            right: -100,
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* CỘT TRÁI: FORM KHÔI PHỤC MẬT KHẨU */}
+        <div
+          style={{
+            flex: "0 0 42%",
+            padding: "56px 48px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            zIndex: 2,
+          }}
+        >
+          {/* Logo nhận diện WMS */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 10px rgba(37, 99, 235, 0.3)",
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2.2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
             </div>
-            {message && <p className={`forgot-message${isError ? " forgot-error" : ""}`} role={isError ? "alert" : "status"}>{message}</p>}
-            {message && !isError && demoMode && (
-              <p className="forgot-subtitle" role="note">
-                Môi trường demo chưa gửi email thật. Nếu không thấy liên kết, hãy kiểm tra database demo đã được seed và xem hộp thư giả lập tại <code>/dev/mock-outbox</code>.
-              </p>
+            <div>
+              <div
+                style={{
+                  fontWeight: 800,
+                  fontSize: 16,
+                  color: "#1e3a8a",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                WMS &amp; OMS
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "#94a3b8",
+                  fontWeight: 500,
+                  lineHeight: 1,
+                }}
+              >
+                Quản lý kho &amp; Bán hàng
+              </div>
+            </div>
+          </div>
+
+          {/* Form Content */}
+          <div style={{ marginTop: 28, marginBottom: 20 }}>
+            <Title
+              level={2}
+              style={{
+                margin: "0 0 6px",
+                fontWeight: 800,
+                color: "#0f172a",
+                fontSize: 30,
+              }}
+            >
+              Quên mật khẩu?
+            </Title>
+            <Text
+              type="secondary"
+              style={{
+                fontSize: 13,
+                display: "block",
+                marginBottom: 24,
+                color: "#64748b",
+                lineHeight: 1.5,
+              }}
+            >
+              Nhập email tài khoản. Nếu email tồn tại, liên kết đặt lại mật khẩu
+              có hiệu lực trong 30 phút sẽ được gửi cho bạn.
+            </Text>
+
+            {/* Thông báo kết quả / cảnh báo */}
+            {message && (
+              <Alert
+                message={message}
+                type={isError ? "error" : "success"}
+                showIcon
+                closable
+                onClose={() => setMessage("")}
+                style={{ marginBottom: 16, borderRadius: 8 }}
+              />
             )}
-            <button className="forgot-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Đang gửi yêu cầu…" : "Gửi liên kết đặt lại mật khẩu"}
-            </button>
-          </form>
-          <p className="forgot-back"><a href="/login">Quay lại đăng nhập</a></p>
-        </section>
-      </main>
-    </>
+
+            {/* Lưu ý khi ở chế độ Mock / Demo */}
+            {message && !isError && demoMode && (
+              <Alert
+                type="info"
+                showIcon
+                message="Chế độ Demo"
+                description={
+                  <span>
+                    Môi trường demo chưa gửi email thật. Hãy kiểm tra hộp thư
+                    giả lập tại{" "}
+                    <code style={{ color: "#1d4ed8" }}>/dev/mock-outbox</code>.
+                  </span>
+                }
+                style={{ marginBottom: 16, borderRadius: 8, fontSize: 12 }}
+              />
+            )}
+
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleFinish}
+              requiredMark={false}
+            >
+              {/* Ô nhập Email */}
+              <Form.Item
+                name="email"
+                label={
+                  <span
+                    style={{ fontWeight: 600, fontSize: 13, color: "#334155" }}
+                  >
+                    Email đăng ký tài khoản
+                  </span>
+                }
+                rules={[
+                  { required: true, message: "Vui lòng nhập địa chỉ email!" },
+                  {
+                    type: "email",
+                    message: "Địa chỉ email không đúng định dạng!",
+                  },
+                ]}
+                style={{ marginBottom: 26 }}
+              >
+                <Input
+                  prefix={<MailOutlined style={{ color: "#94a3b8" }} />}
+                  placeholder="VD: ban@congty.com"
+                  size="large"
+                  maxLength={254}
+                  autoComplete="email"
+                  style={{
+                    borderRadius: 10,
+                    borderColor: "#cbd5e1",
+                    height: 46,
+                  }}
+                />
+              </Form.Item>
+
+              {/* Nút gửi yêu cầu */}
+              <Form.Item style={{ marginBottom: 0 }}>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  size="large"
+                  block
+                  loading={isSubmitting}
+                  icon={<SendOutlined />}
+                  style={{
+                    height: 48,
+                    borderRadius: 12,
+                    fontWeight: 700,
+                    fontSize: 15,
+                    backgroundColor: "#2563eb",
+                    boxShadow: "0 8px 16px -4px rgba(37, 99, 235, 0.4)",
+                  }}
+                >
+                  {isSubmitting
+                    ? "Đang gửi yêu cầu..."
+                    : "GỬI LIÊN KẾT ĐẶT LẠI"}
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
+
+          {/* Nút quay lại trang đăng nhập */}
+          <div>
+            <Link
+              href="/login"
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#2563eb",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <ArrowLeftOutlined style={{ fontSize: 12 }} />
+              Quay lại đăng nhập
+            </Link>
+          </div>
+        </div>
+
+        {/* CỘT PHẢI: KHUNG ẢNH BANNER ĐỒNG BỘ VỚI LOGIN */}
+        <div
+          style={{
+            flex: "0 0 58%",
+            backgroundColor: "#f8fafc",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "8px",
+            borderLeft: "1px solid #f1f5f9",
+            overflow: "hidden",
+          }}
+        >
+          <img
+            src={loginBanner}
+            alt="WMS Banner"
+            style={{
+              width: "100%",
+              maxHeight: "540px",
+              objectFit: "contain",
+              transform: "scale(1.08) translateX(-45px)",
+              transition: "transform 0.3s ease",
+            }}
+          />
+        </div>
+      </div>
+    </div>
   );
 }

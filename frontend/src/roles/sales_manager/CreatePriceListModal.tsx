@@ -1,5 +1,29 @@
-import React, { useState } from "react";
-import { createPriceList } from "../../api";
+import React, { useState, useEffect } from "react";
+import {
+  Modal,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  InputNumber,
+  Button,
+  Space,
+  Alert,
+  Typography,
+  Card,
+  message,
+  Spin,
+} from "antd";
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  FileProtectOutlined,
+} from "@ant-design/icons";
+import dayjs from "dayjs";
+import { createPriceList, getProducts, type Product } from "../../api";
+
+const { Text } = Typography;
+const { RangePicker } = DatePicker;
 
 export interface CreatePriceListModalProps {
   isOpen: boolean;
@@ -12,227 +36,353 @@ export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
   onClose,
   onCreated,
 }) => {
-  const [code, setCode] = useState("");
-  const [customerGroup, setCustomerGroup] = useState("DEALER_LEVEL_1");
-  const [startDate, setStartDate] = useState("2026-10-01");
-  const [endDate, setEndDate] = useState("2026-12-31");
-  const [sku1Price, setSku1Price] = useState(480000);
-  const [sku1Floor, setSku1Floor] = useState(450000);
-  const [sku2Price, setSku2Price] = useState(240000);
-  const [sku2Floor, setSku2Floor] = useState(220000);
+  const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  if (!isOpen) return null;
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code.trim()) {
-      setError("Vui lòng nhập mã bảng giá");
-      return;
+  // Tải danh mục sản phẩm từ CSDL Backend khi mở modal
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingProducts(true);
+      getProducts()
+        .then((data) => {
+          setProducts(Array.isArray(data) ? data : []);
+        })
+        .catch((err) => {
+          message.error("Lỗi khi tải danh mục sản phẩm: " + err.message);
+        })
+        .finally(() => setLoadingProducts(false));
     }
-    setError("");
+  }, [isOpen]);
+
+  const handleFinish = async (values: any) => {
+    setErrorMsg("");
     setSubmitting(true);
 
+    const [startDate, endDate] = values.validityRange || [];
+
     const payload = {
-      code: code.trim().toUpperCase(),
-      customer_group: customerGroup,
-      start_date: startDate,
-      end_date: endDate,
-      items: [
-        { sku: "SKU-001", sale_price: Number(sku1Price), floor_price: Number(sku1Floor) },
-        { sku: "SKU-002", sale_price: Number(sku2Price), floor_price: Number(sku2Floor) },
-      ],
+      code: values.code ? values.code.trim().toUpperCase() : "",
+      customer_group: values.customer_group,
+      start_date: startDate ? dayjs(startDate).format("YYYY-MM-DD") : null,
+      end_date: endDate ? dayjs(endDate).format("YYYY-MM-DD") : null,
+      items: (values.items || []).map((item: any) => ({
+        sku: item.sku,
+        sale_price: Number(item.sale_price || 0),
+        floor_price: Number(item.floor_price || 0),
+      })),
     };
 
     try {
-      const created = await createPriceList(payload);
+      const created = await createPriceList(payload as any);
+      message.success("Khai báo bảng giá mới thành công!");
       onCreated(created);
+      form.resetFields();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Lỗi kết nối khi gửi yêu cầu.");
+      setErrorMsg(err.message || "Lỗi kết nối khi gửi yêu cầu.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleCancel = () => {
+    form.resetFields();
+    setErrorMsg("");
+    onClose();
+  };
+
+  const productOptions = products.map((p) => ({
+    value: p.sku,
+    label: `${p.sku} - ${p.name}`,
+  }));
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              +
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-800">
-                Khai báo bảng giá mới (S2-10)
-              </h3>
-              <p className="text-xs text-slate-400">
-                Áp dụng theo nhóm khách hàng & khoảng thời gian hiệu lực
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+    <Modal
+      open={isOpen}
+      onCancel={handleCancel}
+      title={
+        <Space align="center" style={{ marginBottom: 4 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: "#e6f4ff",
+              color: "#1677ff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 16,
+            }}
           >
-            ✕
-          </button>
+            <FileProtectOutlined />
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#1f1f1f" }}>
+              Khai báo bảng giá mới (S2-10)
+            </div>
+            <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
+              Áp dụng theo nhóm khách hàng & khoảng thời gian hiệu lực
+            </Text>
+          </div>
+        </Space>
+      }
+      footer={null}
+      width={720}
+      destroyOnClose
+      style={{ top: 28 }}
+    >
+      {errorMsg && (
+        <Alert
+          message={errorMsg}
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          closable
+          onClose={() => setErrorMsg("")}
+        />
+      )}
+
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleFinish}
+        initialValues={{
+          customer_group: "DEALER_LEVEL_1",
+          items: [
+            { sku: undefined, sale_price: undefined, floor_price: undefined },
+          ],
+        }}
+        style={{ marginTop: 16 }}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "0 16px",
+          }}
+        >
+          <Form.Item
+            name="code"
+            label="Mã bảng giá"
+            rules={[
+              { required: true, message: "Vui lòng nhập mã bảng giá!" },
+              { whitespace: true, message: "Mã không được để trống!" },
+            ]}
+          >
+            <Input
+              placeholder="VD: PL-DEALER1-Q4"
+              style={{ textTransform: "uppercase" }}
+              allowClear
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="customer_group"
+            label="Nhóm khách hàng áp dụng"
+            rules={[
+              { required: true, message: "Vui lòng chọn nhóm khách hàng!" },
+            ]}
+          >
+            <Select
+              options={[
+                { value: "DEALER_LEVEL_1", label: "Đại lý Cấp 1" },
+                { value: "DEALER_LEVEL_2", label: "Đại lý Cấp 2" },
+                { value: "RETAIL", label: "Khách lẻ" },
+              ]}
+            />
+          </Form.Item>
         </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs font-medium border border-rose-100">
-              {error}
+        <Form.Item
+          name="validityRange"
+          label="Thời gian hiệu lực (Từ ngày - Đến ngày)"
+          rules={[
+            { required: true, message: "Vui lòng chọn thời gian hiệu lực!" },
+          ]}
+        >
+          <RangePicker
+            style={{ width: "100%" }}
+            format="DD/MM/YYYY"
+            placeholder={["Ngày bắt đầu", "Ngày kết thúc"]}
+          />
+        </Form.Item>
+
+        <div
+          style={{
+            marginTop: 8,
+            marginBottom: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Text
+            strong
+            style={{
+              fontSize: 13,
+              textTransform: "uppercase",
+              color: "#595959",
+            }}
+          >
+            Dòng giá sản phẩm (Lấy từ CSDL)
+          </Text>
+          {loadingProducts && <Spin size="small" />}
+        </div>
+
+        <Form.List name="items">
+          {(fields, { add, remove }) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {fields.map(({ key, name, ...restField }, index) => (
+                <Card
+                  key={key}
+                  size="small"
+                  style={{
+                    backgroundColor: "#fafafa",
+                    borderRadius: 8,
+                    borderColor: "#f0f0f0",
+                  }}
+                  styles={{ body: { padding: "12px 16px" } }}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1.4fr 1fr 1fr 36px",
+                      gap: 12,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <Form.Item
+                      {...restField}
+                      name={[name, "sku"]}
+                      label={index === 0 ? "Chọn sản phẩm" : ""}
+                      rules={[{ required: true, message: "Chọn sản phẩm!" }]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Select
+                        showSearch
+                        placeholder="Chọn hoặc tìm SKU..."
+                        optionFilterProp="label"
+                        loading={loadingProducts}
+                        options={productOptions}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      {...restField}
+                      name={[name, "sale_price"]}
+                      label={index === 0 ? "Giá bán (₫)" : ""}
+                      rules={[{ required: true, message: "Nhập giá bán!" }]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <InputNumber
+                        style={{ width: "100%" }}
+                        placeholder="0"
+                        min={0}
+                        formatter={(val: any) =>
+                          `${val || ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                        }
+                        parser={(val: any) =>
+                          val ? Number(val.replace(/\$\s?|(,*)/g, "")) : 0
+                        }
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      {...restField}
+                      name={[name, "floor_price"]}
+                      label={index === 0 ? "Giá sàn (₫)" : ""}
+                      rules={[
+                        { required: true, message: "Nhập giá sàn!" },
+                        ({ getFieldValue }) => ({
+                          validator(_, value) {
+                            const salePrice = getFieldValue([
+                              "items",
+                              name,
+                              "sale_price",
+                            ]);
+                            if (value && salePrice && value > salePrice) {
+                              return Promise.reject(
+                                new Error("Giá sàn không thể lớn hơn giá bán!"),
+                              );
+                            }
+                            return Promise.resolve();
+                          },
+                        }),
+                      ]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <InputNumber
+                        style={{ width: "100%" }}
+                        placeholder="0"
+                        min={0}
+                        formatter={(val: any) =>
+                          `${val || ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                        }
+                        parser={(val: any) =>
+                          val ? Number(val.replace(/\$\s?|(,*)/g, "")) : 0
+                        }
+                      />
+                    </Form.Item>
+
+                    <div style={{ paddingTop: index === 0 ? 28 : 2 }}>
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        disabled={fields.length <= 1}
+                        onClick={() => remove(name)}
+                      />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+
+              <Button
+                type="dashed"
+                onClick={() => add()}
+                block
+                icon={<PlusOutlined />}
+                style={{ marginTop: 4, borderRadius: 8 }}
+              >
+                Thêm dòng sản phẩm
+              </Button>
             </div>
           )}
+        </Form.List>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Mã bảng giá *
-              </label>
-              <input
-                type="text"
-                placeholder="VD: PL-DEALER1-Q4"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 uppercase"
-              />
-            </div>
+        <Text
+          type="secondary"
+          italic
+          style={{ fontSize: 11, display: "block", marginTop: 8 }}
+        >
+          * Quy tắc nghiệp vụ: Nhân viên kinh doanh bán dưới giá sàn sẽ bắt buộc
+          gửi đơn qua Quản lý kinh doanh duyệt.
+        </Text>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nhóm khách hàng áp dụng
-              </label>
-              <select
-                value={customerGroup}
-                onChange={(e) => setCustomerGroup(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
-              >
-                <option value="DEALER_LEVEL_1">Đại lý Cấp 1</option>
-                <option value="DEALER_LEVEL_2">Đại lý Cấp 2</option>
-                <option value="RETAIL">Khách lẻ</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Ngày bắt đầu hiệu lực
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Ngày kết thúc hiệu lực
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Price lines */}
-          <div className="pt-2">
-            <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Dòng giá sản phẩm (Giá bán & Giá sàn)
-            </span>
-
-            <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-              {/* Line 1: Red bull */}
-              <div className="grid grid-cols-12 gap-2 items-center text-xs">
-                <div className="col-span-5">
-                  <strong className="block text-slate-800">SKU-001</strong>
-                  <span className="text-[11px] text-slate-400">Red Bull 250ml</span>
-                </div>
-                <div className="col-span-4">
-                  <label className="text-[10px] text-slate-500 block">Giá bán (₫)</label>
-                  <input
-                    type="number"
-                    value={sku1Price}
-                    onChange={(e) => setSku1Price(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-xs rounded border border-slate-200 bg-white"
-                  />
-                </div>
-                <div className="col-span-3">
-                  <label className="text-[10px] text-slate-500 block">Giá sàn (₫)</label>
-                  <input
-                    type="number"
-                    value={sku1Floor}
-                    onChange={(e) => setSku1Floor(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-xs rounded border border-slate-200 bg-white text-rose-600 font-semibold"
-                  />
-                </div>
-              </div>
-
-              {/* Line 2: Highlands */}
-              <div className="grid grid-cols-12 gap-2 items-center text-xs pt-2 border-t border-slate-200/60">
-                <div className="col-span-5">
-                  <strong className="block text-slate-800">SKU-002</strong>
-                  <span className="text-[11px] text-slate-400">Highlands 235ml</span>
-                </div>
-                <div className="col-span-4">
-                  <label className="text-[10px] text-slate-500 block">Giá bán (₫)</label>
-                  <input
-                    type="number"
-                    value={sku2Price}
-                    onChange={(e) => setSku2Price(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-xs rounded border border-slate-200 bg-white"
-                  />
-                </div>
-                <div className="col-span-3">
-                  <label className="text-[10px] text-slate-500 block">Giá sàn (₫)</label>
-                  <input
-                    type="number"
-                    value={sku2Floor}
-                    onChange={(e) => setSku2Floor(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-xs rounded border border-slate-200 bg-white text-rose-600 font-semibold"
-                  />
-                </div>
-              </div>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1.5 italic">
-              * Quy tắc kinh doanh: Nhân viên bán dưới giá sàn sẽ bắt buộc phải gửi đơn qua Quản lý kinh doanh duyệt.
-            </p>
-          </div>
-
-          {/* Modal Actions */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-600/20 transition-all"
-            >
-              {submitting ? "Đang lưu..." : "Lưu bảng giá nháp"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 12,
+            marginTop: 24,
+            paddingTop: 16,
+            borderTop: "1px solid #f0f0f0",
+          }}
+        >
+          <Button onClick={handleCancel} disabled={submitting}>
+            Hủy bỏ
+          </Button>
+          <Button type="primary" htmlType="submit" loading={submitting}>
+            Lưu bảng giá
+          </Button>
+        </div>
+      </Form>
+    </Modal>
   );
 };
 

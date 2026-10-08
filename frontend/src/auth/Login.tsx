@@ -1,34 +1,13 @@
-import { useState, type FormEvent } from "react";
+import loginBanner from "../assets/login-banner.png";
+import { useState } from "react";
+import { Form, Input, Button, Alert, Typography } from "antd";
+import {
+  UserOutlined,
+  LockOutlined,
+  ArrowRightOutlined,
+} from "@ant-design/icons";
 
-const styles = `
-  * { box-sizing: border-box; }
-  body { min-width: 320px; min-height: 100vh; margin: 0; background: #f8fafc; color: #1f2937; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  .login-page { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
-  .login-card { width: min(100%, 440px); padding: clamp(24px, 6vw, 40px); border: 1px solid #e5e7eb; border-radius: 16px; background: #fff; box-shadow: 0 12px 32px rgb(15 23 42 / 8%); }
-  .login-brand { margin: 0 0 8px; color: #2563eb; font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-  .login-card h1 { margin: 0; font-size: 28px; line-height: 1.25; }
-  .login-subtitle { margin: 10px 0 28px; color: #6b7280; line-height: 1.5; }
-  .login-field { display: grid; gap: 8px; margin-bottom: 18px; }
-  .login-field label { font-size: 14px; font-weight: 600; }
-  .login-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .login-forgot-link { color: #2563eb; font-size: 13px; font-weight: 600; text-decoration: none; }
-  .login-forgot-link:hover { text-decoration: underline; }
-  .login-forgot-link:focus-visible { outline: 3px solid #bfdbfe; outline-offset: 2px; border-radius: 2px; }
-  .login-input { width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; color: inherit; background: #fff; font: inherit; }
-  .login-input:focus { outline: 3px solid #bfdbfe; border-color: #2563eb; }
-  .password-wrap { position: relative; }
-  .password-wrap .login-input { padding-right: 76px; }
-  .password-toggle { position: absolute; top: 0; right: 8px; height: 46px; border: 0; color: #2563eb; background: transparent; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .login-error { margin: 0 0 18px; padding: 12px; border: 1px solid #fecaca; border-radius: 8px; color: #991b1b; background: #fef2f2; font-size: 14px; line-height: 1.5; }
-  .login-notice { margin: 0 0 18px; padding: 12px; border: 1px solid #fde68a; border-radius: 8px; color: #854d0e; background: #fffbeb; font-size: 14px; line-height: 1.5; }
-  .login-submit { width: 100%; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 8px; color: #fff; background: #2563eb; font: inherit; font-weight: 700; cursor: pointer; }
-  .login-submit:hover:not(:disabled) { background: #1d4ed8; }
-  .login-submit:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
-  .login-submit:disabled { cursor: wait; opacity: .7; }
-  .login-spinner { width: 17px; height: 17px; border: 2px solid rgb(255 255 255 / 45%); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @media (max-width: 360px) { .login-page { padding: 16px 12px; } .login-card { padding: 22px 18px; } }
-`;
+const { Title, Text, Link } = Typography;
 
 type LoginResponse = {
   redirect_url: string;
@@ -43,20 +22,19 @@ type ApiError = {
 };
 
 export default function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [form] = Form.useForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const sessionExpired = new URLSearchParams(window.location.search).get("session") === "expired";
-  const loggedOut = new URLSearchParams(window.location.search).get("session") === "logged-out";
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const searchParams = new URLSearchParams(window.location.search);
+  const sessionExpired = searchParams.get("session") === "expired";
+  const loggedOut = searchParams.get("session") === "logged-out";
+
+  const handleFinish = async (values: any) => {
     setError("");
 
-    const normalizedUsername = username.trim();
-    if (!normalizedUsername || !password) {
+    const normalizedUsername = values.username?.trim();
+    if (!normalizedUsername || !values.password) {
       setError("Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.");
       return;
     }
@@ -66,7 +44,10 @@ export default function Login() {
       const response = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalizedUsername, password }),
+        body: JSON.stringify({
+          username: normalizedUsername,
+          password: values.password,
+        }),
       });
 
       if (response.ok) {
@@ -83,14 +64,18 @@ export default function Login() {
           window.sessionStorage.removeItem(key);
           window.localStorage.removeItem(key);
         }
+
         if (result.session_token) {
           window.sessionStorage.setItem("session_token", result.session_token);
           window.localStorage.setItem("session_token", result.session_token);
           window.localStorage.setItem("token", result.session_token);
-          const exp = String(Date.now() + (result.expires_in ?? 12 * 60 * 60) * 1000);
+          const exp = String(
+            Date.now() + (result.expires_in ?? 12 * 60 * 60) * 1000,
+          );
           window.sessionStorage.setItem("session_expires_at", exp);
           window.localStorage.setItem("session_expires_at", exp);
         }
+
         if (result.access_token) {
           window.sessionStorage.setItem("access_token", result.access_token);
           window.localStorage.setItem("access_token", result.access_token);
@@ -98,98 +83,365 @@ export default function Login() {
           window.sessionStorage.setItem("access_token_expires_at", accExp);
           window.localStorage.setItem("access_token_expires_at", accExp);
         }
+
         if (result.user?.username) {
           window.sessionStorage.setItem("user_name", result.user.username);
           window.localStorage.setItem("user_name", result.user.username);
         }
+
         if (result.user?.role_code) {
           window.sessionStorage.setItem("user_role", result.user.role_code);
           window.localStorage.setItem("user_role", result.user.role_code);
         }
-        const requestedRedirect = new URLSearchParams(window.location.search).get("redirect");
-        const safeRedirect = requestedRedirect?.startsWith("/") && !requestedRedirect.startsWith("//")
-          ? requestedRedirect
-          : result.redirect_url;
+
+        const requestedRedirect = searchParams.get("redirect");
+        const safeRedirect =
+          requestedRedirect?.startsWith("/") &&
+          !requestedRedirect.startsWith("//")
+            ? requestedRedirect
+            : result.redirect_url;
+
         window.location.assign(safeRedirect);
         return;
       }
 
       const result = (await response.json().catch(() => ({}))) as ApiError;
       if (response.status === 423 && typeof result.detail === "object") {
-        setError(result.detail?.message ?? "Tài khoản đang bị tạm khóa. Vui lòng thử lại sau.");
+        setError(
+          result.detail?.message ??
+            "Tài khoản đang bị tạm khóa. Vui lòng thử lại sau ít phút.",
+        );
       } else if (response.status === 401) {
         setError("Tên đăng nhập hoặc mật khẩu không chính xác.");
       } else if (response.status === 403) {
-        setError(typeof result.detail === "string" ? result.detail : "Tài khoản không được phép truy cập.");
+        setError(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Tài khoản không có quyền truy cập hệ thống.",
+        );
       } else {
-        setError("Hệ thống đang bận. Vui lòng thử lại sau ít phút.");
+        setError("Hệ thống máy chủ đang bận. Vui lòng thử lại sau.");
       }
     } catch {
-      setError("Không thể kết nối đến máy chủ. Vui lòng thử lại.");
+      setError("Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại backend.");
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   return (
-    <>
-      <style>{styles}</style>
-      <main className="login-page">
-        <section className="login-card" aria-labelledby="login-title">
-          <p className="login-brand">OMS · Bán hàng &amp; Kho</p>
-          <h1 id="login-title">Đăng nhập</h1>
-          <p className="login-subtitle">Đăng nhập để truy cập công việc theo vai trò của bạn.</p>
-          {sessionExpired && <p className="login-notice" role="status">Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.</p>}
-          {loggedOut && <p className="login-notice" role="status">Bạn đã đăng xuất thành công.</p>}
-          <form onSubmit={handleSubmit}>
-            <div className="login-field">
-              <label htmlFor="username">Tên đăng nhập</label>
-              <input
-                className="login-input"
-                id="username"
-                name="username"
-                autoComplete="username"
-                maxLength={100}
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                required
-              />
-            </div>
-            <div className="login-field">
-              <div className="login-field-heading">
-                <label htmlFor="password">Mật khẩu</label>
-                <a className="login-forgot-link" href="/forgot-password">Quên mật khẩu?</a>
-              </div>
-              <div className="password-wrap">
-                <input
-                  className="login-input"
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  maxLength={128}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background:
+          "linear-gradient(135deg, #e0e7ff 0%, #dbeafe 50%, #eff6ff 100%)",
+        padding: "32px 20px",
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      {/* Khung Canvas Tròn Viền Nổi (Đúng form ảnh mẫu) */}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 1100,
+          minHeight: 640,
+          backgroundColor: "#ffffff",
+          borderRadius: 36,
+          boxShadow:
+            "0 24px 60px -15px rgba(37, 99, 235, 0.18), 0 0 0 1px rgba(37, 99, 235, 0.08)",
+          display: "flex",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Background đốm trang trí xanh mờ nhẹ kiểu pastel */}
+        <div
+          style={{
+            position: "absolute",
+            width: 500,
+            height: 500,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(191, 219, 254, 0.45) 0%, rgba(255, 255, 255, 0) 70%)",
+            top: -120,
+            right: -100,
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            width: 350,
+            height: 350,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(219, 234, 254, 0.5) 0%, rgba(255, 255, 255, 0) 70%)",
+            bottom: -80,
+            left: 300,
+            pointerEvents: "none",
+          }}
+        />
+        {/* CỘT TRÁI: FORM ĐĂNG NHẬP */}
+        <div
+          style={{
+            flex: "0 0 42%",
+            padding: "56px 48px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            zIndex: 2,
+          }}
+        >
+          {/* Brand Logo góc trên chuẩn WMS */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 10px rgba(37, 99, 235, 0.3)",
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2.2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
                 />
-                <button
-                  className="password-toggle"
-                  type="button"
-                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                  onClick={() => setShowPassword((visible) => !visible)}
-                >
-                  {showPassword ? "Ẩn" : "Hiện"}
-                </button>
+              </svg>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontWeight: 800,
+                  fontSize: 16,
+                  color: "#1e3a8a",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                WMS &amp; OMS
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "#94a3b8",
+                  fontWeight: 500,
+                  lineHeight: 1,
+                }}
+              >
+                Quản lý kho &amp; Bán hàng
               </div>
             </div>
-            {error && <p className="login-error" role="alert">{error}</p>}
-            <button className="login-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting && <span className="login-spinner" aria-hidden="true" />}
-              {isSubmitting ? "Đang đăng nhập…" : "Đăng nhập"}
-            </button>
-          </form>
-        </section>
-      </main>
-    </>
+          </div>
+
+          {/* Form nội dung chính */}
+          <div style={{ marginTop: 32, marginBottom: 24 }}>
+            <Title
+              level={2}
+              style={{
+                margin: "0 0 6px",
+                fontWeight: 800,
+                color: "#0f172a",
+                fontSize: 32,
+              }}
+            >
+              Đăng nhập
+            </Title>
+            <Text
+              type="secondary"
+              style={{
+                fontSize: 13,
+                display: "block",
+                marginBottom: 24,
+                color: "#64748b",
+              }}
+            >
+              Chào mừng bạn trở lại hệ thống quản trị vận hành.
+            </Text>
+
+            {/* Thông báo trạng thái */}
+            {sessionExpired && (
+              <Alert
+                message="Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại."
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16, borderRadius: 8 }}
+              />
+            )}
+
+            {loggedOut && (
+              <Alert
+                message="Đã đăng xuất tài khoản an toàn."
+                type="info"
+                showIcon
+                style={{ marginBottom: 16, borderRadius: 8 }}
+              />
+            )}
+
+            {error && (
+              <Alert
+                message={error}
+                type="error"
+                showIcon
+                closable
+                onClose={() => setError("")}
+                style={{ marginBottom: 16, borderRadius: 8 }}
+              />
+            )}
+
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleFinish}
+              requiredMark={false}
+            >
+              {/* Tên đăng nhập */}
+              <Form.Item
+                name="username"
+                label={
+                  <span
+                    style={{ fontWeight: 600, fontSize: 13, color: "#334155" }}
+                  >
+                    Tài khoản / Email
+                  </span>
+                }
+                rules={[
+                  { required: true, message: "Vui lòng nhập tên đăng nhập!" },
+                ]}
+                style={{ marginBottom: 18 }}
+              >
+                <Input
+                  prefix={<UserOutlined style={{ color: "#94a3b8" }} />}
+                  placeholder="VD: sales_mgr, accountant..."
+                  size="large"
+                  maxLength={100}
+                  autoComplete="username"
+                  style={{
+                    borderRadius: 10,
+                    borderColor: "#cbd5e1",
+                    height: 46,
+                  }}
+                />
+              </Form.Item>
+
+              {/* Mật khẩu & Quên mật khẩu riêng biệt hoàn toàn */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
+                <span
+                  style={{ fontWeight: 600, fontSize: 13, color: "#334155" }}
+                >
+                  Mật khẩu
+                </span>
+                <Link
+                  href="/forgot-password"
+                  style={{ fontSize: 12, fontWeight: 600, color: "#2563eb" }}
+                >
+                  Quên mật khẩu?
+                </Link>
+              </div>
+
+              <Form.Item
+                name="password"
+                rules={[{ required: true, message: "Vui lòng nhập mật khẩu!" }]}
+                style={{ marginBottom: 28 }}
+              >
+                <Input.Password
+                  prefix={<LockOutlined style={{ color: "#94a3b8" }} />}
+                  placeholder="Nhập mật khẩu"
+                  size="large"
+                  maxLength={128}
+                  autoComplete="current-password"
+                  style={{
+                    borderRadius: 10,
+                    borderColor: "#cbd5e1",
+                    height: 46,
+                  }}
+                />
+              </Form.Item>
+
+              {/* Nút bấm Đăng nhập */}
+              <Form.Item style={{ marginBottom: 0 }}>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  size="large"
+                  block
+                  loading={isSubmitting}
+                  icon={<ArrowRightOutlined />}
+                  iconPosition="end"
+                  style={{
+                    height: 48,
+                    borderRadius: 12,
+                    fontWeight: 700,
+                    fontSize: 15,
+                    backgroundColor: "#2563eb",
+                    boxShadow: "0 8px 16px -4px rgba(37, 99, 235, 0.4)",
+                  }}
+                >
+                  {isSubmitting ? "Đang xác thực..." : "ĐĂNG NHẬP"}
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
+
+          {/* Chân trang thông tin trợ giúp */}
+          <div>
+            <Text type="secondary" style={{ fontSize: 12, color: "#94a3b8" }}>
+              Cần hỗ trợ phân quyền?{" "}
+              <Text strong style={{ color: "#2563eb" }}>
+                Liên hệ Quản trị viên
+              </Text>
+            </Text>
+          </div>
+        </div>
+        {/* CỘT PHẢI: HÌNH ẢNH CỦA BẠN */}
+        {/* CỘT PHẢI */}
+        <div
+          style={{
+            flex: "0 0 62%", // Tăng tỉ lệ cột phải từ 58% lên 62% cho rộng rãi
+            backgroundColor: "#f8fafc",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "8px", // Giảm padding để ảnh mở rộng ra sát mép
+            borderLeft: "1px solid #f1f5f9",
+            overflow: "hidden",
+          }}
+        >
+          <img
+            src={loginBanner}
+            alt="WMS Banner"
+            style={{
+              width: "100%",
+              height: "100%",
+              maxHeight: "580px", // Tăng trần chiều cao lên
+              objectFit: "contain",
+              transform: "scale(1.08) translateX(-45px)", // Chỉnh to lên theo ý bạn (1.05 đến 1.15)
+            }}
+          />
+        </div>
+      </div>
+    </div>
   );
 }

@@ -9,7 +9,11 @@ from sqlalchemy.pool import StaticPool
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mysql+pymysql://oms_user:change-me@localhost:3306/oms?charset=utf8mb4",
+    # "mysql+pymysql://oms_user:change-me@localhost:3306/oms?charset=utf8mb4",
+
+    "sqlite:///./database/demo.db",
+
+    
 )
 
 connect_args = {}

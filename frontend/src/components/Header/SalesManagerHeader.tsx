@@ -32,7 +32,17 @@ export interface HeaderProps {
   onLogout?: () => void;
 }
 
-export const HeaderAntd: React.FC<HeaderProps> = ({
+export interface SalesManagerHeaderProps {
+  fullName?: string;
+  roleName?: string;
+  avatarUrl?: string | null;
+  notificationCount?: number;
+  onLogout?: () => void;
+  onProfileClick?: () => void;
+  onChangePasswordClick?: () => void; // Thêm prop này
+}
+
+export const SalesManagerHeader: React.FC<HeaderProps> = ({
   fullName = "Lê Quản Lý Kinh Doanh",
   roleName = "Quản lý kinh doanh",
   avatarUrl,
@@ -74,9 +84,9 @@ export const HeaderAntd: React.FC<HeaderProps> = ({
     },
     {
       key: "change-password",
-      icon: <KeyOutlined />,
+      icon: <KeyOutlined />, // hoặc icon ổ khóa
       label: "Đổi mật khẩu",
-      onClick: onChangePassword,
+      onClick: onChangePassword, // Gọi hàm onChangePassword khi click
     },
     { type: "divider" },
     {
@@ -218,4 +228,4 @@ export const HeaderAntd: React.FC<HeaderProps> = ({
   );
 };
 
-export default HeaderAntd;
+export default SalesManagerHeader;

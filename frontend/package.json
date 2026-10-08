@@ -10,6 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "@ant-design/v5-patch-for-react-19": "^1.0.3",
+    "antd": "^6.6.5",
+    "dayjs": "^1.11.23",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
