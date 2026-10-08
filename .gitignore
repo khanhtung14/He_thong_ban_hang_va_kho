@@ -2,6 +2,11 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+<<<<<<< Updated upstream
 # Local/generated files
 node_modules/
+=======
+
+# Uploaded files
+>>>>>>> Stashed changes
 uploads/
