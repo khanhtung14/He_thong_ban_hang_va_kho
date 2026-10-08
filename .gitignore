@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
+# Local/generated files
+node_modules/
+uploads/
