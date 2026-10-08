@@ -464,6 +464,30 @@ export default function RoleWorkspace() {
     </TableShell>
   );
 
+  async function importUsersFromExcel(file: File) {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    setNotice("");
+    try {
+      const response = await authenticatedFetch("/api/v1/admin/users/import", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result.detail === "string" ? result.detail : result.message || "Không thể nhập danh sách người dùng từ Excel.");
+      }
+      const created = Number(result.created ?? 0);
+      const duplicates = Number(result.duplicates ?? 0);
+      const skipped = Number(result.skipped ?? 0);
+      setNotice(`Đã nhập xong. Tạo mới ${created} tài khoản, bỏ qua ${duplicates} trùng lặp, lỗi ${skipped}.`);
+      await refreshUsers();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Không thể nhập danh sách người dùng từ Excel.");
+    }
+  }
+
   function renderContent(): ReactNode {
     switch (role as RoleKey) {
       case "salesManager":

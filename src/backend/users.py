@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, Query, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from src.backend.database import get_db
@@ -15,9 +15,11 @@ from src.backend.schemas import (
     UserUpdate,
 )
 from src.backend.users_service import (
+    bulk_create_users_from_rows,
     create_user,
     get_user_by_id,
     list_users,
+    parse_excel_rows,
     update_user,
 )
 from src.backend.security import require_admin
@@ -60,6 +62,43 @@ def get_users(
         page_size=effective_page_size,
         total_pages=total_pages
     )
+
+
+@router.post("/import", dependencies=[Depends(require_admin)])
+@compat_router.post("/import", dependencies=[Depends(require_admin)])
+async def import_users_from_excel(
+    file: UploadFile = File(...),
+    x_actor_id: Optional[int] = Header(None, alias="X-Actor-Id"),
+    db: Session = Depends(get_db),
+):
+    """Import user records from an Excel or CSV file and create accounts in bulk."""
+    if not file.filename:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vui lòng đính kèm file Excel hoặc CSV.")
+
+    extension = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
+    allowed = {"xlsx", "xls", "csv"}
+    if extension not in allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chỉ hỗ trợ file Excel (.xlsx, .xls) hoặc CSV.")
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File tải lên rỗng.")
+
+    rows = parse_excel_rows(contents, file.filename)
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File không chứa dữ liệu người dùng hợp lệ.")
+
+    created_count, errors, duplicates_count = bulk_create_users_from_rows(db, rows, actor_user_id=x_actor_id)
+    response = {
+        "message": f"Đã xử lý {len(rows)} dòng trong file. Tạo mới {created_count} tài khoản.",
+        "created": created_count,
+        "duplicates": duplicates_count,
+        "skipped": len(errors),
+        "errors": errors,
+    }
+    if created_count == 0 and duplicates_count == 0 and errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không có người dùng nào được tạo. Vui lòng kiểm tra định dạng file.")
+    return response
 
 
 @router.post("", response_model=CreateUserResult, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])

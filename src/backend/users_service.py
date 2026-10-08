@@ -1,12 +1,16 @@
 """Business Service for User Management (SCRUM-62)."""
 
+import csv
+import io
 import logging
+import re
 import secrets
 import string
-from typing import List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import bcrypt
 from fastapi import HTTPException, status
+from openpyxl import load_workbook
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -296,6 +300,137 @@ def create_user(
     )
 
     return new_user, email_sent, temp_password
+
+
+def normalize_import_header(value: Optional[str]) -> str:
+    if value is None:
+        return ""
+    cleaned = value.strip().lower().replace("-", " ").replace("_", " ")
+    cleaned = " ".join(cleaned.split())
+    aliases = {
+        "ho ten": "full_name",
+        "ho va ten": "full_name",
+        "full name": "full_name",
+        "ten nguoi dung": "username",
+        "user name": "username",
+        "ten dang nhap": "username",
+        "email": "email",
+        "phone": "phone",
+        "dien thoai": "phone",
+        "sdt": "phone",
+        "mobile": "phone",
+        "role code": "role_codes",
+        "role codes": "role_codes",
+        "vai tro": "role_codes",
+        "roles": "role_codes",
+        "role": "role_codes",
+    }
+    return aliases.get(cleaned, cleaned.replace(" ", "_"))
+
+
+def parse_excel_rows(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
+    """Parse an Excel file or CSV into a list of normalized dictionaries."""
+    name = (filename or "").lower()
+    if name.endswith(".csv"):
+        text = file_bytes.decode("utf-8-sig", errors="replace")
+        reader = csv.DictReader(io.StringIO(text))
+        return [
+            {normalize_import_header(key): (value.strip() if isinstance(value, str) else value) for key, value in row.items() if key is not None}
+            for row in reader
+            if row and any((value or "").strip() for value in row.values())
+        ]
+
+    workbook = load_workbook(filename=io.BytesIO(file_bytes), read_only=True, data_only=True)
+    sheet = workbook.active
+    rows = list(sheet.iter_rows(values_only=True))
+    if not rows:
+        return []
+    header = [normalize_import_header(str(cell).strip()) if cell is not None else "" for cell in rows[0]]
+    results: List[Dict[str, Any]] = []
+    for values in rows[1:]:
+        mapping: Dict[str, Any] = {}
+        for key, value in zip(header, values):
+            if not key:
+                continue
+            mapping[key] = value.strip() if isinstance(value, str) else value
+        if mapping and any((str(value)).strip() for value in mapping.values() if value is not None):
+            results.append(mapping)
+    return results
+
+
+def bulk_create_users_from_rows(db: Session, rows: Iterable[Dict[str, Any]], actor_user_id: Optional[int] = None) -> Tuple[int, List[str], int]:
+    """Create multiple users from imported rows and skip duplicates silently."""
+    created_count = 0
+    errors: List[str] = []
+    duplicate_count = 0
+
+    def normalize_phone(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+
+        digits = re.sub(r"\D", "", text)
+        if len(digits) == 11 and digits.startswith("84"):
+            digits = "0" + digits[2:]
+        if len(digits) == 10 and digits.startswith("0"):
+            return digits
+        return text
+
+    for row_index, row in enumerate(rows, start=2):
+        if row is None:
+            continue
+        normalized = {normalize_import_header(str(key)): value for key, value in row.items() if key is not None}
+        if not normalized:
+            continue
+
+        full_name = str(normalized.get("full_name") or normalized.get("ho_ten") or normalized.get("name") or "").strip()
+        username = str(normalized.get("username") or normalized.get("ten_dang_nhap") or normalized.get("user_name") or "").strip()
+        email = str(normalized.get("email") or "").strip().lower()
+        phone = normalize_phone(normalized.get("phone") or normalized.get("dien_thoai") or normalized.get("sdt") or "")
+        raw_role_codes = normalized.get("role_codes") or normalized.get("role") or normalized.get("vai_tro") or "SALES_REP"
+
+        header_tokens = {
+            "full_name", "ho_ten", "name", "username", "user_name", "ten_dang_nhap",
+            "email", "phone", "dien_thoai", "sdt", "role_codes", "role", "vai_tro"
+        }
+        if full_name.lower() in header_tokens or username.lower() in header_tokens or email.lower() in header_tokens:
+            continue
+
+        if not full_name or not username or not email:
+            errors.append(f"Dòng {row_index}: thiếu họ tên, tên đăng nhập hoặc email.")
+            continue
+
+        parsed_roles = []
+        if isinstance(raw_role_codes, str):
+            parsed_roles = [part.strip() for part in raw_role_codes.replace(";", ",").split(",") if part.strip()]
+        elif isinstance(raw_role_codes, (list, tuple)):
+            parsed_roles = [str(part).strip() for part in raw_role_codes if str(part).strip()]
+        if not parsed_roles:
+            parsed_roles = ["SALES_REP"]
+
+        try:
+            model = UserCreate(
+                username=username,
+                full_name=full_name,
+                email=email,
+                phone=phone,
+                role_codes=parsed_roles,
+                status=AccountStatus.PENDING_ACTIVATION,
+            )
+            create_user(db=db, user_data=model, actor_user_id=actor_user_id)
+            created_count += 1
+        except HTTPException as exc:
+            detail = str(exc.detail or "")
+            if "đã tồn tại" in detail.lower() or "already" in detail.lower() or "tồn tại" in detail.lower():
+                duplicate_count += 1
+                continue
+            errors.append(f"Dòng {row_index}: {detail}")
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            errors.append(f"Dòng {row_index}: {exc}")
+
+    return created_count, errors, duplicate_count
 
 
 def get_user_by_id(db: Session, user_id: int) -> User:

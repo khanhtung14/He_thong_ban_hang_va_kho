@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
+from openpyxl import Workbook
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -216,3 +218,44 @@ def test_unlock_nonexistent_user_returns_404(db_session_and_client):
 
     assert response.status_code == 404
     assert "Không tìm thấy người dùng" in response.json()["detail"]
+
+
+def test_bulk_import_users_from_excel_creates_records_and_skips_duplicates():
+    from src.backend import models
+    from src.backend.users_service import bulk_create_users_from_rows
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Users"
+    sheet.append(["full_name", "username", "email", "phone", "role_codes"])
+    sheet.append(["Nguyễn Văn A", "nguyenvana", "a@example.com", "0901234567", "SALES_REP"])
+    sheet.append(["Trần Thị B", "tranthib", "b@example.com", "0901234568", "WAREHOUSE"])
+    sheet.append(["Nguyễn Văn A", "nguyenvana", "a2@example.com", "0901234569", "SALES_REP"])
+
+    rows = []
+    for row in sheet.iter_rows(values_only=True):
+        if row[0] is None:
+            continue
+        rows.append(dict(zip(["full_name", "username", "email", "phone", "role_codes"], row)))
+
+    db = SimpleNamespace()
+    db.query = lambda *args, **kwargs: None
+
+    # Use a real in-memory database to validate actual persistence.
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(bind=engine)
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+
+    try:
+        created, errors, duplicates = bulk_create_users_from_rows(session, rows, actor_user_id=99)
+        assert created == 2
+        assert duplicates == 1
+        assert len(errors) == 0
+        assert session.query(models.User).count() == 2
+        assert {user.username for user in session.query(models.User).all()} == {"nguyenvana", "tranthib"}
+    finally:
+        session.close()
