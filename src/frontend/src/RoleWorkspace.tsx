@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { authenticatedFetch, logout, getCurrentUserRole, hasValidSession } from "./session";
 import Profile from "./Profile";
 import ProfileAvatar from "./ProfileAvatar";
@@ -18,6 +18,9 @@ type Product = { sku: string; name: string; category?: string; sale_price: numbe
 type InventoryItem = { sku: string; name: string; warehouse_id: number; warehouse_name: string; quantity_available: number };
 type UserRole = string | { code: string; name: string };
 type UserRow = { id: number; username: string; full_name: string; email?: string; phone?: string | null; status: string; is_active?: boolean; roles: UserRole[]; territories?: AssignmentOption[]; assigned_dealers_count?: number };
+type UserImportPreviewRow = { row: number; full_name: string; username: string; email: string; phone?: string | null; role_codes: string[]; valid: boolean; duplicate: boolean; error: string };
+type UserImportPreview = { total: number; valid: number; errors: number; duplicates: number; rows: UserImportPreviewRow[] };
+type UserImportReport = { created: number; duplicates: number; skipped: number; errors: string[] };
 type AssignmentOption = { id: number; code: string; name: string };
 type AssignmentForm = { role_ids: number[]; warehouse_ids: number[]; territory_ids: number[] };
 type AssignmentOptions = { roles: AssignmentOption[]; warehouses: AssignmentOption[]; territories: AssignmentOption[] };
@@ -243,6 +246,10 @@ export default function RoleWorkspace() {
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [usersImporting, setUsersImporting] = useState(false);
+  const [userImportFile, setUserImportFile] = useState<File | null>(null);
+  const [userImportPreview, setUserImportPreview] = useState<UserImportPreview | null>(null);
+  const [userImportReport, setUserImportReport] = useState<UserImportReport | null>(null);
   const [, setCartCount] = useState(0);
   const [adjustment, setAdjustment] = useState({ sku: "SKU-001", quantity_delta: "", reason: "" });
   const [isAdjusting, setIsAdjusting] = useState(false);
@@ -464,27 +471,74 @@ export default function RoleWorkspace() {
     </TableShell>
   );
 
-  async function importUsersFromExcel(file: File) {
+  async function previewUsersFromExcel(file: File) {
     if (!file) return;
     const formData = new FormData();
     formData.append("file", file);
     setNotice("");
+    setUserImportReport(null);
+    setUserImportPreview(null);
+    setUserImportFile(file);
+    setUsersImporting(true);
     try {
-      const response = await authenticatedFetch("/api/v1/admin/users/import", {
+      const response = await authenticatedFetch("/api/v1/admin/users/import/preview", {
         method: "POST",
         body: formData,
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(typeof result.detail === "string" ? result.detail : result.message || "Không thể nhập danh sách người dùng từ Excel.");
+        throw new Error(typeof result.detail === "string" ? result.detail : result.message || "Không thể xem trước danh sách người dùng.");
       }
-      const created = Number(result.created ?? 0);
-      const duplicates = Number(result.duplicates ?? 0);
-      const skipped = Number(result.skipped ?? 0);
-      setNotice(`Đã nhập xong. Tạo mới ${created} tài khoản, bỏ qua ${duplicates} trùng lặp, lỗi ${skipped}.`);
+      setUserImportPreview(result as UserImportPreview);
+    } catch (error) {
+      setUserImportFile(null);
+      setNotice(error instanceof Error ? error.message : "Không thể xem trước danh sách người dùng.");
+    } finally {
+      setUsersImporting(false);
+    }
+  }
+
+  async function importUsersFromExcel() {
+    if (!userImportFile || !userImportPreview?.valid) return;
+    const formData = new FormData();
+    formData.append("file", userImportFile);
+    setNotice("");
+    setUsersImporting(true);
+    try {
+      const response = await authenticatedFetch("/api/v1/admin/users/import", { method: "POST", body: formData });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof result.detail === "string" ? result.detail : result.message || "Không thể nhập danh sách người dùng.");
+      }
+      setUserImportReport({
+        created: Number(result.created ?? 0),
+        duplicates: Number(result.duplicates ?? 0),
+        skipped: Number(result.skipped ?? 0),
+        errors: Array.isArray(result.errors) ? result.errors.map(String) : [],
+      });
+      setUserImportPreview(null);
+      setUserImportFile(null);
+      setNotice(typeof result.message === "string" ? result.message : "Đã hoàn tất nhập người dùng.");
       await refreshUsers();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Không thể nhập danh sách người dùng từ Excel.");
+      setNotice(error instanceof Error ? error.message : "Không thể nhập danh sách người dùng.");
+    } finally {
+      setUsersImporting(false);
+    }
+  }
+
+  async function downloadUserImportTemplate() {
+    try {
+      const response = await authenticatedFetch("/api/v1/admin/users/import/template");
+      if (!response.ok) throw new Error("Không tải được tệp mẫu.");
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = "user_import_template.xlsx";
+      link.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Không tải được tệp mẫu.");
     }
   }
 
@@ -531,7 +585,7 @@ export default function RoleWorkspace() {
 
 
       case "admin":
-        if (view === "users") return <AdminUsers users={users} loading={loading} error={loadError} search={userSearch} setSearch={(value) => { setUserSearch(value); setUserPage(1); }} filter={userFilter} setFilter={(value) => { setUserFilter(value); setUserPage(1); }} roleFilter={userRoleFilter} setRoleFilter={(value) => { setUserRoleFilter(value); setUserPage(1); }} page={userPage} total={userTotal} totalPages={userTotalPages} setPage={setUserPage} onCreate={() => { window.location.assign("/admin/users/create"); }} onEdit={openEditUser} onLock={(user) => { setLockTarget(user); setLockReason(""); }} onUnlock={unlockUser} onAudit={showAudit} busy={userActionBusy} />;
+        if (view === "users") return <AdminUsers users={users} loading={loading} error={loadError} search={userSearch} setSearch={(value) => { setUserSearch(value); setUserPage(1); }} filter={userFilter} setFilter={setUserFilter} roleFilter={userRoleFilter} setRoleFilter={setUserRoleFilter} page={userPage} total={userTotal} totalPages={userTotalPages} setPage={setUserPage} onCreate={() => { window.location.assign("/admin/users/create"); }} onPreviewFile={previewUsersFromExcel} onConfirmImport={importUsersFromExcel} onCancelPreview={() => { setUserImportPreview(null); setUserImportFile(null); }} onDownloadTemplate={downloadUserImportTemplate} preview={userImportPreview} report={userImportReport} filename={userImportFile?.name ?? ""} importing={usersImporting} onEdit={openEditUser} onLock={(user) => { setLockTarget(user); setLockReason(""); }} onUnlock={unlockUser} onAudit={showAudit} busy={userActionBusy} />;
         if (view === "audit") return <><PageHeading title="Nhật ký & bảo mật" subtitle="Theo dõi thao tác quản trị, khóa tài khoản và phiên đăng nhập." /><PrototypeBanner text="Các sự kiện ở màn hình này là ví dụ giao diện; nhật ký chi tiết theo user mới được đọc từ API." /><div className="workspace-two-columns"><section className="workspace-panel"><PanelHeading title="Sự kiện bảo mật" /><AuditSummary /></section><section className="workspace-panel"><PanelHeading title="Tài khoản cần chú ý" /><div className="workspace-attention"><span className="workspace-attention-icon">!</span><div><strong>Kiểm tra định kỳ tài khoản khóa</strong><p>Mở mục tài khoản để xem nhật ký và trạng thái bàn giao của user.</p><button className="workspace-link-button" onClick={() => navigate("users")}>Đi tới tài khoản →</button></div></div></section></div></>;
         if (view === "configuration") return <><PageHeading title="Danh mục hệ thống" subtitle="Vai trò chuẩn, địa bàn và kho được cấp cho user." /><PrototypeBanner text="Ma trận vai trò đang cấu hình tĩnh phía backend; màn hình chỉnh sửa danh mục chưa có API." /><ConfigurationCards /></>;
         if (view === "rbac") return <><PageHeading title="Ma trận phân quyền (RBAC)" subtitle="Tổng quan vai trò nghiệp vụ và các khu vực truy cập được cấu hình." /><PrototypeBanner text="Quyền truy cập được máy chủ xác thực. Màn hình này hiển thị danh mục vai trò; thay đổi quyền được quản lý theo chính sách hệ thống." /><RoleSummary /></>;
@@ -651,8 +705,20 @@ function ProfileCard({ username, roleName }: { username: string; roleName: strin
   return <section className="workspace-panel workspace-profile"><ProfileAvatar initials={initials} className="workspace-avatar is-large" editable={false} /><div><h3>{username}</h3><p>{roleName} · Tài khoản đang hoạt động</p><button className="workspace-button is-secondary" onClick={() => window.location.assign("/change-password")}>Đổi mật khẩu</button></div></section>;
 }
 
-function AdminUsers({ users, loading, error, search, setSearch, filter, setFilter, roleFilter, setRoleFilter, page, total, totalPages, setPage, onCreate, onEdit, onLock, onUnlock, onAudit, busy }: { users: UserRow[]; loading: boolean; error: string; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; roleFilter: string; setRoleFilter: (value: string) => void; page: number; total: number; totalPages: number; setPage: (value: number) => void; onCreate: () => void; onEdit: (user: UserRow) => void; onLock: (user: UserRow) => void; onUnlock: (user: UserRow) => void; onAudit: (user: UserRow) => void; busy: boolean }) {
-  return <><PageHeading title="Tài khoản người dùng" subtitle="Tìm kiếm, cập nhật thông tin, vai trò và trạng thái tài khoản." action={<button className="workspace-button" onClick={onCreate}>＋ Tạo tài khoản</button>} /><div className="workspace-admin-tools"><label className="workspace-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên, tài khoản, số điện thoại…" /></label><select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} aria-label="Lọc theo vai trò"><option value="ALL">Mọi vai trò</option><option value="CUSTOMER">Đại lý</option><option value="SALES_REP">Nhân viên kinh doanh</option><option value="SALES_MANAGER">Quản lý kinh doanh</option><option value="WAREHOUSE">Thủ kho</option><option value="WH_MANAGER">Quản lý kho</option><option value="ACCOUNTANT">Kế toán</option><option value="ADMIN">Quản trị hệ thống</option></select><select value={filter} onChange={(event) => setFilter(event.target.value)} aria-label="Lọc theo trạng thái"><option value="ALL">Mọi trạng thái</option><option value="ACTIVE">Đang hoạt động</option><option value="LOCKED">Đã khóa</option><option value="PENDING_ACTIVATION">Chờ kích hoạt</option><option value="DISABLED">Vô hiệu hóa</option></select></div>{error && <div className="workspace-alert is-error">{error}</div>}<AdminUserTable users={users} onEdit={onEdit} onLock={onLock} onUnlock={onUnlock} onAudit={onAudit} busy={busy} />{loading && <div className="workspace-loading">Đang tải tài khoản…</div>}{!loading && users.length === 0 && <div className="workspace-empty">Không tìm thấy tài khoản phù hợp.</div>}<div className="workspace-pagination"><span>{total} tài khoản · Trang {page} / {Math.max(totalPages, 1)}</span><div><button type="button" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1 || loading}>← Trước</button><button type="button" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages || loading}>Sau →</button></div></div></>;
+function AdminUsers({ users, loading, error, search, setSearch, filter, setFilter, roleFilter, setRoleFilter, page, total, totalPages, setPage, onCreate, onPreviewFile, onConfirmImport, onCancelPreview, onDownloadTemplate, preview, report, filename, importing, onEdit, onLock, onUnlock, onAudit, busy }: { users: UserRow[]; loading: boolean; error: string; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; roleFilter: string; setRoleFilter: (value: string) => void; page: number; total: number; totalPages: number; setPage: (value: number) => void; onCreate: () => void; onPreviewFile: (file: File) => void | Promise<void>; onConfirmImport: () => void | Promise<void>; onCancelPreview: () => void; onDownloadTemplate: () => void | Promise<void>; preview: UserImportPreview | null; report: UserImportReport | null; filename: string; importing: boolean; onEdit: (user: UserRow) => void; onLock: (user: UserRow) => void; onUnlock: (user: UserRow) => void; onAudit: (user: UserRow) => void; busy: boolean }) {
+  const importInputRef = useRef<HTMLInputElement>(null);
+  return <>
+    <input ref={importInputRef} type="file" accept=".xlsx,.csv" hidden onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; if (file) void onPreviewFile(file); input.value = ""; }} />
+    <PageHeading title="Tài khoản người dùng" subtitle="Tìm kiếm, cập nhật thông tin, vai trò và trạng thái tài khoản." action={<><button className="workspace-button is-secondary" type="button" onClick={() => void onDownloadTemplate()}>Tải tệp mẫu</button><button className="workspace-button is-secondary" type="button" onClick={() => importInputRef.current?.click()} disabled={importing}>{importing ? "Đang kiểm tra…" : "Chọn Excel/CSV"}</button><button className="workspace-button" onClick={onCreate}>＋ Tạo tài khoản</button></>} />
+    <div className="workspace-admin-tools"><label className="workspace-search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm theo tên, tài khoản, số điện thoại…" /></label><select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} aria-label="Lọc theo vai trò"><option value="ALL">Mọi vai trò</option><option value="CUSTOMER">Đại lý</option><option value="SALES_REP">Nhân viên kinh doanh</option><option value="SALES_MANAGER">Quản lý kinh doanh</option><option value="WAREHOUSE">Thủ kho</option><option value="WH_MANAGER">Quản lý kho</option><option value="ACCOUNTANT">Kế toán</option><option value="ADMIN">Quản trị hệ thống</option></select><select value={filter} onChange={(event) => setFilter(event.target.value)} aria-label="Lọc theo trạng thái"><option value="ALL">Mọi trạng thái</option><option value="ACTIVE">Đang hoạt động</option><option value="LOCKED">Đã khóa</option><option value="PENDING_ACTIVATION">Chờ kích hoạt</option><option value="DISABLED">Vô hiệu hóa</option></select></div>
+    {error && <div className="workspace-alert is-error">{error}</div>}
+    {preview && <section className="workspace-panel workspace-import-preview"><div className="workspace-import-preview-heading"><div><h3>Xem trước: {filename}</h3><p>{preview.valid} hợp lệ · {preview.errors} dòng lỗi · {preview.duplicates} dòng trùng</p></div><div><button className="workspace-button is-secondary" type="button" onClick={onCancelPreview} disabled={importing}>Hủy</button><button className="workspace-button" type="button" onClick={() => void onConfirmImport()} disabled={importing || preview.valid === 0}>{importing ? "Đang nhập…" : `Nhập ${preview.valid} dòng hợp lệ`}</button></div></div><TableShell headers={["Dòng", "Họ tên", "Tên đăng nhập", "Email", "Vai trò", "Kiểm tra"]}>{preview.rows.map((row) => <tr key={row.row}><td>{row.row}</td><td>{row.full_name || "—"}</td><td>{row.username || "—"}</td><td>{row.email || "—"}</td><td>{row.role_codes.join(", ")}</td><td><StatusPill tone={row.valid ? "green" : "red"}>{row.valid ? "Hợp lệ" : row.duplicate ? "Trùng" : "Lỗi"}</StatusPill>{row.error && <small className="workspace-import-row-error">{row.error}</small>}</td></tr>)}</TableShell></section>}
+    {report && <section className="workspace-panel workspace-import-report"><h3>Kết quả nhập</h3><p>Tạo mới {report.created} tài khoản · Bỏ qua {report.duplicates} trùng lặp · {report.skipped} dòng lỗi</p>{report.errors.length > 0 && <ul>{report.errors.map((message, index) => <li key={`${index}-${message}`}>{message}</li>)}</ul>}</section>}
+    <AdminUserTable users={users} onEdit={onEdit} onLock={onLock} onUnlock={onUnlock} onAudit={onAudit} busy={busy} />
+    {loading && <div className="workspace-loading">Đang tải tài khoản…</div>}
+    {!loading && users.length === 0 && <div className="workspace-empty">Không tìm thấy tài khoản phù hợp.</div>}
+    <div className="workspace-pagination"><span>{total} tài khoản · Trang {page} / {Math.max(totalPages, 1)}</span><div><button type="button" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1 || loading}>← Trước</button><button type="button" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages || loading}>Sau →</button></div></div>
+  </>;
 }
 
 function AdminUserTable({ users, onEdit, onLock, onUnlock, onAudit, busy, recentMode = false }: { users: UserRow[]; onEdit: (user: UserRow) => void; onLock: (user: UserRow) => void; onUnlock: (user: UserRow) => void; onAudit: (user: UserRow) => void; busy: boolean; recentMode?: boolean }) {

@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import bcrypt
 from fastapi import HTTPException, status
 from openpyxl import load_workbook
+from pydantic import ValidationError
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -309,19 +310,23 @@ def normalize_import_header(value: Optional[str]) -> str:
     cleaned = " ".join(cleaned.split())
     aliases = {
         "ho ten": "full_name",
+        "họ tên": "full_name",
         "ho va ten": "full_name",
         "full name": "full_name",
         "ten nguoi dung": "username",
         "user name": "username",
         "ten dang nhap": "username",
+        "tên đăng nhập": "username",
         "email": "email",
         "phone": "phone",
         "dien thoai": "phone",
+        "số điện thoại": "phone",
         "sdt": "phone",
         "mobile": "phone",
         "role code": "role_codes",
         "role codes": "role_codes",
         "vai tro": "role_codes",
+        "vai trò": "role_codes",
         "roles": "role_codes",
         "role": "role_codes",
     }
@@ -358,25 +363,26 @@ def parse_excel_rows(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
     return results
 
 
+def normalize_import_phone(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+
+    digits = re.sub(r"\D", "", text)
+    if len(digits) == 11 and digits.startswith("84"):
+        digits = "0" + digits[2:]
+    if len(digits) == 10 and digits.startswith("0"):
+        return digits
+    return text
+
+
 def bulk_create_users_from_rows(db: Session, rows: Iterable[Dict[str, Any]], actor_user_id: Optional[int] = None) -> Tuple[int, List[str], int]:
     """Create multiple users from imported rows and skip duplicates silently."""
     created_count = 0
     errors: List[str] = []
     duplicate_count = 0
-
-    def normalize_phone(value: Any) -> Optional[str]:
-        if value is None:
-            return None
-        text = str(value).strip()
-        if not text:
-            return None
-
-        digits = re.sub(r"\D", "", text)
-        if len(digits) == 11 and digits.startswith("84"):
-            digits = "0" + digits[2:]
-        if len(digits) == 10 and digits.startswith("0"):
-            return digits
-        return text
 
     for row_index, row in enumerate(rows, start=2):
         if row is None:
@@ -388,7 +394,7 @@ def bulk_create_users_from_rows(db: Session, rows: Iterable[Dict[str, Any]], act
         full_name = str(normalized.get("full_name") or normalized.get("ho_ten") or normalized.get("name") or "").strip()
         username = str(normalized.get("username") or normalized.get("ten_dang_nhap") or normalized.get("user_name") or "").strip()
         email = str(normalized.get("email") or "").strip().lower()
-        phone = normalize_phone(normalized.get("phone") or normalized.get("dien_thoai") or normalized.get("sdt") or "")
+        phone = normalize_import_phone(normalized.get("phone") or normalized.get("dien_thoai") or normalized.get("sdt") or "")
         raw_role_codes = normalized.get("role_codes") or normalized.get("role") or normalized.get("vai_tro") or "SALES_REP"
 
         header_tokens = {
@@ -431,6 +437,98 @@ def bulk_create_users_from_rows(db: Session, rows: Iterable[Dict[str, Any]], act
             errors.append(f"Dòng {row_index}: {exc}")
 
     return created_count, errors, duplicate_count
+
+
+def preview_user_import_rows(db: Session, rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Validate imported user rows without creating user records."""
+    preview: List[Dict[str, Any]] = []
+    seen: Dict[str, int] = {}
+    header_tokens = {
+        "full_name", "ho_ten", "name", "username", "user_name", "ten_dang_nhap",
+        "email", "phone", "dien_thoai", "sdt", "role_codes", "role", "vai_tro"
+    }
+
+    for row_index, row in enumerate(rows, start=2):
+        normalized = {normalize_import_header(str(key)): value for key, value in row.items() if key is not None}
+        full_name = str(normalized.get("full_name") or normalized.get("ho_ten") or normalized.get("name") or "").strip()
+        username = str(normalized.get("username") or normalized.get("ten_dang_nhap") or normalized.get("user_name") or "").strip()
+        email = str(normalized.get("email") or "").strip().lower()
+        phone = normalize_import_phone(normalized.get("phone") or normalized.get("dien_thoai") or normalized.get("sdt") or "")
+        raw_role_codes = normalized.get("role_codes") or normalized.get("role") or normalized.get("vai_tro") or "SALES_REP"
+        if not normalized or full_name.lower() in header_tokens or username.lower() in header_tokens or email.lower() in header_tokens:
+            continue
+
+        if isinstance(raw_role_codes, str):
+            role_codes = [part.strip() for part in raw_role_codes.replace(";", ",").split(",") if part.strip()]
+        elif isinstance(raw_role_codes, (list, tuple)):
+            role_codes = [str(part).strip() for part in raw_role_codes if str(part).strip()]
+        else:
+            role_codes = []
+        if not role_codes:
+            role_codes = ["SALES_REP"]
+
+        error = ""
+        duplicate = False
+        try:
+            user_data = UserCreate(
+                username=username,
+                full_name=full_name,
+                email=email,
+                phone=phone,
+                role_codes=role_codes,
+                status=AccountStatus.PENDING_ACTIVATION,
+            )
+            check_duplicate_user(db, username=username, email=email, phone=phone)
+            roles = resolve_roles(db, role_codes=user_data.role_codes, role=user_data.role)
+            warehouse_is_required = any(role.code.upper() in WAREHOUSE_ROLE_CODES for role in roles)
+            active_warehouse_exists = db.query(Warehouse).filter(Warehouse.is_active.is_(True)).first() is not None
+            if warehouse_is_required and active_warehouse_exists:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Người dùng thuộc vai trò kho phải được gắn với ít nhất một kho.",
+                )
+            row_keys = [f"username:{username.lower()}", f"email:{email.lower()}"]
+            if phone:
+                row_keys.append(f"phone:{phone}")
+            duplicate_line = next((seen[key] for key in row_keys if key in seen), None)
+            if duplicate_line is not None:
+                error = f"Trùng thông tin với dòng {duplicate_line}."
+                duplicate = True
+            else:
+                for key in row_keys:
+                    seen[key] = row_index
+        except HTTPException as exc:
+            error = str(exc.detail or "Dữ liệu không hợp lệ.")
+            duplicate = "tồn tại" in error.lower() or "đã tồn tại" in error.lower()
+        except ValidationError as exc:
+            field_labels = {"username": "Tên đăng nhập", "full_name": "Họ tên", "email": "Email", "phone": "Số điện thoại"}
+            messages = []
+            for item in exc.errors():
+                field = str(item["loc"][0]) if item.get("loc") else "dữ liệu"
+                label = field_labels.get(field, field)
+                if item.get("type") == "missing":
+                    messages.append(f"Thiếu {label.lower()}.")
+                elif field == "email":
+                    messages.append("Email không hợp lệ.")
+                else:
+                    messages.append(str(item.get("msg", "Dữ liệu không hợp lệ.")).replace("Value error, ", ""))
+            error = " ".join(messages)
+        except Exception as exc:
+            error = str(exc)
+
+        preview.append({
+            "row": row_index,
+            "full_name": full_name,
+            "username": username,
+            "email": email,
+            "phone": phone,
+            "role_codes": role_codes,
+            "valid": not error,
+            "duplicate": duplicate,
+            "error": error,
+        })
+
+    return preview
 
 
 def get_user_by_id(db: Session, user_id: int) -> User:

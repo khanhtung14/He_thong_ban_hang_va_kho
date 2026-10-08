@@ -1,8 +1,11 @@
 """FastAPI router for User Management (SCRUM-62)."""
 
+from io import BytesIO
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
 from sqlalchemy.orm import Session
 
 from src.backend.database import get_db
@@ -20,6 +23,7 @@ from src.backend.users_service import (
     get_user_by_id,
     list_users,
     parse_excel_rows,
+    preview_user_import_rows,
     update_user,
 )
 from src.backend.security import require_admin
@@ -64,6 +68,62 @@ def get_users(
     )
 
 
+@router.get("/import/template", dependencies=[Depends(require_admin)])
+@compat_router.get("/import/template", dependencies=[Depends(require_admin)])
+def download_user_import_template():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Users"
+    sheet.append(["Họ tên", "Tên đăng nhập", "Email", "Số điện thoại", "Vai trò"])
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = "A1:E1"
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="user_import_template.xlsx"'},
+    )
+
+
+async def read_user_import_file(file: UploadFile) -> list[dict]:
+    if not file.filename:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vui lòng đính kèm file Excel hoặc CSV.")
+    extension = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
+    if extension not in {"xlsx", "csv"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chỉ hỗ trợ file Excel (.xlsx) hoặc CSV.")
+    contents = await file.read(10 * 1024 * 1024 + 1)
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File tải lên vượt quá giới hạn 10 MB.")
+    if not contents:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File tải lên rỗng.")
+    try:
+        rows = parse_excel_rows(contents, file.filename)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Không đọc được file. Hãy dùng mẫu .xlsx hoặc CSV hợp lệ.") from exc
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File không chứa dữ liệu người dùng hợp lệ.")
+    return rows
+
+
+@router.post("/import/preview", dependencies=[Depends(require_admin)])
+@compat_router.post("/import/preview", dependencies=[Depends(require_admin)])
+async def preview_users_from_excel(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    rows = await read_user_import_file(file)
+    preview = preview_user_import_rows(db, rows)
+    return {
+        "total": len(preview),
+        "valid": sum(1 for row in preview if row["valid"]),
+        "errors": sum(1 for row in preview if not row["valid"]),
+        "duplicates": sum(1 for row in preview if row["duplicate"]),
+        "rows": preview,
+    }
+
+
 @router.post("/import", dependencies=[Depends(require_admin)])
 @compat_router.post("/import", dependencies=[Depends(require_admin)])
 async def import_users_from_excel(
@@ -72,22 +132,7 @@ async def import_users_from_excel(
     db: Session = Depends(get_db),
 ):
     """Import user records from an Excel or CSV file and create accounts in bulk."""
-    if not file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vui lòng đính kèm file Excel hoặc CSV.")
-
-    extension = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
-    allowed = {"xlsx", "xls", "csv"}
-    if extension not in allowed:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chỉ hỗ trợ file Excel (.xlsx, .xls) hoặc CSV.")
-
-    contents = await file.read()
-    if not contents:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File tải lên rỗng.")
-
-    rows = parse_excel_rows(contents, file.filename)
-    if not rows:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File không chứa dữ liệu người dùng hợp lệ.")
-
+    rows = await read_user_import_file(file)
     created_count, errors, duplicates_count = bulk_create_users_from_rows(db, rows, actor_user_id=x_actor_id)
     response = {
         "message": f"Đã xử lý {len(rows)} dòng trong file. Tạo mới {created_count} tài khoản.",

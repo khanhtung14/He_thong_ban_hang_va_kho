@@ -4,7 +4,7 @@ from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -259,3 +259,108 @@ def test_bulk_import_users_from_excel_creates_records_and_skips_duplicates():
         assert {user.username for user in session.query(models.User).all()} == {"nguyenvana", "tranthib"}
     finally:
         session.close()
+
+
+def test_admin_user_import_preview_reports_rows_without_creating_users():
+    from src.backend import models
+    from src.backend.database import get_db
+    from src.backend.users import router as users_router
+
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    models.Base.metadata.create_all(bind=engine)
+    TestingSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    app = FastAPI()
+    app.include_router(users_router)
+
+    def override_get_db():
+        session = TestingSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[require_admin] = lambda: SimpleNamespace(id=999, roles=[SimpleNamespace(code="ADMIN")])
+    content = (
+        "full_name,username,email,phone,role_codes\n"
+        "Valid User,valid_user,valid@example.com,0901234567,SALES_REP\n"
+        "Invalid User,invalid_user,not-an-email,0901234568,SALES_REP\n"
+        "Duplicate User,valid_user,duplicate@example.com,0901234569,SALES_REP\n"
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/admin/users/import/preview",
+            files={"file": ("users.csv", content, "text/csv")},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 3
+    assert payload["valid"] == 1
+    assert payload["errors"] == 2
+    assert payload["duplicates"] == 1
+    assert [row["valid"] for row in payload["rows"]] == [True, False, False]
+    assert "Email không hợp lệ" in payload["rows"][1]["error"]
+    with TestingSession() as session:
+        assert session.query(models.User).count() == 0
+
+
+def test_admin_user_import_template_downloads_valid_xlsx():
+    from src.backend.users import router as users_router
+
+    app = FastAPI()
+    app.include_router(users_router)
+    app.dependency_overrides[require_admin] = lambda: SimpleNamespace(id=999, roles=[SimpleNamespace(code="ADMIN")])
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/admin/users/import/template")
+
+    assert response.status_code == 200
+    assert "spreadsheetml.sheet" in response.headers["content-type"]
+    workbook = load_workbook(BytesIO(response.content), read_only=True, data_only=True)
+    assert list(workbook.active.iter_rows(values_only=True))[0] == ("Họ tên", "Tên đăng nhập", "Email", "Số điện thoại", "Vai trò")
+
+
+def test_admin_user_import_skips_invalid_rows_and_creates_valid_rows(monkeypatch):
+    from src.backend import models
+    from src.backend.database import get_db
+    from src.backend.users import router as users_router
+    from src.backend.email_service import email_service
+
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    models.Base.metadata.create_all(bind=engine)
+    TestingSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    app = FastAPI()
+    app.include_router(users_router)
+
+    def override_get_db():
+        session = TestingSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[require_admin] = lambda: SimpleNamespace(id=999, roles=[SimpleNamespace(code="ADMIN")])
+    monkeypatch.setattr(email_service, "send_activation_email", lambda **kwargs: True)
+    content = (
+        "full_name,username,email,phone,role_codes\n"
+        "Valid User,valid_user,valid@example.com,0901234567,SALES_REP\n"
+        "Invalid User,invalid_user,invalid-email,0901234568,SALES_REP\n"
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/admin/users/import",
+            files={"file": ("users.csv", content, "text/csv")},
+        )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["created"] == 1
+    assert result["skipped"] == 1
+    assert "Dòng 3" in result["errors"][0]
+    with TestingSession() as session:
+        assert session.query(models.User).count() == 1
+        assert session.query(models.User).filter_by(username="valid_user").one()
