@@ -291,6 +291,9 @@ class Customer(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # Relationship: danh sách đơn hàng của đại lý này
+    orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+
 
 class PriceList(Base):
     """A customer-segment price list; published versions are immutable."""
@@ -326,8 +329,6 @@ class PriceListItem(Base):
     sale_price: Mapped[int] = mapped_column(Integer, nullable=False)
     floor_price: Mapped[int] = mapped_column(Integer, nullable=False)
     price_list: Mapped[PriceList] = relationship(back_populates="items")
-
-    orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
 
 
 class Order(Base):

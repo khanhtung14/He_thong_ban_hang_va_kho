@@ -4,6 +4,8 @@
  * and FastAPI direct deployment (port 8000).
  */
 
+import { authenticatedFetch } from "./session";
+
 export interface UserProfile {
   username: string;
   email?: string;
@@ -100,8 +102,7 @@ export const getAuthHeaders = (): Record<string, string> => {
 };
 
 export const fetchProfile = async (): Promise<UserProfile> => {
-  const headers = getAuthHeaders();
-  const res = await fetch("/api/v1/profile", { headers });
+  const res = await authenticatedFetch("/api/v1/profile");
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Không thể tải thông tin tài khoản.");

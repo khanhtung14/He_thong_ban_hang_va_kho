@@ -29,38 +29,43 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{
     text: string;
     type: "success" | "error";
   } | null>(null);
 
+  const loadProfile = (silent = false) => {
+    if (!silent) setIsLoading(true);
+    setLoadError(null);
+    setStatusMsg(null);
+    setIsEditing(false);
+
+    fetchProfile()
+      .then((data: any) => {
+        setProfile(data);
+        form.setFieldsValue({
+          username: data?.username || "",
+          email: data?.email || "",
+          role: data?.role || "",
+          warehouse: data?.warehouse || "Kho Tổng",
+          area: data?.area || "Toàn quốc",
+          full_name: data?.full_name || "",
+          phone: data?.phone || "",
+        });
+      })
+      .catch((err: any) => {
+        const msg = err?.message || "Không thể tải dữ liệu hồ sơ cá nhân.";
+        setLoadError(msg);
+      })
+      .finally(() => setIsLoading(false));
+  };
+
   useEffect(() => {
     if (isOpen) {
-      setIsLoading(true);
-      setStatusMsg(null);
-      setIsEditing(false);
-
-      fetchProfile()
-        .then((data: any) => {
-          setProfile(data);
-          form.setFieldsValue({
-            username: data?.username || "",
-            email: data?.email || "",
-            role: data?.role || "",
-            warehouse: data?.warehouse || "Kho Tổng",
-            area: data?.area || "Toàn quốc",
-            full_name: data?.full_name || "",
-            phone: data?.phone || "",
-          });
-        })
-        .catch((err: any) => {
-          setStatusMsg({
-            text: err.message || "Không thể tải dữ liệu hồ sơ cá nhân.",
-            type: "error",
-          });
-        })
-        .finally(() => setIsLoading(false));
+      loadProfile();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, form]);
 
   const handleSubmit = async (values: any) => {
@@ -347,13 +352,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
             )}
           </Form>
-        ) : (
-          <Alert
-            message="Chưa có thông tin tài khoản hoặc phiên làm việc đã hết hạn."
-            type="warning"
-            showIcon
-          />
-        )}
+        ) : loadError ? (
+          <div style={{ padding: "32px 0", textAlign: "center" }}>
+            <Alert
+              message={loadError}
+              description="Phiên làm việc có thể đã hết hạn hoặc mạng không ổn định."
+              type="error"
+              showIcon
+              style={{ marginBottom: 16, borderRadius: 8, textAlign: "left" }}
+            />
+            <Button
+              type="primary"
+              onClick={() => loadProfile()}
+              style={{ borderRadius: 6, backgroundColor: "#2563eb" }}
+            >
+              Thử tải lại
+            </Button>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

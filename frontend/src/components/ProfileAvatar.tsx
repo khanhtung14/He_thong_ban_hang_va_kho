@@ -56,31 +56,13 @@ export default function ProfileAvatar({
   useEffect(() => {
     let disposed = false;
 
-    async function loadInitials() {
-      try {
-        const response = await authenticatedFetch("/api/v1/profile");
-        if (!response.ok) return;
-        const profile = (await response.json()) as { full_name?: string };
-        const nextInitials = (profile.full_name ?? "")
-          .trim()
-          .split(/\s+/)
-          .filter(Boolean)
-          .slice(-2)
-          .map((part: string) => part[0])
-          .join("")
-          .toUpperCase();
-        if (!disposed && nextInitials) setFallbackInitials(nextInitials);
-      } catch {
-        /* Giữ nguyên initials mặc định khi endpoint chưa sẵn sàng */
-      }
-    }
-
     async function loadAvatar() {
       try {
-        const response = await authenticatedFetch("/profile/avatar", {
+        // Bước 1: Lấy profile để có avatar_url hiện tại
+        const profileRes = await authenticatedFetch("/api/v1/profile", {
           cache: "no-store",
         });
-        if (!response.ok) {
+        if (!profileRes.ok) {
           if (!disposed) {
             if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
             avatarUrlRef.current = "";
@@ -88,7 +70,43 @@ export default function ProfileAvatar({
           }
           return;
         }
-        const nextUrl = URL.createObjectURL(await response.blob());
+        const profile = (await profileRes.json()) as { avatar_url?: string; full_name?: string };
+
+        // Cập nhật initials từ full_name
+        if (profile.full_name) {
+          const nextInitials = profile.full_name
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(-2)
+            .map((part: string) => part[0])
+            .join("")
+            .toUpperCase();
+          if (!disposed && nextInitials) setFallbackInitials(nextInitials);
+        }
+
+        // Bước 2: Nếu có avatar_url, tải binary qua authenticatedFetch
+        if (!profile.avatar_url) {
+          if (!disposed) {
+            if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
+            avatarUrlRef.current = "";
+            setAvatarUrl("");
+          }
+          return;
+        }
+
+        const imgRes = await authenticatedFetch(profile.avatar_url, {
+          cache: "no-store",
+        });
+        if (!imgRes.ok) {
+          if (!disposed) {
+            if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
+            avatarUrlRef.current = "";
+            setAvatarUrl("");
+          }
+          return;
+        }
+        const nextUrl = URL.createObjectURL(await imgRes.blob());
         if (disposed) {
           URL.revokeObjectURL(nextUrl);
           return;
@@ -103,10 +121,8 @@ export default function ProfileAvatar({
 
     const handleAvatarUpdated = () => {
       void loadAvatar();
-      void loadInitials();
     };
 
-    void loadInitials();
     void loadAvatar();
     window.addEventListener(AVATAR_UPDATED_EVENT, handleAvatarUpdated);
 
@@ -170,7 +186,7 @@ export default function ProfileAvatar({
     try {
       const body = new FormData();
       body.append("file", selectedFile);
-      const response = await authenticatedFetch("/profile/avatar", {
+      const response = await authenticatedFetch("/api/v1/profile/avatar", {
         method: "POST",
         body,
       });
