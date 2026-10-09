@@ -69,6 +69,7 @@ PERM_INVENTORY_RECEIVE = "inventory:receive"
 PERM_INVENTORY_PICK = "inventory:pick"
 
 PERM_PRODUCTS_VIEW = "products:view"
+PERM_PRODUCTS_UNIT_MANAGE = "products:unit_manage"
 PERM_PRODUCTS_VIEW_FINANCIALS = "products:view_financials"  # Cost price & Margin
 
 PERM_ORDERS_CREATE = "orders:create"
@@ -116,6 +117,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     },
     RoleCode.WAREHOUSE.value: {
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_UNIT_MANAGE,
         PERM_INVENTORY_VIEW,
         PERM_INVENTORY_PICK,
         PERM_INVENTORY_RECEIVE,
@@ -125,6 +127,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     },
     RoleCode.WH_MANAGER.value: {
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_UNIT_MANAGE,
         PERM_INVENTORY_VIEW,
         PERM_INVENTORY_PICK,
         PERM_INVENTORY_RECEIVE,
@@ -145,6 +148,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     RoleCode.ADMIN.value: {
         PERM_SYSTEM_ADMIN,
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_UNIT_MANAGE,
         PERM_INVENTORY_VIEW,
         PERM_INVENTORY_ADJUST,
         PERM_INVENTORY_TRANSFER,
