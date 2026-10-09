@@ -79,3 +79,14 @@ minutes. The public response never contains the reset link.
 | `demo_locked` | `locked@example.com` |
 
 These addresses are stored in the `users` table and `database/demo_login_users.json`. Run `scripts/seed_demo_data.py` to refresh the demo database and regenerate the fixture.
+
+## Sales manager demo records
+
+Running `scripts/seed_demo_data.py` also seeds the business records used by the Sales Manager workspace. The operation is repeatable and updates rows with the reserved `DEMO-` codes:
+
+- Three demo customers assigned to dealer level 1, dealer level 2, and retail groups.
+- One published, currently effective price list per customer group, each with sample prices for `SKU-001` and `SKU-002`.
+- A completed order for the sales report, an order waiting for below-floor approval, and an order being processed.
+- Each order line links to the applicable price list and stores the floor price used when the order was created.
+
+The sales margin report reads eligible orders from the database for the current month. Inventory remains served by the existing in-memory demo catalog because this project does not currently define an inventory ORM table.

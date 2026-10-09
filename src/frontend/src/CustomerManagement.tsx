@@ -5,6 +5,7 @@ export interface CustomerItem {
   id: number;
   code: string;
   name: string;
+  customer_group?: string;
   sales_rep_id?: number | null;
   territory_id?: number | null;
   is_active: boolean;

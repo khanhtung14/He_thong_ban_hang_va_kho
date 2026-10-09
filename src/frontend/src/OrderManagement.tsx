@@ -138,7 +138,7 @@ export default function OrderManagement({ onNewOrderClick }: OrderManagementProp
 
       {/* Table */}
       <div className="workspace-table-wrap">
-        <table className="workspace-table">
+        <table className="workspace-table order-management-table">
           <thead>
             <tr>
               <th>Mã đơn</th>
@@ -152,13 +152,13 @@ export default function OrderManagement({ onNewOrderClick }: OrderManagementProp
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "#6b7280" }}>
+                <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "#374151", fontSize: 14, fontWeight: 600 }}>
                   Đang tải đơn hàng...
                 </td>
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "#6b7280" }}>
+                <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "#374151", fontSize: 14, fontWeight: 600 }}>
                   Không có đơn hàng nào.
                 </td>
               </tr>
@@ -188,7 +188,7 @@ export default function OrderManagement({ onNewOrderClick }: OrderManagementProp
                         style={{
                           padding: "3px 8px",
                           borderRadius: 999,
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: 700,
                           backgroundColor: tone.bg,
                           color: tone.color,
@@ -206,7 +206,7 @@ export default function OrderManagement({ onNewOrderClick }: OrderManagementProp
                             gap: 5,
                             padding: "3px 8px",
                             borderRadius: 6,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: 700,
                             backgroundColor: "#fee2e2",
                             color: "#b91c1c",
@@ -217,13 +217,14 @@ export default function OrderManagement({ onNewOrderClick }: OrderManagementProp
                           ⚠️ ĐẠI LÝ BỊ KHÓA
                         </span>
                       ) : (
-                        <span style={{ color: "#9ca3af", fontSize: 12 }}>—</span>
+                        <span style={{ color: "#4b5563", fontSize: 14 }}>—</span>
                       )}
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <button
                         type="button"
                         className="workspace-link-button"
+                        style={{ fontSize: 14, fontWeight: 700, color: "#1d4ed8" }}
                         onClick={() => setSelectedOrder(ord)}
                       >
                         Xem chi tiết →

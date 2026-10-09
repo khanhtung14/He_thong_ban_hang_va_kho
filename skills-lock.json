@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "memory": {
+      "source": "google-gemini/gemini-cli",
+      "sourceType": "github",
+      "skillPath": "tools/gemini-cli-bot/.gemini/skills/memory/SKILL.md",
+      "computedHash": "74659f4daed360e710885bd2d616dded2bc58d0a41d34a50beebfde9ce1d06ac"
+    }
+  }
+}

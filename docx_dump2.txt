@@ -1,0 +1,101 @@
+{   "success": true,   "code": 200,   "message": "Thao tác thành công",   "data": { ... },   "pagination": {     "page": 1,     "limit": 20,     "totalRecords": 150,     "totalPages": 8   } }
+
+{   "success": false,   "code": 422,   "error": "VALIDATION_FAILED",   "message": "Dữ liệu gửi lên không hợp lệ",   "details": [     { "field": "sku", "message": "Mã SKU đã tồn tại trong hệ thống" },     { "field": "price", "message": "Giá bán không được nhỏ hơn giá sàn" }   ] }
+
+Method	Endpoint	Chức năng (Story ID)	Roles	Request Parameters / Body	Response Data
+POST	/auth/login	Đăng nhập (S1-01)	Public	{ username, password }	{ accessToken, refreshToken, expiresIn, user }
+POST	/auth/refresh-token	Gia hạn Token (S1-02)	Public	{ refreshToken }	{ accessToken, refreshToken, expiresIn }
+POST	/auth/logout	Đăng xuất (S1-02)	All Staff	{ refreshToken }	{ success: true }
+POST	/auth/forgot-password	Quên mật khẩu (S1-03)	Public	{ email }	{ message: 'Đã gửi mail xác nhận' }
+POST	/auth/reset-password	Đặt lại MK (S1-03)	Public	{ token, newPassword }	{ success: true }
+POST	/auth/change-password	Đổi MK (S1-04)	All Staff	{ currentPassword, newPassword }	{ success: true }
+GET	/users/me	Hồ sơ cá nhân (S1-06, S2-02)	All Staff	-	{ id, username, fullName, roles, permissions, menus }
+PUT	/users/me	Sửa hồ sơ (S2-02)	All Staff	{ fullName, phone }	{ id, fullName, phone }
+POST	/users/me/avatar	Tải ảnh đại diện (S2-03)	All Staff	multipart/form-data: file (<=2MB)	{ avatarUrl }
+GET	/admin/users	Danh sách User (S1-08)	Admin	?page&limit&keyword&role&status	Mảng User kèm vai trò, phòng ban
+POST	/admin/users	Tạo tài khoản (S1-08, S1-09)	Admin	{ username, email, fullName, roleIds, warehouseIds }	User mới (gửi mail MK tạm)
+PUT	/admin/users/{id}	Sửa tài khoản (S1-09)	Admin	{ fullName, phone, roleIds, warehouseIds }	User đã cập nhật
+PATCH	/admin/users/{id}/status	Khóa / Mở TK (S1-10)	Admin	{ status: 'ACTIVE' | 'LOCKED' }	{ id, status }
+POST	/admin/users/import-excel	Nhập User Excel (S2-01)	Admin	multipart/form-data: file Excel	{ totalRows, successCount, failedRows }
+GET	/admin/audit-logs	Nhật ký hệ thống (S2-04)	Admin	?page&limit&module&action&userId	Danh sách Audit Logs
+
+Method	Endpoint	Chức năng (Story ID)	Roles	Request Parameters / Body	Response Data
+GET	/categories/tree	Cây nhóm hàng 3 cấp (S2-06)	All Staff	-	Mảng cây nhóm hàng [{ id, name, children }]
+POST	/categories	Thêm nhóm hàng (S2-06)	Sales Mgr	{ code, name, parentId, description }	Nhóm hàng mới
+GET	/products	Danh sách SKU (S2-05)	All, Customer	?page&limit&keyword&categoryId&status	Mảng SKU, ĐVT, tồn kho cơ sở
+POST	/products	Thêm SKU (S2-05)	Sales Mgr	{ sku, name, categoryId, baseUnit, manageByLot, minStock }	Sản phẩm mới
+GET	/products/{id}	Chi tiết SKU & ĐVT (S2-07)	All Staff	Path: {id}	Chi tiết SKU + mảng units quy đổi
+PUT	/products/{id}/units	Bảng quy đổi ĐVT (S2-07)	Sales Mgr	{ units: [{ unitName, conversionRate, barcode }] }	Mảng đơn vị quy đổi đã lưu
+POST	/products/import-excel	Nhập SKU từ Excel (S2-08)	Sales Mgr	multipart/form-data: file Excel	Báo cáo import (thành công/dòng lỗi)
+GET	/price-lists	Bảng giá nhóm KH (S2-10)	Sales Mgr, Rep	?customerGroupId&effectiveDate	Danh sách bảng giá hiệu lực
+POST	/price-lists	Thiết lập bảng giá (S2-10)	Sales Mgr	{ name, customerGroupId, startDate, endDate, items }	Bảng giá mới (kèm giá sàn)
+POST	/discount-policies	Chiết khấu sản lượng (S3-01)	Sales Mgr	{ name, scope, targetId, tiers: [{ minQty, discountPercent }] }	Chính sách chiết khấu bậc thang
+GET	/products/{id}/price-history	Lịch sử biến động giá (S3-02)	Sales Mgr	?productId&fromDate&toDate	Mảng [{ changedAt, oldPrice, newPrice, user }]
+
+Method	Endpoint	Chức năng (Story ID)	Roles	Request Parameters / Body	Response Data
+GET	/customers	Tìm kiếm & lọc đại lý (S3-08)	Sales, Acct	?page&limit&keyword&regionId&customerGroupId	Mảng khách hàng, doanh số, nợ hiện tại
+POST	/customers	Thêm hồ sơ đại lý (S3-03)	Acct, Sales Mgr	{ code, name, taxCode, phone, customerGroupId, regionId }	Hồ sơ đại lý mới
+GET	/customers/{id}	Chi tiết hồ sơ đại lý (S3-03)	All Staff	Path: {id}	Chi tiết hồ sơ, hạn mức, NVKD quản lý
+GET	/customers/{id}/delivery-addresses	Danh sách điểm giao (S3-04)	All Staff	Path: {id}	Danh sách địa chỉ giao hàng
+POST	/customers/{id}/delivery-addresses	Thêm điểm giao hàng (S3-04)	Sales Rep	{ receiverName, phone, address, isDefault }	Địa chỉ giao hàng mới
+PUT	/customers/{id}/credit-limit	Hạn mức & ngày nợ (S3-05)	Accountant	{ creditLimit, maxDueDays, warningThresholdPercent }	Hạn mức nợ mới đã duyệt
+PATCH	/customers/{id}/assign-sales-rep	Phân công NVKD (S3-06)	Sales Mgr	{ salesRepId }	Thông tin phân công phụ trách
+PATCH	/customers/{id}/transaction-status	Khóa / Chặn đặt hàng (S3-07)	Accountant	{ status: 'ACTIVE' | 'LOCKED_FOR_DEBT', reason }	Trạng thái giao dịch mới
+
+Method	Endpoint	Chức năng (Story ID)	Roles	Request Parameters / Body	Response Data
+POST	/orders/simulate	Tính nhẩm đơn & nợ (S4-01..03)	Sales Rep, Cust	{ customerId, warehouseId, items }	Tổng tiền, CK, tồn khả dụng, cảnh báo vượt hạn mức/sàn
+GET	/customers/{id}/purchase-history	Hàng mua 3 tháng (S4-04)	Sales Rep	?page&limit&months=3	Mảng SKU từng mua, ngày mua, đơn giá cũ
+GET	/orders	Danh sách đơn hàng (S4-07)	All Staff	?page&limit&status&customerId&fromDate&toDate	Danh sách đơn hàng, tiến trình
+POST	/orders	Tạo đơn hàng mới (S3-09, S4-10)	Sales Rep, Cust	{ customerId, warehouseId, items: [{ productId, unitId, qty }] }	Đơn hàng mới (DRAFT / PENDING_APPROVAL)
+GET	/orders/{id}	Chi tiết đơn hàng (S4-06)	All Staff	Path: {id}	Chi tiết đơn, dòng hàng, tổng tiền, lịch sử duyệt
+PATCH	/orders/{id}/submit	Gửi duyệt đơn hàng (S4-06)	Sales Rep	-	Trạng thái PENDING_APPROVAL / APPROVED
+POST	/orders/{id}/approve	Duyệt đơn ngoại lệ (S4-05)	Sales Mgr	{ note, overrideReason }	Đơn sang APPROVED, giữ chỗ tồn kho
+POST	/orders/{id}/reject	Từ chối duyệt đơn (S4-05)	Sales Mgr	{ rejectReason }	Đơn sang REJECTED
+PATCH	/orders/{id}/cancel	Hủy đơn hàng (S4-06)	Sales, Cust	{ cancelReason }	Đơn sang CANCELLED, giải phóng giữ chỗ
+POST	/orders/{id}/clone	Sao chép đơn cũ (S4-09, S5-02)	Sales Rep, Cust	-	Bản nháp đơn mới tự tính lại giá hiện hành
+GET	/orders/{id}/print-pdf	In phiếu đơn hàng (S4-08)	Sales, Cust	Path: {id}	File PDF stream
+
+Method	Endpoint	Chức năng (Story ID)	Roles	Request Parameters / Body	Response Data
+GET/POST	/suppliers	Danh mục nhà cung cấp (S2-09)	WH Mgr, WH	Body: { code, name, taxCode, phone, address }	Danh mục nhà cung cấp
+GET/POST	/warehouses	Danh mục kho & vị trí (S5-03)	WH Manager	Body: { code, name, address, managerId, locations }	Danh mục kho bãi
+GET	/inventory	Sổ tồn kho 3 cột (S5-05)	WH, Sales Rep	?warehouseId&categoryId&keyword	{ sku, name, physicalQty, reservedQty, availableQty }
+GET	/inventory/alerts	Cảnh báo dưới tồn min (S5-09)	WH Mgr, Sales	?warehouseId	Mảng SKU chạm ngưỡng tồn an toàn
+GET	/inventory/stock-cards	Sổ thẻ kho truy nguyên (S6-02)	WH, Accountant	?productId&warehouseId&fromDate&toDate	Biến động thẻ kho: Nhập, Xuất, Tồn cuối
+GET	/inventory/lots	Quản lý Lô & HSD (S6-01)	WH, WH Mgr	?productId&warehouseId&isExpired	Mảng [{ lotNumber, mfgDate, expDate, quantity }]
+POST	/warehouse/receipts	Phiếu nhập kho NCC (S5-04)	WH, WH Mgr	{ supplierId, warehouseId, receiptDate, items }	Phiếu nhập kho (Tăng tồn thực tế)
+POST	/warehouse/transfers	Phiếu chuyển kho (S5-07)	WH, WH Mgr	{ fromWarehouseId, toWarehouseId, transferDate, items }	Phiếu chuyển kho (Trạng thái đang luân chuyển)
+PATCH	/warehouse/transfers/{id}/receive	Nhận hàng chuyển kho (S5-07)	Warehouse	-	Hoàn tất chuyển kho, tăng tồn kho đích
+POST	/warehouse/audits	Phiếu kiểm kê kho (S5-08)	WH Manager	{ warehouseId, auditDate, items: [{ systemQty, actualQty }] }	Phiếu kiểm kê kèm chênh lệch
+POST	/warehouse/audits/{id}/approve	Chốt cân bằng kho (S5-08)	WH Manager	-	Cân bằng sổ tồn kho theo thực tế kiểm kê
+GET	/inventory/export-excel	Xuất tồn kho ra Excel (S8-08)	WH Mgr, Acct	?warehouseId&categoryId	File Excel sổ tồn
+
+Method	Endpoint	Chức năng (Story ID)	Roles	Request Parameters / Body	Response Data
+POST	/warehouse/pick-lists	Lập phiếu soạn hàng (S6-03)	Warehouse	{ orderId }	Phiếu soạn hàng tối ưu đường đi
+GET	/warehouse/pick-lists/{id}/suggest-lots	Gợi ý xuất lô FEFO (S6-04)	Warehouse	Path: {id}	Gợi ý chọn lô cận hạn nhất trước
+POST	/warehouse/dispatches	Xác nhận xuất kho (S6-05)	Warehouse	{ orderId, pickListId, items: [{ lotNumber, actualQty }] }	Phiếu xuất kho (Tồn giữ chỗ -> Xuất thực)
+POST	/deliveries/trips	Gom chuyến xe giao (S6-06)	WH Manager	{ driverName, vehicleNumber, dispatchIds, routeName }	Chuyến xe giao hàng
+GET	/deliveries/trips/active	Tiến độ chuyến giao (S6-07)	WH Mgr, Sales	-	Danh sách xe đang chạy, số điểm đã giao
+POST	/deliveries/{dispatchId}/confirm-pod	Xác nhận POD thành công (S6-08)	Warehouse, Rep	multipart/form-data: { receiverName, proofImages }	Xác nhận giao thành công (Đủ điều kiện xuất HĐ)
+GET	/deliveries/track/{orderId}	Tra cứu mốc giao hàng (S6-09)	Cust, Sales Rep	Path: {orderId}	Timeline: Chờ duyệt -> Soạn -> Đang giao -> Đã nhận
+
+Method	Endpoint	Chức năng (Story ID)	Roles	Request Parameters / Body	Response Data
+POST	/invoices/from-dispatch	Phát hành HĐ từ xuất (S7-01)	Accountant	{ dispatchId, invoiceDate, paymentTermDays }	Hóa đơn bán hàng theo số lượng thực giao
+GET	/invoices	Danh sách hóa đơn (S7-01)	Acct, Sales Rep	?customerId&status&fromDate&toDate	Mảng HĐ: Chưa TT, TT một phần, Đã TT
+POST	/payments	Ghi nhận thanh toán (S7-02, 05)	Accountant, Rep	{ customerId, amount, paymentMethod, invoiceIds }	Phiếu thu tiền + kết quả gạch trừ nợ
+GET	/debts/aging	Báo cáo phân tích tuổi nợ (S7-03)	Acct, Sales Mgr	?page&limit&regionId&agingBucket	Bảng tuổi nợ: 0-30, 31-60, 61-90, >90 ngày
+GET	/customers/{id}/debts	Sổ nợ chi tiết đại lý (S7-07)	Customer, Sales	Path: {id}	Dư đầu kỳ, phát sinh tăng giảm, hạn nợ
+POST	/debts/reconciliation	Biên bản đối chiếu nợ (S7-06)	Accountant	{ customerId, startDate, endDate }	Bảng đối chiếu công nợ định kỳ
+POST	/debts/send-reminder	Gửi email nhắc nợ (S7-08)	System, Acct	{ customerId, invoiceId }	Kết quả gửi thông báo nhắc nợ trước 3 ngày
+GET	/payments/{id}/receipt-pdf	In phiếu thu tiền (S7-09)	Acct, Sales Rep	Path: {id}	File PDF phiếu thu tiền
+GET	/debts/{customerId}/export-excel	Xuất sổ nợ chi tiết (S8-10)	Accountant	?customerId&fromDate&toDate	File Excel sao kê công nợ
+
+Method	Endpoint	Chức năng (Story ID)	Roles	Request Parameters / Body	Response Data
+POST	/returns	Lập phiếu trả hàng (S8-01)	Sales, Warehouse	{ invoiceId, warehouseId, reason, items }	Phiếu trả hàng (Chờ kiểm nhập)
+POST	/returns/{id}/credit-note	Chứng từ giảm trừ nợ (S8-02)	Accountant	{ returnId, note }	Credit Note trừ vào công nợ đại lý
+POST	/inventory/adjustments	Điều chỉnh hàng hỏng/hạn (S8-03)	WH Manager	{ warehouseId, reason, items: [{ lotNumber, adjustQty }] }	Phiếu điều chỉnh tồn kho
+POST	/reports/sales-targets	Giao KPI doanh số (S8-04)	Sales Manager	{ salesRepId, month, year, targetAmount }	KPI doanh số nhân viên
+GET	/dashboard/overview	Dashboard điều hành (S8-05)	Sales Mgr, Admin	?period=today | this_month	Thống kê: Doanh thu, đơn duyệt, cảnh báo tồn, nợ xấu
+GET	/reports/sales	Báo cáo doanh số đa chiều (S8-06)	Sales Manager	?groupBy=sales_rep|region|customer&fromDate&toDate	Ma trận doanh thu đa tiêu chí
+GET	/reports/inventory-turnover	Vòng quay tồn kho (S8-07)	WH Manager	?warehouseId&categoryId	Hệ số quay vòng tồn kho, ngày tồn bình quân
+GET	/reports/debt-overdue	Báo cáo nợ quá hạn (S8-09)	Acct, Sales Mgr	?salesRepId&regionId	Danh sách nợ xấu quá hạn theo tuyến
+

@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
-import Login from "./auth/Login";
-import ForgotPassword from "./auth/ForgotPassword";
-import CreateUser from "./roles/admin/CreateUser";
+import Login from "./features/auth/Login";
+import ForgotPassword from "./features/auth/ForgotPassword";
+import ResetPassword from "./features/auth/ResetPassword";
+import ChangePassword from "./features/auth/ChangePassword";
+import CreateUser from "./features/users/CreateUser";
+import Profile from "./features/profile/Profile";
 import Navigation from "./Navigation";
-import RoleWorkspace from "./RoleWorkspace";
+import RoleWorkspace from "./features/roles/RoleWorkspace";
 import Error403 from "./Error403";
-import { hasValidSession, getCurrentUserRole } from "./session";
+import {
+  hasValidSession,
+  getCurrentUserRole,
+} from "./services/sessionService";
 
 const roleWorkspacePaths = [
   "/portal/orders",
@@ -41,55 +47,57 @@ export default function App() {
     document.title = "Quản trị tài khoản | OMS";
   }
 
-  // 1. Tuyến đường công khai (không cần xác thực)
+  // 1. Public routes (accessible without login)
   if (currentPath === "/login") {
     return <Login />;
   }
   if (currentPath === "/forgot-password") {
     return <ForgotPassword />;
   }
+  if (currentPath === "/reset-password") {
+    return <ResetPassword />;
+  }
   if (currentPath === "/errors/403") {
     return <Error403 />;
   }
 
-  // 2. Kiểm tra xác thực phiên đăng nhập
+  // 2. Unauthenticated check:
+  // If not logged in (no token / valid session / valid role), MUST display Login screen.
+  // Never hardcode SalesManagerDashboard on root (/) or protected routes.
   if (!isAuthenticated || !userRole) {
     return <Login />;
   }
 
-  // 3. Quản trị viên: Tạo tài khoản nhân sự mới
+  // 3. Authenticated: on root (/) or /workspace, render user's role workspace
+  if (currentPath === "/" || currentPath === "/workspace") {
+    return <RoleWorkspace />;
+  }
+
+  // 4. Admin create user route
   if (currentPath === "/admin/users/create") {
-    const normalized = (userRole ?? "")
-      .trim()
-      .toUpperCase()
-      .replace(/[ -]/g, "_");
+    const normalized = (userRole ?? "").trim().toUpperCase().replace(/[ -]/g, "_");
     if (["ADMIN", "ADMINISTRATOR"].includes(normalized)) {
       return <CreateUser />;
     }
     return <Error403 />;
   }
 
-  // 4. Menu điều hướng hệ thống (Navigation testing)
+  // 5. User settings / common routes
+  if (currentPath === "/change-password") {
+    return <ChangePassword />;
+  }
+  if (currentPath === "/profile") {
+    return <Profile />;
+  }
   if (currentPath === "/navigation" || currentPath === "/navigation-ui") {
     return <Navigation />;
   }
 
-  // 5. Tuyến đường xem hồ sơ / đổi mật khẩu:
-  // Vì đã tích hợp Modal trên Header nên đưa thẳng người dùng vào không gian làm việc
-  if (currentPath === "/change-password" || currentPath === "/profile") {
+  // 6. Role workspace routes (e.g. /manager/dashboard, /sales/orders, etc.)
+  if (roleWorkspacePaths.includes(currentPath) || currentPath.startsWith("/admin/")) {
     return <RoleWorkspace />;
   }
 
-  // 6. Mặc định render RoleWorkspace cho trang chủ và các phân hệ chức năng
-  if (
-    currentPath === "/" ||
-    currentPath === "/workspace" ||
-    roleWorkspacePaths.includes(currentPath) ||
-    currentPath.startsWith("/admin/")
-  ) {
-    return <RoleWorkspace />;
-  }
-
-  // Fallback an toàn cho người dùng đã đăng nhập
+  // Fallback for any other route when authenticated
   return <RoleWorkspace />;
 }

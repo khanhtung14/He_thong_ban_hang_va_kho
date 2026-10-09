@@ -107,6 +107,10 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
 .workspace-table tbody tr:hover { background: #fbfcfe; }
 .workspace-table td strong { color: #3b4960; font-weight: 660; }
 .workspace-table td > small { display: block; }
+.workspace-table.order-management-table { color: #1f2937; font-size: 14px; }
+.workspace-table.order-management-table th { color: #334155; font-size: 12px; font-weight: 800; letter-spacing: .035em; }
+.workspace-table.order-management-table td { color: #1f2937; font-size: 14px; }
+.workspace-table.order-management-table td strong { color: #111827; font-weight: 700; }
 .workspace-cell-subtitle { margin-top: 4px; color: #9ba4b3; font-size: 9px; }
 .workspace-link-text { color: #416ecd !important; }
 .workspace-product-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
@@ -469,3 +473,81 @@ body { margin: 0; background: #f5f7fb; color: #1b263b; font-family: Inter, ui-sa
   .workspace-edit-user-form .workspace-modal-actions { grid-column: 1; }
   .workspace-pagination { align-items: flex-start; flex-direction: column; }
 }
+
+/* Admin reuses the same Tailwind shell as the Sales Manager workspace. */
+.role-workspace.is-admin.admin-tailwind-shell {
+  display: flex;
+  min-height: 100vh;
+  padding-top: 0;
+  color: #1e293b;
+  background: #f8fafc;
+  font-size: 14px;
+}
+.role-workspace.is-admin.admin-tailwind-shell .workspace-main-column {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  min-height: 100vh;
+  margin: 0;
+}
+.role-workspace.is-admin .workspace-content.admin-tailwind-content {
+  width: min(100%, 1480px);
+  max-width: 1480px;
+  min-height: calc(100vh - 64px);
+  margin: 0 auto;
+  padding: 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+@media (max-width: 720px) {
+  .role-workspace.is-admin .workspace-content.admin-tailwind-content {
+    padding: 20px 14px;
+  }
+}
+
+/* Increase Admin workspace typography by one pixel while keeping the shared shell unchanged. */
+.role-workspace.is-admin .admin-tailwind-content { font-size: 15px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-page-heading h2 { font-size: 23px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-page-heading p,
+.role-workspace.is-admin .admin-tailwind-content .workspace-welcome-copy p { font-size: 14px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-welcome-copy > span { font-size: 11px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-welcome-copy h2 { font-size: 22px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-button,
+.role-workspace.is-admin .admin-tailwind-content .workspace-prototype,
+.role-workspace.is-admin .admin-tailwind-content .workspace-data-source,
+.role-workspace.is-admin .admin-tailwind-content .workspace-link-button { font-size: 12px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-metric-label,
+.role-workspace.is-admin .admin-tailwind-content .workspace-metric-change { font-size: 11px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-metric-value { font-size: clamp(18px, 1.7vw, 23px); }
+.role-workspace.is-admin .admin-tailwind-content .workspace-panel-heading h3,
+.role-workspace.is-admin .admin-tailwind-content .workspace-section-heading h3 { font-size: 14px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-table { font-size: 13px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-table th { font-size: 11px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-table td { font-size: 12px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-cell-subtitle { font-size: 12px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-status { font-size: 11px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-admin-tools input,
+.role-workspace.is-admin .admin-tailwind-content .workspace-admin-tools select,
+.role-workspace.is-admin .admin-tailwind-content .workspace-pagination,
+.role-workspace.is-admin .admin-tailwind-content .workspace-pagination button { font-size: 13px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-row-actions button { font-size: 12px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-audit-summary strong,
+.role-workspace.is-admin .admin-tailwind-content .workspace-role-summary strong { font-size: 12px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-audit-summary small,
+.role-workspace.is-admin .admin-tailwind-content .workspace-role-summary small,
+.role-workspace.is-admin .admin-tailwind-content .workspace-configuration-grid small,
+.role-workspace.is-admin .admin-tailwind-content .workspace-configuration-grid p,
+.role-workspace.is-admin .admin-tailwind-content .workspace-footer { font-size: 11px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-assignment-group legend { font-size: 13px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-assignment-summary,
+.role-workspace.is-admin .admin-tailwind-content .workspace-assignment-trigger::after { font-size: 12px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-modal > p,
+.role-workspace.is-admin .admin-tailwind-content .workspace-modal form label,
+.role-workspace.is-admin .admin-tailwind-content .workspace-modal textarea,
+.role-workspace.is-admin .admin-tailwind-content .workspace-modal input,
+.role-workspace.is-admin .admin-tailwind-content .workspace-modal select,
+.role-workspace.is-admin .admin-tailwind-content .workspace-modal .workspace-assignment-summary,
+.role-workspace.is-admin .admin-tailwind-content .workspace-modal .workspace-check-option { font-size: 13px; }
+.role-workspace.is-admin .admin-tailwind-content .workspace-empty,
+.role-workspace.is-admin .admin-tailwind-content .workspace-loading { font-size: 14px; }
