@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { authenticatedFetch } from "./session";
+import { authenticatedFetch } from "services/sessionService";
 import "./CreateUser.css";
 
 type RoleOption = {

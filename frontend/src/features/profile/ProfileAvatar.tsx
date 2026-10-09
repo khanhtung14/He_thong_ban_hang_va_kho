@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { authenticatedFetch } from "./session";
+import { authenticatedFetch } from "services/sessionService";
 import "./ProfileAvatar.css";
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;

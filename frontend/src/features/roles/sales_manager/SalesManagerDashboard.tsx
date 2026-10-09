@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useCallback } from "react";
-import HeaderTailwind from "../../components/Header/HeaderTailwind";
-import SidebarTailwind from "../../components/Sidebar/SidebarTailwind";
-import StatCard from "../../components/StatCard";
+import HeaderTailwind from "../../../components/Header/HeaderTailwind";
+import SidebarTailwind from "../../../components/Sidebar/SidebarTailwind";
+import StatCard from "../../../components/StatCard";
 import ApprovalList, { type ApprovalItem } from "./ApprovalList";
 import TerritoryProgress from "./TerritoryProgress";
 import CreatePriceListModal from "./CreatePriceListModal";
 import ExportReportModal from "./ExportReportModal";
-import { logout } from "../../session";
+import { logout } from "services/sessionService";
 import {
   fetchProfile,
   fetchSalesMarginReport,
@@ -16,7 +16,7 @@ import {
   type UserProfile,
   type SalesMarginReport,
   type PriceListItem,
-} from "../../api";
+} from "services/apiClient";
 
 export const SalesManagerDashboard: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -74,8 +74,8 @@ export const SalesManagerDashboard: React.FC = () => {
 
         // Derive draft price lists requiring manager publish
         const draftItems: ApprovalItem[] = lists
-          .filter((p) => !p.published)
-          .map((draft) => ({
+          .filter((p: any) => !p.published)
+          .map((draft: any) => ({
             id: `pl-${draft.id}`,
             type: "price_list",
             typeLabel: "BG",
@@ -199,7 +199,7 @@ export const SalesManagerDashboard: React.FC = () => {
         pendingApprovalCount={approvals.length}
         menuItems={menuItems}
         onLogout={logout}
-        onNavigate={(path) => {
+        onNavigate={(path: any) => {
           if (path === "/manager/dashboard" || path === "/") {
             window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/orders/approval") {
@@ -233,13 +233,12 @@ export const SalesManagerDashboard: React.FC = () => {
           {/* Toast alert */}
           {toast && (
             <div
-              className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm animate-fade-in ${
-                toast.type === "success"
+              className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm animate-fade-in ${toast.type === "success"
                   ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                   : toast.type === "error"
-                  ? "bg-rose-50 text-rose-800 border-rose-200"
-                  : "bg-blue-50 text-blue-800 border-blue-200"
-              }`}
+                    ? "bg-rose-50 text-rose-800 border-rose-200"
+                    : "bg-blue-50 text-blue-800 border-blue-200"
+                }`}
             >
               <span>{toast.message}</span>
               <button

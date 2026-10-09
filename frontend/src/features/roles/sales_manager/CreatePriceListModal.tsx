@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { createPriceList } from "../../api";
+import { createPriceList } from "services/apiClient";
 
 export interface CreatePriceListModalProps {
   isOpen: boolean;
