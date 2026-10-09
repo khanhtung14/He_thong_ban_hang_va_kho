@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,11 +21,13 @@ router = APIRouter(tags=["Quản lý tài khoản"])
 
 
 class LockUserRequest(BaseModel):
-    user_id: str = ""
-    reason: str = ""
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str = Field(default="", max_length=100)
+    reason: str = Field(default="", max_length=2000)
 
 
-def _find_user(db: Session, user_id: str) -> Any | None:
+def _find_user(db: Session, user_id: str) -> Optional[Any]:
     user_id_clean = user_id.strip()
     if not user_id_clean:
         raise HTTPException(status_code=400, detail="Vui lòng cung cấp ID hoặc username của người dùng.")
@@ -56,13 +58,13 @@ def _ensure_audit_logs_table(db: Session) -> None:
     AccountAuditLog.__table__.create(bind=db.get_bind(), checkfirst=True)
 
 
-def _user_columns(db: Session) -> set[str]:
+def _user_columns(db: Session) -> Set[str]:
     return {column["name"] for column in inspect(db.get_bind()).get_columns("users")}
 
 
 def _set_account_state(db: Session, user_id: int, *, active: bool, state: str) -> None:
     columns = _user_columns(db)
-    values: dict[str, Any] = {"active": active, "user_id": user_id}
+    values: Dict[str, Any] = {"active": active, "user_id": user_id}
     assignments = ["is_active = :active"]
     if "status" in columns:
         assignments.append("status = :state")
@@ -70,7 +72,7 @@ def _set_account_state(db: Session, user_id: int, *, active: bool, state: str) -
     db.execute(text(f"UPDATE users SET {', '.join(assignments)} WHERE id = :user_id"), values)
 
 
-def _handover_message(count: int) -> str | None:
+def _handover_message(count: int) -> Optional[str]:
     if count <= 0:
         return None
     return (
@@ -256,7 +258,7 @@ def list_users(
             """
         )
     ).mappings().all()
-    users: dict[int, dict[str, Any]] = {}
+    users: Dict[int, Dict[str, Any]] = {}
     for row in rows:
         item = users.setdefault(
             int(row["id"]),

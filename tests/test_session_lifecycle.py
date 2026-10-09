@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from src.backend.models import AccountStatus, Base, User, UserSession
+from src.backend.models import AccountStatus, Base, Role, User, UserSession
 from src.backend.security import require_active_user
 from src.backend.session import logout, refresh_session
 
@@ -22,6 +22,9 @@ def session_db():
     )
     Base.metadata.create_all(engine)
     with Session(engine) as db:
+        role = Role(code="ADMIN", name="Quản trị hệ thống", description="Quản trị")
+        db.add(role)
+        db.flush()
         user = User(
             username="session-user",
             email="session@example.test",
@@ -29,6 +32,7 @@ def session_db():
             password_hash="unused",
             is_active=True,
             status=AccountStatus.ACTIVE,
+            roles=[role],
         )
         db.add(user)
         db.flush()

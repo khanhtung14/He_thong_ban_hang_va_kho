@@ -9,6 +9,7 @@ Covers:
 """
 
 import pytest
+from typing import Dict
 from fastapi.testclient import TestClient
 
 from src.backend.main import app
@@ -18,7 +19,7 @@ from src.backend.rbac import create_access_token
 client = TestClient(app)
 
 
-def make_auth_header_for_role(role: str, username: str = "test_user") -> dict[str, str]:
+def make_auth_header_for_role(role: str, username: str = "test_user") -> Dict[str, str]:
     """Helper to generate JWT Bearer Authorization header."""
     token = create_access_token({"sub": username, "role": role})
     return {"Authorization": f"Bearer {token}"}
@@ -56,6 +57,24 @@ class TestRBACDefaultDeny:
         # Calling protected endpoint without token must return 401
         response = client.get("/api/v1/products/SKU-001")
         assert response.status_code == 401
+
+    def test_role_headers_cannot_authenticate_or_escalate_privileges(self):
+        # A caller must not be able to choose an identity by sending headers.
+        response = client.get(
+            "/api/v1/products/SKU-001",
+            headers={"X-User-Role": "Sales Manager", "X-User-Name": "attacker"},
+        )
+        assert response.status_code == 401
+
+        # A role header must not override the role in a signed bearer token.
+        sales_token = make_auth_header_for_role(RoleCode.SALES_REP.value)
+        response = client.get(
+            "/api/v1/products/SKU-001",
+            headers={**sales_token, "X-User-Role": "Sales Manager"},
+        )
+        assert response.status_code == 200
+        assert "cost_price" not in response.json()
+        assert "margin" not in response.json()
 
     def test_invalid_role_rejected(self):
         headers = make_auth_header_for_role("HackerRole")
@@ -175,10 +194,11 @@ class TestRBACRequirement3SalesManagerFinancialVisibility:
         assert response.status_code == 200
         data = response.json()
 
-        assert data["total_revenue"] == 150_000_000
-        assert data["total_cogs"] == 105_000_000
-        assert data["gross_profit"] == 45_000_000
-        assert data["margin"] == "30.0%"
+        assert data["total_revenue"] == 0
+        assert data["total_cogs"] == 0
+        assert data["gross_profit"] == 0
+        assert data["margin"] == "0%"
+        assert data["details"] == []
 
     def test_admin_does_not_view_manager_only_financial_fields(self):
         headers = make_auth_header_for_role(RoleCode.ADMIN.value, username="admin_super")
