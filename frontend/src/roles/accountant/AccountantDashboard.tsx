@@ -12,6 +12,7 @@ import { AccountantHeader } from "../../components/Header/AccountantHeader";
 // Auth & API
 import { logout } from "../../session";
 import { fetchProfile, type UserProfile } from "../../api";
+import AgencyLockManager from "./AgencyLockManager";
 
 const { Content } = Layout;
 
@@ -86,6 +87,7 @@ export const AccountantDashboard: React.FC = () => {
         />
 
         {/* Nội dung Dashboard Kế toán */}
+        {/* Nội dung Dashboard Kế toán */}
         <Content
           style={{
             padding: "24px 32px",
@@ -94,7 +96,46 @@ export const AccountantDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung phân hệ kế toán */}
+          {/* 1. Màn hình Khóa / Mở giao dịch đại lý */}
+          {selectedKey === "agency-locks" && <AgencyLockManager />}
+
+          {/* 2. Màn hình Công nợ đại lý (hoặc mặc định cho xem luôn chức năng này) */}
+          {selectedKey === "debt" && <AgencyLockManager />}
+
+          {/* Các tab khác tạm thời hiển thị placeholder để không bị trắng màn hình */}
+          {selectedKey === "dashboard" && (
+            <div style={{ background: "#fff", padding: 24, borderRadius: 8 }}>
+              <h3>Tổng quan tài chính & công nợ</h3>
+              <p>
+                Chọn mục <b>Khóa / Mở giao dịch</b> hoặc <b>Công nợ đại lý</b>{" "}
+                trên thanh menu để thao tác.
+              </p>
+            </div>
+          )}
+
+          {selectedKey === "invoices" && (
+            <div style={{ background: "#fff", padding: 24, borderRadius: 8 }}>
+              <h3>Danh sách Hóa đơn & Chứng từ</h3>
+            </div>
+          )}
+
+          {selectedKey === "reconciliation" && (
+            <div style={{ background: "#fff", padding: 24, borderRadius: 8 }}>
+              <h3>Đối soát công nợ đại lý</h3>
+            </div>
+          )}
+
+          {selectedKey === "ledger" && (
+            <div style={{ background: "#fff", padding: 24, borderRadius: 8 }}>
+              <h3>Sổ sách kế toán</h3>
+            </div>
+          )}
+
+          {selectedKey === "reports" && (
+            <div style={{ background: "#fff", padding: 24, borderRadius: 8 }}>
+              <h3>Báo cáo tài chính</h3>
+            </div>
+          )}
         </Content>
       </Layout>
 

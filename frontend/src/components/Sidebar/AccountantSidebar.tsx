@@ -8,6 +8,7 @@ import {
   BookOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
+import { LockOutlined } from "@ant-design/icons";
 
 interface AccountantSidebarProps {
   selectedKey: string;
@@ -22,11 +23,12 @@ export const AccountantSidebar: React.FC<AccountantSidebarProps> = ({
 }) => {
   const menuItems = [
     { key: "dashboard", label: "Tổng quan", icon: <HomeOutlined /> },
+    { key: "debt", label: "Công nợ đại lý", icon: <DollarCircleOutlined /> },
     {
-      key: "receivables",
-      label: "Công nợ đại lý",
-      icon: <DollarCircleOutlined />,
-    },
+      key: "agency-locks",
+      label: "Khóa / Mở giao dịch",
+      icon: <LockOutlined />,
+    }, // <-- Thêm mục này
     {
       key: "invoices",
       label: "Hóa đơn & Chứng từ",
@@ -37,11 +39,7 @@ export const AccountantSidebar: React.FC<AccountantSidebarProps> = ({
       label: "Đối soát công nợ",
       icon: <SwapOutlined />,
     },
-    {
-      key: "accounting-book",
-      label: "Sổ sách kế toán",
-      icon: <BookOutlined />,
-    },
+    { key: "ledger", label: "Sổ sách kế toán", icon: <BookOutlined /> },
     { key: "reports", label: "Báo cáo tài chính", icon: <BarChartOutlined /> },
   ];
 
