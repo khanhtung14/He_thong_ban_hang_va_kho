@@ -9,6 +9,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from starlette.responses import StreamingResponse
+from typing import Any, Dict
+from fastapi import APIRouter, Depends, HTTPException, status
 
 try:
     from src.backend.rbac import (
@@ -41,7 +43,7 @@ IMPORT_COLUMNS = (
 REQUIRED_IMPORT_COLUMNS = {"sku", "name", "category"}
 
 # Mock products database
-MOCK_PRODUCTS: dict[str, dict[str, Any]] = {
+MOCK_PRODUCTS: Dict[str, Dict[str, Any]] = {
     "SKU-001": {
         "sku": "SKU-001",
         "name": "Nước tăng lực Red Bull 250ml",

@@ -176,6 +176,9 @@ def test_openapi_lists_every_http_api(client):
     assert "/api/users/{user_id}/handover-status" in actual_paths
     assert "/api/users/{user_id}/audit-logs" in actual_paths
     assert "/api/users" in actual_paths
+    # Các API SCRUM-62: Quản lý người dùng (đăng ký qua users)
+    assert "/api/v1/admin/users" in actual_paths
+    assert "/users" in actual_paths
 
 
 def test_change_password_success_updates_hash(client):
