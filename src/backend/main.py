@@ -8,6 +8,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
 
 if __package__:
@@ -16,7 +17,7 @@ if __package__:
     from src.backend.change_password import router as change_password_router
     from src.backend.audit_logs import router as audit_logs_router
     from src.backend.forgot_password import router as forgot_password_router
-    from src.backend.inventory import router as inventory_router
+    from src.backend.inventory import legacy_router as inventory_legacy_router, router as inventory_router
     from src.backend.login import router as login_router
     from src.backend.navigation import router as navigation_router
     from src.backend.products import router as products_router
@@ -33,7 +34,7 @@ else:  # pragma: no cover - direct script execution from src/backend
     from change_password import router as change_password_router
     from audit_logs import router as audit_logs_router
     from forgot_password import router as forgot_password_router
-    from inventory import router as inventory_router
+    from inventory import legacy_router as inventory_legacy_router, router as inventory_router
     from login import router as login_router
     from navigation import router as navigation_router
     from products import router as products_router
@@ -58,6 +59,45 @@ app = FastAPI(
 @app.on_event("startup")
 def migrate_profile_database() -> None:
     try:
+        from src.backend.database import engine
+        from src.backend.models import Base, InventoryStock, InventoryTransaction, ProductUnit
+
+        Base.metadata.create_all(
+            bind=engine,
+            tables=[ProductUnit.__table__, InventoryStock.__table__, InventoryTransaction.__table__],
+        )
+        # create_all() does not add columns to installations with an older table.
+        inspector = inspect(engine)
+        additions = {
+            "product_units": {"is_base_unit": "BOOLEAN NOT NULL DEFAULT 0"},
+            "inventory_transactions": {
+                "warehouse_id": "INTEGER NOT NULL DEFAULT 1",
+                "transaction_type": "VARCHAR(3) NOT NULL DEFAULT 'IN'",
+                "created_at": "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            },
+        }
+        for table_name, columns in additions.items():
+            if not inspector.has_table(table_name):
+                continue
+            existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, column_type in columns.items():
+                if column_name not in existing_columns:
+                    # SQLite cannot add a NOT NULL column with CURRENT_TIMESTAMP as
+                    # its ALTER TABLE default; backfill it after adding a nullable column.
+                    sqlite_created_at = (
+                        engine.dialect.name == "sqlite"
+                        and table_name == "inventory_transactions"
+                        and column_name == "created_at"
+                    )
+                    alter_type = "DATETIME" if sqlite_created_at else column_type
+                    with engine.begin() as connection:
+                        connection.execute(
+                            text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {alter_type}")
+                        )
+                        if sqlite_created_at:
+                            connection.execute(
+                                text("UPDATE inventory_transactions SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL")
+                            )
         migrate_profile_schema()
     except Exception:
         pass
@@ -164,6 +204,7 @@ app.include_router(forgot_password_router)
 app.include_router(login_router)
 app.include_router(session_router)
 app.include_router(inventory_router)
+app.include_router(inventory_legacy_router)
 app.include_router(products_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
@@ -210,6 +251,7 @@ def change_password_page():
 
 
 @app.get("/profile", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/inventory", response_class=HTMLResponse, include_in_schema=False)
 def profile_page():
     return login_page_response()
 

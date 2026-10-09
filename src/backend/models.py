@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SqlEnum,
     ForeignKey,
+    Float,
     Integer,
     Index,
     JSON,
@@ -290,6 +291,7 @@ class Customer(Base):
     locked_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
 
     # Relationship: danh sách đơn hàng của đại lý này
     orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
@@ -367,3 +369,50 @@ class OrderItem(Base):
     unit_price: Mapped[float] = mapped_column(default=0.0, nullable=False)
 
     order: Mapped[Order] = relationship(back_populates="items")
+
+
+class ProductUnit(Base):
+    """Unit and base-unit conversion factor for a product."""
+    __tablename__ = "product_units"
+    __table_args__ = (
+        UniqueConstraint("product_id", "unit_name", name="uq_product_units_product_name"),
+        Index("ix_product_units_product", "product_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    # The current products endpoint is backed by demo data, not a SQL Product table.
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    unit_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    conversion_rate: Mapped[float] = mapped_column(Float, nullable=False)
+    is_base_unit: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class InventoryTransaction(Base):
+    """Append-only record of stock movements in both entered and base units."""
+    __tablename__ = "inventory_transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    transaction_type: Mapped[str] = mapped_column(String(3), nullable=False)
+    unit_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    conversion_rate_snapshot: Mapped[float] = mapped_column(Float, nullable=False)
+    base_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False
+    )
+
+
+class InventoryStock(Base):
+    """Current on-hand quantity, stored in each product's base unit."""
+    __tablename__ = "inventory_stock"
+    __table_args__ = (
+        UniqueConstraint("product_id", "warehouse_id", name="uq_inventory_stock_product_warehouse"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    base_quantity: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

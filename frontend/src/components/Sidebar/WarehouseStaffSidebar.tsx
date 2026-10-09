@@ -8,6 +8,7 @@ import {
   CheckSquareOutlined,
   EnvironmentOutlined,
   LogoutOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import BrandLogo from "../BrandLogo";
 
@@ -48,6 +49,11 @@ export const WarehouseStaffSidebar: React.FC<WarehouseStaffSidebarProps> = ({
           key: "outbound",
           icon: <ExportOutlined />,
           label: "Thực hiện Xuất kho",
+        },
+        {
+          key: "unit-conversion", // <-- Key mới cho chức năng này
+          icon: <SwapOutlined />,
+          label: "Đơn vị tính & Quy đổi",
         },
         {
           key: "stocktake-exec",

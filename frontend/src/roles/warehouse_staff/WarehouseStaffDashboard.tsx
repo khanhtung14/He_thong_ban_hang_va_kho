@@ -5,6 +5,7 @@ import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSidebar";
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
+import UnitConversionManager from "./UnitConversionManager";
 
 import { logout } from "../../session";
 import { fetchProfile, type UserProfile } from "../../api";
@@ -82,7 +83,20 @@ export const WarehouseStaffDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Màn hình thao tác quét mã, thực hiện nhập xuất */}
+          {selectedKey === "unit-conversion" && <UnitConversionManager />}
+
+          {/* Các tab khác */}
+          {selectedKey === "scan" && <div>Giao diện quét mã Barcode / QR</div>}
+          {selectedKey === "inbound" && <div>Giao diện Thực hiện Nhập kho</div>}
+          {selectedKey === "outbound" && (
+            <div>Giao diện Thực hiện Xuất kho</div>
+          )}
+          {selectedKey === "stocktake-exec" && (
+            <div>Giao diện Đếm hàng kiểm kê</div>
+          )}
+          {selectedKey === "locations" && (
+            <div>Giao diện Tra cứu vị trí / Kệ hàng</div>
+          )}
         </Content>
       </Layout>
 
