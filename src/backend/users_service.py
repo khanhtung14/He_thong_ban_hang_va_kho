@@ -311,13 +311,17 @@ def normalize_import_header(value: Optional[str]) -> str:
     aliases = {
         "ho ten": "full_name",
         "họ tên": "full_name",
+        "họ và tên": "full_name",
         "ho va ten": "full_name",
         "full name": "full_name",
+        "fullname": "full_name",
         "ten nguoi dung": "username",
         "user name": "username",
         "ten dang nhap": "username",
         "tên đăng nhập": "username",
+        "tài khoản": "username",
         "email": "email",
+        "địa chỉ email": "email",
         "phone": "phone",
         "dien thoai": "phone",
         "số điện thoại": "phone",
@@ -327,6 +331,7 @@ def normalize_import_header(value: Optional[str]) -> str:
         "role codes": "role_codes",
         "vai tro": "role_codes",
         "vai trò": "role_codes",
+        "mã vai trò": "role_codes",
         "roles": "role_codes",
         "role": "role_codes",
     }
@@ -335,30 +340,52 @@ def normalize_import_header(value: Optional[str]) -> str:
 
 def parse_excel_rows(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
     """Parse an Excel file or CSV into a list of normalized dictionaries."""
+    required_headers = {"full_name", "username", "email"}
     name = (filename or "").lower()
     if name.endswith(".csv"):
         text = file_bytes.decode("utf-8-sig", errors="replace")
         reader = csv.DictReader(io.StringIO(text))
-        return [
-            {normalize_import_header(key): (value.strip() if isinstance(value, str) else value) for key, value in row.items() if key is not None}
-            for row in reader
-            if row and any((value or "").strip() for value in row.values())
-        ]
+        headers = {normalize_import_header(key) for key in (reader.fieldnames or []) if key}
+        missing_headers = required_headers - headers
+        if missing_headers:
+            raise ValueError("Thiếu cột bắt buộc trong tiêu đề: Họ tên, Tên đăng nhập, Email.")
+        results: List[Dict[str, Any]] = []
+        for row in reader:
+            if not row or not any(str(value or "").strip() for value in row.values()):
+                continue
+            mapping = {
+                normalize_import_header(key): (value.strip() if isinstance(value, str) else value)
+                for key, value in row.items() if key is not None
+            }
+            mapping["__import_row_number"] = reader.line_num
+            results.append(mapping)
+        return results
 
     workbook = load_workbook(filename=io.BytesIO(file_bytes), read_only=True, data_only=True)
     sheet = workbook.active
     rows = list(sheet.iter_rows(values_only=True))
     if not rows:
         return []
-    header = [normalize_import_header(str(cell).strip()) if cell is not None else "" for cell in rows[0]]
+    header_index = None
+    header: List[str] = []
+    for candidate_index, candidate in enumerate(rows[:10]):
+        candidate_headers = [normalize_import_header(str(cell).strip()) if cell is not None else "" for cell in candidate]
+        if required_headers.issubset(set(candidate_headers)):
+            header_index = candidate_index
+            header = candidate_headers
+            break
+    if header_index is None:
+        raise ValueError("Không tìm thấy hàng tiêu đề có đủ cột Họ tên, Tên đăng nhập và Email trong 10 hàng đầu.")
+
     results: List[Dict[str, Any]] = []
-    for values in rows[1:]:
+    for source_row_number, values in enumerate(rows[header_index + 1:], start=header_index + 2):
         mapping: Dict[str, Any] = {}
         for key, value in zip(header, values):
             if not key:
                 continue
             mapping[key] = value.strip() if isinstance(value, str) else value
         if mapping and any((str(value)).strip() for value in mapping.values() if value is not None):
+            mapping["__import_row_number"] = source_row_number
             results.append(mapping)
     return results
 
@@ -387,6 +414,7 @@ def bulk_create_users_from_rows(db: Session, rows: Iterable[Dict[str, Any]], act
     for row_index, row in enumerate(rows, start=2):
         if row is None:
             continue
+        source_row_index = int(row.get("__import_row_number", row_index) or row_index)
         normalized = {normalize_import_header(str(key)): value for key, value in row.items() if key is not None}
         if not normalized:
             continue
@@ -403,9 +431,11 @@ def bulk_create_users_from_rows(db: Session, rows: Iterable[Dict[str, Any]], act
         }
         if full_name.lower() in header_tokens or username.lower() in header_tokens or email.lower() in header_tokens:
             continue
+        if not full_name and not username and not email and not phone:
+            continue
 
         if not full_name or not username or not email:
-            errors.append(f"Dòng {row_index}: thiếu họ tên, tên đăng nhập hoặc email.")
+            errors.append(f"Dòng {source_row_index}: thiếu họ tên, tên đăng nhập hoặc email.")
             continue
 
         parsed_roles = []
@@ -432,9 +462,9 @@ def bulk_create_users_from_rows(db: Session, rows: Iterable[Dict[str, Any]], act
             if "đã tồn tại" in detail.lower() or "already" in detail.lower() or "tồn tại" in detail.lower():
                 duplicate_count += 1
                 continue
-            errors.append(f"Dòng {row_index}: {detail}")
+            errors.append(f"Dòng {source_row_index}: {detail}")
         except Exception as exc:  # pragma: no cover - defensive fallback
-            errors.append(f"Dòng {row_index}: {exc}")
+            errors.append(f"Dòng {source_row_index}: {exc}")
 
     return created_count, errors, duplicate_count
 
@@ -450,12 +480,15 @@ def preview_user_import_rows(db: Session, rows: Iterable[Dict[str, Any]]) -> Lis
 
     for row_index, row in enumerate(rows, start=2):
         normalized = {normalize_import_header(str(key)): value for key, value in row.items() if key is not None}
+        source_row_index = int(normalized.get("__import_row_number", row_index) or row_index)
         full_name = str(normalized.get("full_name") or normalized.get("ho_ten") or normalized.get("name") or "").strip()
         username = str(normalized.get("username") or normalized.get("ten_dang_nhap") or normalized.get("user_name") or "").strip()
         email = str(normalized.get("email") or "").strip().lower()
         phone = normalize_import_phone(normalized.get("phone") or normalized.get("dien_thoai") or normalized.get("sdt") or "")
         raw_role_codes = normalized.get("role_codes") or normalized.get("role") or normalized.get("vai_tro") or "SALES_REP"
         if not normalized or full_name.lower() in header_tokens or username.lower() in header_tokens or email.lower() in header_tokens:
+            continue
+        if not full_name and not username and not email and not phone:
             continue
 
         if isinstance(raw_role_codes, str):
@@ -496,7 +529,7 @@ def preview_user_import_rows(db: Session, rows: Iterable[Dict[str, Any]]) -> Lis
                 duplicate = True
             else:
                 for key in row_keys:
-                    seen[key] = row_index
+                    seen[key] = source_row_index
         except HTTPException as exc:
             error = str(exc.detail or "Dữ liệu không hợp lệ.")
             duplicate = "tồn tại" in error.lower() or "đã tồn tại" in error.lower()
@@ -510,6 +543,10 @@ def preview_user_import_rows(db: Session, rows: Iterable[Dict[str, Any]]) -> Lis
                     messages.append(f"Thiếu {label.lower()}.")
                 elif field == "email":
                     messages.append("Email không hợp lệ.")
+                elif item.get("type") == "string_too_short" and field == "username":
+                    messages.append("Tên đăng nhập phải có ít nhất 3 ký tự.")
+                elif item.get("type") == "string_too_short" and field == "full_name":
+                    messages.append("Họ tên không được để trống.")
                 else:
                     messages.append(str(item.get("msg", "Dữ liệu không hợp lệ.")).replace("Value error, ", ""))
             error = " ".join(messages)
@@ -517,7 +554,7 @@ def preview_user_import_rows(db: Session, rows: Iterable[Dict[str, Any]]) -> Lis
             error = str(exc)
 
         preview.append({
-            "row": row_index,
+            "row": source_row_index,
             "full_name": full_name,
             "username": username,
             "email": email,

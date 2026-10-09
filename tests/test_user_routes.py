@@ -364,3 +364,26 @@ def test_admin_user_import_skips_invalid_rows_and_creates_valid_rows(monkeypatch
     with TestingSession() as session:
         assert session.query(models.User).count() == 1
         assert session.query(models.User).filter_by(username="valid_user").one()
+
+
+def test_excel_import_parser_finds_header_after_title_and_ignores_blank_rows():
+    from src.backend.users_service import parse_excel_rows
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["MẪU NHẬP DANH SÁCH NGƯỜI DÙNG"])
+    sheet.append(["Vui lòng điền thông tin bên dưới"])
+    sheet.append(["Họ và tên", "Tên đăng nhập", "Địa chỉ email", "Số điện thoại", "Vai trò"])
+    sheet.append(["Alice Example", "alice", "alice@example.com", "0901234567", "SALES_REP"])
+    for _ in range(20):
+        sheet.append([None, None, None, None, None])
+    output = BytesIO()
+    workbook.save(output)
+
+    rows = parse_excel_rows(output.getvalue(), "users.xlsx")
+
+    assert len(rows) == 1
+    assert rows[0]["__import_row_number"] == 4
+    assert rows[0]["full_name"] == "Alice Example"
+    assert rows[0]["username"] == "alice"
+    assert rows[0]["email"] == "alice@example.com"
