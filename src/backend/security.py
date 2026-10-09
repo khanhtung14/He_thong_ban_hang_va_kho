@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -22,7 +23,7 @@ SESSION_DURATION = timedelta(hours=12)
 
 
 def require_active_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
     db: Session = Depends(get_db),
 ) -> User:
     unauthorized = HTTPException(
@@ -36,7 +37,8 @@ def require_active_user(
     if credentials.scheme.lower() != "bearer":
         raise unauthorized
 
-    token_hash = hashlib.sha256(credentials.credentials.encode("utf-8")).hexdigest()
+    token = credentials.credentials
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     session = (
         db.query(UserSession)
         .filter(
@@ -45,23 +47,35 @@ def require_active_user(
         )
         .first()
     )
-    if session is None:
-        raise unauthorized
+    if session is not None:
+        expires_at = session.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= datetime.now(timezone.utc):
+            raise unauthorized
 
-    expires_at = session.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at <= datetime.now(timezone.utc):
-        raise unauthorized
+        user = session.user
+        if user is None or user.is_active is False or user.status != AccountStatus.ACTIVE:
+            raise unauthorized
 
-    user = session.user
-    if user is None or user.is_active is False or user.status != AccountStatus.ACTIVE:
-        raise unauthorized
+        # Sliding session: every authenticated request extends the session window.
+        session.expires_at = datetime.now(timezone.utc) + SESSION_DURATION
+        db.commit()
+        return user
 
-    # Sliding session: every authenticated request extends the session window.
-    session.expires_at = datetime.now(timezone.utc) + SESSION_DURATION
-    db.commit()
-    return user
+    # Support JWT access token authentication as well
+    try:
+        from src.backend.rbac import decode_access_token
+        payload = decode_access_token(token)
+        username = payload.get("sub") or payload.get("username")
+        if username:
+            user = db.query(User).filter(User.username == username).first()
+            if user and user.is_active is not False and user.status == AccountStatus.ACTIVE:
+                return user
+    except Exception:
+        pass
+
+    raise unauthorized
 
 
 def require_admin(user: User = Depends(require_active_user)) -> User:

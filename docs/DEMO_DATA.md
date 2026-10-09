@@ -53,6 +53,16 @@ Invoke-RestMethod -Method Post `
 
 The forgot-password flow looks up each account email in the `users` table and records a demo reset link in `GET /dev/mock-outbox`. Seed the demo database before requesting a reset for a seeded account.
 
+For actual email delivery, configure `SMTP_HOST` and `SMTP_FROM`; optionally set
+`SMTP_PORT` (default `587`), `SMTP_USERNAME`, `SMTP_PASSWORD`, and
+`SMTP_USE_SSL=true` for implicit TLS. Set `PUBLIC_BASE_URL` to the public site
+origin so emailed links point to the deployed application. Set `APP_ENV=production`
+in deployed environments. The mock outbox and token-expiration demo endpoint
+are available only in development/demo mode and are disabled when SMTP is
+configured or `APP_ENV=production`.
+Reset tokens are stored hashed in `password_reset_tokens` and expire after 30
+minutes. The public response never contains the reset link.
+
 > Bộ dữ liệu chỉ dành cho phát triển cục bộ. Không dùng mật khẩu mẫu hay tài khoản này trên môi trường thật.
 
 ### Demo account emails
