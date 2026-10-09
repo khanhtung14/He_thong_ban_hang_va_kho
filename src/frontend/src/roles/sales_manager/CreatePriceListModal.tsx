@@ -1,239 +1,33 @@
-import React, { useState } from "react";
-import { createPriceList } from "../../api";
+import React, { useEffect, useState } from "react";
+import { createPriceList, fetchProducts, type PriceListLine } from "../../api";
 
-export interface CreatePriceListModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCreated: (newPriceList: any) => void;
-}
+type Product = { sku:string; name:string; sale_price:number };
+export interface CreatePriceListModalProps { isOpen:boolean; onClose:()=>void; onCreated:(value:any)=>void; initialCode?:string; initialCustomerGroup?:string; initialItems?:PriceListLine[]; }
 
-export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
-  isOpen,
-  onClose,
-  onCreated,
-}) => {
-  const [code, setCode] = useState("");
-  const [customerGroup, setCustomerGroup] = useState("DEALER_LEVEL_1");
-  const [startDate, setStartDate] = useState("2026-10-01");
-  const [endDate, setEndDate] = useState("2026-12-31");
-  const [sku1Price, setSku1Price] = useState(480000);
-  const [sku1Floor, setSku1Floor] = useState(450000);
-  const [sku2Price, setSku2Price] = useState(240000);
-  const [sku2Floor, setSku2Floor] = useState(220000);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+const today = () => new Date().toISOString().slice(0,10);
+export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({isOpen,onClose,onCreated,initialCode="",initialCustomerGroup="DEALER_LEVEL_1",initialItems}) => {
+  const [code,setCode]=useState("");
+  const [group,setGroup]=useState(initialCustomerGroup);
+  const [start,setStart]=useState(today());
+  const [end,setEnd]=useState(`${new Date().getFullYear()}-12-31`);
+  const [products,setProducts]=useState<Product[]>([]);
+  const [lines,setLines]=useState<Record<string,PriceListLine>>({});
+  const [error,setError]=useState("");
+  const [busy,setBusy]=useState(false);
 
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code.trim()) {
-      setError("Vui lòng nhập mã bảng giá");
-      return;
-    }
-    setError("");
-    setSubmitting(true);
-
-    const payload = {
-      code: code.trim().toUpperCase(),
-      customer_group: customerGroup,
-      start_date: startDate,
-      end_date: endDate,
-      items: [
-        { sku: "SKU-001", sale_price: Number(sku1Price), floor_price: Number(sku1Floor) },
-        { sku: "SKU-002", sale_price: Number(sku2Price), floor_price: Number(sku2Floor) },
-      ],
-    };
-
-    try {
-      const created = await createPriceList(payload);
-      onCreated(created);
-      onClose();
-    } catch (err: any) {
-      setError(err.message || "Lỗi kết nối khi gửi yêu cầu.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden">
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              +
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-800">
-                Khai báo bảng giá mới (S2-10)
-              </h3>
-              <p className="text-xs text-slate-400">
-                Áp dụng theo nhóm khách hàng & khoảng thời gian hiệu lực
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 rounded-xl bg-rose-50 text-rose-700 text-xs font-medium border border-rose-100">
-              {error}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Mã bảng giá *
-              </label>
-              <input
-                type="text"
-                placeholder="VD: PL-DEALER1-Q4"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 uppercase"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nhóm khách hàng áp dụng
-              </label>
-              <select
-                value={customerGroup}
-                onChange={(e) => setCustomerGroup(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
-              >
-                <option value="DEALER_LEVEL_1">Đại lý Cấp 1</option>
-                <option value="DEALER_LEVEL_2">Đại lý Cấp 2</option>
-                <option value="RETAIL">Khách lẻ</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Ngày bắt đầu hiệu lực
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Ngày kết thúc hiệu lực
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                required
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Price lines */}
-          <div className="pt-2">
-            <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-              Dòng giá sản phẩm (Giá bán & Giá sàn)
-            </span>
-
-            <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-              {/* Line 1: Red bull */}
-              <div className="grid grid-cols-12 gap-2 items-center text-xs">
-                <div className="col-span-5">
-                  <strong className="block text-slate-800">SKU-001</strong>
-                  <span className="text-[11px] text-slate-400">Red Bull 250ml</span>
-                </div>
-                <div className="col-span-4">
-                  <label className="text-[10px] text-slate-500 block">Giá bán (₫)</label>
-                  <input
-                    type="number"
-                    value={sku1Price}
-                    onChange={(e) => setSku1Price(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-xs rounded border border-slate-200 bg-white"
-                  />
-                </div>
-                <div className="col-span-3">
-                  <label className="text-[10px] text-slate-500 block">Giá sàn (₫)</label>
-                  <input
-                    type="number"
-                    value={sku1Floor}
-                    onChange={(e) => setSku1Floor(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-xs rounded border border-slate-200 bg-white text-rose-600 font-semibold"
-                  />
-                </div>
-              </div>
-
-              {/* Line 2: Highlands */}
-              <div className="grid grid-cols-12 gap-2 items-center text-xs pt-2 border-t border-slate-200/60">
-                <div className="col-span-5">
-                  <strong className="block text-slate-800">SKU-002</strong>
-                  <span className="text-[11px] text-slate-400">Highlands 235ml</span>
-                </div>
-                <div className="col-span-4">
-                  <label className="text-[10px] text-slate-500 block">Giá bán (₫)</label>
-                  <input
-                    type="number"
-                    value={sku2Price}
-                    onChange={(e) => setSku2Price(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-xs rounded border border-slate-200 bg-white"
-                  />
-                </div>
-                <div className="col-span-3">
-                  <label className="text-[10px] text-slate-500 block">Giá sàn (₫)</label>
-                  <input
-                    type="number"
-                    value={sku2Floor}
-                    onChange={(e) => setSku2Floor(Number(e.target.value))}
-                    className="w-full px-2 py-1 text-xs rounded border border-slate-200 bg-white text-rose-600 font-semibold"
-                  />
-                </div>
-              </div>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1.5 italic">
-              * Quy tắc kinh doanh: Nhân viên bán dưới giá sàn sẽ bắt buộc phải gửi đơn qua Quản lý kinh doanh duyệt.
-            </p>
-          </div>
-
-          {/* Modal Actions */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-600/20 transition-all"
-            >
-              {submitting ? "Đang lưu..." : "Lưu bảng giá nháp"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+  useEffect(()=>{ if(!isOpen)return; setCode(initialCode);setGroup(initialCustomerGroup);fetchProducts().then((items)=>{setProducts(items);const previous=Object.fromEntries((initialItems||[]).map(line=>[line.sku,line]));setLines(Object.fromEntries(items.map(p=>[p.sku,previous[p.sku]||{sku:p.sku,sale_price:p.sale_price,floor_price:p.sale_price}])));}).catch(e=>setError(e.message)); },[isOpen,initialCode,initialCustomerGroup,initialItems]);
+  if(!isOpen)return null;
+  const setLine=(sku:string,key:"sale_price"|"floor_price",value:number)=>setLines(old=>({...old,[sku]:{...old[sku], [key]:value}}));
+  const submit=async(e:React.FormEvent)=>{e.preventDefault();setError("");if(!code.trim()){setError("Vui lòng nhập mã bảng giá.");return;}if(products.length===0){setError("Danh mục sản phẩm đang trống.");return;}
+    const invalid=products.find(p=>!lines[p.sku]||lines[p.sku].sale_price<lines[p.sku].floor_price);if(invalid){setError(`Giá bán của ${invalid.sku} phải bằng hoặc cao hơn giá sàn.`);return;}
+    setBusy(true);try{const created=await createPriceList({code:code.trim().toUpperCase(),customer_group:group,start_date:start,end_date:end,items:products.map(p=>lines[p.sku])});onCreated(created);onClose();}catch(e:any){setError(e.message||"Không lưu được bảng giá.");}finally{setBusy(false);}};
+  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"><div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-auto shadow-2xl">
+    <div className="px-6 py-4 border-b flex justify-between"><div><h2 className="font-bold">Khai báo bảng giá</h2><p className="text-xs text-slate-500">Bảng giá theo nhóm khách hàng và thời hạn hiệu lực</p></div><button onClick={onClose}>✕</button></div>
+    <form onSubmit={submit} className="p-6 space-y-4">{error&&<div className="p-3 bg-rose-50 text-rose-700 rounded">{error}</div>}
+      <div className="grid md:grid-cols-4 gap-3"><label className="text-xs">Mã bảng giá<input required value={code} onChange={e=>setCode(e.target.value)} className="mt-1 w-full border rounded p-2"/></label><label className="text-xs">Nhóm khách hàng<select value={group} onChange={e=>setGroup(e.target.value)} className="mt-1 w-full border rounded p-2"><option value="DEALER_LEVEL_1">Đại lý cấp 1</option><option value="DEALER_LEVEL_2">Đại lý cấp 2</option><option value="RETAIL">Khách lẻ</option></select></label><label className="text-xs">Ngày bắt đầu<input type="date" required value={start} onChange={e=>setStart(e.target.value)} className="mt-1 w-full border rounded p-2"/></label><label className="text-xs">Ngày kết thúc<input type="date" required value={end} onChange={e=>setEnd(e.target.value)} className="mt-1 w-full border rounded p-2"/></label></div>
+      <div><h3 className="font-semibold text-sm mb-2">Giá bán và giá sàn theo SKU</h3><div className="space-y-2 max-h-72 overflow-auto">{products.map(p=><div key={p.sku} className="grid grid-cols-12 gap-2 items-center border rounded-lg p-3"><div className="col-span-5"><b>{p.sku}</b><div className="text-xs text-slate-500">{p.name}</div></div><label className="col-span-3 text-xs">Giá bán<input type="number" min="0" value={lines[p.sku]?.sale_price??p.sale_price} onChange={e=>setLine(p.sku,"sale_price",Number(e.target.value))} className="w-full border rounded p-2"/></label><label className="col-span-3 text-xs">Giá sàn<input type="number" min="0" value={lines[p.sku]?.floor_price??p.sale_price} onChange={e=>setLine(p.sku,"floor_price",Number(e.target.value))} className="w-full border rounded p-2"/></label></div>)}</div></div>
+      <p className="text-xs text-amber-700">Đơn bán dưới giá sàn sẽ chuyển sang trạng thái chờ Quản lý kinh doanh duyệt.</p><div className="flex justify-end gap-2 border-t pt-4"><button type="button" onClick={onClose} className="border rounded px-4 py-2">Hủy</button><button disabled={busy} className="bg-blue-600 text-white rounded px-4 py-2">{busy?"Đang lưu…":"Lưu bảng giá nháp"}</button></div>
+    </form>
+  </div></div>;
 };
-
 export default CreatePriceListModal;

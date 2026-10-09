@@ -7,6 +7,8 @@ import Error403 from "./Error403";
 import CustomerManagement from "./CustomerManagement";
 import CreateOrder from "./CreateOrder";
 import OrderManagement from "./OrderManagement";
+import HeaderTailwind from "./components/Header/HeaderTailwind";
+import SidebarTailwind, { type MenuItem } from "./components/Sidebar/SidebarTailwind";
 
 
 import "./RoleWorkspace.css";
@@ -300,6 +302,13 @@ export default function RoleWorkspace() {
 
   const heading = useMemo(() => details?.views.find((item) => item.id === view)?.label ?? details?.views[0]?.label ?? "Tổng quan", [details, view]);
   const username = window.sessionStorage.getItem("user_name") || "Người dùng";
+  const adminMenuItems: MenuItem[] = [
+    { id: "overview", title: "Tổng quan", path: "/admin/users?view=overview", icon: "home" },
+    { id: "users", title: "Tài khoản người dùng", path: "/admin/users?view=users", icon: "users" },
+    { id: "rbac", title: "Ma trận phân quyền (RBAC)", path: "/admin/users?view=rbac", icon: "approval" },
+    { id: "configuration", title: "Danh mục hệ thống", path: "/admin/users?view=configuration", icon: "boxes-stacked" },
+    { id: "audit", title: "Nhật ký hệ thống", path: "/admin/users?view=audit", icon: "chart" },
+  ];
 
   function navigate(nextView: string) {
     setView(nextView);
@@ -524,19 +533,32 @@ export default function RoleWorkspace() {
   }
 
   return (
-    <div className={`role-workspace${role === "admin" ? " is-admin" : ""}`}>
-      <aside className="workspace-sidebar">
-        <a className="workspace-brand" href={details.views[0]?.id ? `${window.location.pathname}` : "/"}><span className="workspace-brand-mark">{role === "admin" ? "⌂" : "O"}</span><span>{role === "admin" ? "WMS" : "OMS"} <small>{role === "admin" ? "HỆ THỐNG QUẢN LÝ KHO & BÁN HÀNG" : "OPERATIONS"}</small></span></a>
+    <div className={`role-workspace${role === "admin" ? " is-admin admin-tailwind-shell" : ""}`}>
+      {role === "admin" ? (
+        <SidebarTailwind
+          currentPath={`/admin/users?view=${view}`}
+          menuItems={adminMenuItems}
+          pendingApprovalCount={0}
+          onNavigate={(path) => {
+            const nextView = new URL(path, window.location.origin).searchParams.get("view");
+            if (nextView) navigate(nextView);
+          }}
+          onLogout={() => void logout()}
+        />
+      ) : <aside className="workspace-sidebar">
+        <a className="workspace-brand" href={details.views[0]?.id ? `${window.location.pathname}` : "/"}><span className="workspace-brand-mark">O</span><span>OMS <small>OPERATIONS</small></span></a>
         <div className="workspace-sidebar-role"><span className="workspace-avatar is-sidebar">{details.initials}</span><span><small>ĐANG ĐĂNG NHẬP</small><strong>{details.name}</strong></span><span className="workspace-chevron">⌄</span></div>
         <nav className="workspace-nav" aria-label="Điều hướng nghiệp vụ">
           {details.views.map((item, index) => <div key={item.id}>{item.section && <div className={`workspace-nav-section ${index ? "has-gap" : ""}`}>{item.section}</div>}<button className={`workspace-nav-item ${view === item.id ? "is-active" : ""}`} onClick={() => navigate(item.id)} aria-current={view === item.id ? "page" : undefined}><span className="workspace-nav-icon">{item.icon}</span><span>{item.label}</span>{item.id === "new-order" && <span className="workspace-nav-plus">+</span>}</button></div>)}
         </nav>
         <div className="workspace-sidebar-bottom"><div className="workspace-help"><span className="workspace-help-icon">?</span><div><strong>Cần hỗ trợ?</strong><small>Liên hệ quản trị viên</small></div><span>›</span></div><button className="workspace-logout" onClick={() => void logout()}><span>↪</span> Đăng xuất</button></div>
-      </aside>
+      </aside>}
 
       <div className="workspace-main-column">
-        <header className="workspace-topbar"><div className="workspace-breadcrumb"><span>{role === "admin" ? "Quản trị hệ thống" : "OMS"}</span><span>/</span><strong>{heading}</strong></div><div className="workspace-top-actions"><div className="workspace-quick-actions"><button type="button" onClick={() => goBack(role)}>← <span>Quay lại</span></button></div><span className="workspace-env"><i /> Hệ thống hoạt động</span><button className="workspace-icon-button" aria-label="Thông báo">♧<i /></button><span className="workspace-top-divider" /><div className="workspace-user-chip"><ProfileAvatar initials={details.initials} className="workspace-avatar" editable={false} /><button type="button" className="workspace-user-profile" aria-label="Mở hồ sơ cá nhân" onClick={() => setProfileOpen(true)}><strong>{username}</strong><small>{details.name}</small></button><span className="workspace-chevron">⌄</span></div></div></header>
-        <main className="workspace-content">
+        {role === "admin" ? (
+          <HeaderTailwind fullName={username} roleName={details.name} notificationCount={0} onProfileClick={() => setProfileOpen(true)} onLogout={() => void logout()} />
+        ) : <header className="workspace-topbar"><div className="workspace-breadcrumb"><span>OMS</span><span>/</span><strong>{heading}</strong></div><div className="workspace-top-actions"><div className="workspace-quick-actions"><button type="button" onClick={() => goBack(role)}>← <span>Quay lại</span></button></div><span className="workspace-env"><i /> Hệ thống hoạt động</span><button className="workspace-icon-button" aria-label="Thông báo">♧<i /></button><span className="workspace-top-divider" /><div className="workspace-user-chip"><ProfileAvatar initials={details.initials} className="workspace-avatar" editable={false} /><button type="button" className="workspace-user-profile" aria-label="Mở hồ sơ cá nhân" onClick={() => setProfileOpen(true)}><strong>{username}</strong><small>{details.name}</small></button><span className="workspace-chevron">⌄</span></div></div></header>}
+        <main className={`workspace-content${role === "admin" ? " admin-tailwind-content" : ""}`}>
           {notice && <div className="workspace-alert" role="status"><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Đóng thông báo">×</button></div>}
           {renderContent()}
           <footer className="workspace-footer"><span>© 2026 OMS · Hệ thống bán hàng & kho</span><span>Vai trò: {details.name} <i /> Quyền được xác thực tại máy chủ</span></footer>

@@ -55,7 +55,7 @@ def require_active_user(
             raise unauthorized
 
         user = session.user
-        if user is None or user.is_active is False or user.status != AccountStatus.ACTIVE:
+        if user is None or user.is_active is False or user.status not in (AccountStatus.ACTIVE, AccountStatus.PENDING_ACTIVATION):
             raise unauthorized
 
         # Sliding session: every authenticated request extends the session window.
@@ -70,7 +70,7 @@ def require_active_user(
         username = payload.get("sub") or payload.get("username")
         if username:
             user = db.query(User).filter(User.username == username).first()
-            if user and user.is_active is not False and user.status == AccountStatus.ACTIVE:
+            if user and user.is_active is not False and user.status in (AccountStatus.ACTIVE, AccountStatus.PENDING_ACTIVATION):
                 return user
     except Exception:
         pass

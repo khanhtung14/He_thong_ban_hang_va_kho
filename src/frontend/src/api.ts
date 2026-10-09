@@ -53,6 +53,9 @@ export interface PriceListItem {
   items: PriceListLine[];
 }
 
+export interface ManagerCustomer { id:number; code:string; name:string; customer_group:string; }
+export interface PendingOrder { id:number; order_code:string; customer_id:number; customer_name?:string; status:string; total_amount:number; approval_reason?:string; items: Array<{sku:string;quantity:number;unit_price:number}>; }
+
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
 
@@ -153,6 +156,43 @@ export const createPriceList = async (payload: {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Không thể tạo bảng giá mới.");
   }
+  return res.json();
+};
+
+export const deleteDraftPriceList = async (priceListId:number): Promise<void> => {
+  const res = await fetch(`/api/v1/price-lists/${priceListId}`, {method:"DELETE", headers:getAuthHeaders()});
+  if (!res.ok) throw new Error((await res.json().catch(()=>({}))).detail || "Không xóa được bảng giá nháp.");
+};
+
+export const fetchManagerCustomers = async (): Promise<ManagerCustomer[]> => {
+  const res = await fetch("/api/v1/customers", { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Không tải được đại lý.");
+  return res.json();
+};
+
+export const updateCustomerGroup = async (id:number, customer_group:string): Promise<ManagerCustomer> => {
+  const res = await fetch(`/api/v1/customers/${id}/pricing-group`, { method:"PATCH", headers:getAuthHeaders(), body:JSON.stringify({customer_group}) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Không cập nhật được nhóm giá.");
+  return res.json();
+};
+
+export const fetchPendingOrders = async (): Promise<PendingOrder[]> => {
+  const res = await fetch("/api/v1/orders/pending-approval", { headers:getAuthHeaders() });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Không tải được đơn chờ duyệt.");
+  return res.json();
+};
+
+const orderDecision = async (id:number, action:"approve"|"reject"): Promise<PendingOrder> => {
+  const res = await fetch(`/api/v1/orders/${id}/${action}`, { method:"POST", headers:getAuthHeaders(), ...(action === "reject" ? {body:JSON.stringify({reason:"Không duyệt giá dưới sàn"})} : {}) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Không xử lý được đơn hàng.");
+  return res.json();
+};
+export const approveOrder = (id:number) => orderDecision(id,"approve");
+export const rejectOrder = (id:number) => orderDecision(id,"reject");
+
+export const fetchProducts = async (): Promise<Array<{sku:string;name:string;sale_price:number}>> => {
+  const res = await fetch("/api/v1/products", { headers:getAuthHeaders() });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Không tải được danh mục sản phẩm.");
   return res.json();
 };
 

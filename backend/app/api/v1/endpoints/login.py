@@ -276,6 +276,9 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if redirect_url is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vai trò tài khoản chưa được hỗ trợ.")
 
+    if db_user and db_user.get("status") == "PENDING_ACTIVATION":
+        redirect_url = "/change-password"
+
     # 6. Ghi nhận phiên làm việc nếu có bảng user_sessions
     if db_user and db_user.get("id") and isinstance(db, Session):
         session_token = secrets.token_urlsafe(48)

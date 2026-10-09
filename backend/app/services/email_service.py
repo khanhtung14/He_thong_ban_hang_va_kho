@@ -152,9 +152,10 @@ Bộ phận Quản trị hệ thống OMS
 
         smtp_host = os.getenv("SMTP_HOST")
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        smtp_user = os.getenv("SMTP_USER")
+        smtp_user = os.getenv("SMTP_USERNAME") or os.getenv("SMTP_USER")
         smtp_password = os.getenv("SMTP_PASSWORD")
         smtp_from = os.getenv("SMTP_FROM", smtp_user or "oms-noreply@company.com")
+        use_ssl = os.getenv("SMTP_USE_SSL", "false").strip().lower() in {"1", "true", "yes"}
 
         if smtp_host and smtp_user and smtp_password:
             self.last_retry_count = 0
@@ -171,8 +172,10 @@ Bộ phận Quản trị hệ thống OMS
                     msg.attach(part1)
                     msg.attach(part2)
 
-                    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-                        server.starttls()
+                    smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+                    with smtp_class(smtp_host, smtp_port, timeout=10) as server:
+                        if not use_ssl:
+                            server.starttls()
                         server.login(smtp_user, smtp_password)
                         server.sendmail(smtp_from, [to_email], msg.as_string())
                     logger.info(f"[EMAIL] Sent activation email to {to_email} via SMTP on attempt {attempt}")

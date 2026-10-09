@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { authenticatedFetch } from "../../session";
 
 export interface HeaderProps {
   fullName?: string;
@@ -18,6 +19,43 @@ export const HeaderTailwind: React.FC<HeaderProps> = ({
   onLogout,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [displayAvatarUrl, setDisplayAvatarUrl] = useState("");
+  const avatarObjectUrl = useRef("");
+
+  useEffect(() => {
+    let disposed = false;
+    const loadAvatar = async () => {
+      try {
+        const imagePath = avatarUrl?.startsWith("/") ? avatarUrl : "/profile/avatar";
+        const response = await authenticatedFetch(imagePath, { cache: "no-store" });
+        if (!response.ok) {
+          if (!disposed) setDisplayAvatarUrl("");
+          return;
+        }
+        const nextObjectUrl = URL.createObjectURL(await response.blob());
+        if (disposed) {
+          URL.revokeObjectURL(nextObjectUrl);
+          return;
+        }
+        if (avatarObjectUrl.current) URL.revokeObjectURL(avatarObjectUrl.current);
+        avatarObjectUrl.current = nextObjectUrl;
+        setDisplayAvatarUrl(nextObjectUrl);
+      } catch {
+        if (!disposed) setDisplayAvatarUrl("");
+      }
+    };
+    const handleAvatarUpdated = () => { void loadAvatar(); };
+    void loadAvatar();
+    window.addEventListener("oms:profile-avatar-updated", handleAvatarUpdated);
+    return () => {
+      disposed = true;
+      window.removeEventListener("oms:profile-avatar-updated", handleAvatarUpdated);
+      if (avatarObjectUrl.current) {
+        URL.revokeObjectURL(avatarObjectUrl.current);
+        avatarObjectUrl.current = "";
+      }
+    };
+  }, [avatarUrl]);
 
   // Avatar initials if no image
   const initials = fullName
@@ -91,9 +129,9 @@ export const HeaderTailwind: React.FC<HeaderProps> = ({
           className="flex items-center gap-3 p-1 pl-2 pr-3 rounded-full hover:bg-slate-100/80 transition-colors group cursor-pointer"
         >
           {/* Avatar image or fallback badge */}
-          {avatarUrl ? (
+          {displayAvatarUrl ? (
             <img
-              src={avatarUrl}
+              src={displayAvatarUrl}
               alt={fullName}
               className="w-9 h-9 rounded-full object-cover ring-2 ring-blue-500/20"
             />

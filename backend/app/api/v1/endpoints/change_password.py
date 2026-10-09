@@ -54,11 +54,14 @@ def change_authenticated_password(
         raise HTTPException(status_code=400, detail="Mật khẩu mới phải chứa số")
 
     from datetime import datetime, timezone
+    from app.models.models import AccountStatus
 
     user.password_hash = bcrypt.hashpw(
         data.new_password.encode("utf-8"), bcrypt.gensalt()
     ).decode("utf-8")
     user.must_change_password = False
+    if user.status == AccountStatus.PENDING_ACTIVATION:
+        user.status = AccountStatus.ACTIVE
     user.password_changed_at = datetime.now(timezone.utc)
     db.commit()
     return {"message": "Đổi mật khẩu thành công"}

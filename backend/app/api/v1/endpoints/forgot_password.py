@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover - direct script execution
     from app.core.database import get_db
     from app.models.models import PasswordResetToken, User
 
-router = APIRouter(tags=["Quên & Đặt lại mật khẩu"])
+router = APIRouter(prefix="/api/v1/auth", tags=["Quên & Đặt lại mật khẩu"])
 
 RESET_TOKEN_EXPIRE_MINUTES = 30
 GENERIC_SUCCESS_MESSAGE = (
@@ -172,10 +172,18 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
                         "sent_at": now.isoformat(),
                     }
                 )
+                print("\n" + "="*70)
+                print(f"📧 [DEMO MODE] EMAIL GIẢ LẬP ĐÃ ĐƯỢC GỬI ĐẾN: {user.email}")
+                print(f"🔗 LIÊN KẾT ĐẶT LẠI MẬT KHẨU CỦA BẠN LÀ:")
+                print(f"   {reset_link}")
+                print("="*70 + "\n")
             else:
                 raise RuntimeError("SMTP must be configured outside demo mode")
-        except Exception:
+        except Exception as e:
             db.rollback()
+            import traceback
+            traceback.print_exc()
+            print(f"LỖI KHI GỬI EMAIL QUÊN MẬT KHẨU: {e}")
             # Remove an unusable token if persistence succeeded but delivery failed.
             try:
                 persisted = (

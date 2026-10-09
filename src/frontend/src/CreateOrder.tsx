@@ -28,17 +28,27 @@ export default function CreateOrder({ products, onOrderCreated, onCancel }: Crea
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState<string>("");
+  const [effectivePrice, setEffectivePrice] = useState<{sale_price:number;floor_price:number;code:string;version:number}|null>(null);
+  const [priceLookupError, setPriceLookupError] = useState("");
 
   useEffect(() => {
     loadCustomers();
   }, []);
 
   useEffect(() => {
-    const prod = products.find((p) => p.sku === selectedProductSku);
-    if (prod) {
-      setUnitPrice(prod.sale_price);
-    }
-  }, [selectedProductSku, products]);
+    let active = true;
+    const customer = customers.find(c=>c.id===Number(selectedCustomerId));
+    const product = products.find(p=>p.sku===selectedProductSku);
+    setEffectivePrice(null); setPriceLookupError("");
+    if(!customer || !product) return;
+    authenticatedFetch(`/api/v1/price-lists/effective/${encodeURIComponent(selectedProductSku)}?customer_group=${encodeURIComponent(customer.customer_group||"RETAIL")}`)
+      .then(async res=>{
+        if(!res.ok){const data=await res.json().catch(()=>({}));throw new Error(data.detail||"Chưa có bảng giá hiệu lực.");}
+        return res.json();
+      }).then(price=>{if(active){setEffectivePrice(price);setUnitPrice(price.sale_price);}})
+      .catch(err=>{if(!active)return;if((customer.customer_group||"RETAIL")==="RETAIL"){setUnitPrice(product.sale_price);}else{setPriceLookupError(err.message);}});
+    return ()=>{active=false;};
+  }, [selectedProductSku, selectedCustomerId, customers, products]);
 
   async function loadCustomers() {
     setLoadingCustomers(true);
@@ -106,7 +116,7 @@ export default function CreateOrder({ products, onOrderCreated, onCancel }: Crea
         throw new Error(data.detail || "Không thể tạo đơn hàng.");
       }
 
-      setSuccessMessage(`Tạo đơn hàng ${data.order_code} thành công!`);
+      setSuccessMessage(data.status === "PENDING" ? `Đơn ${data.order_code} đã gửi quản lý duyệt vì có giá dưới sàn.` : `Tạo đơn hàng ${data.order_code} thành công!`);
       if (onOrderCreated) {
         onOrderCreated(data);
       }
@@ -181,6 +191,7 @@ export default function CreateOrder({ products, onOrderCreated, onCancel }: Crea
           {successMessage}
         </div>
       )}
+      {priceLookupError && <div className="workspace-alert is-error" style={{marginBottom:16}}>{priceLookupError} Vui lòng khai báo và phát hành bảng giá trước khi đặt hàng.</div>}
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 16 }}>
         <div>
@@ -245,6 +256,9 @@ export default function CreateOrder({ products, onOrderCreated, onCancel }: Crea
             />
           </div>
         </div>
+        <div style={{fontSize:13,color:effectivePrice&&unitPrice<effectivePrice.floor_price?"#b91c1c":"#64748b"}}>
+          {effectivePrice ? `Bảng giá ${effectivePrice.code} v${effectivePrice.version} · Giá sàn ${effectivePrice.floor_price.toLocaleString("vi-VN")} ₫${unitPrice<effectivePrice.floor_price?" · Đơn sẽ chờ quản lý duyệt":""}` : "Giá mặc định theo danh mục sản phẩm"}
+        </div>
 
         <div>
           <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Ghi chú đơn hàng</label>
@@ -284,7 +298,7 @@ export default function CreateOrder({ products, onOrderCreated, onCancel }: Crea
           <button
             type="submit"
             className="workspace-button"
-            disabled={isSubmitting || isCustomerLocked}
+            disabled={isSubmitting || isCustomerLocked || Boolean(priceLookupError)}
             style={{
               minWidth: 160,
               backgroundColor: isCustomerLocked ? "#9ca3af" : "#2563eb",

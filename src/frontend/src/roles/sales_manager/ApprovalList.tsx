@@ -14,6 +14,7 @@ export interface ApprovalItem {
   assigneeName: string;
   approveActionLabel: string;
   priceListId?: number;
+  orderId?: number;
 }
 
 export interface ApprovalListProps {
