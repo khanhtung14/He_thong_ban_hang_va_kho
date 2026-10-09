@@ -1,0 +1,69 @@
+/* Scoped styles for profile form if needed */
+.profile-form-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+}
+
+.profile-card {
+  width: 100%;
+  max-width: 550px;
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.profile-card h1 {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.profile-card form {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-card label {
+  margin-bottom: 6px;
+  font-weight: bold;
+}
+
+.profile-card input {
+  padding: 10px;
+  margin-bottom: 16px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.profile-card input:disabled {
+  background: #eee;
+  color: #666;
+}
+
+.profile-card button {
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.profile-card button:hover {
+  background: #1d4ed8;
+}
+
+.error-text {
+  color: #dc2626;
+  margin-bottom: 15px;
+}
+
+.success-text {
+  color: #16a34a;
+  margin-bottom: 15px;
+}
