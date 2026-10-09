@@ -1,0 +1,166 @@
+import React from "react";
+import {
+  Layout,
+  Avatar,
+  Badge,
+  Dropdown,
+  Tag,
+  Space,
+  Typography,
+  Button,
+} from "antd";
+import type { MenuProps } from "antd";
+import {
+  BellOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  KeyOutlined,
+  CheckCircleTwoTone,
+} from "@ant-design/icons";
+
+const { Header } = Layout;
+const { Text } = Typography;
+
+export interface WarehouseStaffHeaderProps {
+  fullName?: string;
+  roleName?: string;
+  avatarUrl?: string | null;
+  notificationCount?: number;
+  onLogout?: () => void;
+  onProfileClick?: () => void;
+  onChangePassword?: () => void;
+}
+
+export const WarehouseStaffHeader: React.FC<WarehouseStaffHeaderProps> = ({
+  fullName = "Nhân viên kho",
+  roleName = "Nhân viên tác nghiệp",
+  avatarUrl,
+  notificationCount = 0,
+  onProfileClick,
+  onChangePassword,
+  onLogout,
+}) => {
+  const initials =
+    fullName
+      .trim()
+      .split(" ")
+      .filter(Boolean)
+      .map((n) => n[0])
+      .slice(-2)
+      .join("")
+      .toUpperCase() || "NK";
+
+  const profileMenuItems: MenuProps["items"] = [
+    {
+      key: "user-info",
+      disabled: true,
+      label: (
+        <div style={{ padding: "4px 0", cursor: "default" }}>
+          <Text strong style={{ display: "block" }}>
+            {fullName}
+          </Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {roleName}
+          </Text>
+        </div>
+      ),
+    },
+    { type: "divider" },
+    {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: "Hồ sơ cá nhân",
+      onClick: onProfileClick,
+    },
+    {
+      key: "change-password",
+      icon: <KeyOutlined />,
+      label: "Đổi mật khẩu",
+      onClick: onChangePassword,
+    },
+    { type: "divider" },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      danger: true,
+      label: "Đăng xuất",
+      onClick: onLogout,
+    },
+  ];
+
+  return (
+    <Header
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: "#ffffff",
+        borderBottom: "1px solid #f0f0f0",
+        padding: "0 24px",
+        height: 64,
+        lineHeight: "64px",
+      }}
+    >
+      <Space align="center">
+        <Tag
+          icon={<CheckCircleTwoTone twoToneColor="#52c41a" />}
+          color="success"
+          style={{ padding: "4px 10px", borderRadius: 12, fontSize: 13 }}
+        >
+          Trực tuyến · Kho vận
+        </Tag>
+      </Space>
+
+      <Space size="large" align="center">
+        <Badge count={notificationCount} size="small" offset={[-2, 4]}>
+          <Button
+            type="text"
+            shape="circle"
+            icon={<BellOutlined style={{ fontSize: 18, color: "#595959" }} />}
+            style={{ width: 40, height: 40 }}
+          />
+        </Badge>
+
+        <Dropdown
+          menu={{ items: profileMenuItems }}
+          trigger={["click"]}
+          placement="bottomRight"
+        >
+          <Space style={{ cursor: "pointer", userSelect: "none" }} size="small">
+            {avatarUrl ? (
+              <Avatar src={avatarUrl} size={36} />
+            ) : (
+              <Avatar
+                style={{ backgroundColor: "#d97706", fontWeight: "bold" }}
+                size={36}
+              >
+                {initials}
+              </Avatar>
+            )}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                lineHeight: 1.2,
+                textAlign: "left",
+              }}
+            >
+              <Text strong style={{ fontSize: 14 }}>
+                {fullName}
+              </Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {roleName}
+              </Text>
+            </div>
+          </Space>
+        </Dropdown>
+      </Space>
+    </Header>
+  );
+};
+
+export default WarehouseStaffHeader;
