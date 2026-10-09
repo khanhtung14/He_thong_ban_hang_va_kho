@@ -13,6 +13,7 @@ import {
   AppstoreOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
+import { FileExcelOutlined } from "@ant-design/icons";
 
 const { Sider } = Layout;
 
@@ -65,6 +66,12 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       path: "/manager/pricing",
       icon: "tag",
     },
+    {
+      id: "excel-import",
+      title: "Nhập sản phẩm (Excel)",
+      path: "/manager/products/import",
+      icon: "excel",
+    },
   ];
 
   const menuItems =
@@ -82,6 +89,9 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       case "chart":
       case "bar-chart":
         return <BarChartOutlined />;
+      case "excel": // <-- Thêm dòng này
+      case "import": // <-- Thêm dòng này
+        return <FileExcelOutlined />;
       case "users":
         return <UsergroupAddOutlined />;
       case "tag":

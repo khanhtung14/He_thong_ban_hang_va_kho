@@ -4,6 +4,7 @@ import ForgotPassword from "./auth/ForgotPassword";
 import ChangePassword from "./auth/ChangePassword";
 import CreateUser from "./CreateUser";
 import Profile from "./Profile";
+import ProductImport from "./ProductImport";
 import Navigation from "./Navigation";
 import RoleWorkspace from "./RoleWorkspace";
 import Error403 from "./Error403";
@@ -62,6 +63,10 @@ export default function App() {
   // Never hardcode SalesManagerDashboard on root (/) or protected routes.
   if (!isAuthenticated || !userRole) {
     return <Login />;
+  }
+
+  if (currentPath === "/" && new URLSearchParams(window.location.search).get("view") === "product-import") {
+    return <ProductImport />;
   }
 
   // 3. Authenticated: on root (/) or /workspace, render user's role workspace

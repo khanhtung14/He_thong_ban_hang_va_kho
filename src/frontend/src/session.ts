@@ -1,6 +1,6 @@
 const TOKEN_KEY = "session_token";
-const EXPIRY_KEY = "session_expires_at";
 const ACCESS_TOKEN_KEY = "access_token";
+const EXPIRY_KEY = "session_expires_at";
 const ACCESS_EXPIRY_KEY = "access_token_expires_at";
 const REFRESH_BEFORE_MS = 2 * 60 * 1000;
 
@@ -35,17 +35,9 @@ export function hasValidSession(): boolean {
       0,
   );
 
-  if (!sessionToken && !accessToken) {
-    return false;
-  }
-  if (sessionExpiry && sessionExpiry < Date.now()) {
-    return false;
-  }
-  const role = getCurrentUserRole();
-  if (!role) {
-    return false;
-  }
-  return true;
+  if (!sessionToken && !accessToken) return false;
+  if (sessionExpiry && sessionExpiry < Date.now()) return false;
+  return Boolean(getCurrentUserRole());
 }
 
 export function getCurrentUserRole(): string | null {
@@ -70,10 +62,10 @@ export function getDefaultPathForRole(roleCode?: string | null): string {
   const normalized = (roleCode ?? "").trim().toUpperCase().replace(/[ -]/g, "_");
   if (normalized === "SALES_MANAGER") return "/manager/dashboard";
   if (["SALES", "SALES_REP"].includes(normalized)) return "/sales/orders";
-  if (["CUSTOMER"].includes(normalized)) return "/portal/orders";
-  if (["WAREHOUSE"].includes(normalized)) return "/warehouse/picking";
+  if (normalized === "CUSTOMER") return "/portal/orders";
+  if (normalized === "WAREHOUSE") return "/warehouse/picking";
   if (["WH_MANAGER", "WAREHOUSE_MANAGER"].includes(normalized)) return "/warehouse/dashboard";
-  if (["ACCOUNTANT"].includes(normalized)) return "/accounting/debt-book";
+  if (normalized === "ACCOUNTANT") return "/accounting/debt-book";
   if (["ADMIN", "ADMINISTRATOR"].includes(normalized)) return "/admin/users";
   return "/login";
 }
@@ -89,7 +81,7 @@ export async function refreshSession(token: string): Promise<boolean> {
   try {
     const response = await fetch("/api/v1/auth/refresh", {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: ["Bearer", token].join(" ") },
     });
     if (!response.ok) return false;
     const result = (await response.json()) as { expires_in: number; access_token?: string };
@@ -99,9 +91,9 @@ export async function refreshSession(token: string): Promise<boolean> {
     if (result.access_token) {
       window.sessionStorage?.setItem(ACCESS_TOKEN_KEY, result.access_token);
       window.localStorage?.setItem(ACCESS_TOKEN_KEY, result.access_token);
-      const accExp = String(Date.now() + 58 * 60 * 1000);
-      window.sessionStorage?.setItem(ACCESS_EXPIRY_KEY, accExp);
-      window.localStorage?.setItem(ACCESS_EXPIRY_KEY, accExp);
+      const accessExpiry = String(Date.now() + 58 * 60 * 1000);
+      window.sessionStorage?.setItem(ACCESS_EXPIRY_KEY, accessExpiry);
+      window.localStorage?.setItem(ACCESS_EXPIRY_KEY, accessExpiry);
     }
     return true;
   } catch {
@@ -115,7 +107,8 @@ export async function authenticatedFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const headers = new Headers(init.headers);
-  const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
+  const requestUrl =
+    typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
   const pathname = new URL(requestUrl, window.location.origin).pathname;
   const usesAccessToken = [
     "/api/v1/products",
@@ -123,9 +116,7 @@ export async function authenticatedFetch(
     "/api/v1/reports",
     "/api/v1/customers",
     "/api/v1/orders",
-  ].some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  ].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
   const sessionToken =
     window.sessionStorage?.getItem(TOKEN_KEY) ||
     window.localStorage?.getItem(TOKEN_KEY) ||
@@ -143,30 +134,25 @@ export async function authenticatedFetch(
   const needsRefresh = Boolean(
     sessionToken &&
       ((sessionExpiry && sessionExpiry - Date.now() < REFRESH_BEFORE_MS) ||
-        (usesAccessToken && (!accessExpiry || accessExpiry - Date.now() < REFRESH_BEFORE_MS))),
+        (usesAccessToken &&
+          (!accessExpiry || accessExpiry - Date.now() < REFRESH_BEFORE_MS))),
   );
 
-  if (needsRefresh && sessionToken) {
-    try {
-      if (!(await refreshSession(sessionToken))) {
-        expireSession();
-        return new Response(null, { status: 401 });
-      }
-    } catch {
-      // Keep session intact while offline
-    }
+  if (needsRefresh && sessionToken && !(await refreshSession(sessionToken))) {
+    expireSession();
+    return new Response(null, { status: 401 });
   }
+
   const token = usesAccessToken
-    ? window.sessionStorage?.getItem(ACCESS_TOKEN_KEY) || window.localStorage?.getItem(ACCESS_TOKEN_KEY)
+    ? window.sessionStorage?.getItem(ACCESS_TOKEN_KEY) ||
+      window.localStorage?.getItem(ACCESS_TOKEN_KEY)
     : window.sessionStorage?.getItem(TOKEN_KEY) ||
       window.localStorage?.getItem(TOKEN_KEY) ||
       window.localStorage?.getItem("token");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (token) headers.set("Authorization", ["Bearer", token].join(" "));
 
   const response = await fetch(input, { ...init, headers });
-  if (response.status === 401) {
-    expireSession();
-  }
+  if (response.status === 401) expireSession();
   return response;
 }
 
@@ -179,7 +165,7 @@ export async function logout(): Promise<void> {
   try {
     await fetch("/api/v1/auth/logout", {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: token ? { Authorization: ["Bearer", token].join(" ") } : {},
     });
   } catch {
     // Ignore network error on logout
