@@ -1,4 +1,4 @@
-"""Role-Based Access Control (RBAC) and Security Scoping for OMS.
+﻿"""Role-Based Access Control (RBAC) and Security Scoping for OMS.
 
 Enforces:
 1. 7 standard system roles: Customer, Sales Rep, Sales Manager, Warehouse, WH Manager, Accountant, Admin.
@@ -69,7 +69,9 @@ PERM_INVENTORY_RECEIVE = "inventory:receive"
 PERM_INVENTORY_PICK = "inventory:pick"
 
 PERM_PRODUCTS_VIEW = "products:view"
+PERM_PRODUCTS_UNIT_MANAGE = "products:unit_manage"
 PERM_PRODUCTS_VIEW_FINANCIALS = "products:view_financials"  # Cost price & Margin
+PERM_PRODUCTS_IMPORT = "products:import"
 PERM_PRODUCTS_MANAGE = "products:manage"
 
 PERM_ORDERS_CREATE = "orders:create"
@@ -85,7 +87,7 @@ PERM_DEBT_RECONCILE = "debt:reconcile"
 
 PERM_INVOICE_MANAGE = "invoice:manage"
 PERM_PAYMENT_RECORD = "payment:record"
-PERM_CUSTOMERS_LOCK = "customers:lock"  # SCRUM-85: Quyền khóa/mở khóa giao dịch đại lý
+PERM_CUSTOMERS_LOCK = "customers:lock"  # SCRUM-85: Quyá»n khÃ³a/má»Ÿ khÃ³a giao dá»‹ch Ä‘áº¡i lÃ½
 PERM_SYSTEM_ADMIN = "system:admin"
 
 
@@ -103,12 +105,13 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PERM_ORDERS_CREATE,
         PERM_ORDERS_VIEW_ASSIGNED,
         PERM_DEBT_VIEW_ASSIGNED,
-        # TUYỆT ĐỐI KHÔNG có PERM_INVENTORY_ADJUST
-        # TUYỆT ĐỐI KHÔNG có PERM_PRODUCTS_VIEW_FINANCIALS
+        # TUYá»†T Äá»I KHÃ”NG cÃ³ PERM_INVENTORY_ADJUST
+        # TUYá»†T Äá»I KHÃ”NG cÃ³ PERM_PRODUCTS_VIEW_FINANCIALS
     },
     RoleCode.SALES_MANAGER.value: {
         PERM_PRODUCTS_VIEW,
-        PERM_PRODUCTS_VIEW_FINANCIALS,  # Cho phép xem giá vốn & biên lợi nhuận
+        PERM_PRODUCTS_VIEW_FINANCIALS,  # Cho phÃ©p xem giÃ¡ vá»‘n & biÃªn lá»£i nhuáº­n
+        PERM_PRODUCTS_IMPORT,
         PERM_INVENTORY_VIEW,
         PERM_ORDERS_CREATE,
         PERM_ORDERS_APPROVE,
@@ -117,22 +120,24 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     },
     RoleCode.WAREHOUSE.value: {
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_UNIT_MANAGE,
         PERM_INVENTORY_VIEW,
         PERM_INVENTORY_PICK,
         PERM_INVENTORY_RECEIVE,
         PERM_INVENTORY_COUNT,
-        # TUYỆT ĐỐI KHÔNG có PERM_PRODUCTS_VIEW_FINANCIALS
-        # Không có PERM_INVENTORY_ADJUST (chỉ WH Manager mới có quyền duyệt/điều chỉnh)
+        # TUYá»†T Äá»I KHÃ”NG cÃ³ PERM_PRODUCTS_VIEW_FINANCIALS
+        # KhÃ´ng cÃ³ PERM_INVENTORY_ADJUST (chá»‰ WH Manager má»›i cÃ³ quyá»n duyá»‡t/Ä‘iá»u chá»‰nh)
     },
     RoleCode.WH_MANAGER.value: {
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_UNIT_MANAGE,
         PERM_INVENTORY_VIEW,
         PERM_INVENTORY_PICK,
         PERM_INVENTORY_RECEIVE,
         PERM_INVENTORY_COUNT,
-        PERM_INVENTORY_ADJUST,    # Quản lý kho duyệt điều chỉnh tồn
-        PERM_INVENTORY_TRANSFER,  # Quản lý kho chuyển kho
-        # TUYỆT ĐỐI KHÔNG có PERM_PRODUCTS_VIEW_FINANCIALS (Bảo vệ bí mật thương mại)
+        PERM_INVENTORY_ADJUST,    # Quáº£n lÃ½ kho duyá»‡t Ä‘iá»u chá»‰nh tá»“n
+        PERM_INVENTORY_TRANSFER,  # Quáº£n lÃ½ kho chuyá»ƒn kho
+        # TUYá»†T Äá»I KHÃ”NG cÃ³ PERM_PRODUCTS_VIEW_FINANCIALS (Báº£o vá»‡ bÃ­ máº­t thÆ°Æ¡ng máº¡i)
     },
     RoleCode.ACCOUNTANT.value: {
         PERM_PRODUCTS_VIEW,
@@ -140,12 +145,14 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PERM_PAYMENT_RECORD,
         PERM_DEBT_RECONCILE,
         PERM_DEBT_VIEW_ALL,
-        PERM_CUSTOMERS_LOCK,  # SCRUM-85: Kế toán công nợ được phép khóa/mở giao dịch đại lý
-        # TUYỆT ĐỐI KHÔNG có PERM_PRODUCTS_VIEW_FINANCIALS
+        PERM_CUSTOMERS_LOCK,  # SCRUM-85: Káº¿ toÃ¡n cÃ´ng ná»£ Ä‘Æ°á»£c phÃ©p khÃ³a/má»Ÿ giao dá»‹ch Ä‘áº¡i lÃ½
+        # TUYá»†T Äá»I KHÃ”NG cÃ³ PERM_PRODUCTS_VIEW_FINANCIALS
     },
     RoleCode.ADMIN.value: {
         PERM_SYSTEM_ADMIN,
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_UNIT_MANAGE,
+        PERM_PRODUCTS_IMPORT,
         PERM_INVENTORY_VIEW,
         PERM_INVENTORY_ADJUST,
         PERM_INVENTORY_TRANSFER,
@@ -240,7 +247,7 @@ def decode_access_token(token: str) -> Dict[str, Any]:
     except jwt.PyJWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Mã xác thực không hợp lệ hoặc đã hết hạn.",
+            detail="MÃ£ xÃ¡c thá»±c khÃ´ng há»£p lá»‡ hoáº·c Ä‘Ã£ háº¿t háº¡n.",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
@@ -267,13 +274,13 @@ def get_current_user(
             if not username or not role_raw:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Mã token thiếu thông tin người dùng hoặc vai trò.",
+                    detail="MÃ£ token thiáº¿u thÃ´ng tin ngÆ°á»i dÃ¹ng hoáº·c vai trÃ².",
                 )
             normalized = normalize_role(role_raw)
             if not normalized:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Vai trò trong token không hợp lệ trên hệ thống.",
+                    detail="Vai trÃ² trong token khÃ´ng há»£p lá»‡ trÃªn há»‡ thá»‘ng.",
                 )
             return AuthenticatedUser(
                 username=username,
@@ -317,7 +324,7 @@ def get_current_user(
     # Default-Deny: Missing authentication credentials
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Yêu cầu xác thực tài khoản (Thiếu thông tin đăng nhập hoặc Authorization header).",
+        detail="YÃªu cáº§u xÃ¡c thá»±c tÃ i khoáº£n (Thiáº¿u thÃ´ng tin Ä‘Äƒng nháº­p hoáº·c Authorization header).",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -334,7 +341,7 @@ def require_roles(*allowed_roles: Union[str, RoleCode]):
         if user_norm not in normalized_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Quyền bị từ chối: Vai trò '{user.role}' không được phép truy cập tài nguyên này.",
+                detail=f"Quyá»n bá»‹ tá»« chá»‘i: Vai trÃ² '{user.role}' khÃ´ng Ä‘Æ°á»£c phÃ©p truy cáº­p tÃ i nguyÃªn nÃ y.",
             )
         return user
 
@@ -348,7 +355,7 @@ def require_permissions(*required_permissions: str):
             if not user.has_permission(perm):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Quyền bị từ chối: Vai trò '{user.role}' không có quyền '{perm}'.",
+                    detail=f"Quyá»n bá»‹ tá»« chá»‘i: Vai trÃ² '{user.role}' khÃ´ng cÃ³ quyá»n '{perm}'.",
                 )
         return user
 

@@ -4,6 +4,8 @@
  * and FastAPI direct deployment (port 8000).
  */
 
+import { authenticatedFetch } from "./sessionService";
+
 export interface UserProfile {
   username: string;
   email?: string;
@@ -65,7 +67,9 @@ export const getAuthToken = (): string | null => {
   // 2. Local Storage
   const localAccess = window.localStorage?.getItem("access_token");
   if (localAccess) return localAccess;
-  const localToken = window.localStorage?.getItem("token") || window.localStorage?.getItem("session_token");
+  const localToken =
+    window.localStorage?.getItem("token") ||
+    window.localStorage?.getItem("session_token");
   if (localToken) return localToken;
 
   // 3. Document Cookie
@@ -73,7 +77,11 @@ export const getAuthToken = (): string | null => {
     const cookies = document.cookie.split("; ");
     for (const cookie of cookies) {
       const [name, val] = cookie.split("=");
-      if (name === "access_token" || name === "token" || name === "session_token") {
+      if (
+        name === "access_token" ||
+        name === "token" ||
+        name === "session_token"
+      ) {
         return decodeURIComponent(val || "");
       }
     }
@@ -94,8 +102,7 @@ export const getAuthHeaders = (): Record<string, string> => {
 };
 
 export const fetchProfile = async (): Promise<UserProfile> => {
-  const headers = getAuthHeaders();
-  const res = await fetch("/api/v1/profile", { headers });
+  const res = await authenticatedFetch("/api/v1/profile");
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Không thể tải thông tin tài khoản.");
@@ -108,7 +115,9 @@ export const fetchSalesMarginReport = async (): Promise<SalesMarginReport> => {
   const res = await fetch("/api/v1/reports/sales-margin", { headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Không thể tải báo cáo doanh số & biên lợi nhuận.");
+    throw new Error(
+      err.detail || "Không thể tải báo cáo doanh số & biên lợi nhuận.",
+    );
   }
   return res.json();
 };
@@ -123,7 +132,9 @@ export const fetchPriceLists = async (): Promise<PriceListItem[]> => {
   return res.json();
 };
 
-export const publishPriceList = async (priceListId: number): Promise<PriceListItem> => {
+export const publishPriceList = async (
+  priceListId: number,
+): Promise<PriceListItem> => {
   const headers = getAuthHeaders();
   const res = await fetch(`/api/v1/price-lists/${priceListId}/publish`, {
     method: "POST",
@@ -131,7 +142,9 @@ export const publishPriceList = async (priceListId: number): Promise<PriceListIt
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Không thể phát hành bảng giá #${priceListId}.`);
+    throw new Error(
+      err.detail || `Không thể phát hành bảng giá #${priceListId}.`,
+    );
   }
   return res.json();
 };
@@ -156,10 +169,15 @@ export const createPriceList = async (payload: {
   return res.json();
 };
 
-export const fetchNavigationMenu = async (role = "SALES_MANAGER"): Promise<any[]> => {
+export const fetchNavigationMenu = async (
+  role = "SALES_MANAGER",
+): Promise<any[]> => {
   try {
     const headers = getAuthHeaders();
-    const res = await fetch(`/api/v1/navigation/menu?role=${encodeURIComponent(role)}`, { headers });
+    const res = await fetch(
+      `/api/v1/navigation/menu?role=${encodeURIComponent(role)}`,
+      { headers },
+    );
     if (res.ok) {
       const data = await res.json();
       return Array.isArray(data.menu_items) ? data.menu_items : [];
@@ -169,3 +187,33 @@ export const fetchNavigationMenu = async (role = "SALES_MANAGER"): Promise<any[]
   }
   return [];
 };
+
+// Thêm interface Product
+export interface Product {
+  sku: string;
+  name: string;
+  category?: string;
+  unit?: string;
+  base_price?: number;
+}
+
+// Hàm gọi API lấy danh sách sản phẩm từ backend
+export async function getProducts(): Promise<Product[]> {
+  const token =
+    localStorage.getItem("token") || sessionStorage.getItem("token");
+
+  const response = await fetch("/api/v1/products", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Không thể tải danh sách sản phẩm từ hệ thống.");
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.items || [];
+}

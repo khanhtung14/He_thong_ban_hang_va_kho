@@ -33,7 +33,7 @@ export default function ProfileAvatar({ initials = "?", className = "", editable
     }
     async function loadAvatar() {
       try {
-        const response = await authenticatedFetch("/profile/avatar", { cache: "no-store" });
+        const response = await authenticatedFetch("/api/v1/profile/avatar", { cache: "no-store" });
         if (!response.ok) {
           if (!disposed) {
             if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
@@ -117,15 +117,19 @@ export default function ProfileAvatar({ initials = "?", className = "", editable
     try {
       const body = new FormData();
       body.append("file", selectedFile);
-      const response = await authenticatedFetch("/profile/avatar", { method: "POST", body });
-      const result = await response.json().catch(() => ({})) as ApiError & { message?: string };
+      const response = await authenticatedFetch("/api/v1/profile/avatar", { method: "POST", body });
+      const result = await response.json().catch(() => ({})) as ApiError & { message?: string; avatar_url?: string };
       if (!response.ok) throw new Error(result.detail ?? "Không thể tải ảnh đại diện lên.");
       setMessage(result.message ?? "Đã cập nhật ảnh đại diện.");
+      if (result.avatar_url) {
+        window.sessionStorage.setItem("avatar_url", result.avatar_url);
+        window.localStorage.setItem("avatar_url", result.avatar_url);
+      }
       setSelectedFile(null);
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = "";
       setPreviewUrl("");
-      window.dispatchEvent(new Event(AVATAR_UPDATED_EVENT));
+      window.dispatchEvent(new CustomEvent(AVATAR_UPDATED_EVENT, { detail: { avatarUrl: result.avatar_url } }));
     } catch (error) {
       setIsError(true);
       setMessage(error instanceof Error ? error.message : "Không thể kết nối máy chủ.");
@@ -136,10 +140,10 @@ export default function ProfileAvatar({ initials = "?", className = "", editable
 
   return <>
     {editable ? <button className={`profile-avatar-trigger ${className}`} type="button" aria-label="Xem hoặc đổi ảnh đại diện" title="Ảnh đại diện · nhấn để đổi" onClick={() => { setIsOpen(true); setMessage(""); setIsError(false); }}>
-      {avatarUrl ? <img src={avatarUrl} alt="Ảnh đại diện" /> : <span>{fallbackInitials}</span>}
+      {avatarUrl ? <img src={avatarUrl} alt="Ảnh đại diện" onError={() => setAvatarUrl("")} /> : <span>{fallbackInitials}</span>}
       <i aria-hidden="true">✎</i>
     </button> : <div className={`profile-avatar-trigger is-readonly ${className}`} aria-label="Ảnh đại diện">
-      {avatarUrl ? <img src={avatarUrl} alt="Ảnh đại diện" /> : <span>{fallbackInitials}</span>}
+      {avatarUrl ? <img src={avatarUrl} alt="Ảnh đại diện" onError={() => setAvatarUrl("")} /> : <span>{fallbackInitials}</span>}
     </div>}
     {editable && isOpen && <div className="avatar-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
       <section className="avatar-dialog" role="dialog" aria-modal="true" aria-labelledby="avatar-dialog-title">
