@@ -13,11 +13,51 @@ from app.api.v1.endpoints.rbac import (
     require_permissions,
     sanitize_financial_data,
 )
+from pydantic import BaseModel
+
+class ProductUnitResponse(BaseModel):
+    id: int
+    unitName: str
+    conversionRate: float
+    barcode: Optional[str] = None
+
+class ProductBase(BaseModel):
+    id: int
+    sku: str
+    name: str
+    categoryId: Optional[int] = None
+    baseUnit: str
+    manageByLot: bool
+    minStock: int
+    basePrice: Optional[float] = None
+    costPrice: Optional[float] = None
+    status: str
+    imageUrl: Optional[str] = None
+    units: Optional[list[ProductUnitResponse]] = None
+
+class PaginationInfo(BaseModel):
+    page: int
+    limit: int
+    totalRecords: int
+    totalPages: int
+
+class ProductListResponse(BaseModel):
+    success: bool
+    code: int
+    message: str
+    data: list[ProductBase]
+    pagination: PaginationInfo
+
+class ProductDetailResponse(BaseModel):
+    success: bool
+    code: int
+    message: str
+    data: ProductBase
 
 router = APIRouter(prefix="/api/v1/products", tags=["Products"])
 
 
-@router.get("")
+@router.get("", response_model=ProductListResponse)
 def list_products(
     keyword: Optional[str] = None,
     category_id: Optional[int] = Query(None, alias="categoryId"),
@@ -75,7 +115,7 @@ def list_products(
     }
 
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=ProductDetailResponse)
 def get_product_detail(
     id: int,
     db: Session = Depends(get_db),

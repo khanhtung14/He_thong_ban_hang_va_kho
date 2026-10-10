@@ -50,8 +50,8 @@ def fix_imports(file_path):
         content = f.read()
 
     new_content = content
-    # In features/auth/*: ../session -> ../../services/sessionService
-    # In features/auth/*: ../api -> ../../services/apiClient
+    # In features/auth/*: ../services/sessionService -> ../../services/sessionService
+    # In features/auth/*: ../services/apiClient -> ../../services/apiClient
     # Replace anything importing session or api depending on depth.
     
     # We will do a regex to replace session and api imports
@@ -59,7 +59,7 @@ def fix_imports(file_path):
     new_content = re.sub(r'from\s+["\'](\./|\.\./)+session["\']', 'from "services/sessionService"', new_content)
     new_content = re.sub(r'from\s+["\'](\./|\.\./)+api["\']', 'from "services/apiClient"', new_content)
     
-    # Also fix imports pointing to ../../session etc
+    # Also fix imports pointing to ../../services/sessionService etc
     new_content = re.sub(r'from\s+["\'].*?/session["\']', 'from "services/sessionService"', new_content)
     new_content = re.sub(r'from\s+["\'].*?/api["\']', 'from "services/apiClient"', new_content)
     

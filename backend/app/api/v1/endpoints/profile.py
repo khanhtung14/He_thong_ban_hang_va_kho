@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.core.database import engine, get_db
 from app.models.models import User
@@ -15,6 +16,20 @@ from app.core.security import require_active_user
 
 router = APIRouter(prefix="/api/v1", tags=["Personal profile"])
 
+
+class UserProfileResponse(BaseModel):
+    username: str
+    email: Optional[str] = None
+    full_name: str
+    avatar_url: Optional[str] = None
+    phone: str
+    role: str
+    warehouse: str
+    area: str
+
+class UpdateProfileResponse(BaseModel):
+    message: str
+    profile: UserProfileResponse
 
 class UpdateProfileRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -74,7 +89,7 @@ def _serialize_profile(user: User) -> dict:
     }
 
 
-@router.get("/profile")
+@router.get("/profile", response_model=UserProfileResponse)
 def get_profile(
     user: User = Depends(require_active_user),
 ) -> dict:
@@ -82,7 +97,7 @@ def get_profile(
     return _serialize_profile(user)
 
 
-@router.put("/profile")
+@router.put("/profile", response_model=UpdateProfileResponse)
 def update_profile(
     request: UpdateProfileRequest,
     user: User = Depends(require_active_user),

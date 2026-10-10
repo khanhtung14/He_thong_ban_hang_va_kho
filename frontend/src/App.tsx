@@ -6,12 +6,9 @@ import ChangePassword from "./features/auth/ChangePassword";
 import CreateUser from "./features/users/CreateUser";
 import Profile from "./features/profile/Profile";
 import Navigation from "./Navigation";
-import RoleWorkspace from "./features/roles/RoleWorkspace";
+import RoleWorkspace from "./RoleWorkspace";
 import Error403 from "./Error403";
-import {
-  hasValidSession,
-  getCurrentUserRole,
-} from "./services/sessionService";
+import { hasValidSession, getCurrentUserRole } from "./services/sessionService";
 
 const roleWorkspacePaths = [
   "/portal/orders",
@@ -75,7 +72,10 @@ export default function App() {
 
   // 4. Admin create user route
   if (currentPath === "/admin/users/create") {
-    const normalized = (userRole ?? "").trim().toUpperCase().replace(/[ -]/g, "_");
+    const normalized = (userRole ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[ -]/g, "_");
     if (["ADMIN", "ADMINISTRATOR"].includes(normalized)) {
       return <CreateUser />;
     }
@@ -94,7 +94,10 @@ export default function App() {
   }
 
   // 6. Role workspace routes (e.g. /manager/dashboard, /sales/orders, etc.)
-  if (roleWorkspacePaths.includes(currentPath) || currentPath.startsWith("/admin/")) {
+  if (
+    roleWorkspacePaths.includes(currentPath) ||
+    currentPath.startsWith("/admin/")
+  ) {
     return <RoleWorkspace />;
   }
 
