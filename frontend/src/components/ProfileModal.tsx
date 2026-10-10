@@ -9,8 +9,8 @@ import {
   EditOutlined,
   SaveOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../session";
-import { fetchProfile, type UserProfile } from "../api";
+import { authenticatedFetch } from "../services/sessionService";
+import { fetchProfile, type UserProfile } from "../services/apiClient";
 import ProfileAvatar from "./ProfileAvatar";
 
 export interface ProfileModalProps {
@@ -65,7 +65,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     if (isOpen) {
       loadProfile();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, form]);
 
   const handleSubmit = async (values: any) => {

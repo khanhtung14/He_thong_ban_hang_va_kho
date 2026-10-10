@@ -15,7 +15,7 @@ import {
   CheckCircleOutlined,
   SaveOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../session";
+import { authenticatedFetch } from "../services/sessionService";
 
 const { Text } = Typography;
 

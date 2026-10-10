@@ -16,7 +16,7 @@ except ImportError:  # pragma: no cover - direct script execution
     from app.core.security import require_active_user
     from app.core.database import get_db
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1", tags=["Profile avatar"])
 
 AVATAR_DIR = Path("uploads/avatars")
 AVATAR_DIR.mkdir(parents=True, exist_ok=True)
@@ -113,7 +113,7 @@ async def upload_avatar(
         quality=90,
     )
 
-    user.avatar_url = f"/profile/avatar/{filename}"
+    user.avatar_url = f"/api/v1/profile/avatar/{filename}"
     try:
         db.commit()
     except Exception as exc:
@@ -131,7 +131,8 @@ async def upload_avatar(
     return {
         "message": "Tải ảnh đại diện thành công.",
         "filename": filename,
-        "avatar_url": f"/profile/avatar/{filename}",
+        "status": "success",
+        "avatar_url": f"/api/v1/profile/avatar/{filename}",
         "size": {
             "width": 256,
             "height": 256,
@@ -162,7 +163,7 @@ def get_current_avatar(user: User = Depends(require_active_user)):
 
 
 @router.get("/profile/avatar/{filename}")
-def get_avatar(filename: str, user: User = Depends(require_active_user)):
+def get_avatar(filename: str):
     safe_filename = Path(filename).name
     if safe_filename != filename:
         raise HTTPException(status_code=404, detail="Không tìm thấy ảnh đại diện.")

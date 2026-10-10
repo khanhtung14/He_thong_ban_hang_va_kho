@@ -20,7 +20,7 @@ import {
   UserAddOutlined,
   ArrowRightOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../../session";
+import { authenticatedFetch } from "../../services/sessionService";
 
 const { Title, Text } = Typography;
 

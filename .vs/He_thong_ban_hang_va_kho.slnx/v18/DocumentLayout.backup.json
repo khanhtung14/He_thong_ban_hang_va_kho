@@ -1,12 +1,7 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "D:\\He_thong_ban_hang_va_kho\\",
-  "Documents": [
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\He_thong_ban_hang_va_kho\\frontend\\src\\roles\\admin\\AdminOverView.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:frontend\\src\\roles\\admin\\AdminOverView.tsx||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
-    }
-  ],
+  "Documents": [],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -14,7 +9,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 7,
+          "SelectedChildIndex": -1,
           "Children": [
             {
               "$type": "Bookmark",
@@ -43,19 +38,6 @@
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{1c64b9c2-e352-428e-a56d-0ace190b99a6}"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "AdminOverView.tsx",
-              "DocumentMoniker": "D:\\He_thong_ban_hang_va_kho\\frontend\\src\\roles\\admin\\AdminOverView.tsx",
-              "RelativeDocumentMoniker": "frontend\\src\\roles\\admin\\AdminOverView.tsx",
-              "ToolTip": "D:\\He_thong_ban_hang_va_kho\\frontend\\src\\roles\\admin\\AdminOverView.tsx",
-              "RelativeToolTip": "frontend\\src\\roles\\admin\\AdminOverView.tsx",
-              "ViewState": "AgIAAAgAAAAAAAAAAAAAABYAAAA7AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
-              "WhenOpened": "2026-10-09T15:40:51.131Z",
-              "EditorCaption": ""
             }
           ]
         },

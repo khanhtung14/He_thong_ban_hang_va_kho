@@ -10,8 +10,8 @@ import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
 import { SalesHeader } from "../../components/Header/SalesHeader";
 
 // Auth & API
-import { logout } from "../../session";
-import { fetchProfile, type UserProfile } from "../../api";
+import { logout } from "../../services/sessionService";
+import { fetchProfile, type UserProfile } from "../../services/apiClient";
 
 const { Content } = Layout;
 

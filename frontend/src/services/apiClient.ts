@@ -4,7 +4,7 @@
  * and FastAPI direct deployment (port 8000).
  */
 
-import { authenticatedFetch } from "./session";
+import { authenticatedFetch } from "./sessionService";
 
 export interface UserProfile {
   username: string;

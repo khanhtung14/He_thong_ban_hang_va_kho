@@ -7,8 +7,8 @@ import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSi
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
 
-import { logout } from "../../session";
-import { fetchProfile, type UserProfile } from "../../api";
+import { logout } from "../../services/sessionService";
+import { fetchProfile, type UserProfile } from "../../services/apiClient";
 
 const { Content } = Layout;
 

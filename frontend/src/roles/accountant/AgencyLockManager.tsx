@@ -22,9 +22,9 @@ import {
   SearchOutlined,
   WarningOutlined,
   ShopOutlined,
-//   HistoryOutlined,
+  //   HistoryOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../../session";
+import { authenticatedFetch } from "../../services/sessionService";
 
 const { Text } = Typography;
 const { TextArea } = Input;

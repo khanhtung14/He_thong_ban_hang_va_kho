@@ -20,7 +20,7 @@ import {
   LockOutlined,
   UnlockOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../../session";
+import { authenticatedFetch } from "../../services/sessionService";
 
 interface UserRow {
   id: number;

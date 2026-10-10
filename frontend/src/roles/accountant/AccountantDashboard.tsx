@@ -10,8 +10,8 @@ import { AccountantSidebar } from "../../components/Sidebar/AccountantSidebar";
 import { AccountantHeader } from "../../components/Header/AccountantHeader";
 
 // Auth & API
-import { logout } from "../../session";
-import { fetchProfile, type UserProfile } from "../../api";
+import { logout } from "../../services/sessionService";
+import { fetchProfile, type UserProfile } from "../../services/apiClient";
 import AgencyLockManager from "./AgencyLockManager";
 
 const { Content } = Layout;

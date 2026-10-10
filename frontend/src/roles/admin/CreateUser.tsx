@@ -26,7 +26,7 @@ import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../../session";
+import { authenticatedFetch } from "../../services/sessionService";
 import AdminSidebar from "../../components/Sidebar/AdminSidebar";
 import AdminHeader from "../../components/Header/AdminHeader";
 import ProfileModal from "../../components/ProfileModal";

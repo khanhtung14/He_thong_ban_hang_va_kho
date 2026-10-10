@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import {
   Card,
   Upload,
@@ -21,7 +21,7 @@ import {
   FileExcelOutlined,
 } from "@ant-design/icons";
 import type { UploadProps } from "antd";
-import { authenticatedFetch } from "services/sessionService";
+import { authenticatedFetch } from "../../services/sessionService";
 
 interface PreviewRow {
   row_number?: number;
@@ -48,11 +48,11 @@ export const ProductExcelImport: React.FC = () => {
   const [committing, setCommitting] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // 1. Táº£i file Excel máº«u
+  // 1. Tải file Excel mẫu
   const handleDownloadTemplate = async () => {
     try {
       const res = await authenticatedFetch("/api/v1/products/import/template");
-      if (!res.ok) throw new Error("KhÃ´ng thá»ƒ táº£i file máº«u");
+      if (!res.ok) throw new Error("Không thể tải file mẫu");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -62,16 +62,16 @@ export const ProductExcelImport: React.FC = () => {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      message.success("ÄÃ£ táº£i xuá»‘ng file máº«u thÃ nh cÃ´ng");
+      message.success("Đã tải xuống file mẫu thành công");
     } catch (err: any) {
-      message.error(err.message || "Lá»—i khi táº£i file máº«u");
+      message.error(err.message || "Lỗi khi tải file mẫu");
     }
   };
 
-  // 2. Gá»­i file lÃªn API Preview
+  // 2. Gửi file lên API Preview
   const handlePreview = async () => {
     if (fileList.length === 0) {
-      message.warning("Vui lÃ²ng chá»n 1 file Excel trÆ°á»›c");
+      message.warning("Vui lòng chọn 1 file Excel trước");
       return;
     }
 
@@ -87,7 +87,7 @@ export const ProductExcelImport: React.FC = () => {
 
       const result = await res.json();
       if (!res.ok) {
-        throw new Error(result.detail || "KhÃ´ng thá»ƒ phÃ¢n tÃ­ch dá»¯ liá»‡u file");
+        throw new Error(result.detail || "Không thể phân tích dữ liệu file");
       }
 
       const rows: PreviewRow[] = result.items || result.rows || [];
@@ -105,15 +105,15 @@ export const ProductExcelImport: React.FC = () => {
           rows.filter((r) => r.action_type === "ERROR").length,
       });
       setSessionId(result.session_id || result.batch_id || null);
-      message.success("ÄÃ£ Ä‘á»c vÃ  phÃ¢n tÃ­ch file thÃ nh cÃ´ng");
+      message.success("Đã đọc và phân tích file thành công");
     } catch (err: any) {
-      message.error(err.message || "Lá»—i khi Ä‘á»c file");
+      message.error(err.message || "Lỗi khi đọc file");
     } finally {
       setUploading(false);
     }
   };
 
-  // 3. Commit dá»¯ liá»‡u vÃ o CSDL
+  // 3. Commit dữ liệu vào CSDL
   const handleCommit = async () => {
     setCommitting(true);
     try {
@@ -131,17 +131,17 @@ export const ProductExcelImport: React.FC = () => {
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.detail || "LÆ°u dá»¯ liá»‡u tháº¥t báº¡i");
+      if (!res.ok) throw new Error(result.detail || "Lưu dữ liệu thất bại");
 
       message.success(
-        result.message || "ÄÃ£ lÆ°u danh má»¥c sáº£n pháº©m vÃ o há»‡ thá»‘ng",
+        result.message || "Đã lưu danh mục sản phẩm vào hệ thống",
       );
       setFileList([]);
       setPreviewData([]);
       setSummary(null);
       setSessionId(null);
     } catch (err: any) {
-      message.error(err.message || "Lá»—i khi chá»‘t nháº­p hÃ ng loáº¡t");
+      message.error(err.message || "Lỗi khi chốt nhập hàng loạt");
     } finally {
       setCommitting(false);
     }
@@ -161,11 +161,11 @@ export const ProductExcelImport: React.FC = () => {
         file.type.includes("excel");
 
       if (!isValidExcel) {
-        message.error("Chá»‰ cháº¥p nháº­n file Ä‘á»‹nh dáº¡ng Excel (.xlsx, .xls)");
+        message.error("Chỉ chấp nhận file định dạng Excel (.xlsx, .xls)");
         return Upload.LIST_IGNORE;
       }
       setFileList([file]);
-      return false; // NgÄƒn cháº·n tá»± Ä‘á»™ng upload
+      return false; // Ngăn chặn tự động upload
     },
     fileList,
     maxCount: 1,
@@ -173,45 +173,45 @@ export const ProductExcelImport: React.FC = () => {
 
   const columns = [
     {
-      title: "DÃ²ng",
+      title: "Dòng",
       dataIndex: "row_number",
       key: "row_number",
       width: 70,
       render: (val: number, _: any, idx: number) => val || idx + 1,
     },
     {
-      title: "MÃ£ SKU",
+      title: "Mã SKU",
       dataIndex: "sku",
       key: "sku",
       width: 140,
       render: (sku: string) => (
-        <strong style={{ color: "#1d4ed8" }}>{sku || "â€”"}</strong>
+        <strong style={{ color: "#1d4ed8" }}>{sku || "—"}</strong>
       ),
     },
     {
-      title: "TÃªn sáº£n pháº©m",
+      title: "Tên sản phẩm",
       dataIndex: "name",
       key: "name",
       render: (name: string) =>
-        name || <span style={{ color: "#94a3b8" }}>(Trá»‘ng)</span>,
+        name || <span style={{ color: "#94a3b8" }}>(Trống)</span>,
     },
     {
-      title: "ÄÆ¡n vá»‹ tÃ­nh",
+      title: "Đơn vị tính",
       dataIndex: "unit",
       key: "unit",
       width: 110,
-      render: (unit?: string) => <Tag>{unit || "â€”"}</Tag>,
+      render: (unit?: string) => <Tag>{unit || "—"}</Tag>,
     },
     {
-      title: "GiÃ¡ bÃ¡n",
+      title: "Giá bán",
       dataIndex: "sale_price",
       key: "sale_price",
       width: 130,
       render: (val?: number) =>
-        val ? `${val.toLocaleString("vi-VN")} â‚«` : "â€”",
+        val ? `${val.toLocaleString("vi-VN")} ₫` : "—",
     },
     {
-      title: "PhÃ¢n loáº¡i xá»­ lÃ½",
+      title: "Phân loại xử lý",
       dataIndex: "action_type",
       key: "action_type",
       width: 220,
@@ -219,20 +219,20 @@ export const ProductExcelImport: React.FC = () => {
         if (action === "CREATE") {
           return (
             <Tag color="green" icon={<CheckCircleOutlined />}>
-              Táº¡o má»›i SKU
+              Tạo mới SKU
             </Tag>
           );
         }
         if (action === "UPDATE") {
           return (
             <Tag color="blue" icon={<ExclamationCircleOutlined />}>
-              Cáº­p nháº­t SKU cÅ©
+              Cập nhật SKU cũ
             </Tag>
           );
         }
         return (
           <Tag color="red" icon={<CloseCircleOutlined />}>
-            Lá»—i: {record.error_message || "Dá»¯ liá»‡u khÃ´ng há»£p lá»‡"}
+            Lỗi: {record.error_message || "Dữ liệu không hợp lệ"}
           </Tag>
         );
       },
@@ -245,18 +245,18 @@ export const ProductExcelImport: React.FC = () => {
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <FileExcelOutlined style={{ color: "#16a34a", fontSize: 22 }} />
-            <span>Nháº­p danh má»¥c sáº£n pháº©m tá»« file Excel</span>
+            <span>Nhập danh mục sản phẩm từ file Excel</span>
           </div>
         }
         extra={
           <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
-            Táº£i file máº«u Excel
+            Tải file mẫu Excel
           </Button>
         }
       >
         <Alert
-          message="HÆ°á»›ng dáº«n táº£i lÃªn"
-          description="Há»‡ thá»‘ng há»— trá»£ táº£i lÃªn danh sÃ¡ch hÃ ng nghÃ¬n sáº£n pháº©m. Náº¿u mÃ£ SKU Ä‘Ã£ tá»“n táº¡i, thÃ´ng tin sáº½ Ä‘Æ°á»£c cáº­p nháº­t thay vÃ¬ táº¡o trÃ¹ng. CÃ¡c dÃ²ng bá»‹ lá»—i sáº½ Ä‘Æ°á»£c hiá»ƒn thá»‹ chi tiáº¿t Ä‘á»ƒ báº¡n kiá»ƒm tra trÆ°á»›c khi lÆ°u."
+          message="Hướng dẫn tải lên"
+          description="Hệ thống hỗ trợ tải lên danh sách hàng nghìn sản phẩm. Nếu mã SKU đã tồn tại, thông tin sẽ được cập nhật thay vì tạo trùng. Các dòng bị lỗi sẽ được hiển thị chi tiết để bạn kiểm tra trước khi lưu."
           type="info"
           showIcon
           style={{ marginBottom: 20 }}
@@ -264,7 +264,7 @@ export const ProductExcelImport: React.FC = () => {
 
         <Space size="middle">
           <Upload {...uploadProps}>
-            <Button icon={<UploadOutlined />}>Chá»n file Excel</Button>
+            <Button icon={<UploadOutlined />}>Chọn file Excel</Button>
           </Upload>
           <Button
             type="primary"
@@ -272,7 +272,7 @@ export const ProductExcelImport: React.FC = () => {
             loading={uploading}
             disabled={fileList.length === 0}
           >
-            Äá»c & Xem trÆ°á»›c
+            Đọc & Xem trước
           </Button>
         </Space>
       </Card>
@@ -281,11 +281,11 @@ export const ProductExcelImport: React.FC = () => {
         <Card>
           <Row gutter={16}>
             <Col span={6}>
-              <Statistic title="Tá»•ng sá»‘ dÃ²ng" value={summary.total} />
+              <Statistic title="Tổng số dòng" value={summary.total} />
             </Col>
             <Col span={6}>
               <Statistic
-                title="Sáº½ táº¡o má»›i"
+                title="Sẽ tạo mới"
                 value={summary.create_count}
                 valueStyle={{ color: "#16a34a" }}
                 prefix={<CheckCircleOutlined />}
@@ -293,7 +293,7 @@ export const ProductExcelImport: React.FC = () => {
             </Col>
             <Col span={6}>
               <Statistic
-                title="Sáº½ cáº­p nháº­t"
+                title="Sẽ cập nhật"
                 value={summary.update_count}
                 valueStyle={{ color: "#2563eb" }}
                 prefix={<ExclamationCircleOutlined />}
@@ -301,7 +301,7 @@ export const ProductExcelImport: React.FC = () => {
             </Col>
             <Col span={6}>
               <Statistic
-                title="DÃ²ng bá»‹ lá»—i"
+                title="Dòng bị lỗi"
                 value={summary.error_count}
                 valueStyle={{ color: "#dc2626" }}
                 prefix={<CloseCircleOutlined />}
@@ -324,15 +324,15 @@ export const ProductExcelImport: React.FC = () => {
               disabled={summary.create_count + summary.update_count === 0}
               onClick={handleCommit}
             >
-              XÃ¡c nháº­n nháº­p kho ({summary.create_count + summary.update_count}{" "}
-              sáº£n pháº©m)
+              Xác nhận nhập kho ({summary.create_count + summary.update_count}{" "}
+              sản phẩm)
             </Button>
           </div>
         </Card>
       )}
 
       {previewData.length > 0 && (
-        <Card title="Dá»¯ liá»‡u xem trÆ°á»›c (Preview)">
+        <Card title="Dữ liệu xem trước (Preview)">
           <Table
             dataSource={previewData}
             columns={columns}

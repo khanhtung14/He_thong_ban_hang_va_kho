@@ -17,7 +17,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import type { RcFile } from "antd/es/upload/interface";
-import { authenticatedFetch } from "../session";
+import { authenticatedFetch } from "../services/sessionService";
 
 const { Text } = Typography;
 
@@ -70,7 +70,10 @@ export default function ProfileAvatar({
           }
           return;
         }
-        const profile = (await profileRes.json()) as { avatar_url?: string; full_name?: string };
+        const profile = (await profileRes.json()) as {
+          avatar_url?: string;
+          full_name?: string;
+        };
 
         // Cập nhật initials từ full_name
         if (profile.full_name) {
@@ -193,6 +196,7 @@ export default function ProfileAvatar({
 
       const result = (await response.json().catch(() => ({}))) as ApiError & {
         message?: string;
+        avatar_url?: string;
       };
 
       if (!response.ok) {
@@ -200,6 +204,10 @@ export default function ProfileAvatar({
       }
 
       message.success(result.message ?? "Đã cập nhật ảnh đại diện thành công!");
+      if (result.avatar_url) {
+        window.sessionStorage.setItem("avatar_url", result.avatar_url);
+        window.localStorage.setItem("avatar_url", result.avatar_url);
+      }
       setStatusMsg({
         text: result.message ?? "Đã cập nhật ảnh đại diện.",
         type: "success",
@@ -208,7 +216,7 @@ export default function ProfileAvatar({
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = "";
       setPreviewUrl("");
-      window.dispatchEvent(new Event(AVATAR_UPDATED_EVENT));
+      window.dispatchEvent(new CustomEvent(AVATAR_UPDATED_EVENT, { detail: { avatarUrl: result.avatar_url } }));
       setTimeout(() => {
         setIsOpen(false);
       }, 700);

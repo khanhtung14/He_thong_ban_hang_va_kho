@@ -24,7 +24,7 @@ import {
   SettingOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../../session";
+import { authenticatedFetch } from "../../services/sessionService";
 
 const { Text } = Typography;
 const { Option } = Select;

@@ -6,8 +6,8 @@ import ProfileModal from "../../components/ProfileModal";
 import { WarehouseManagerSidebar } from "../../components/Sidebar/WarehouseManagerSidebar";
 import { WarehouseManagerHeader } from "../../components/Header/WarehouseManagerHeader";
 
-import { logout } from "../../session";
-import { fetchProfile, type UserProfile } from "../../api";
+import { logout } from "../../services/sessionService";
+import { fetchProfile, type UserProfile } from "../../services/apiClient";
 
 const { Content } = Layout;
 
