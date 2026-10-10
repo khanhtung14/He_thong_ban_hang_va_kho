@@ -44,6 +44,13 @@ def migrate_profile_database() -> None:
     except Exception:
         pass
     migrate_pricing_schema()
+    try:
+        from app.api.v1.endpoints.warehouse import seed_default_warehouses_and_territories
+        from app.core.database import SessionLocal
+        with SessionLocal() as db:
+            seed_default_warehouses_and_territories(db)
+    except Exception:
+        pass
 
 
 app.add_middleware(
@@ -158,7 +165,12 @@ app.include_router(user_router)
 app.include_router(profile_router)
 app.include_router(customer_lock_router)
 try:
-    from app.api.v1.endpoints.warehouse import router as warehouse_router
+    from app.api.v1.endpoints.warehouse import (
+        router as warehouse_router,
+        warehouses_router,
+        territories_router,
+        roles_router,
+    )
     from app.api.v1.endpoints.customers import router as customers_router
     from app.api.v1.endpoints.orders import router as orders_router
     from app.api.v1.endpoints.invoices import router as invoices_router
@@ -166,6 +178,9 @@ try:
     from app.api.v1.endpoints.returns import router as returns_router
 
     app.include_router(warehouse_router)
+    app.include_router(warehouses_router)
+    app.include_router(territories_router)
+    app.include_router(roles_router)
     app.include_router(customers_router)
     app.include_router(orders_router)
     app.include_router(invoices_router)
