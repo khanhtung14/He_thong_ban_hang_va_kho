@@ -6,54 +6,13 @@
 
 import { authenticatedFetch } from "./sessionService";
 
-export interface UserProfile {
-  username: string;
-  email?: string;
-  full_name: string;
-  role: string;
-  phone?: string;
-  avatar_url?: string;
-  warehouse?: string;
-  area?: string;
-}
+import type { components } from "../types/api.generated";
 
-export interface ProductMarginDetail {
-  sku: string;
-  name: string;
-  units_sold: number;
-  revenue: number;
-  cost_price: number;
-  margin: string;
-}
-
-export interface SalesMarginReport {
-  report_name?: string;
-  generated_by?: string;
-  role?: string;
-  period: string;
-  total_revenue: number;
-  total_cogs: number;
-  gross_profit: number;
-  margin: string;
-  details?: ProductMarginDetail[];
-}
-
-export interface PriceListLine {
-  sku: string;
-  sale_price: number;
-  floor_price: number;
-}
-
-export interface PriceListItem {
-  id: number;
-  code: string;
-  customer_group: string;
-  start_date: string;
-  end_date: string;
-  version: number;
-  published: boolean;
-  items: PriceListLine[];
-}
+export type UserProfile = components["schemas"]["UserProfileResponse"];
+export type ProductMarginDetail = components["schemas"]["ProductMarginDetail"];
+export type SalesMarginReport = components["schemas"]["SalesMarginReportResponse"];
+export type PriceListLine = components["schemas"]["PriceLine"];
+export type PriceListItem = components["schemas"]["PriceListView"];
 
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -189,13 +148,7 @@ export const fetchNavigationMenu = async (
 };
 
 // Thêm interface Product
-export interface Product {
-  sku: string;
-  name: string;
-  category?: string;
-  unit?: string;
-  base_price?: number;
-}
+export type Product = components["schemas"]["ProductBase"];
 
 // Hàm gọi API lấy danh sách sản phẩm từ backend
 export async function getProducts(): Promise<Product[]> {
@@ -215,5 +168,5 @@ export async function getProducts(): Promise<Product[]> {
   }
 
   const data = await response.json();
-  return Array.isArray(data) ? data : data.items || [];
+  return Array.isArray(data) ? data : data.data || [];
 }

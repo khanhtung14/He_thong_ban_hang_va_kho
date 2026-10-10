@@ -465,14 +465,6 @@ export const UnitConversionManager: React.FC = () => {
             </Button>
           }
         >
-          <Alert
-            message="Quy tắc chuẩn hóa kho"
-            description={`Hàng xuất nhập có thể bốc dỡ theo Thùng/Lốc, nhưng số liệu tồn kho kế toán luôn được tự động tính về đơn vị cơ sở là "${currentProduct.baseUnit}".`}
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-
           <Table
             dataSource={currentProduct.conversions}
             rowKey="id"

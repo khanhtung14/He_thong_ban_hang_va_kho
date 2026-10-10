@@ -1015,7 +1015,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/profile/avatar": {
+    "/api/v1/profile/avatar": {
         parameters: {
             query?: never;
             header?: never;
@@ -1023,17 +1023,17 @@ export interface paths {
             cookie?: never;
         };
         /** Get Current Avatar */
-        get: operations["get_current_avatar_profile_avatar_get"];
+        get: operations["get_current_avatar_api_v1_profile_avatar_get"];
         put?: never;
         /** Upload Avatar */
-        post: operations["upload_avatar_profile_avatar_post"];
+        post: operations["upload_avatar_api_v1_profile_avatar_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/profile/avatar/{filename}": {
+    "/api/v1/profile/avatar/{filename}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1041,7 +1041,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Avatar */
-        get: operations["get_avatar_profile_avatar__filename__get"];
+        get: operations["get_avatar_api_v1_profile_avatar__filename__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1114,8 +1114,8 @@ export interface components {
              */
             happened_at: string;
         };
-        /** Body_upload_avatar_profile_avatar_post */
-        Body_upload_avatar_profile_avatar_post: {
+        /** Body_upload_avatar_api_v1_profile_avatar_post */
+        Body_upload_avatar_api_v1_profile_avatar_post: {
             /** File */
             file: string;
         };
@@ -1340,6 +1340,17 @@ export interface components {
          * @enum {string}
          */
         OrderStatus: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "PROCESSING" | "COMPLETED" | "CANCELLED";
+        /** PaginationInfo */
+        PaginationInfo: {
+            /** Page */
+            page: number;
+            /** Limit */
+            limit: number;
+            /** Totalrecords */
+            totalRecords: number;
+            /** Totalpages */
+            totalPages: number;
+        };
         /** PaymentCreate */
         PaymentCreate: {
             /** Customer Id */
@@ -1405,6 +1416,81 @@ export interface components {
             version: number;
             /** Published */
             published: boolean;
+        };
+        /** ProductBase */
+        ProductBase: {
+            /** Id */
+            id: number;
+            /** Sku */
+            sku: string;
+            /** Name */
+            name: string;
+            /** Categoryid */
+            categoryId?: number | null;
+            /** Baseunit */
+            baseUnit: string;
+            /** Managebylot */
+            manageByLot: boolean;
+            /** Minstock */
+            minStock: number;
+            /** Baseprice */
+            basePrice?: number | null;
+            /** Costprice */
+            costPrice?: number | null;
+            /** Status */
+            status: string;
+            /** Imageurl */
+            imageUrl?: string | null;
+            /** Units */
+            units?: components["schemas"]["ProductUnitResponse"][] | null;
+        };
+        /** ProductDetailResponse */
+        ProductDetailResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message: string;
+            data: components["schemas"]["ProductBase"];
+        };
+        /** ProductListResponse */
+        ProductListResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message: string;
+            /** Data */
+            data: components["schemas"]["ProductBase"][];
+            pagination: components["schemas"]["PaginationInfo"];
+        };
+        /** ProductMarginDetail */
+        ProductMarginDetail: {
+            /** Sku */
+            sku: string;
+            /** Name */
+            name: string;
+            /** Units Sold */
+            units_sold: number;
+            /** Revenue */
+            revenue: number;
+            /** Cost Price */
+            cost_price: number;
+            /** Margin */
+            margin: string;
+        };
+        /** ProductUnitResponse */
+        ProductUnitResponse: {
+            /** Id */
+            id: number;
+            /** Unitname */
+            unitName: string;
+            /** Conversionrate */
+            conversionRate: number;
+            /** Barcode */
+            barcode?: string | null;
         };
         /** ReceiptItemSchema */
         ReceiptItemSchema: {
@@ -1497,6 +1583,27 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** SalesMarginReportResponse */
+        SalesMarginReportResponse: {
+            /** Report Name */
+            report_name: string;
+            /** Generated By */
+            generated_by: string;
+            /** Role */
+            role: string;
+            /** Period */
+            period: string;
+            /** Total Revenue */
+            total_revenue: number;
+            /** Total Cogs */
+            total_cogs: number;
+            /** Gross Profit */
+            gross_profit: number;
+            /** Margin */
+            margin: string;
+            /** Details */
+            details: components["schemas"]["ProductMarginDetail"][];
+        };
         /** TerritoryResponse */
         TerritoryResponse: {
             /** Id */
@@ -1512,6 +1619,12 @@ export interface components {
             full_name: string;
             /** Phone */
             phone: string;
+        };
+        /** UpdateProfileResponse */
+        UpdateProfileResponse: {
+            /** Message */
+            message: string;
+            profile: components["schemas"]["UserProfileResponse"];
         };
         /** UserCreate */
         UserCreate: {
@@ -1568,6 +1681,25 @@ export interface components {
             page_size: number;
             /** Total Pages */
             total_pages: number;
+        };
+        /** UserProfileResponse */
+        UserProfileResponse: {
+            /** Username */
+            username: string;
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name: string;
+            /** Avatar Url */
+            avatar_url?: string | null;
+            /** Phone */
+            phone: string;
+            /** Role */
+            role: string;
+            /** Warehouse */
+            warehouse: string;
+            /** Area */
+            area: string;
         };
         /** UserResponse */
         UserResponse: {
@@ -2124,7 +2256,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProductListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2155,7 +2287,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProductDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2409,7 +2541,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SalesMarginReportResponse"];
                 };
             };
         };
@@ -3040,9 +3172,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["UserProfileResponse"];
                 };
             };
         };
@@ -3066,9 +3196,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["UpdateProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3634,7 +3762,7 @@ export interface operations {
             };
         };
     };
-    get_current_avatar_profile_avatar_get: {
+    get_current_avatar_api_v1_profile_avatar_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3654,7 +3782,7 @@ export interface operations {
             };
         };
     };
-    upload_avatar_profile_avatar_post: {
+    upload_avatar_api_v1_profile_avatar_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3663,7 +3791,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_upload_avatar_profile_avatar_post"];
+                "multipart/form-data": components["schemas"]["Body_upload_avatar_api_v1_profile_avatar_post"];
             };
         };
         responses: {
@@ -3687,7 +3815,7 @@ export interface operations {
             };
         };
     };
-    get_avatar_profile_avatar__filename__get: {
+    get_avatar_api_v1_profile_avatar__filename__get: {
         parameters: {
             query?: never;
             header?: never;

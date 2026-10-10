@@ -14,11 +14,31 @@ from app.api.v1.endpoints.rbac import (
 )
 from app.core.database import get_db
 from app.models.models import Order, OrderStatus, Product
+from pydantic import BaseModel
+
+class ProductMarginDetail(BaseModel):
+    sku: str
+    name: str
+    units_sold: int
+    revenue: float
+    cost_price: float
+    margin: str
+
+class SalesMarginReportResponse(BaseModel):
+    report_name: str
+    generated_by: str
+    role: str
+    period: str
+    total_revenue: float
+    total_cogs: float
+    gross_profit: float
+    margin: str
+    details: list[ProductMarginDetail]
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 
 
-@router.get("/sales-margin")
+@router.get("/sales-margin", response_model=SalesMarginReportResponse)
 def get_sales_margin_report(
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW_FINANCIALS)),
     db: Session = Depends(get_db),

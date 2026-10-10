@@ -1,47 +1,130 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Card,
-  Alert,
-  Row,
-  Col,
-  List,
-  Tag,
+  Table,
+  Select,
+  DatePicker,
   Button,
+  Tag,
   Typography,
-  Space,
+  message,
 } from "antd";
-import {
-  ArrowRightOutlined,
-  ExclamationCircleOutlined,
-} from "@ant-design/icons";
+import type { ColumnsType } from "antd/es/table";
+import { SearchOutlined } from "@ant-design/icons";
+import { authenticatedFetch } from "../../services/sessionService";
+import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
+
+interface AuditLog {
+  id: number;
+  actor_user_id: number;
+  actor_name: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  before_value: any;
+  after_value: any;
+  happened_at: string;
+}
 
 export const AdminAudit: React.FC = () => {
-  const auditLogs = [
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<{ id: number; full_name: string }[]>([]);
+
+  // Filters
+  const [actorUserId, setActorUserId] = useState<number | undefined>(undefined);
+  const [entityType, setEntityType] = useState<string>("ALL");
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([null, null]);
+
+  useEffect(() => {
+    // Fetch users for the filter
+    authenticatedFetch("/api/v1/admin/users?page_size=500")
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        setUsers(data.items || []);
+      })
+      .catch(() => console.error("Could not fetch users"));
+  }, []);
+
+  const fetchLogs = () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (actorUserId) params.set("actor_user_id", String(actorUserId));
+    if (entityType !== "ALL") params.set("entity_type", entityType);
+    if (dateRange && dateRange[0]) params.set("start_at", dateRange[0].toISOString());
+    if (dateRange && dateRange[1]) params.set("end_at", dateRange[1].toISOString());
+
+    authenticatedFetch(`/api/v1/audit-logs?${params.toString()}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => setLogs(data))
+      .catch(() => message.error("Không tải được nhật ký hệ thống."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchLogs();
+  }, [actorUserId, entityType, dateRange]);
+
+  const columns: ColumnsType<AuditLog> = [
     {
-      title: "Đăng nhập quản trị thành công",
-      time: "Vừa xong",
-      role: "Quản trị hệ thống",
-      color: "green",
+      title: "THỜI GIAN",
+      dataIndex: "happened_at",
+      key: "time",
+      render: (val) => dayjs(val).format("DD/MM/YYYY HH:mm:ss"),
     },
     {
-      title: "Đã thu hồi 2 phiên hết hạn",
-      time: "09:42",
-      role: "Quản trị hệ thống",
-      color: "blue",
+      title: "NGƯỜI THỰC HIỆN",
+      dataIndex: "actor_name",
+      key: "actor",
+      render: (name) => <div style={{ fontWeight: 600 }}>{name}</div>,
     },
     {
-      title: "Cập nhật quyền truy cập cho user",
-      time: "Hôm qua",
-      role: "Quản trị hệ thống",
-      color: "orange",
+      title: "ĐỐI TƯỢNG",
+      dataIndex: "entity_type",
+      key: "entity",
+      render: (type) => {
+        const map: Record<string, { label: string; color: string }> = {
+          inventory: { label: "Tồn kho", color: "blue" },
+          price: { label: "Giá", color: "orange" },
+          credit_limit: { label: "Hạn mức", color: "magenta" },
+          invoice: { label: "Hóa đơn", color: "green" },
+          debt: { label: "Công nợ", color: "red" },
+        };
+        const config = map[type] || { label: type, color: "default" };
+        return <Tag color={config.color}>{config.label}</Tag>;
+      },
     },
     {
-      title: "Khóa tài khoản vi phạm chính sách",
-      time: "3 ngày trước",
-      role: "Quản trị hệ thống",
-      color: "red",
+      title: "THAO TÁC",
+      key: "action",
+      render: (_, r) => (
+        <div>
+          <div><strong>{r.action}</strong>: {r.entity_id}</div>
+        </div>
+      ),
+    },
+    {
+      title: "GIÁ TRỊ TRƯỚC",
+      dataIndex: "before_value",
+      key: "before",
+      render: (val) => (
+        <pre style={{ margin: 0, fontSize: 12, background: "#f1f5f9", padding: 4, borderRadius: 4, maxWidth: 200, overflow: 'auto' }}>
+          {val ? JSON.stringify(val, null, 2) : "N/A"}
+        </pre>
+      ),
+    },
+    {
+      title: "GIÁ TRỊ SAU",
+      dataIndex: "after_value",
+      key: "after",
+      render: (val) => (
+        <pre style={{ margin: 0, fontSize: 12, background: "#f0fdf4", padding: 4, borderRadius: 4, maxWidth: 200, overflow: 'auto' }}>
+          {val ? JSON.stringify(val, null, 2) : "N/A"}
+        </pre>
+      ),
     },
   ];
 
@@ -49,74 +132,57 @@ export const AdminAudit: React.FC = () => {
     <Card style={{ borderRadius: 16 }}>
       <div style={{ marginBottom: 20 }}>
         <Title level={3} style={{ margin: "0 0 6px", fontWeight: 700 }}>
-          Nhật ký &amp; bảo mật
+          Nhật ký thao tác tồn kho &amp; công nợ
         </Title>
         <Text type="secondary">
-          Theo dõi thao tác quản trị, khóa tài khoản và các phiên đăng nhập.
+          Theo dõi mọi thay đổi về tồn kho, giá, hạn mức công nợ và hóa đơn trên toàn hệ thống.
         </Text>
       </div>
 
-      <Alert
-        type="info"
-        showIcon
-        message="Nhật ký chi tiết các thay đổi cấu hình tài khoản và phân quyền được lưu trữ phục vụ đối soát an ninh."
-        style={{ marginBottom: 24, borderRadius: 8 }}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <Select
+          allowClear
+          placeholder="Chọn người thực hiện"
+          value={actorUserId}
+          onChange={(val) => setActorUserId(val)}
+          style={{ width: 220 }}
+          options={users.map((u) => ({ label: u.full_name, value: u.id }))}
+        />
+        <Select
+          value={entityType}
+          onChange={(val) => setEntityType(val)}
+          style={{ width: 180 }}
+          options={[
+            { label: "Mọi loại đối tượng", value: "ALL" },
+            { label: "Tồn kho", value: "inventory" },
+            { label: "Giá", value: "price" },
+            { label: "Hạn mức công nợ", value: "credit_limit" },
+            { label: "Công nợ", value: "debt" },
+            { label: "Hóa đơn", value: "invoice" },
+          ]}
+        />
+        <RangePicker
+          showTime
+          onChange={(dates) => setDateRange(dates as any)}
+          style={{ borderRadius: 8 }}
+        />
+        <Button
+          type="primary"
+          onClick={fetchLogs}
+          icon={<SearchOutlined />}
+          style={{ borderRadius: 8 }}
+        >
+          Làm mới
+        </Button>
+      </div>
+
+      <Table
+        dataSource={logs}
+        columns={columns}
+        rowKey="id"
+        loading={loading}
+        pagination={{ pageSize: 15 }}
       />
-
-      <Row gutter={24}>
-        <Col xs={24} lg={14}>
-          <Card title="Sự kiện bảo mật gần đây" style={{ borderRadius: 12 }}>
-            <List
-              dataSource={auditLogs}
-              renderItem={(item) => (
-                <List.Item>
-                  <List.Item.Meta
-                    avatar={<Tag color={item.color}>●</Tag>}
-                    title={
-                      <span style={{ fontWeight: 600 }}>{item.title}</span>
-                    }
-                    description={`${item.time} · ${item.role}`}
-                  />
-                </List.Item>
-              )}
-            />
-          </Card>
-        </Col>
-
-        <Col xs={24} lg={10}>
-          <Card
-            title={
-              <Space>
-                <ExclamationCircleOutlined style={{ color: "#d97706" }} />
-                <span>Tài khoản cần chú ý</span>
-              </Space>
-            }
-            style={{
-              borderRadius: 12,
-              border: "1px solid #fed7aa",
-              background: "#fffbeb",
-            }}
-          >
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>
-              Kiểm tra định kỳ tài khoản bị khóa
-            </div>
-            <Text
-              type="secondary"
-              style={{ display: "block", marginBottom: 16, fontSize: 13 }}
-            >
-              Mở mục tài khoản để xem nhật ký hoạt động và trạng thái bàn giao
-              đại lý phụ trách của nhân sự.
-            </Text>
-            <Button
-              type="primary"
-              href="/admin/users?view=users"
-              style={{ backgroundColor: "#2563eb", borderRadius: 8 }}
-            >
-              Đi tới danh sách tài khoản <ArrowRightOutlined />
-            </Button>
-          </Card>
-        </Col>
-      </Row>
     </Card>
   );
 };

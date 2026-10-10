@@ -395,13 +395,6 @@ export const AgencyLockManager: React.FC = () => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Khối giải thích nghiệp vụ */}
-      <Alert
-        message="Chính sách kiểm soát công nợ đại lý"
-        description="Khi đại lý bị khóa giao dịch: Cổng đặt hàng của đại lý sẽ tự động bị chặn tạo đơn mới. Các đơn hàng đang được soạn hoặc đang giao vẫn tiếp tục được xử lý nhưng được gắn cờ cảnh báo rủi ro thu hồi nợ."
-        type="info"
-        showIcon
-      />
-
       <Card
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

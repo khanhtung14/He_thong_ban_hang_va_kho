@@ -254,14 +254,6 @@ export const ProductExcelImport: React.FC = () => {
           </Button>
         }
       >
-        <Alert
-          message="Hướng dẫn tải lên"
-          description="Hệ thống hỗ trợ tải lên danh sách hàng nghìn sản phẩm. Nếu mã SKU đã tồn tại, thông tin sẽ được cập nhật thay vì tạo trùng. Các dòng bị lỗi sẽ được hiển thị chi tiết để bạn kiểm tra trước khi lưu."
-          type="info"
-          showIcon
-          style={{ marginBottom: 20 }}
-        />
-
         <Space size="middle">
           <Upload {...uploadProps}>
             <Button icon={<UploadOutlined />}>Chọn file Excel</Button>

@@ -341,14 +341,23 @@ export const AdminUsers: React.FC = () => {
           <Form.Item name="phone" label="Số điện thoại">
             <Input />
           </Form.Item>
-          <Form.Item name="status" label="Trạng thái">
-            <Select
-              options={[
-                { label: "Đang hoạt động", value: "ACTIVE" },
-                { label: "Chờ kích hoạt", value: "PENDING_ACTIVATION" },
-                { label: "Đã khóa", value: "LOCKED" },
-              ]}
-            />
+          <Form.Item label="Trạng thái">
+            <Tag
+              color={
+                editUser?.status === "ACTIVE"
+                  ? "green"
+                  : editUser?.status === "LOCKED"
+                    ? "red"
+                    : "orange"
+              }
+              style={{ fontSize: 13, padding: "4px 8px" }}
+            >
+              {editUser?.status === "ACTIVE"
+                ? "Hoạt động"
+                : editUser?.status === "LOCKED"
+                  ? "Đã khóa"
+                  : "Chờ kích hoạt"}
+            </Tag>
           </Form.Item>
           <div style={{ textAlign: "right", marginTop: 20 }}>
             <Space>

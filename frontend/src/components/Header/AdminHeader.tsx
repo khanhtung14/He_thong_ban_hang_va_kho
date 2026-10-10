@@ -1,4 +1,5 @@
 import React from "react";
+import ProfileAvatar from "../ProfileAvatar";
 import { Layout, Dropdown, Space, Avatar, Badge, Tag } from "antd";
 import type { MenuProps } from "antd";
 import {
@@ -126,17 +127,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           placement="bottomRight"
         >
           <Space style={{ cursor: "pointer", userSelect: "none" }} size={10}>
-            <Avatar
-              size={36}
-              style={{
-                backgroundColor: "#2563eb",
-                fontWeight: 700,
-                color: "#ffffff",
-                boxShadow: "0 2px 6px rgba(37, 99, 235, 0.2)",
-              }}
-            >
-              {fullName.charAt(0).toUpperCase()}
-            </Avatar>
+            <ProfileAvatar editable={false} size={36} initials={fullName.charAt(0).toUpperCase()} />
             <div style={{ textAlign: "left", lineHeight: 1.2 }}>
               <div style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>
                 {fullName}

@@ -85,16 +85,16 @@
 }
 ```
 
-#### `POST /auth/refresh-token`
+#### `POST /auth/refresh`
 - **Story:** S1-02
-- **Phân quyền:** Public
-- **Request Body:** `{"refreshToken": "ey..."}`
-- **Response Data:** `{"accessToken": "ey...", "refreshToken": "ey...", "expiresIn": 3600}`
+- **Phân quyền:** Authenticated (via Bearer Session Token)
+- **Request Body:** Không có
+- **Response Data:** `{"accessToken": "ey...", "expiresIn": 43200}`
 
 #### `POST /auth/logout`
 - **Story:** S1-02
-- **Phân quyền:** Authenticated
-- **Request Body:** `{"refreshToken": "ey..."}`
+- **Phân quyền:** Authenticated (via Bearer Session Token)
+- **Request Body:** Không có
 - **Response Data:** `{"success": true}`
 
 #### `POST /auth/forgot-password`

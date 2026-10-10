@@ -41,13 +41,6 @@ export const AdminConfiguration: React.FC = () => {
         </Text>
       </div>
 
-      <Alert
-        type="warning"
-        showIcon
-        message="Các danh mục hệ thống cốt lõi hiện được đồng bộ trực tiếp từ cơ sở dữ liệu máy chủ."
-        style={{ marginBottom: 24, borderRadius: 8 }}
-      />
-
       <Row gutter={20}>
         {configs.map((c) => (
           <Col xs={24} md={8} key={c.title}>

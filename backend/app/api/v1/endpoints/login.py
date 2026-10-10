@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -347,3 +348,90 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         response["session_token"] = session_token
         response["expires_in"] = 12 * 60 * 60
     return response
+
+# OAuth2 scheme for extracting the Bearer token
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login", auto_error=False)
+
+@router.post("/refresh")
+def refresh_session(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+    
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    
+    # Verify session in DB
+    try:
+        stmt = text(
+            """
+            SELECT s.id, s.user_id, s.expires_at, s.revoked_at,
+                   u.username, u.is_active, u.status, r.code AS role_code
+            FROM user_sessions s
+            JOIN users u ON s.user_id = u.id
+            LEFT JOIN user_roles ur ON u.id = ur.user_id
+            LEFT JOIN roles r ON ur.role_id = r.id
+            WHERE s.refresh_token_hash = :hash
+            LIMIT 1
+            """
+        )
+        row = db.execute(stmt, {"hash": token_hash}).mappings().first()
+        
+        if not row:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+            
+        if row["revoked_at"] is not None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked")
+            
+        if row["expires_at"].replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+            
+        if not row["is_active"] or row["status"] == "LOCKED":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account locked")
+            
+        # Renew session
+        new_expires_at = datetime.now(timezone.utc) + timedelta(hours=12)
+        db.execute(
+            text("UPDATE user_sessions SET expires_at = :expires_at WHERE id = :session_id"),
+            {"expires_at": new_expires_at, "session_id": row["id"]}
+        )
+        db.commit()
+        
+        # Get warehouse IDs
+        warehouse_ids = [
+            int(w_row[0]) for w_row in db.execute(
+                text("SELECT warehouse_id FROM user_warehouses WHERE user_id = :user_id"),
+                {"user_id": row["user_id"]}
+            ).fetchall()
+        ]
+        
+        canonical_role = normalize_role(row["role_code"] or "SALES")
+        new_access_token = create_access_token({
+            "sub": row["username"],
+            "role": canonical_role,
+            "warehouse_ids": warehouse_ids,
+        })
+        
+        return {
+            "expires_in": 12 * 60 * 60,
+            "access_token": new_access_token
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server error") from exc
+
+@router.post("/logout")
+def logout_session(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    if not token:
+        return {"success": True}
+        
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    try:
+        db.execute(
+            text("UPDATE user_sessions SET revoked_at = :now WHERE refresh_token_hash = :hash AND revoked_at IS NULL"),
+            {"now": datetime.now(timezone.utc), "hash": token_hash}
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+    
+    return {"success": True}

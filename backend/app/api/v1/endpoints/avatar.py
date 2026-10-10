@@ -113,7 +113,7 @@ async def upload_avatar(
         quality=90,
     )
 
-    user.avatar_url = f"/api/v1/profile/avatar/{filename}"
+    user.avatar_url = f"/api/v1/avatars/{user.id}/{filename}"
     try:
         db.commit()
     except Exception as exc:
@@ -132,7 +132,7 @@ async def upload_avatar(
         "message": "Tải ảnh đại diện thành công.",
         "filename": filename,
         "status": "success",
-        "avatar_url": f"/api/v1/profile/avatar/{filename}",
+        "avatar_url": f"/api/v1/avatars/{user.id}/{filename}",
         "size": {
             "width": 256,
             "height": 256,
@@ -162,13 +162,13 @@ def get_current_avatar(user: User = Depends(require_active_user)):
     return _avatar_response(user.id, filename)
 
 
-@router.get("/profile/avatar/{filename}")
-def get_avatar(filename: str):
+@router.get("/avatars/{user_id}/{filename}")
+def get_avatar(user_id: int, filename: str):
     safe_filename = Path(filename).name
     if safe_filename != filename:
         raise HTTPException(status_code=404, detail="Không tìm thấy ảnh đại diện.")
 
-    return _avatar_response(user.id, safe_filename)
+    return _avatar_response(user_id, safe_filename)
 
 
 def _avatar_response(user_id: int, filename: str):

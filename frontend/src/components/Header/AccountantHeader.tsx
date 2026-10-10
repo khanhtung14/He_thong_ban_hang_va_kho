@@ -1,4 +1,5 @@
 import React from "react";
+import ProfileAvatar from "../ProfileAvatar";
 import {
   Layout,
   Avatar,
@@ -133,16 +134,7 @@ export const AccountantHeader: React.FC<AccountantHeaderProps> = ({
           placement="bottomRight"
         >
           <Space style={{ cursor: "pointer", userSelect: "none" }} size="small">
-            {avatarUrl ? (
-              <Avatar src={avatarUrl} size={36} />
-            ) : (
-              <Avatar
-                style={{ backgroundColor: "#2563eb", fontWeight: "bold" }}
-                size={36}
-              >
-                {initials}
-              </Avatar>
-            )}
+            <ProfileAvatar editable={false} size={36} initials={initials} />
             <div
               style={{
                 display: "flex",

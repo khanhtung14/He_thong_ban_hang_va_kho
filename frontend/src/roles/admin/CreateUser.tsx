@@ -533,13 +533,6 @@ export default function CreateUser() {
                   </Col>
                 </Row>
 
-                <Alert
-                  type="info"
-                  showIcon
-                  message="Tài khoản mới sẽ ở trạng thái 'Chờ kích hoạt' và cần đổi mật khẩu ở lần đăng nhập đầu tiên."
-                  style={{ margin: "16px 0 24px", borderRadius: 8 }}
-                />
-
                 <div
                   style={{
                     display: "flex",
