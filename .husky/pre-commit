@@ -1,0 +1,22 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "=== [1/3] Kiểm tra đồng bộ Type từ OpenAPI ==="
+# 1. Chạy lệnh sinh type Frontend để đảm bảo luôn cập nhật
+npm --prefix src/frontend run generate:types
+
+# 2. Kiểm tra type của Frontend (TypeScript)
+echo "=== [2/3] Type-checking Frontend ==="
+npm --prefix src/frontend run typecheck
+if [ $? -ne 0 ]; then
+  echo "❌ Lỗi: Frontend có code sai lệch với API Specification hoặc sai kiểu dữ liệu TypeScript!"
+  exit 1
+fi
+
+# 3. Kiểm tra code Backend Python (tùy chọn)
+echo "=== [3/3] Kiểm tra Backend Python ==="
+# Nếu bạn dùng mypy hoặc flake8:
+# .venv/Scripts/mypy src/backend
+# if [ $? -ne 0 ]; then exit 1; fi
+
+echo "✅ Kiểm tra hợp lệ! Cho phép commit."

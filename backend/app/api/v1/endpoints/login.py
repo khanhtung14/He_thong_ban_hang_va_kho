@@ -22,13 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-try:
-    from app.core.database import get_db
-except ImportError:
-    try:
-        from backend.database import get_db
-    except ImportError:
-        from app.core.database import get_db
+from app.core.database import get_db
 
 try:
     from app.api.v1.endpoints.rbac import create_access_token, normalize_role
