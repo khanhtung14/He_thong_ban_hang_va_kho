@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Integer,
     Index,
     JSON,
+    Numeric,
     String,
     Table,
     Text,
@@ -291,6 +293,78 @@ class Customer(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+    delivery_points: Mapped[list["CustomerDeliveryPoint"]] = relationship(
+        back_populates="customer", cascade="all, delete-orphan"
+    )
+
+
+class CatalogProduct(Base):
+    """Persisted sales catalog; no products are created by application startup."""
+    __tablename__ = "catalog_products"
+    __table_args__ = (
+        CheckConstraint("sale_price >= 0", name="ck_catalog_products_sale_price_nonnegative"),
+        CheckConstraint("discount_percent >= 0 AND discount_percent <= 100", name="ck_catalog_products_discount_range"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    sku: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    sale_price: Mapped[Any] = mapped_column(Numeric(14, 2), nullable=False)
+    discount_percent: Mapped[Any] = mapped_column(Numeric(5, 2), default=0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    units: Mapped[list["CatalogProductUnit"]] = relationship(
+        back_populates="product", cascade="all, delete-orphan"
+    )
+
+
+class CatalogProductUnit(Base):
+    """A sellable unit; conversion_factor maps it to the product's base unit."""
+    __tablename__ = "catalog_product_units"
+    __table_args__ = (
+        UniqueConstraint("product_id", "unit_code", name="uq_catalog_product_units_code"),
+        CheckConstraint("conversion_factor > 0", name="ck_catalog_product_units_conversion_positive"),
+        CheckConstraint(
+            "is_base_unit = 0 OR conversion_factor = 1",
+            name="ck_catalog_product_units_base_conversion",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("catalog_products.id", ondelete="CASCADE"), nullable=False
+    )
+    unit_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    unit_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    conversion_factor: Mapped[Any] = mapped_column(Numeric(14, 4), nullable=False)
+    is_base_unit: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    product: Mapped[CatalogProduct] = relationship(back_populates="units")
+
+
+class CustomerDeliveryPoint(Base):
+    """Persistent delivery locations belonging to a customer/dealer."""
+    __tablename__ = "customer_delivery_points"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    customer_id: Mapped[int] = mapped_column(
+        ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    address: Mapped[str] = mapped_column(String(500), nullable=False)
+    contact_name: Mapped[Optional[str]] = mapped_column(String(150))
+    contact_phone: Mapped[Optional[str]] = mapped_column(String(30))
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    customer: Mapped[Customer] = relationship(back_populates="delivery_points")
+    orders: Mapped[list["Order"]] = relationship(back_populates="delivery_point")
 
 
 class PriceList(Base):
@@ -336,6 +410,10 @@ class Order(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    delivery_point_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("customer_delivery_points.id", ondelete="SET NULL"), nullable=True
+    )
+    desired_delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[OrderStatus] = mapped_column(
         SqlEnum(OrderStatus, native_enum=False, length=20),
@@ -343,6 +421,8 @@ class Order(Base):
         nullable=False,
     )
     total_amount: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    subtotal_amount: Mapped[Any] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    discount_amount: Mapped[Any] = mapped_column(Numeric(14, 2), default=0, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -350,6 +430,7 @@ class Order(Base):
     )
 
     customer: Mapped[Customer] = relationship(back_populates="orders")
+    delivery_point: Mapped[Optional[CustomerDeliveryPoint]] = relationship(back_populates="orders")
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
 
@@ -363,5 +444,19 @@ class OrderItem(Base):
     product_name: Mapped[str] = mapped_column(String(255), nullable=False)
     quantity: Mapped[int] = mapped_column(default=1, nullable=False)
     unit_price: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    unit_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("catalog_product_units.id", ondelete="SET NULL"), nullable=True
+    )
+    product_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("catalog_products.id", ondelete="SET NULL"), nullable=True
+    )
+    unit_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    unit_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    conversion_factor: Mapped[Any] = mapped_column(Numeric(14, 4), default=1, nullable=False)
+    discount_percent: Mapped[Any] = mapped_column(Numeric(5, 2), default=0, nullable=False)
+    line_subtotal: Mapped[Any] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    discount_amount: Mapped[Any] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    line_total: Mapped[Any] = mapped_column(Numeric(14, 2), default=0, nullable=False)
 
     order: Mapped[Order] = relationship(back_populates="items")
+    unit: Mapped[Optional[CatalogProductUnit]] = relationship()

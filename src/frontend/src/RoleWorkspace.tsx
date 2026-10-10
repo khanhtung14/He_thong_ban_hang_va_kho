@@ -5,8 +5,8 @@ import ProfileAvatar from "./ProfileAvatar";
 import SalesManagerDashboard from "./roles/sales_manager/SalesManagerDashboard";
 import Error403 from "./Error403";
 import CustomerManagement from "./CustomerManagement";
-import CreateOrder from "./CreateOrder";
 import OrderManagement from "./OrderManagement";
+import SalesOrderDraft from "./SalesOrderDraft";
 
 
 import "./RoleWorkspace.css";
@@ -556,9 +556,8 @@ export default function RoleWorkspace() {
       case "sales":
         if (view === "customers") return <CustomerManagement userRole="sales" />;
         if (view === "orders") return <OrderManagement userRole="sales" onNewOrderClick={() => navigate("new-order")} />;
-        if (view === "new-order") return <CreateOrder products={products} onOrderCreated={() => navigate("orders")} onCancel={() => navigate("orders")} />;
+        if (view === "new-order") return <SalesOrderDraft />;
         if (view === "collections") return <><PageHeading title="Thu tiền theo tuyến" subtitle="Theo dõi khoản cần thu và ghi nhận giao dịch tại điểm bán." /><PrototypeBanner /><Metrics items={[["Cần thu hôm nay", "21,000,000 ₫", "₫", "amber"], ["Đã thu", "8,400,000 ₫", "✓", "green"], ["Đại lý quá hạn", "02", "!", "red"]]} /><DebtTable /></>;
-        if (view === "new-order") return <SalesOrderDraft products={products} onSaved={(message) => setNotice(message)} notice={notice} />;
         if (view === "products") return <><PageHeading title="Sản phẩm & tồn khả dụng" subtitle="Giá bán và số lượng khả dụng tại các kho." />{renderProducts()}</>;
         return <><WelcomeCard eyebrow="TUYẾN HÀ NỘI · THỨ HAI, 15/06" title={`Chào ${username}, bắt đầu ngày mới`} text="Tập trung đơn cần xử lý và các đại lý cần chăm sóc trong tuyến." action={<button className="workspace-button" onClick={() => navigate("new-order")}>＋ Tạo đơn hàng</button>} /><Metrics items={[["Đại lý được giao", "42", "♧", "blue"], ["Đơn cần theo dõi", "08", "▤", "violet"], ["Công nợ cần thu", "21,000,000 ₫", "₫", "amber"]]} /><div className="workspace-two-columns"><section className="workspace-panel"><PanelHeading title="Đại lý cần chăm sóc" link="Xem tuyến" onClick={() => navigate("customers")} /><CustomersTable compact /></section><section className="workspace-panel"><PanelHeading title="Đơn hàng gần đây" link="Tất cả đơn" onClick={() => navigate("orders")} /><OrdersTable compact /></section></div><PrototypeBanner text="Khách hàng, đơn hàng và công nợ của tuyến hiện là dữ liệu giao diện mẫu; API tác nghiệp chưa kết nối." /></>;
 
@@ -682,14 +681,6 @@ function TransferTable() {
 
 function ExpiryList() {
   return <div className="workspace-expiry-list">{[["Sữa tươi tiệt trùng 1L", "12 ngày", "amber"], ["Nước ép cam 1L", "21 ngày", "blue"], ["Bánh quy bơ 300g", "28 ngày", "blue"]].map(([name, expiry, tone]) => <div key={name}><span className={`workspace-expiry-dot is-${tone}`} /><span><strong>{name}</strong><small>Lô nhập gần nhất</small></span><StatusPill tone={tone}>{expiry}</StatusPill></div>)}</div>;
-}
-
-function SalesOrderDraft({ products, onSaved, notice }: { products: Product[]; onSaved: (message: string) => void; notice: string }) {
-  const [customer, setCustomer] = useState(demoCustomers[0].code);
-  const [sku, setSku] = useState(products[0]?.sku ?? "SKU-001");
-  const [quantity, setQuantity] = useState(1);
-  const selected = products.find((product) => product.sku === sku);
-  return <><PageHeading title="Tạo đơn hàng" subtitle="Lập đơn tại điểm bán, kiểm tra hàng khả dụng và chính sách giá." /><PrototypeBanner text="Có thể lập đơn nháp để xem trước; API tạo đơn chưa được kết nối nên dữ liệu chưa lưu." /><section className="workspace-panel workspace-order-form"><label>Đại lý<select value={customer} onChange={(event) => setCustomer(event.target.value)}>{demoCustomers.map((item) => <option key={item.code} value={item.code}>{item.name} · {item.area}</option>)}</select></label><label>Sản phẩm<select value={sku} onChange={(event) => setSku(event.target.value)}>{products.map((item) => <option key={item.sku} value={item.sku}>{item.name} · {formatMoney(item.sale_price)}</option>)}</select></label><label>Số lượng<input type="number" min={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label><div className="workspace-order-total"><span>Tạm tính</span><strong>{formatMoney((selected?.sale_price ?? 0) * quantity)}</strong></div><button className="workspace-button" onClick={() => onSaved("Đơn nháp chỉ tồn tại trong giao diện mẫu, chưa được lưu vào hệ thống.")}>Lưu đơn nháp mẫu</button>{notice && <div className="workspace-alert">{notice}</div>}</section></>;
 }
 
 function PaymentForm() {

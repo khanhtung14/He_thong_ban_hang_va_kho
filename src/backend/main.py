@@ -28,6 +28,7 @@ if __package__:
     from src.backend.user_routes import router as user_router
     from src.backend.users import compat_router as users_compat_router, router as users_router
     from src.backend.customer_lock_routes import router as customer_lock_router
+    from src.backend.sales_orders import migrate_sales_order_schema, router as sales_orders_router
 else:  # pragma: no cover - direct script execution from src/backend
     from avatar import router as avatar_router
     from change_password import router as change_password_router
@@ -45,6 +46,7 @@ else:  # pragma: no cover - direct script execution from src/backend
     from user_routes import router as user_router
     from users import compat_router as users_compat_router, router as users_router
     from customer_lock_routes import router as customer_lock_router
+    from sales_orders import migrate_sales_order_schema, router as sales_orders_router
 
 
 
@@ -61,6 +63,7 @@ def migrate_profile_database() -> None:
         migrate_profile_schema()
     except Exception:
         pass
+    migrate_sales_order_schema()
 
 
 app.add_middleware(
@@ -75,7 +78,12 @@ app.add_middleware(
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 ROOT_FRONTEND_DIST = ROOT_DIR / "frontend" / "dist"
-if (ROOT_FRONTEND_DIST / "index.html").is_file():
+SOURCE_FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+SOURCE_FRONTEND_DIST = SOURCE_FRONTEND_DIR / "dist"
+if (SOURCE_FRONTEND_DIST / "index.html").is_file():
+    FRONTEND_DIR = SOURCE_FRONTEND_DIR
+    FRONTEND_DIST = SOURCE_FRONTEND_DIST
+elif (ROOT_FRONTEND_DIST / "index.html").is_file():
     FRONTEND_DIR = ROOT_DIR / "frontend"
     FRONTEND_DIST = ROOT_FRONTEND_DIST
 else:
@@ -174,6 +182,7 @@ app.include_router(users_compat_router)
 app.include_router(user_router)
 app.include_router(profile_router)
 app.include_router(customer_lock_router)
+app.include_router(sales_orders_router)
 
 # SCRUM-71: Avatar
 
