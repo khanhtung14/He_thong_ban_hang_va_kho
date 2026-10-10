@@ -14,7 +14,7 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mysql+pymysql://oms_user:change-me@localhost:3306/oms?charset=utf8mb4",
+    "sqlite:///../database/demo.db",
 )
 
 connect_args = {}

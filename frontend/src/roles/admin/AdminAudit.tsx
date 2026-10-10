@@ -10,7 +10,7 @@ import {
   message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { SearchOutlined } from "@ant-design/icons";
+import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
 import { authenticatedFetch } from "../../services/sessionService";
 import dayjs from "dayjs";
 
@@ -59,7 +59,7 @@ export const AdminAudit: React.FC = () => {
 
     authenticatedFetch(`/api/v1/audit-logs?${params.toString()}`)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => setLogs(data))
+      .then((data) => setLogs(data || []))
       .catch(() => message.error("Không tải được nhật ký hệ thống."))
       .finally(() => setLoading(false));
   };
@@ -73,22 +73,31 @@ export const AdminAudit: React.FC = () => {
       title: "THỜI GIAN",
       dataIndex: "happened_at",
       key: "time",
+      width: 170,
       render: (val) => dayjs(val).format("DD/MM/YYYY HH:mm:ss"),
     },
     {
       title: "NGƯỜI THỰC HIỆN",
       dataIndex: "actor_name",
       key: "actor",
-      render: (name) => <div style={{ fontWeight: 600 }}>{name}</div>,
+      width: 180,
+      render: (name) => <div style={{ fontWeight: 600, color: "#1e293b" }}>{name || "Hệ thống"}</div>,
     },
     {
       title: "ĐỐI TƯỢNG",
       dataIndex: "entity_type",
       key: "entity",
+      width: 150,
       render: (type) => {
         const map: Record<string, { label: string; color: string }> = {
+          // Các đối tượng quản trị hệ thống
+          user: { label: "Tài khoản", color: "purple" },
+          role: { label: "Phân quyền", color: "geekblue" },
+          auth: { label: "Xác thực", color: "cyan" },
+          system: { label: "Hệ thống", color: "volcano" },
+          // Các đối tượng kiểm toán dữ liệu vận hành
           inventory: { label: "Tồn kho", color: "blue" },
-          price: { label: "Giá", color: "orange" },
+          price: { label: "Bảng giá", color: "orange" },
           credit_limit: { label: "Hạn mức", color: "magenta" },
           invoice: { label: "Hóa đơn", color: "green" },
           debt: { label: "Công nợ", color: "red" },
@@ -102,7 +111,8 @@ export const AdminAudit: React.FC = () => {
       key: "action",
       render: (_, r) => (
         <div>
-          <div><strong>{r.action}</strong>: {r.entity_id}</div>
+          <strong style={{ color: "#0f172a" }}>{r.action}</strong>
+          {r.entity_id ? <span style={{ color: "#64748b" }}> ({r.entity_id})</span> : null}
         </div>
       ),
     },
@@ -111,8 +121,20 @@ export const AdminAudit: React.FC = () => {
       dataIndex: "before_value",
       key: "before",
       render: (val) => (
-        <pre style={{ margin: 0, fontSize: 12, background: "#f1f5f9", padding: 4, borderRadius: 4, maxWidth: 200, overflow: 'auto' }}>
-          {val ? JSON.stringify(val, null, 2) : "N/A"}
+        <pre
+          style={{
+            margin: 0,
+            fontSize: 12,
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            padding: "6px 8px",
+            borderRadius: 6,
+            maxWidth: 220,
+            maxHeight: 100,
+            overflow: "auto",
+          }}
+        >
+          {val ? JSON.stringify(val, null, 2) : "—"}
         </pre>
       ),
     },
@@ -121,28 +143,46 @@ export const AdminAudit: React.FC = () => {
       dataIndex: "after_value",
       key: "after",
       render: (val) => (
-        <pre style={{ margin: 0, fontSize: 12, background: "#f0fdf4", padding: 4, borderRadius: 4, maxWidth: 200, overflow: 'auto' }}>
-          {val ? JSON.stringify(val, null, 2) : "N/A"}
+        <pre
+          style={{
+            margin: 0,
+            fontSize: 12,
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
+            padding: "6px 8px",
+            borderRadius: 6,
+            maxWidth: 220,
+            maxHeight: 100,
+            overflow: "auto",
+          }}
+        >
+          {val ? JSON.stringify(val, null, 2) : "—"}
         </pre>
       ),
     },
   ];
 
   return (
-    <Card style={{ borderRadius: 16 }}>
+    <Card
+      style={{
+        borderRadius: 16,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+        border: "1px solid #e2e8f0",
+      }}
+    >
       <div style={{ marginBottom: 20 }}>
-        <Title level={3} style={{ margin: "0 0 6px", fontWeight: 700 }}>
-          Nhật ký thao tác tồn kho &amp; công nợ
+        <Title level={3} style={{ margin: "0 0 6px", fontWeight: 700, color: "#0f172a" }}>
+          Nhật ký hệ thống &amp; Kiểm toán vận hành
         </Title>
         <Text type="secondary">
-          Theo dõi mọi thay đổi về tồn kho, giá, hạn mức công nợ và hóa đơn trên toàn hệ thống.
+          Theo dõi lịch sử thay đổi tài khoản, phân quyền và các biến động dữ liệu cốt lõi trên toàn hệ thống.
         </Text>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         <Select
           allowClear
-          placeholder="Chọn người thực hiện"
+          placeholder="Lọc theo người thực hiện"
           value={actorUserId}
           onChange={(val) => setActorUserId(val)}
           style={{ width: 220 }}
@@ -151,11 +191,14 @@ export const AdminAudit: React.FC = () => {
         <Select
           value={entityType}
           onChange={(val) => setEntityType(val)}
-          style={{ width: 180 }}
+          style={{ width: 200 }}
           options={[
-            { label: "Mọi loại đối tượng", value: "ALL" },
+            { label: "Tất cả đối tượng", value: "ALL" },
+            { label: "Tài khoản người dùng", value: "user" },
+            { label: "Phân quyền & Vai trò", value: "role" },
+            { label: "Đăng nhập & Xác thực", value: "auth" },
             { label: "Tồn kho", value: "inventory" },
-            { label: "Giá", value: "price" },
+            { label: "Bảng giá", value: "price" },
             { label: "Hạn mức công nợ", value: "credit_limit" },
             { label: "Công nợ", value: "debt" },
             { label: "Hóa đơn", value: "invoice" },
@@ -169,8 +212,8 @@ export const AdminAudit: React.FC = () => {
         <Button
           type="primary"
           onClick={fetchLogs}
-          icon={<SearchOutlined />}
-          style={{ borderRadius: 8 }}
+          icon={<ReloadOutlined />}
+          style={{ borderRadius: 8, backgroundColor: "#2563eb" }}
         >
           Làm mới
         </Button>
@@ -181,7 +224,7 @@ export const AdminAudit: React.FC = () => {
         columns={columns}
         rowKey="id"
         loading={loading}
-        pagination={{ pageSize: 15 }}
+        pagination={{ pageSize: 15, showTotal: (total) => `Tổng cộng ${total} bản ghi` }}
       />
     </Card>
   );

@@ -8,13 +8,15 @@ import AdminOverview from "./AdminOverView";
 import AdminUsers from "./AdminUsers";
 import AdminRBAC from "./AdminRBAC";
 import AdminConfiguration from "./AdminConfiguration";
+import CreateUserModal from "./CreateUser";
 import AdminAudit from "./AdminAudit";
+import { logout } from "services/sessionService";
 
 const { Content } = Layout;
 
 export const AdminDashboard: React.FC = () => {
-  const currentView =
-    new URLSearchParams(window.location.search).get("view") || "overview";
+  // Quản lý tab view trực tiếp bằng state như Sales
+  const [currentView, setCurrentView] = useState("overview");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
 
@@ -24,6 +26,8 @@ export const AdminDashboard: React.FC = () => {
         return <AdminUsers />;
       case "rbac":
         return <AdminRBAC />;
+      case "create-user":
+        return <CreateUserModal />;
       case "configuration":
         return <AdminConfiguration />;
       case "audit":
@@ -35,12 +39,37 @@ export const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh", background: "#f8fafc" }}>
-      {/* 1. Sidebar chuẩn */}
-      <AdminSidebar currentView={currentView} />
+    <Layout style={{ minHeight: "100vh", position: "relative" }}>
+      {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
+      <div
+        style={{
+          position: "fixed",
+          inset: "-20px",
+          backgroundImage: "url('/bg.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(4px)",
+          transform: "scale(1.05)",
+          zIndex: 0,
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(248, 250, 252, 0.5)",
+          zIndex: 0,
+        }}
+      />
 
-      <Layout style={{ background: "#f8fafc" }}>
-        {/* 2. Header chuẩn */}
+      {/* 2. Sidebar Admin (Layout tự canh bên trái) */}
+      <AdminSidebar
+        currentView={currentView}
+        onSelect={(key) => setCurrentView(key)}
+      />
+
+      {/* 3. Cột nội dung (minWidth: 0 chống vỡ bảng) */}
+      <Layout style={{ backgroundColor: "transparent", minWidth: 0, zIndex: 1 }}>
         <AdminHeader
           fullName="Quản trị viên"
           roleName="Quản trị hệ thống"
@@ -48,7 +77,6 @@ export const AdminDashboard: React.FC = () => {
           onChangePassword={() => setIsChangePassOpen(true)}
         />
 
-        {/* 3. Nội dung trang */}
         <Content
           style={{
             padding: "28px 32px",
@@ -61,7 +89,7 @@ export const AdminDashboard: React.FC = () => {
         </Content>
       </Layout>
 
-      {/* Modal Profile & Đổi mật khẩu */}
+      {/* Modals */}
       <ProfileModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
