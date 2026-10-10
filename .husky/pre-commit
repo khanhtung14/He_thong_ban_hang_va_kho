@@ -1,13 +1,10 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
 echo "=== [1/3] Kiểm tra đồng bộ Type từ OpenAPI ==="
 # 1. Chạy lệnh sinh type Frontend để đảm bảo luôn cập nhật
-npm --prefix src/frontend run generate:types
+npm --prefix frontend run generate:types
 
 # 2. Kiểm tra type của Frontend (TypeScript)
 echo "=== [2/3] Type-checking Frontend ==="
-npm --prefix src/frontend run typecheck
+npm --prefix frontend run typecheck
 if [ $? -ne 0 ]; then
   echo "❌ Lỗi: Frontend có code sai lệch với API Specification hoặc sai kiểu dữ liệu TypeScript!"
   exit 1
