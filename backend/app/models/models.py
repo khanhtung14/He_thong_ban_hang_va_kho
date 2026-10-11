@@ -308,6 +308,7 @@ class Customer(Base):
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
+    region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     customer_group: Mapped[str] = mapped_column(String(30), default="RETAIL", server_default="RETAIL", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -322,6 +323,31 @@ class Customer(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+    sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
+
+
+class HandoverHistory(Base):
+    __tablename__ = "handover_history"
+    __table_args__ = (
+        Index("ix_handover_history_from_user", "from_user_id"),
+        Index("ix_handover_history_to_user", "to_user_id"),
+        Index("ix_handover_history_created_at", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
+    from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    to_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    transferred_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    customer_ids: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    customer_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    from_user: Mapped[Optional["User"]] = relationship(foreign_keys=[from_user_id])
+    to_user: Mapped[Optional["User"]] = relationship(foreign_keys=[to_user_id])
+    transferred_by: Mapped[Optional["User"]] = relationship(foreign_keys=[transferred_by_id])
 
 
 class DeliveryAddress(Base):
