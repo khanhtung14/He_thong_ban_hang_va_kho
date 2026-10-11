@@ -27,6 +27,7 @@ from app.api.v1.endpoints.user_assignment import router as user_assignment_route
 from app.api.v1.endpoints.user_routes import router as user_router
 from app.api.v1.endpoints.users import compat_router as users_compat_router, router as users_router
 from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_router
+from app.api.v1.endpoints.import_users import router as import_users_router
 
 
 
@@ -151,6 +152,7 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 app.include_router(change_password_router)
 app.include_router(audit_logs_router)
 app.include_router(forgot_password_router)
+app.include_router(import_users_router)
 app.include_router(login_router)
 app.include_router(session_router)
 app.include_router(inventory_router)

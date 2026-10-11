@@ -19,8 +19,10 @@ import {
   EditOutlined,
   LockOutlined,
   UnlockOutlined,
+  FileExcelOutlined,
 } from "@ant-design/icons";
 import { authenticatedFetch } from "../../services/sessionService";
+import UserExcelImportModal from "./UserExcelImportModal";
 
 interface UserRow {
   id: number;
@@ -41,6 +43,9 @@ export const AdminUsers: React.FC = () => {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  // State Modal Nhập Excel
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // State Modal Sửa & Khóa
   const [editUser, setEditUser] = useState<UserRow | null>(null);
@@ -232,14 +237,23 @@ export const AdminUsers: React.FC = () => {
         </div>
       }
       extra={
-        <Button
-          type="primary"
-          icon={<UserAddOutlined />}
-          href="/admin/users/create"
-          style={{ backgroundColor: "#2563eb", borderRadius: 8 }}
-        >
-          Tạo tài khoản
-        </Button>
+        <Space>
+          <Button
+            icon={<FileExcelOutlined />}
+            onClick={() => setIsImportModalOpen(true)}
+            style={{ borderRadius: 8 }}
+          >
+            Nhập người dùng từ Excel
+          </Button>
+          <Button
+            type="primary"
+            icon={<UserAddOutlined />}
+            href="/admin/users/create"
+            style={{ backgroundColor: "#2563eb", borderRadius: 8 }}
+          >
+            Tạo tài khoản
+          </Button>
+        </Space>
       }
     >
       {/* Bộ lọc & Tìm kiếm */}
@@ -393,6 +407,13 @@ export const AdminUsers: React.FC = () => {
           onChange={(e) => setLockReason(e.target.value)}
         />
       </Modal>
+
+      {/* Modal Nhập danh sách người dùng từ Excel */}
+      <UserExcelImportModal
+        open={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => fetchUsers()}
+      />
     </Card>
   );
 };
