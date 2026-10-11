@@ -341,7 +341,7 @@ def require_roles(*allowed_roles: Union[str, RoleCode]):
         if user_norm not in normalized_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Quyá»n bá»‹ tá»« chá»‘i: Vai trÃ² '{user.role}' khÃ´ng Ä‘Æ°á»£c phÃ©p truy cáº­p tÃ i nguyÃªn nÃ y.",
+                detail=f"Quyền bị từ chối: Vai trò '{user.role}' không được phép truy cập tài nguyên này.",
             )
         return user
 
@@ -355,7 +355,7 @@ def require_permissions(*required_permissions: str):
             if not user.has_permission(perm):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Quyá»n bá»‹ tá»« chá»‘i: Vai trÃ² '{user.role}' khÃ´ng cÃ³ quyá»n '{perm}'.",
+                    detail=f"Quyền bị từ chối: Vai trò '{user.role}' không có quyền '{perm}'.",
                 )
         return user
 

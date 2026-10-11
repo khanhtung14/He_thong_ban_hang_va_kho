@@ -422,13 +422,14 @@ def list_users(
 
     query = db.query(User)
 
-    # Search by full_name, username, or phone
+    # Search by full_name, username, email, or phone
     if search and search.strip():
         term = f"%{search.strip()}%"
         query = query.filter(
             or_(
                 User.full_name.ilike(term),
                 User.username.ilike(term),
+                User.email.ilike(term),
                 User.phone.ilike(term)
             )
         )

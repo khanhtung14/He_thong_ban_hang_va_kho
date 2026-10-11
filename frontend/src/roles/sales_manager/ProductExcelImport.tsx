@@ -6,7 +6,6 @@ import {
   Table,
   Tag,
   Space,
-  Alert,
   message,
   Statistic,
   Row,
@@ -27,8 +26,11 @@ interface PreviewRow {
   row_number?: number;
   sku: string;
   name: string;
+  category?: string;
   unit?: string;
   sale_price?: number;
+  cost_price?: number;
+  stock_available?: number;
   action_type: "CREATE" | "UPDATE" | "ERROR";
   error_message?: string;
 }
@@ -117,12 +119,13 @@ export const ProductExcelImport: React.FC = () => {
   const handleCommit = async () => {
     setCommitting(true);
     try {
-      const payload: any = { session_id: sessionId };
-      if (!sessionId) {
-        payload.items = previewData.filter(
-          (item) => item.action_type !== "ERROR",
-        );
-      }
+      const validItems = previewData.filter(
+        (item) => item.action_type !== "ERROR",
+      );
+      const payload: any = {
+        session_id: sessionId,
+        items: validItems,
+      };
 
       const res = await authenticatedFetch("/api/v1/products/import/commit", {
         method: "POST",

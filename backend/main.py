@@ -9,15 +9,15 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-
 from app.core.database import migrate_pricing_schema
 from app.api.v1.endpoints.avatar import router as avatar_router
 from app.api.v1.endpoints.change_password import router as change_password_router
 from app.api.v1.endpoints.audit_logs import router as audit_logs_router
 from app.api.v1.endpoints.forgot_password import router as forgot_password_router
-from app.api.v1.endpoints.inventory import router as inventory_router
+from app.api.v1.endpoints.inventory import router as inventory_router, legacy_router as legacy_inventory_router
 from app.api.v1.endpoints.login import router as login_router
 from app.api.v1.endpoints.navigation import router as navigation_router
+from app.api.v1.endpoints.product_categories import router as product_categories_router
 from app.api.v1.endpoints.products import router as products_router
 from app.api.v1.endpoints.price_lists import router as price_lists_router
 from app.api.v1.endpoints.profile import migrate_profile_schema, router as profile_router
@@ -27,6 +27,7 @@ from app.api.v1.endpoints.user_assignment import router as user_assignment_route
 from app.api.v1.endpoints.user_routes import router as user_router
 from app.api.v1.endpoints.users import compat_router as users_compat_router, router as users_router
 from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_router
+from app.api.v1.endpoints.import_users import router as import_users_router
 
 
 
@@ -44,6 +45,13 @@ def migrate_profile_database() -> None:
     except Exception:
         pass
     migrate_pricing_schema()
+    try:
+        from app.api.v1.endpoints.warehouse import seed_default_warehouses_and_territories
+        from app.core.database import SessionLocal
+        with SessionLocal() as db:
+            seed_default_warehouses_and_territories(db)
+    except Exception:
+        pass
 
 
 app.add_middleware(
@@ -144,10 +152,13 @@ async def render_html_for_forbidden(request: Request, exc: HTTPException):
 app.include_router(change_password_router)
 app.include_router(audit_logs_router)
 app.include_router(forgot_password_router)
+app.include_router(import_users_router)
 app.include_router(login_router)
 app.include_router(session_router)
 app.include_router(inventory_router)
+app.include_router(legacy_inventory_router)
 app.include_router(products_router)
+app.include_router(product_categories_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
 app.include_router(navigation_router)
@@ -158,7 +169,12 @@ app.include_router(user_router)
 app.include_router(profile_router)
 app.include_router(customer_lock_router)
 try:
-    from app.api.v1.endpoints.warehouse import router as warehouse_router
+    from app.api.v1.endpoints.warehouse import (
+        router as warehouse_router,
+        warehouses_router,
+        territories_router,
+        roles_router,
+    )
     from app.api.v1.endpoints.customers import router as customers_router
     from app.api.v1.endpoints.orders import router as orders_router
     from app.api.v1.endpoints.invoices import router as invoices_router
@@ -166,6 +182,9 @@ try:
     from app.api.v1.endpoints.returns import router as returns_router
 
     app.include_router(warehouse_router)
+    app.include_router(warehouses_router)
+    app.include_router(territories_router)
+    app.include_router(roles_router)
     app.include_router(customers_router)
     app.include_router(orders_router)
     app.include_router(invoices_router)
@@ -244,6 +263,12 @@ def role_workspace_page():
 @app.get("/admin/territory-handover", response_class=HTMLResponse, include_in_schema=False)
 def territory_handover_page():
     """Serve the territory handover screen."""
+    return login_page_response()
+
+
+@app.get("/manager/categories", response_class=HTMLResponse, include_in_schema=False)
+def manager_categories_page():
+    """Serve the product categories management screen (SCRUM-76)."""
     return login_page_response()
 
 

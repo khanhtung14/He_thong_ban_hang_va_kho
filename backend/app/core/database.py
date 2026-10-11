@@ -14,7 +14,7 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mysql+pymysql://oms_user:change-me@localhost:3306/oms?charset=utf8mb4",
+    "sqlite:///../database/demo.db",
 )
 
 connect_args = {}
@@ -65,6 +65,14 @@ def migrate_pricing_schema():
         "order_items": {
             "floor_price": "INTEGER NULL",
             "price_list_id": "INTEGER NULL",
+            "sku": "VARCHAR(50) NULL",
+            "product_name": "VARCHAR(255) NULL",
+        },
+        "product_units": {
+            "is_base_unit": "BOOLEAN NOT NULL DEFAULT 0",
+        },
+        "price_list_items": {
+            "sku": "VARCHAR(50) NULL",
         },
     }
     for table_name, columns_to_add in additions.items():

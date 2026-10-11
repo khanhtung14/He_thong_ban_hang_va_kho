@@ -266,3 +266,44 @@ def test_warning_on_incomplete_orders_of_locked_customer(scrum85_env):
     assert updated_data["status"] == "PROCESSING"
     assert updated_data["has_warning"] is True
     assert "CẢNH BÁO" in updated_data["warning_message"]
+
+
+def test_patch_customer_transaction_status(scrum85_env):
+    """Kiểm tra endpoint PATCH /customers/{id}/transaction-status theo API_SPECIFICATION.md S3-07."""
+    client, _ = scrum85_env
+    acc_headers = make_auth_header(RoleCode.ACCOUNTANT.value, "accountant_user")
+
+    # 1. Khóa bằng PATCH LOCKED_FOR_DEBT không có lý do -> 400
+    res_err = client.patch(
+        "/api/v1/customers/2/transaction-status",
+        json={"status": "LOCKED_FOR_DEBT", "reason": "   "},
+        headers=acc_headers,
+    )
+    assert res_err.status_code == 400
+
+    # 2. Khóa hợp lệ bằng PATCH
+    res_lock = client.patch(
+        "/api/v1/customers/2/transaction-status",
+        json={"status": "LOCKED_FOR_DEBT", "reason": "Nợ quá hạn trên 45 ngày"},
+        headers=acc_headers,
+    )
+    assert res_lock.status_code == 200
+    data_lock = res_lock.json()
+    assert data_lock["is_locked"] is True
+    assert data_lock["lock_reason"] == "Nợ quá hạn trên 45 ngày"
+
+    # 3. Mở khóa bằng PATCH ACTIVE
+    res_unlock = client.patch(
+        "/api/v1/customers/2/transaction-status",
+        json={"status": "ACTIVE"},
+        headers=acc_headers,
+    )
+    assert res_unlock.status_code == 200
+    data_unlock = res_unlock.json()
+    assert data_unlock["is_locked"] is False
+    assert data_unlock["lock_reason"] is None
+
+    # 4. Kiểm tra endpoint alias GET /accounting/agencies-debt-status
+    res_debt = client.get("/api/v1/accounting/agencies-debt-status", headers=acc_headers)
+    assert res_debt.status_code == 200
+    assert len(res_debt.json()) >= 2
