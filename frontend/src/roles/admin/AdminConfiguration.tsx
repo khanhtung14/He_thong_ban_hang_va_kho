@@ -18,7 +18,6 @@ import {
   message,
   Tooltip,
   Badge,
-  Alert,
   Divider,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -29,18 +28,17 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  ReloadOutlined,
   SearchOutlined,
   CheckCircleOutlined,
   StopOutlined,
   UserAddOutlined,
   SafetyCertificateOutlined,
-  InfoCircleOutlined,
   EnvironmentOutlined,
   GlobalOutlined,
   ApartmentOutlined,
 } from "@ant-design/icons";
 import { authenticatedFetch } from "../../services/sessionService";
+import CategoryManagement from "../sales_manager/CategoryManagement";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -963,7 +961,7 @@ export const AdminConfiguration: React.FC = () => {
               label: (
                 <Space size={8}>
                   <ShopOutlined />
-                  <span>Quản lý Kho hàng (Warehouses)</span>
+                  <span>Quản lý Kho hàng</span>
                   <Badge count={warehouses.length} overflowCount={99} style={{ backgroundColor: "#d97706" }} />
                 </Space>
               ),
@@ -1040,7 +1038,7 @@ export const AdminConfiguration: React.FC = () => {
               label: (
                 <Space size={8}>
                   <CompassOutlined />
-                  <span>Địa bàn hoạt động (Territories)</span>
+                  <span>Địa bàn hoạt động</span>
                   <Badge count={territories.length} overflowCount={99} style={{ backgroundColor: "#16a34a" }} />
                 </Space>
               ),
@@ -1104,7 +1102,7 @@ export const AdminConfiguration: React.FC = () => {
               label: (
                 <Space size={8}>
                   <SafetyCertificateOutlined />
-                  <span>Vai trò hệ thống (Roles)</span>
+                  <span>Vai trò hệ thống</span>
                   <Badge count={roles.length} overflowCount={99} style={{ backgroundColor: "#2563eb" }} />
                 </Space>
               ),
@@ -1125,6 +1123,22 @@ export const AdminConfiguration: React.FC = () => {
                     bordered
                     style={{ borderRadius: 8, overflow: "hidden" }}
                   />
+                </div>
+              ),
+            },
+
+            // TAB 4: NHÓM NGÀNH HÀNG & PHÂN LOẠI SẢN PHẨM
+            {
+              key: "categories",
+              label: (
+                <Space size={8}>
+                  <ApartmentOutlined />
+                  <span>Nhóm ngành hàng &amp; Phân loại sản phẩm</span>
+                </Space>
+              ),
+              children: (
+                <div style={{ marginTop: 8 }}>
+                  <CategoryManagement />
                 </div>
               ),
             },

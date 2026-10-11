@@ -1,6 +1,6 @@
 import React from "react";
 import ProfileAvatar from "../ProfileAvatar";
-import { Layout, Dropdown, Space, Avatar, Badge, Tag } from "antd";
+import { Layout, Dropdown, Space, Badge, Tag } from "antd";
 import type { MenuProps } from "antd";
 import {
   UserOutlined,

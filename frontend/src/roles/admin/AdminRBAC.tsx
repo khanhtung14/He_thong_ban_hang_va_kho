@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Alert, Typography, Table, Tag } from "antd";
+import { Card, Typography, Table, Tag } from "antd";
 import { CheckCircleFilled, CloseCircleOutlined } from "@ant-design/icons";
 
 const { Title, Text } = Typography;

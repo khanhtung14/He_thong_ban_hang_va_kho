@@ -45,7 +45,7 @@ router = APIRouter(prefix="/api/v1/categories", tags=["Product Categories"])
 # ---------------------------------------------------------------------------
 
 class CreateCategoryRequest(BaseModel):
-    code: str = Field(min_length=1, max_length=50, description="Mã nhóm hàng (duy nhất)")
+    code: Optional[str] = Field(default=None, max_length=50, description="Mã nhóm hàng (duy nhất, tự sinh nếu để trống)")
     name: str = Field(min_length=1, max_length=150, description="Tên nhóm hàng")
     parent_id: Optional[int] = Field(default=None, description="ID nhóm cha (None nếu là cấp 1)")
     description: Optional[str] = Field(default=None, description="Mô tả nhóm hàng")
@@ -271,16 +271,25 @@ def create_category(
     global _NEXT_CATEGORY_ID
     verify_write_permission(user)
 
-    code_clean = payload.code.strip().upper()
     name_clean = payload.name.strip()
-
-    # Check unique code
-    for c in _CATEGORY_REGISTRY.values():
-        if c["code"].upper() == code_clean:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Mã nhóm hàng '{code_clean}' đã tồn tại trong hệ thống. Vui lòng chọn mã khác.",
-            )
+    if payload.code and payload.code.strip():
+        code_clean = payload.code.strip().upper()
+        # Check unique code
+        for c in _CATEGORY_REGISTRY.values():
+            if c["code"].upper() == code_clean:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Mã nhóm hàng '{code_clean}' đã tồn tại trong hệ thống. Vui lòng chọn mã khác.",
+                )
+    else:
+        import re
+        slug = re.sub(r'[^A-Za-z0-9]', '', name_clean).upper()[:10]
+        base_code = f"CAT_{slug}_{_NEXT_CATEGORY_ID}" if slug else f"CAT_{_NEXT_CATEGORY_ID}"
+        code_clean = base_code
+        counter = 1
+        while any(c["code"].upper() == code_clean for c in _CATEGORY_REGISTRY.values()):
+            code_clean = f"{base_code}_{counter}"
+            counter += 1
 
     # Check parent_id exists if specified
     if payload.parent_id is not None:
