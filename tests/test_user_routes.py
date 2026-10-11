@@ -171,7 +171,7 @@ def test_unlock_user_success_updates_is_active_to_true(db_session_and_client):
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert "mở khóa thành công" in data["message"]
+    assert "đã được mở khóa thành công" in data["message"]
 
     # Xác nhận trực tiếp trong Database: is_active đã được cập nhật thành True (1)
     with engine.connect() as conn:

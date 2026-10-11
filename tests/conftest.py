@@ -1,10 +1,22 @@
 import json
+import os
+
+# Prevent tests from connecting to a developer's configured MySQL instance.
+# Set this before importing backend modules, since database.py creates its
+# engine at import time.
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["TESTING"] = "1"
+for _smtp_key in ("SMTP_HOST", "SMTP_USER", "SMTP_USERNAME", "SMTP_PASSWORD"):
+    os.environ.pop(_smtp_key, None)
 
 import bcrypt
 import pytest
 from fastapi.testclient import TestClient
 
-from src.backend import change_password, login
+from src.backend import change_password, database, login
+
+database.init_db()
+
 from src.backend.main import app
 
 

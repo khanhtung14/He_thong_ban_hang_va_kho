@@ -1,0 +1,30 @@
+TÀI LIỆU ĐẶC TẢ KỸ THUẬT RESTful API
+HỆ THỐNG BÁN HÀNG & KHO
+Hợp đồng API (API Contract) chuẩn hóa cho phát triển Frontend & Backend song song
+(Quy chiếu theo 76 User Stories - Kỳ TTCS_T926_K13C4)
+I. QUY CHUẨN KỸ THUẬT DÙNG CHUNG
+1. Base URL: https://api.domain.com/api/v1
+2. Header xác thực: Authorization: Bearer <access_token>
+3. Content-Type: application/json; charset=utf-8 (Upload dùng multipart/form-data)
+4. Phân quyền (RBAC): Admin, Sales Manager, Sales Rep, WH Manager, Warehouse, Accountant, Customer.
+Cấu trúc phản hồi JSON chuẩn (Response Envelopes)
+Định dạng phản hồi thành công (200 OK / 201 Created):
+
+Định dạng phản hồi lỗi (400, 401, 403, 422, 500):
+
+MODULE 1: XÁC THỰC, PHÂN QUYỀN & NGƯỜI DÙNG (EP-01)
+
+MODULE 2: DANH MỤC SẢN PHẨM & BẢNG GIÁ (EP-02)
+
+MODULE 3: ĐẠI LÝ & HẠN MỨC CÔNG NỢ (EP-03)
+
+MODULE 4: ĐẶT HÀNG & DUYỆT ĐƠN (EP-04)
+
+MODULE 5: KHO, TỒN KHO & ĐIỀU CHUYỂN (EP-05)
+
+MODULE 6: XUẤT KHO, GIAO HÀNG & CHỨNG TỪ (EP-06)
+
+MODULE 7: HÓA ĐƠN, CÔNG NỢ & THANH TOÁN (EP-07)
+
+MODULE 8 & 9: TRẢ HÀNG, ĐIỀU CHỈNH & BÁO CÁO (EP-08, EP-09)
+

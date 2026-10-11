@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: API He Thong Ban Hang
+  version: 1.0.0
+paths:
+  /products:
+    get:
+      summary: Danh sách sản phẩm
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+components:
+  schemas:
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - price
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number

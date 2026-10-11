@@ -1,0 +1,88 @@
+"""Authentication dependencies for protected account administration APIs."""
+
+from __future__ import annotations
+
+import hashlib
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
+
+try:
+    from app.core.database import get_db
+    from app.models.models import AccountStatus, User, UserSession
+except ImportError:  # pragma: no cover - direct script execution
+    from app.core.database import get_db
+    from app.models.models import AccountStatus, User, UserSession
+
+
+_bearer = HTTPBearer(auto_error=False)
+SESSION_DURATION = timedelta(hours=12)
+
+
+def require_active_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> User:
+    unauthorized = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Vui lòng đăng nhập để tiếp tục.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if credentials is None:
+        raise unauthorized
+
+    if credentials.scheme.lower() != "bearer":
+        raise unauthorized
+
+    token = credentials.credentials
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    session = (
+        db.query(UserSession)
+        .filter(
+            UserSession.refresh_token_hash == token_hash,
+            UserSession.revoked_at.is_(None),
+        )
+        .first()
+    )
+    if session is not None:
+        expires_at = session.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= datetime.now(timezone.utc):
+            raise unauthorized
+
+        user = session.user
+        if user is None or user.is_active is False or user.status not in (AccountStatus.ACTIVE, AccountStatus.PENDING_ACTIVATION):
+            raise unauthorized
+
+        # Sliding session: every authenticated request extends the session window.
+        session.expires_at = datetime.now(timezone.utc) + SESSION_DURATION
+        db.commit()
+        return user
+
+    # Support JWT access token authentication as well
+    try:
+        from app.api.v1.endpoints.rbac import decode_access_token
+        payload = decode_access_token(token)
+        username = payload.get("sub") or payload.get("username")
+        if username:
+            user = db.query(User).filter(User.username == username).first()
+            if user and user.is_active is not False and user.status in (AccountStatus.ACTIVE, AccountStatus.PENDING_ACTIVATION):
+                return user
+    except Exception:
+        pass
+
+    raise unauthorized
+
+
+def require_admin(user: User = Depends(require_active_user)) -> User:
+    """Require the authenticated account to have the ADMIN role in the DB."""
+    if not any(role.code.upper() == "ADMIN" for role in user.roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chức năng này chỉ dành cho Quản trị viên.",
+        )
+    return user
