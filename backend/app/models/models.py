@@ -414,9 +414,16 @@ class Supplier(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     tax_code: Mapped[Optional[str]] = mapped_column(String(50))
+    contact_person: Mapped[Optional[str]] = mapped_column(String(100))
+    payment_terms: Mapped[Optional[str]] = mapped_column(String(100))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     phone: Mapped[Optional[str]] = mapped_column(String(20))
     address: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    receipts: Mapped[List["WarehouseReceipt"]] = relationship("WarehouseReceipt", back_populates="supplier")
 
 
 class Inventory(Base):
@@ -447,6 +454,8 @@ class WarehouseReceipt(Base):
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False)
     receipt_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     status: Mapped[str] = mapped_column(String(30), default="COMPLETED")
+
+    supplier: Mapped[Optional["Supplier"]] = relationship("Supplier", back_populates="receipts")
 
 
 class WarehouseReceiptItem(Base):

@@ -17,6 +17,19 @@ DATABASE_URL = os.getenv(
     "mysql+pymysql://oms_user:change-me@localhost:3306/oms?charset=utf8mb4",
 )
 
+if DATABASE_URL.startswith("sqlite:///") and not DATABASE_URL.endswith(":memory:"):
+    db_path_str = DATABASE_URL.replace("sqlite:///", "")
+    db_path = Path(db_path_str)
+    if not db_path.is_absolute() and not db_path.exists():
+        # Check project root directory or database/demo.db
+        root_dir = Path(__file__).resolve().parents[3]
+        candidate1 = root_dir / db_path_str.lstrip("./\\").replace("../", "")
+        candidate2 = root_dir / "database" / "demo.db"
+        if candidate1.exists():
+            DATABASE_URL = f"sqlite:///{candidate1.resolve().as_posix()}"
+        elif candidate2.exists():
+            DATABASE_URL = f"sqlite:///{candidate2.resolve().as_posix()}"
+
 connect_args = {}
 engine_options = {"pool_pre_ping": True}
 if "sqlite" in DATABASE_URL:
@@ -49,9 +62,9 @@ def init_db():
 
 def migrate_pricing_schema():
     """Create price-list tables and add pricing/approval fields to existing DBs."""
-    from app.models.models import Base, PriceList, PriceListItem
+    from app.models.models import Base, PriceList, PriceListItem, Supplier
 
-    Base.metadata.create_all(bind=engine, tables=[PriceList.__table__, PriceListItem.__table__])
+    Base.metadata.create_all(bind=engine, tables=[PriceList.__table__, PriceListItem.__table__, Supplier.__table__])
     inspector = inspect(engine)
     additions = {
         "customers": {
@@ -60,6 +73,13 @@ def migrate_pricing_schema():
             "lock_reason": "VARCHAR(255) NULL",
             "locked_at": "DATETIME NULL",
             "locked_by_id": "INTEGER NULL",
+        },
+        "suppliers": {
+            "contact_person": "VARCHAR(100) NULL",
+            "payment_terms": "VARCHAR(100) NULL",
+            "is_active": "BOOLEAN NOT NULL DEFAULT 1",
+            "created_at": "DATETIME NULL",
+            "updated_at": "DATETIME NULL",
         },
         "orders": {"approval_reason": "TEXT NULL"},
         "order_items": {
