@@ -10,7 +10,6 @@ import AdminRBAC from "./AdminRBAC";
 import AdminConfiguration from "./AdminConfiguration";
 import CreateUserModal from "./CreateUser";
 import AdminAudit from "./AdminAudit";
-import { logout } from "services/sessionService";
 
 const { Content } = Layout;
 

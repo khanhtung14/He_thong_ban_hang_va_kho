@@ -18,6 +18,7 @@ import TerritoryProgress from "./TerritoryProgress";
 import CreatePriceListModal from "./CreatePriceListModal";
 import ExportReportModal from "./ExportReportModal";
 import ProductExcelImport from "./ProductExcelImport";
+import CategoryManagement from "./CategoryManagement";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -42,7 +43,13 @@ export const SalesManagerDashboard: React.FC = () => {
   const [menuItems, setMenuItems] = useState<any[]>([]);
 
   // State điều hướng màn hình hiển thị
-  const [currentPath, setCurrentPath] = useState<string>("/manager/dashboard");
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      if (window.location.pathname === "/manager/categories") return "/manager/categories";
+      if (window.location.pathname === "/manager/products/import") return "/manager/products/import";
+    }
+    return "/manager/dashboard";
+  });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -109,28 +116,60 @@ export const SalesManagerDashboard: React.FC = () => {
 
       // 4. Menu điều hướng
       if (navItems.status === "fulfilled" && navItems.value.length > 0) {
-        setMenuItems([
+        // Lọc bỏ route admin và loại bỏ mục "Quản lý nhóm hàng" (nếu có từ backend)
+        const backendNavItems = navItems.value
+          .filter(
+            (m: any) =>
+              !m.path.startsWith("/admin/") &&
+              m.title !== "Quản lý nhóm hàng" &&
+              m.id !== "category-management"
+          )
+          .map((m: any) => ({
+            id: m.id,
+            title: m.path === "/manager/categories" ? "Nhóm hàng" : m.title,
+            path: m.path,
+            icon: m.icon,
+          }));
+
+        const hasCategoryMenu = backendNavItems.some(
+          (m: any) => m.path === "/manager/categories" || m.id === "manager-categories"
+        );
+
+        const rawMenuItems = [
           {
             id: "home",
             title: "Trang chủ",
             path: "/manager/dashboard",
             icon: "home",
           },
-          ...navItems.value
-            .filter((m: any) => !m.path.startsWith("/admin/"))
-            .map((m: any) => ({
-              id: m.id,
-              title: m.title,
-              path: m.path,
-              icon: m.icon,
-            })),
+          ...backendNavItems,
+          ...(hasCategoryMenu
+            ? []
+            : [
+                {
+                  id: "manager-categories",
+                  title: "Nhóm hàng",
+                  path: "/manager/categories",
+                  icon: "appstore",
+                },
+              ]),
           {
             id: "excel-import",
             title: "Nhập sản phẩm (Excel)",
             path: "/manager/products/import",
             icon: "excel",
           },
-        ]);
+        ];
+
+        // Đảm bảo không trùng lặp mục menu theo path và không có "Quản lý nhóm hàng"
+        const uniqueMenuItems = rawMenuItems
+          .filter((item) => item.title !== "Quản lý nhóm hàng")
+          .filter(
+            (item, index, self) =>
+              index === self.findIndex((t) => t.path === item.path)
+          );
+
+        setMenuItems(uniqueMenuItems);
       }
     } catch (err: any) {
       setError(err.message || "Đã xảy ra lỗi khi kết nối với máy chủ.");
@@ -221,6 +260,9 @@ export const SalesManagerDashboard: React.FC = () => {
           } else if (path === "/manager/products/import") {
             setCurrentPath("/manager/products/import");
             window.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (path === "/manager/categories") {
+            setCurrentPath("/manager/categories");
+            window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/orders/approval") {
             setCurrentPath("/manager/dashboard");
             setTimeout(() => {
@@ -243,7 +285,7 @@ export const SalesManagerDashboard: React.FC = () => {
         <SalesManagerHeader
           fullName={profile?.full_name || "Quản lý kinh doanh"}
           roleName={profile?.role || "Quản lý kinh doanh"}
-          avatarUrl={profile?.avatar_url}
+          avatarUrl={profile?.avatar_url || undefined}
           notificationCount={approvals.length}
           onLogout={logout}
           onProfileClick={() => setIsProfileModalOpen(true)}
@@ -287,6 +329,10 @@ export const SalesManagerDashboard: React.FC = () => {
               </div>
 
               <ProductExcelImport />
+            </div>
+          ) : currentPath === "/manager/categories" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <CategoryManagement />
             </div>
           ) : (
             /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */

@@ -18,6 +18,8 @@ const roleWorkspacePaths = [
   "/manager/orders/approval",
   "/manager/pricing",
   "/manager/reports",
+  "/manager/categories",
+  "/manager/products/import",
   "/warehouse/picking",
   "/warehouse/receiving",
   "/warehouse/inventory",

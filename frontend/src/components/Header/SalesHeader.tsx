@@ -2,7 +2,6 @@ import React from "react";
 import ProfileAvatar from "../ProfileAvatar";
 import {
   Layout,
-  Avatar,
   Badge,
   Dropdown,
   Tag,
@@ -35,12 +34,13 @@ export interface SalesHeaderProps {
 export const SalesHeader: React.FC<SalesHeaderProps> = ({
   fullName = "Nhân viên kinh doanh",
   roleName = "Chuyên viên bán hàng",
-  avatarUrl,
+  avatarUrl: _avatarUrl,
   notificationCount = 0,
   onProfileClick,
   onChangePassword,
   onLogout,
 }) => {
+  void _avatarUrl;
   const initials =
     fullName
       .trim()

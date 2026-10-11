@@ -67,6 +67,12 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       icon: "tag",
     },
     {
+      id: "manager-categories",
+      title: "Nhóm hàng",
+      path: "/manager/categories",
+      icon: "appstore",
+    },
+    {
       id: "excel-import",
       title: "Nhập sản phẩm (Excel)",
       path: "/manager/products/import",
@@ -74,10 +80,19 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  const menuItems =
+  const menuItems = (
     customMenuItems && customMenuItems.length > 0
       ? customMenuItems
-      : defaultMenuItems;
+      : defaultMenuItems
+  )
+    .filter(
+      (item) =>
+        item.title !== "Quản lý nhóm hàng" && item.id !== "category-management"
+    )
+    .filter(
+      (item, index, self) =>
+        index === self.findIndex((t) => t.path === item.path)
+    );
 
   const getIcon = (icon?: string) => {
     switch (icon) {
@@ -92,6 +107,11 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       case "excel": // <-- Thêm dòng này
       case "import": // <-- Thêm dòng này
         return <FileExcelOutlined />;
+      case "appstore":
+      case "category":
+      case "categories":
+      case "folder-tree":
+        return <AppstoreOutlined />;
       case "users":
         return <UsergroupAddOutlined />;
       case "tag":

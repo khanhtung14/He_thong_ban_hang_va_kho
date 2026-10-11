@@ -2,7 +2,6 @@ import React from "react";
 import ProfileAvatar from "../ProfileAvatar";
 import {
   Layout,
-  Avatar,
   Badge,
   Dropdown,
   Tag,
@@ -35,12 +34,13 @@ export interface WarehouseManagerHeaderProps {
 export const WarehouseManagerHeader: React.FC<WarehouseManagerHeaderProps> = ({
   fullName = "Quản lý kho",
   roleName = "Trưởng bộ phận kho",
-  avatarUrl,
+  avatarUrl: _avatarUrl,
   notificationCount = 0,
   onProfileClick,
   onChangePassword,
   onLogout,
 }) => {
+  void _avatarUrl;
   const initials =
     fullName
       .trim()

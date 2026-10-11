@@ -11,7 +11,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 from fastapi import APIRouter, Depends, File, HTTPException, Path as PathParam, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.database import get_db
 from app.models.models import Product, Category, ProductUnit
@@ -770,7 +770,18 @@ def upsert_product_unit(
 
 
 class MoveProductCategoryRequest(BaseModel):
-    target_category_id: int = Field(gt=0, description="ID nhóm hàng mới cần chuyển đến")
+    target_category_id: Optional[int] = Field(default=None, gt=0, description="ID nhóm hàng mới cần chuyển đến")
+    category_id: Optional[int] = Field(default=None, gt=0)
+    categoryId: Optional[int] = Field(default=None, gt=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_target_category_id(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            target_id = data.get("target_category_id") or data.get("category_id") or data.get("categoryId")
+            if target_id is not None:
+                data["target_category_id"] = target_id
+        return data
 
 
 
@@ -783,6 +794,12 @@ def move_product_category(
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
     """Move a single product to a new target category (SCRUM-76 AC 2)."""
+    if not payload.target_category_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vui lòng cung cấp target_category_id hoặc category_id hợp lệ.",
+        )
+
     from app.models.models import RoleCode
     if user.role not in (RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value):
         raise HTTPException(

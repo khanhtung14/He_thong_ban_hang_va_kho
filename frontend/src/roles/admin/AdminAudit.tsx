@@ -10,7 +10,7 @@ import {
   message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
+import { ReloadOutlined } from "@ant-design/icons";
 import { authenticatedFetch } from "../../services/sessionService";
 import dayjs from "dayjs";
 
