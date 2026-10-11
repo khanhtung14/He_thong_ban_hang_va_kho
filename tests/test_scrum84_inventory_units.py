@@ -106,3 +106,52 @@ def test_legacy_transaction_accepts_original_payload(inventory_client):
     assert response.status_code == 201
     assert response.json()["warehouse_id"] == 1
     assert response.json()["transaction_type"] == "IN"
+
+
+def test_updating_conversion_rate_does_not_alter_past_transactions(inventory_client):
+    """AC 3: Đổi hệ số quy đổi không làm sai lệch các giao dịch đã ghi trước đó."""
+    from src.backend.models import InventoryTransaction
+
+    # 1. Khai báo đơn vị 'thùng' với hệ số 24
+    inventory_client.post(
+        "/api/v1/products/1/units",
+        json={"unit_name": "thùng", "conversion_rate": 24},
+    )
+
+    # 2. Nhập 2 thùng (quy đổi thành 48 lon)
+    tx = inventory_client.post(
+        "/api/v1/inventory/transaction",
+        json={
+            "product_id": 1,
+            "warehouse_id": 1,
+            "transaction_type": "IN",
+            "unit_name": "thùng",
+            "input_quantity": 2,
+        },
+    )
+    assert tx.status_code == 201
+    tx_id = tx.json()["id"]
+    assert tx.json()["base_quantity"] == 48
+    assert tx.json()["conversion_rate_snapshot"] == 24
+
+    # 3. Đổi hệ số quy đổi của 'thùng' sang 30
+    update_unit = inventory_client.post(
+        "/api/v1/products/1/units",
+        json={"unit_name": "thùng", "conversion_rate": 30},
+    )
+    assert update_unit.status_code == 200
+    assert update_unit.json()["conversion_rate"] == 30
+
+    # 4. Kiểm tra giao dịch quá khứ: Snapshot và base_quantity vẫn giữ nguyên 24 và 48, không bị sai lệch
+    db = next(app.dependency_overrides[get_db]())
+    try:
+        past_tx = db.query(InventoryTransaction).filter_by(id=tx_id).one()
+        assert past_tx.conversion_rate_snapshot == 24
+        assert past_tx.base_quantity == 48
+        assert past_tx.input_quantity == 2
+
+        # Tồn kho không bị tự ý nhảy lên 60
+        stock = db.query(InventoryStock).filter_by(product_id=1, warehouse_id=1).one()
+        assert stock.base_quantity == 48
+    finally:
+        db.close()

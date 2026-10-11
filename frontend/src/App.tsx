@@ -3,7 +3,7 @@ import Login from "./features/auth/Login";
 import ForgotPassword from "./features/auth/ForgotPassword";
 import ResetPassword from "./features/auth/ResetPassword";
 import ChangePassword from "./features/auth/ChangePassword";
-import CreateUser from "./features/users/CreateUser";
+import CreateUser from "./roles/admin/CreateUser";
 import Profile from "./features/profile/Profile";
 import Navigation from "./Navigation";
 import RoleWorkspace from "./RoleWorkspace";
@@ -18,6 +18,8 @@ const roleWorkspacePaths = [
   "/manager/orders/approval",
   "/manager/pricing",
   "/manager/reports",
+  "/manager/categories",
+  "/manager/products/import",
   "/warehouse/picking",
   "/warehouse/receiving",
   "/warehouse/inventory",

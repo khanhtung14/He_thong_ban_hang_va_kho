@@ -306,9 +306,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     message: "Vui lòng nhập số điện thoại!",
                   },
                   {
-                    pattern: isEditing ? /^0[0-9]{9}$/ : undefined,
+                    pattern: isEditing ? /^0[1235789][0-9]{8}$/ : undefined,
                     message:
-                      "Số điện thoại phải gồm 10 chữ số (bắt đầu bằng 0)!",
+                      "Số điện thoại gồm 10 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!",
                   },
                 ]}
               >

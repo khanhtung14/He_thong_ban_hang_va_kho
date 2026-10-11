@@ -9,7 +9,6 @@ import {
   Tag,
   Space,
   Typography,
-  Alert,
   Tooltip,
   Badge,
   message,
@@ -120,14 +119,27 @@ export const AgencyLockManager: React.FC = () => {
   const loadAgenciesFromDB = useCallback(async () => {
     setLoading(true);
     try {
-      // Các endpoint khả dụng theo database hiện có
-      const res = await authenticatedFetch(
-        "/api/v1/accounting/agencies-debt-status",
-      );
+      const res = await authenticatedFetch("/api/v1/customers");
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          setAgencies(data);
+          const mapped: AgencyDebtItem[] = data.map((item: any) => ({
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            phone: item.phone || "—",
+            current_debt: item.current_debt ?? 0,
+            debt_limit: item.debt_limit ?? item.credit_limit ?? 100000000,
+            overdue_days: item.overdue_days ?? 0,
+            is_locked: Boolean(item.is_locked),
+            lock_reason: item.lock_reason || undefined,
+            locked_at: item.locked_at
+              ? String(item.locked_at).replace("T", " ").slice(0, 16)
+              : undefined,
+            locked_by: item.locked_by_id ? `User #${item.locked_by_id}` : undefined,
+            pending_orders_count: item.pending_orders_count ?? 0,
+          }));
+          setAgencies(mapped);
         }
       }
     } catch (err) {
@@ -151,19 +163,19 @@ export const AgencyLockManager: React.FC = () => {
     setIsLockModalOpen(true);
   };
 
-  // Xác nhận khóa đại lý
+  // Xác nhận khóa đại lý theo chuẩn S3-07: PATCH /customers/{id}/transaction-status
   const handleConfirmLock = async (values: { reason: string }) => {
     if (!targetAgency) return;
     setLockSubmitting(true);
     try {
       const res = await authenticatedFetch(
-        `/api/v1/accounting/agencies/${targetAgency.code}/lock`,
+        `/api/v1/customers/${targetAgency.id}/transaction-status`,
         {
-          method: "POST",
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            status: "LOCKED_FOR_DEBT",
             reason: values.reason.trim(),
-            agency_id: targetAgency.id,
           }),
         },
       );
@@ -173,6 +185,25 @@ export const AgencyLockManager: React.FC = () => {
         throw new Error(errJson.detail || "Không thể khóa đại lý qua API");
       }
 
+      const updated = await res.json().catch(() => ({}));
+      setAgencies((prev) =>
+        prev.map((item) =>
+          item.id === targetAgency.id
+            ? {
+                ...item,
+                is_locked: true,
+                lock_reason: updated.lock_reason || values.reason.trim(),
+                locked_at: updated.locked_at
+                  ? String(updated.locked_at).replace("T", " ").slice(0, 16)
+                  : new Date()
+                      .toISOString()
+                      .replace("T", " ")
+                      .slice(0, 16),
+                locked_by: "Kế toán công nợ",
+              }
+            : item,
+        ),
+      );
       message.success(`Đã khóa giao dịch thành công cho ${targetAgency.name}`);
     } catch (err: any) {
       // Cập nhật state cục bộ để UI luôn phản hồi đúng nghiệp vụ
@@ -202,15 +233,15 @@ export const AgencyLockManager: React.FC = () => {
     }
   };
 
-  // Mở khóa giao dịch đại lý
+  // Mở khóa giao dịch đại lý theo chuẩn S3-07: PATCH /customers/{id}/transaction-status
   const handleUnlockAgency = async (record: AgencyDebtItem) => {
     try {
       const res = await authenticatedFetch(
-        `/api/v1/accounting/agencies/${record.code}/unlock`,
+        `/api/v1/customers/${record.id}/transaction-status`,
         {
-          method: "POST",
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ agency_id: record.id }),
+          body: JSON.stringify({ status: "ACTIVE" }),
         },
       );
 
@@ -219,6 +250,19 @@ export const AgencyLockManager: React.FC = () => {
         throw new Error(errJson.detail || "Không thể mở khóa đại lý");
       }
 
+      setAgencies((prev) =>
+        prev.map((item) =>
+          item.id === record.id
+            ? {
+                ...item,
+                is_locked: false,
+                lock_reason: undefined,
+                locked_at: undefined,
+                locked_by: undefined,
+              }
+            : item,
+        ),
+      );
       message.success(`Đã mở khóa giao dịch cho ${record.name}`);
     } catch (err: any) {
       // Cập nhật state cục bộ
