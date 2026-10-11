@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Row, Col, Alert, Typography } from "antd";
+import { Card, Row, Col, Typography } from "antd";
 import {
   AppstoreOutlined,
   CompassOutlined,

@@ -2,7 +2,6 @@ import React from "react";
 import ProfileAvatar from "../ProfileAvatar";
 import {
   Layout,
-  Avatar,
   Badge,
   Dropdown,
   Tag,
@@ -132,7 +131,7 @@ export const WarehouseStaffHeader: React.FC<WarehouseStaffHeaderProps> = ({
           placement="bottomRight"
         >
           <Space style={{ cursor: "pointer", userSelect: "none" }} size="small">
-            <ProfileAvatar editable={false} size={36} initials={initials} />
+            <ProfileAvatar editable={false} size={36} initials={initials} avatarUrl={avatarUrl} />
             <div
               style={{
                 display: "flex",

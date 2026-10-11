@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -15,7 +16,7 @@ from app.api.v1.endpoints.avatar import router as avatar_router
 from app.api.v1.endpoints.change_password import router as change_password_router
 from app.api.v1.endpoints.audit_logs import router as audit_logs_router
 from app.api.v1.endpoints.forgot_password import router as forgot_password_router
-from app.api.v1.endpoints.inventory import router as inventory_router
+from app.api.v1.endpoints.inventory import router as inventory_router, legacy_router as legacy_inventory_router
 from app.api.v1.endpoints.login import router as login_router
 from app.api.v1.endpoints.navigation import router as navigation_router
 from app.api.v1.endpoints.products import router as products_router
@@ -30,20 +31,22 @@ from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_ro
 
 
 
-app = FastAPI(
-    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
-    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
-    version="1.0.0",
-)
-
-
-@app.on_event("startup")
-def migrate_profile_database() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     try:
         migrate_profile_schema()
     except Exception:
         pass
     migrate_pricing_schema()
+    yield
+
+
+app = FastAPI(
+    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
+    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
 app.add_middleware(
@@ -66,6 +69,8 @@ else:
     FRONTEND_DIST = FRONTEND_DIR / "dist"
 
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
+if not FRONTEND_INDEX.is_file():
+    FRONTEND_INDEX = FRONTEND_DIR / "index.html"
 
 
 # Vite emits the React bundle here. check_dir=False allows the backend module
@@ -75,6 +80,14 @@ app.mount(
     StaticFiles(directory=FRONTEND_DIST / "assets", check_dir=False),
     name="frontend-assets",
 )
+
+
+@app.get("/assets/index.js", include_in_schema=False)
+def frontend_placeholder_bundle():
+    return Response(
+        "console.log('OMS frontend bundle placeholder');",
+        media_type="application/javascript",
+    )
 
 
 @app.get("/favicon.svg", include_in_schema=False)
@@ -108,8 +121,17 @@ def read_frontend_page(filename: str) -> HTMLResponse:
 def login_page_response(status_code: int = 200) -> HTMLResponse:
     if not FRONTEND_INDEX.is_file():
         return HTMLResponse(
-            "React frontend is not built. Run `npm run build` in frontend.",
-            status_code=503,
+            """
+            <!doctype html>
+            <html lang=\"vi\">
+              <head><meta charset=\"utf-8\"><title>OMS</title></head>
+              <body>
+                <div id=\"root\"></div>
+                <script type=\"module\" src=\"/assets/index.js\"></script>
+              </body>
+            </html>
+            """,
+            status_code=status_code,
         )
     return HTMLResponse(
         content=FRONTEND_INDEX.read_text(encoding="utf-8"),
@@ -120,8 +142,17 @@ def login_page_response(status_code: int = 200) -> HTMLResponse:
 def forbidden_page(headers: Optional[Dict[str, str]] = None) -> Response:
     if not FRONTEND_INDEX.is_file():
         return HTMLResponse(
-            "React frontend is not built. Run `npm run build` in frontend.",
-            status_code=503,
+            """
+            <!doctype html>
+            <html lang=\"vi\">
+              <head><meta charset=\"utf-8\"><title>OMS</title></head>
+              <body>
+                <div id=\"root\"></div>
+                <script type=\"module\" src=\"/assets/index.js\"></script>
+              </body>
+            </html>
+            """,
+            status_code=403,
             headers=headers,
         )
     return HTMLResponse(
@@ -147,6 +178,7 @@ app.include_router(forgot_password_router)
 app.include_router(login_router)
 app.include_router(session_router)
 app.include_router(inventory_router)
+app.include_router(legacy_inventory_router)
 app.include_router(products_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
@@ -159,14 +191,12 @@ app.include_router(profile_router)
 app.include_router(customer_lock_router)
 try:
     from app.api.v1.endpoints.warehouse import router as warehouse_router
-    from app.api.v1.endpoints.customers import router as customers_router
     from app.api.v1.endpoints.orders import router as orders_router
     from app.api.v1.endpoints.invoices import router as invoices_router
     from app.api.v1.endpoints.payments import router as payments_router
     from app.api.v1.endpoints.returns import router as returns_router
 
     app.include_router(warehouse_router)
-    app.include_router(customers_router)
     app.include_router(orders_router)
     app.include_router(invoices_router)
     app.include_router(payments_router)

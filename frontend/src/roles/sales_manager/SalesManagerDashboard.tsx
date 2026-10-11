@@ -243,7 +243,7 @@ export const SalesManagerDashboard: React.FC = () => {
         <SalesManagerHeader
           fullName={profile?.full_name || "Quản lý kinh doanh"}
           roleName={profile?.role || "Quản lý kinh doanh"}
-          avatarUrl={profile?.avatar_url}
+          avatarUrl={profile?.avatar_url ?? undefined}
           notificationCount={approvals.length}
           onLogout={logout}
           onProfileClick={() => setIsProfileModalOpen(true)}
