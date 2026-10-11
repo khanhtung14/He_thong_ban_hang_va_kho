@@ -166,6 +166,15 @@ MENU_REGISTRY: List[MenuItem] = [
         category="Quản lý",
     ),
     MenuItem(
+        id="sales-assignments",
+        title="Phân công & Bàn giao",
+        path="/sales/assignments",
+        icon="user-switch",
+        roles=["SALES_MANAGER", "ADMIN"],
+        order=108,
+        category="Quản lý",
+    ),
+    MenuItem(
         id="manager-sales-reports",
         title="Báo cáo doanh số",
         path="/manager/reports",

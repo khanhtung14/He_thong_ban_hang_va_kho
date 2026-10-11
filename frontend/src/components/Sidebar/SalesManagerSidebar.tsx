@@ -6,14 +6,15 @@ import {
   CheckCircleOutlined,
   BarChartOutlined,
   TagsOutlined,
-  UsergroupAddOutlined,
   ShoppingCartOutlined,
   ShopOutlined,
   InboxOutlined,
   AppstoreOutlined,
   LogoutOutlined,
+  UserSwitchOutlined,
+  FileExcelOutlined,
 } from "@ant-design/icons";
-import { FileExcelOutlined } from "@ant-design/icons";
+import BrandLogo from "components/BrandLogo";
 
 const { Sider } = Layout;
 
@@ -55,16 +56,10 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       badge: pendingApprovalCount,
     },
     {
-      id: "reports",
-      title: "Báo cáo doanh số & KPI",
-      path: "/manager/reports",
-      icon: "chart",
-    },
-    {
-      id: "pricing",
-      title: "Chính sách giá & Chiết khấu",
-      path: "/manager/pricing",
-      icon: "tag",
+      id: "sales-assignments",
+      title: "Phân công & Bàn giao",
+      path: "/sales/assignments",
+      icon: "user-switch",
     },
     {
       id: "manager-categories",
@@ -78,21 +73,78 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       path: "/manager/products/import",
       icon: "excel",
     },
+    {
+      id: "reports",
+      title: "Báo cáo doanh số & KPI",
+      path: "/manager/reports",
+      icon: "chart",
+    },
   ];
 
-  const menuItems = (
-    customMenuItems && customMenuItems.length > 0
+  const baseItems: MenuItem[] = [
+    ...(customMenuItems && customMenuItems.length > 0
       ? customMenuItems
-      : defaultMenuItems
-  )
+      : defaultMenuItems),
+  ];
+
+  // Đảm bảo mục "Phân công & Bàn giao" luôn luôn có mặt trong menu của Sales Manager
+  const hasAssignment = baseItems.some(
+    (item) => item.path === "/sales/assignments" || item.id === "sales-assignments"
+  );
+  if (!hasAssignment) {
+    const insertIdx = baseItems.findIndex(
+      (item) => item.path === "/manager/orders/approval"
+    );
+    const assignmentItem: MenuItem = {
+      id: "sales-assignments",
+      title: "Phân công & Bàn giao",
+      path: "/sales/assignments",
+      icon: "user-switch",
+    };
+    if (insertIdx !== -1) {
+      baseItems.splice(insertIdx + 1, 0, assignmentItem);
+    } else {
+      baseItems.push(assignmentItem);
+    }
+  }
+
+  // Lọc bỏ các mục không dùng (Bảng giá, Quản lý nhóm hàng cũ) và deduplicate
+  const filteredItems = baseItems
     .filter(
       (item) =>
-        item.title !== "Quản lý nhóm hàng" && item.id !== "category-management"
+        item.title !== "Quản lý nhóm hàng" &&
+        item.id !== "category-management" &&
+        item.id !== "pricing" &&
+        item.id !== "manager-pricing" &&
+        item.path !== "/manager/pricing" &&
+        item.title !== "Bảng giá" &&
+        item.title !== "Chính sách giá & Chiết khấu"
     )
     .filter(
       (item, index, self) =>
         index === self.findIndex((t) => t.path === item.path)
     );
+
+  // Đảm bảo mục "Báo cáo doanh số" (Reports) LUÔN NẰM Ở VỊ TRÍ CUỐI CÙNG của danh sách Menu nghiệp vụ
+  const nonReportItems = filteredItems.filter(
+    (item) =>
+      item.path !== "/manager/reports" &&
+      item.id !== "reports" &&
+      item.id !== "manager-sales-reports"
+  );
+  const reportItem = filteredItems.find(
+    (item) =>
+      item.path === "/manager/reports" ||
+      item.id === "reports" ||
+      item.id === "manager-sales-reports"
+  ) || {
+    id: "reports",
+    title: "Báo cáo doanh số & KPI",
+    path: "/manager/reports",
+    icon: "chart",
+  };
+
+  const menuItems = [...nonReportItems, reportItem];
 
   const getIcon = (icon?: string) => {
     switch (icon) {
@@ -104,16 +156,19 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       case "chart":
       case "bar-chart":
         return <BarChartOutlined />;
-      case "excel": // <-- Thêm dòng này
-      case "import": // <-- Thêm dòng này
+      case "excel":
+      case "import":
         return <FileExcelOutlined />;
       case "appstore":
       case "category":
       case "categories":
       case "folder-tree":
         return <AppstoreOutlined />;
+      case "user-switch":
+      case "sales-assignments":
+      case "team":
       case "users":
-        return <UsergroupAddOutlined />;
+        return <UserSwitchOutlined />;
       case "tag":
         return <TagsOutlined />;
       case "shopping-cart":
@@ -197,69 +252,7 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
     >
       <div style={{ flex: 1, overflowY: "auto", background: "#ffffff" }}>
         {/* Logo WMS & Icon ngôi nhà nguyên bản */}
-        <div
-          style={{
-            padding: "24px 20px 20px",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          {/* Icon ngôi nhà nền xanh bo góc đúng mẫu */}
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 14,
-              backgroundColor: "#2563eb",
-              color: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              boxShadow: "0 6px 14px rgba(37, 99, 235, 0.22)",
-            }}
-          >
-            <svg
-              width="24"
-              height="24"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2.2"
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-              />
-            </svg>
-          </div>
-          <div>
-            <div
-              style={{
-                fontWeight: 800,
-                fontSize: 20,
-                color: "#2563eb",
-                lineHeight: 1.1,
-                letterSpacing: "-0.5px",
-              }}
-            >
-              WMS
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: "#94a3b8",
-                marginTop: 3,
-                lineHeight: 1.25,
-                fontWeight: 500,
-              }}
-            >
-              Hệ thống quản lý kho & bán hàng
-            </div>
-          </div>
-        </div>
+        <BrandLogo></BrandLogo>
 
         {/* Tiêu đề nhóm Menu */}
         <div
@@ -289,44 +282,38 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Phần chân trang: Đồng bộ 100% nền trắng (#ffffff), liền mạch tuyệt đối */}
-      <div
-        style={{
-          padding: "16px 14px 20px",
-          borderTop: "1px solid #f1f5f9",
-          backgroundColor: "#ffffff",
-        }}
-      >
+      <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
         <div
           style={{
             fontSize: 11,
             fontWeight: 700,
             color: "#94a3b8",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
+            letterSpacing: "0.06em",
+            padding: "0 12px",
             marginBottom: 8,
-            paddingLeft: 10,
           }}
         >
-          Hệ thống
+          HỆ THỐNG
         </div>
+
         <Button
-          danger
           type="text"
-          block
-          icon={<LogoutOutlined style={{ fontSize: 16 }} />}
+          danger
+          icon={<LogoutOutlined />}
           onClick={handleLogout}
+          block
           style={{
+            textAlign: "left",
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-start",
-            height: 42,
-            borderRadius: 10,
-            fontWeight: 600,
-            fontSize: 13,
-            paddingLeft: 12,
+            gap: 8,
+            height: 40,
+            borderRadius: 8,
+            fontWeight: 500,
           }}
         >
-          Đăng xuất tài khoản
+          Đăng xuất
         </Button>
       </div>
     </Sider>

@@ -24,6 +24,7 @@ from app.api.v1.endpoints.profile import migrate_profile_schema, router as profi
 from app.api.v1.endpoints.reports import router as reports_router
 from app.core.session import router as session_router
 from app.api.v1.endpoints.user_assignment import router as user_assignment_router
+from app.api.v1.endpoints.sales_assignment import router as sales_assignment_router
 from app.api.v1.endpoints.user_routes import router as user_router
 from app.api.v1.endpoints.users import compat_router as users_compat_router, router as users_router
 from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_router
@@ -163,6 +164,7 @@ app.include_router(price_lists_router)
 app.include_router(reports_router)
 app.include_router(navigation_router)
 app.include_router(user_assignment_router)
+app.include_router(sales_assignment_router)
 app.include_router(users_router)
 app.include_router(users_compat_router)
 app.include_router(user_router)
@@ -244,6 +246,7 @@ def admin_create_user_page():
 @app.get("/portal/orders", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/sales/orders", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/sales/customers", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/sales/assignments", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/manager/dashboard", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/manager/orders/approval", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/manager/pricing", response_class=HTMLResponse, include_in_schema=False)
