@@ -25,12 +25,14 @@ import {
   CompassOutlined,
   ArrowLeftOutlined,
   ArrowRightOutlined,
+  FileExcelOutlined,
 } from "@ant-design/icons";
 import { authenticatedFetch } from "../../services/sessionService";
 import AdminSidebar from "../../components/Sidebar/AdminSidebar";
 import AdminHeader from "../../components/Header/AdminHeader";
 import ProfileModal from "../../components/ProfileModal";
 import ChangePasswordModal from "../../components/ChangePasswordModal";
+import UserExcelImportModal from "./UserExcelImportModal";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -116,6 +118,7 @@ export default function CreateUser() {
   // Quản lý Modal hồ sơ & đổi mật khẩu trên Header
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const requestedRole = new URLSearchParams(window.location.search).get("role");
   const handleGoBack = () => {
@@ -251,23 +254,41 @@ export default function CreateUser() {
           >
             Quay lại
           </Button>
-          <div style={{ marginBottom: 28 }}>
-            <Text
-              type="secondary"
-              style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em" }}
+          <div
+            style={{
+              marginBottom: 28,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
+            <div>
+              <Text
+                type="secondary"
+                style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em" }}
+              >
+                QUẢN LÝ NGƯỜI DÙNG
+              </Text>
+              <Title
+                level={2}
+                style={{ margin: "4px 0 8px", fontWeight: 800, color: "#0f172a" }}
+              >
+                Tạo tài khoản mới
+              </Title>
+              <Text type="secondary" style={{ fontSize: 14 }}>
+                Thêm nhân sự mới vào hệ thống, chỉ định phân quyền và phân công
+                kho/địa bàn quản trị.
+              </Text>
+            </div>
+            <Button
+              icon={<FileExcelOutlined />}
+              onClick={() => setIsImportModalOpen(true)}
+              style={{ borderRadius: 8, height: 38 }}
             >
-              QUẢN LÝ NGƯỜI DÙNG
-            </Text>
-            <Title
-              level={2}
-              style={{ margin: "4px 0 8px", fontWeight: 800, color: "#0f172a" }}
-            >
-              Tạo tài khoản mới
-            </Title>
-            <Text type="secondary" style={{ fontSize: 14 }}>
-              Thêm nhân sự mới vào hệ thống, chỉ định phân quyền và phân công
-              kho/địa bàn quản trị.
-            </Text>
+              Nhập hàng loạt từ Excel
+            </Button>
           </div>
 
           {createdData ? (
@@ -587,6 +608,13 @@ export default function CreateUser() {
       <ChangePasswordModal
         isOpen={isChangePassOpen}
         onClose={() => setIsChangePassOpen(false)}
+      />
+      <UserExcelImportModal
+        open={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          message.success("Nhập danh sách người dùng hoàn tất!");
+        }}
       />
     </Layout>
   );
