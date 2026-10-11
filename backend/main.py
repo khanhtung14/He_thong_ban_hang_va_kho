@@ -9,15 +9,15 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-
 from app.core.database import migrate_pricing_schema
 from app.api.v1.endpoints.avatar import router as avatar_router
 from app.api.v1.endpoints.change_password import router as change_password_router
 from app.api.v1.endpoints.audit_logs import router as audit_logs_router
 from app.api.v1.endpoints.forgot_password import router as forgot_password_router
-from app.api.v1.endpoints.inventory import router as inventory_router
+from app.api.v1.endpoints.inventory import router as inventory_router, legacy_router as legacy_inventory_router
 from app.api.v1.endpoints.login import router as login_router
 from app.api.v1.endpoints.navigation import router as navigation_router
+from app.api.v1.endpoints.product_categories import router as product_categories_router
 from app.api.v1.endpoints.products import router as products_router
 from app.api.v1.endpoints.price_lists import router as price_lists_router
 from app.api.v1.endpoints.profile import migrate_profile_schema, router as profile_router
@@ -154,7 +154,9 @@ app.include_router(forgot_password_router)
 app.include_router(login_router)
 app.include_router(session_router)
 app.include_router(inventory_router)
+app.include_router(legacy_inventory_router)
 app.include_router(products_router)
+app.include_router(product_categories_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
 app.include_router(navigation_router)
@@ -259,6 +261,12 @@ def role_workspace_page():
 @app.get("/admin/territory-handover", response_class=HTMLResponse, include_in_schema=False)
 def territory_handover_page():
     """Serve the territory handover screen."""
+    return login_page_response()
+
+
+@app.get("/manager/categories", response_class=HTMLResponse, include_in_schema=False)
+def manager_categories_page():
+    """Serve the product categories management screen (SCRUM-76)."""
     return login_page_response()
 
 

@@ -42,7 +42,7 @@ except ImportError:  # pragma: no cover
         require_roles,
     )
 
-MOCK_PRODUCTS = {}
+from app.api.v1.endpoints.products import MOCK_PRODUCTS
 
 router = APIRouter(prefix="/api/v1", tags=["Customers & Orders (SCRUM-85)"])
 
@@ -401,7 +401,7 @@ def create_order(
         order_code=order_code,
         customer_id=customer.id,
         created_by_id=actor_user.id if actor_user else None,
-        status=OrderStatus.PENDING_APPROVAL if approval_lines else OrderStatus.DRAFT,
+        status=OrderStatus.PENDING if approval_lines else OrderStatus.DRAFT,
         total_amount=total_amount,
         note=payload.note,
         approval_reason="; ".join(approval_lines) if approval_lines else None,
@@ -465,7 +465,7 @@ def list_orders_pending_approval(
 ):
     orders = db.execute(
         select(Order).options(selectinload(Order.items))
-        .where(Order.status == OrderStatus.PENDING_APPROVAL, Order.approval_reason.is_not(None))
+        .where(Order.status.in_([OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL]), Order.approval_reason.is_not(None))
         .order_by(Order.id.desc())
     ).scalars().all()
     results = []
@@ -486,9 +486,9 @@ def approve_below_floor_order(
     order = db.execute(select(Order).options(selectinload(Order.items)).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
-    if order.status != OrderStatus.PENDING_APPROVAL or not order.approval_reason:
+    if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL) or not order.approval_reason:
         raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt giá sàn.")
-    order.status = OrderStatus.PROCESSING
+    order.status = OrderStatus.APPROVED
     db.commit()
     customer = db.get(Customer, order.customer_id)
     response = OrderResponse.model_validate(order)
@@ -510,7 +510,7 @@ def reject_below_floor_order(
     order = db.execute(select(Order).options(selectinload(Order.items)).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
-    if order.status != OrderStatus.PENDING_APPROVAL or not order.approval_reason:
+    if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL) or not order.approval_reason:
         raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt giá sàn.")
     order.status = OrderStatus.CANCELLED
     order.approval_reason = f"{order.approval_reason}; Từ chối: {payload.reason.strip()}"

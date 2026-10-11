@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover - direct script execution
     from app.core.database import get_db
     from app.models.models import PasswordResetToken, User
 
-router = APIRouter(prefix="/api/v1/auth", tags=["Quên & Đặt lại mật khẩu"])
+router = APIRouter(tags=["Quên & Đặt lại mật khẩu"])
 
 RESET_TOKEN_EXPIRE_MINUTES = 30
 GENERIC_SUCCESS_MESSAGE = (
@@ -133,6 +133,11 @@ def _load_valid_token(
     response_model=ForgotPasswordResponse,
     summary="Yêu cầu gửi liên kết đặt lại mật khẩu qua email",
 )
+@router.post(
+    "/api/v1/auth/forgot-password",
+    response_model=ForgotPasswordResponse,
+    include_in_schema=False,
+)
 def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
     if not _smtp_configured() and not _demo_mode_enabled():
         raise HTTPException(
@@ -210,6 +215,11 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
     response_model=VerifyTokenResponse,
     summary="Kiểm tra tính hợp lệ của token đặt lại mật khẩu",
 )
+@router.get(
+    "/api/v1/auth/verify-reset-token/{token}",
+    response_model=VerifyTokenResponse,
+    include_in_schema=False,
+)
 def verify_reset_token(token: str, db: Session = Depends(get_db)):
     result = _load_valid_token(db, token)
     if result is None:
@@ -229,6 +239,11 @@ def verify_reset_token(token: str, db: Session = Depends(get_db)):
     "/reset-password",
     response_model=MessageResponse,
     summary="Đặt lại mật khẩu bằng liên kết token",
+)
+@router.post(
+    "/api/v1/auth/reset-password",
+    response_model=MessageResponse,
+    include_in_schema=False,
 )
 def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     result = _load_valid_token(db, data.token)

@@ -1,7 +1,11 @@
-"""Products endpoints with RBAC enforcement."""
+import re
 
-from typing import Any, List, Optional
-import io
+# Read current products.py
+with open("backend/app/api/v1/endpoints/products.py", "r", encoding="utf-8") as f:
+    orig = f.read()
+
+# 1. Update imports
+import_insert = """import io
 import math
 import re
 import uuid
@@ -9,76 +13,59 @@ from zipfile import BadZipFile
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from fastapi import APIRouter, Depends, File, HTTPException, Path as PathParam, Query, Request, UploadFile, status
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field, field_validator
+from fastapi.responses import StreamingResponse"""
 
-from app.core.database import get_db
-from app.models.models import Product, Category, ProductUnit
-from app.api.v1.endpoints.rbac import (
-    PERM_PRODUCTS_VIEW,
-    PERM_PRODUCTS_MANAGE,
-    PERM_PRODUCTS_UNIT_MANAGE,
-    PERM_PRODUCTS_IMPORT,
-    AuthenticatedUser,
-    require_permissions,
-    sanitize_financial_data,
+orig = re.sub(
+    r"from fastapi import APIRouter[^\n]*\n",
+    import_insert + "\n",
+    orig
 )
 
-class ProductUnitResponse(BaseModel):
-    id: int
-    unitName: str
-    conversionRate: float
-    barcode: Optional[str] = None
+orig = orig.replace(
+    "    PERM_PRODUCTS_UNIT_MANAGE,\n    AuthenticatedUser,",
+    "    PERM_PRODUCTS_UNIT_MANAGE,\n    PERM_PRODUCTS_IMPORT,\n    AuthenticatedUser,"
+)
 
-class ProductUnitRequest(BaseModel):
-    unit_name: str = Field(min_length=1, max_length=100)
-    conversion_rate: float = Field(gt=0, allow_inf_nan=False)
-    is_base_unit: bool = False
+# 2. Extract and remove DEFAULT_MOCK_PRODUCTS block from bottom
+mock_block = """DEFAULT_MOCK_PRODUCTS: dict[str, dict[str, Any]] = {
+    "SKU-001": {
+        "sku": "SKU-001",
+        "name": "Nước tăng lực Red Bull 250ml",
+        "category": "Nước tăng lực có gas",
+        "category_id": 3,
+        "sale_price": 500000,
+        "cost_price": 350000,
+        "margin": "30.0%",
+        "stock_available": 120,
+        "unit": "Thùng 24 lon",
+    },
+    "SKU-002": {
+        "sku": "SKU-002",
+        "name": "Cà phê lon Highlands 235ml",
+        "category": "Cà phê",
+        "category_id": None,
+        "sale_price": 240000,
+        "cost_price": 180000,
+        "margin": "25.0%",
+        "stock_available": 85,
+        "unit": "Thùng 24 lon",
+    },
+}
 
-    @field_validator("unit_name")
-    @classmethod
-    def clean_unit_name(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("Tên đơn vị không được để trống.")
-        return value
+MOCK_PRODUCTS: dict[str, dict[str, Any]] = {k: v.copy() for k, v in DEFAULT_MOCK_PRODUCTS.items()}
 
-class ProductBase(BaseModel):
-    id: int
-    sku: str
-    name: str
-    categoryId: Optional[int] = None
-    baseUnit: str
-    manageByLot: bool
-    minStock: int
-    basePrice: Optional[float] = None
-    costPrice: Optional[float] = None
-    status: str
-    imageUrl: Optional[str] = None
-    units: Optional[list[ProductUnitResponse]] = None
 
-class PaginationInfo(BaseModel):
-    page: int
-    limit: int
-    totalRecords: int
-    totalPages: int
+def reset_mock_products() -> None:
+    global MOCK_PRODUCTS
+    MOCK_PRODUCTS.clear()
+    for k, v in DEFAULT_MOCK_PRODUCTS.items():
+        MOCK_PRODUCTS[k] = v.copy()
+"""
 
-class ProductListResponse(BaseModel):
-    success: bool
-    code: int
-    message: str
-    data: list[ProductBase]
-    pagination: PaginationInfo
+orig = orig.replace(mock_block, "")
 
-class ProductDetailResponse(BaseModel):
-    success: bool
-    code: int
-    message: str
-    data: ProductBase
-
-router = APIRouter(prefix="/api/v1/products", tags=["Products"])
-
+# 3. Create Excel import block
+excel_import_code = '''
 DEFAULT_MOCK_PRODUCTS: dict[str, dict[str, Any]] = {
     "SKU-001": {
         "sku": "SKU-001",
@@ -485,7 +472,7 @@ async def commit_product_import(
     if "multipart/form-data" in content_type:
         form = await request.form()
         file = form.get("file")
-        if not file or not hasattr(file, "read"):
+        if not file or not isinstance(file, UploadFile):
             raise HTTPException(status_code=400, detail="Thiếu tệp tải lên (file).")
         content = await _read_import_file(file)
         parsed_rows = _parse_import_workbook(content)
@@ -542,297 +529,13 @@ async def import_excel_direct(
             detail={"message": "Không thể import vì tệp chứa dòng lỗi.", "rows": rows},
         )
     return _apply_import_rows(rows, db)
+'''
 
+# Place excel_import_code right after router = APIRouter(prefix="/api/v1/products", tags=["Products"])
+target = 'router = APIRouter(prefix="/api/v1/products", tags=["Products"])'
+orig = orig.replace(target, target + "\n" + excel_import_code)
 
+with open("backend/app/api/v1/endpoints/products.py", "w", encoding="utf-8") as f:
+    f.write(orig)
 
-@router.get("")
-def list_products(
-    keyword: Optional[str] = None,
-    category_id: Optional[int] = Query(None, alias="categoryId"),
-    category_id_legacy: Optional[int] = Query(None, alias="category_id"),
-    status_filter: Optional[str] = Query(None, alias="status"),
-    page: Optional[int] = None,
-    limit: Optional[int] = None,
-    db: Session = Depends(get_db),
-    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
-) -> Any:
-    """Get list of products."""
-    effective_cat_id = category_id if category_id is not None else category_id_legacy
-    
-    if db.query(Product).count() > 0:
-        query = db.query(Product)
-        if keyword:
-            query = query.filter(
-                (Product.name.ilike(f"%{keyword}%")) | (Product.sku.ilike(f"%{keyword}%"))
-            )
-        if effective_cat_id is not None:
-            query = query.filter(Product.category_id == effective_cat_id)
-        if status_filter:
-            query = query.filter(Product.status == status_filter)
-            
-        total_records = query.count()
-        if page is not None and limit is not None:
-            products = query.offset((page - 1) * limit).limit(limit).all()
-        else:
-            products = query.all()
-        
-        products_list = []
-        for p in products:
-            p_dict = {
-                "id": p.id,
-                "sku": p.sku,
-                "name": p.name,
-                "category_id": p.category_id,
-                "categoryId": p.category_id,
-                "category": p.category.name if p.category else None,
-                "baseUnit": p.base_unit,
-                "unit": p.base_unit,
-                "manageByLot": p.manage_by_lot,
-                "minStock": p.min_stock,
-                "basePrice": p.base_price,
-                "sale_price": p.base_price,
-                "costPrice": p.cost_price,
-                "cost_price": p.cost_price,
-                "margin": f"{round(((p.base_price - p.cost_price) / p.base_price * 100), 1)}%"
-                if p.base_price and p.cost_price
-                else None,
-                "status": p.status,
-                "imageUrl": p.image_url,
-            }
-            products_list.append(p_dict)
-    else:
-        mock_items = list(MOCK_PRODUCTS.values())
-        if effective_cat_id is not None:
-            mock_items = [p for p in mock_items if p.get("category_id") == effective_cat_id]
-        if keyword:
-            kw = keyword.lower()
-            mock_items = [p for p in mock_items if kw in p.get("name", "").lower() or kw in p.get("sku", "").lower()]
-        total_records = len(mock_items)
-        if page is not None and limit is not None:
-            mock_items = mock_items[(page - 1) * limit : page * limit]
-        products_list = [p.copy() for p in mock_items]
-
-    sanitized = sanitize_financial_data(products_list, user)
-    
-    if page is not None and limit is not None:
-        return {
-            "success": True,
-            "code": 200,
-            "message": "Thành công",
-            "data": sanitized,
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "totalRecords": total_records,
-                "totalPages": (total_records + limit - 1) // limit if limit > 0 else 1,
-            },
-        }
-    return sanitized
-
-
-@router.get("/{id_or_sku}")
-def get_product_detail(
-    id_or_sku: str,
-    db: Session = Depends(get_db),
-    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
-) -> Any:
-    """Get product detail by ID or SKU."""
-    product = None
-    if id_or_sku.isdigit():
-        product = db.query(Product).filter(Product.id == int(id_or_sku)).first()
-    if not product:
-        product = db.query(Product).filter(
-            (Product.sku == id_or_sku) | (Product.sku == id_or_sku.upper())
-        ).first()
-
-    if product:
-        units = db.query(ProductUnit).filter(ProductUnit.product_id == product.id).all()
-        p_dict = {
-            "id": product.id,
-            "sku": product.sku,
-            "name": product.name,
-            "category_id": product.category_id,
-            "categoryId": product.category_id,
-            "category": product.category.name if product.category else None,
-            "baseUnit": product.base_unit,
-            "unit": product.base_unit,
-            "manageByLot": product.manage_by_lot,
-            "minStock": product.min_stock,
-            "basePrice": product.base_price,
-            "sale_price": product.base_price,
-            "costPrice": product.cost_price,
-            "cost_price": product.cost_price,
-            "margin": f"{round(((product.base_price - product.cost_price) / product.base_price * 100), 1)}%"
-            if product.base_price and product.cost_price
-            else None,
-            "status": product.status,
-            "imageUrl": product.image_url,
-            "units": [
-                {
-                    "id": u.id,
-                    "unitName": u.unit_name,
-                    "conversionRate": u.conversion_rate,
-                    "barcode": u.barcode,
-                }
-                for u in units
-            ],
-        }
-        return sanitize_financial_data(p_dict, user)
-
-    mock_p = MOCK_PRODUCTS.get(id_or_sku.upper()) or MOCK_PRODUCTS.get(id_or_sku)
-    if mock_p:
-        return sanitize_financial_data(mock_p.copy(), user)
-
-    raise HTTPException(status_code=404, detail=f"Sản phẩm '{id_or_sku}' không tồn tại")
-
-
-@router.get("/{product_id}/units")
-def list_product_units(
-    product_id: int = PathParam(gt=0),
-    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
-    db: Session = Depends(get_db),
-) -> list[dict[str, Any]]:
-    """List configured conversion units for one product."""
-    rows = (
-        db.query(ProductUnit)
-        .filter(ProductUnit.product_id == product_id)
-        .order_by(ProductUnit.is_base_unit.desc(), ProductUnit.unit_name.asc())
-        .all()
-    )
-    return [
-        {
-            "id": row.id,
-            "product_id": row.product_id,
-            "unit_name": row.unit_name,
-            "conversion_rate": row.conversion_rate,
-            "is_base_unit": row.is_base_unit,
-        }
-        for row in rows
-    ]
-
-
-@router.post("/{product_id}/units")
-def upsert_product_unit(
-    payload: ProductUnitRequest,
-    product_id: int = PathParam(gt=0),
-    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_UNIT_MANAGE)),
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    """Create or update a unit; at most one unit per product can be the base."""
-    conversion_rate = 1.0 if payload.is_base_unit else payload.conversion_rate
-    try:
-        row = (
-            db.query(ProductUnit)
-            .filter(
-                ProductUnit.product_id == product_id,
-                ProductUnit.unit_name == payload.unit_name,
-            )
-            .first()
-        )
-        if row is None:
-            row = ProductUnit(
-                product_id=product_id,
-                unit_name=payload.unit_name,
-                conversion_rate=conversion_rate,
-                is_base_unit=payload.is_base_unit,
-            )
-            db.add(row)
-        else:
-            row.conversion_rate = conversion_rate
-            row.is_base_unit = payload.is_base_unit
-
-        if payload.is_base_unit:
-            (
-                db.query(ProductUnit)
-                .filter(
-                    ProductUnit.product_id == product_id,
-                    ProductUnit.unit_name != payload.unit_name,
-                )
-                .update({ProductUnit.is_base_unit: False}, synchronize_session=False)
-            )
-        db.commit()
-        db.refresh(row)
-    except Exception as exc:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Không thể lưu đơn vị tính sản phẩm.",
-        ) from exc
-
-    return {
-        "id": row.id,
-        "product_id": row.product_id,
-        "unit_name": row.unit_name,
-        "conversion_rate": row.conversion_rate,
-        "is_base_unit": row.is_base_unit,
-    }
-
-
-
-class MoveProductCategoryRequest(BaseModel):
-    target_category_id: int = Field(gt=0, description="ID nhóm hàng mới cần chuyển đến")
-
-
-
-
-@router.patch("/{sku}/category")
-def move_product_category(
-    sku: str,
-    payload: MoveProductCategoryRequest,
-    db: Session = Depends(get_db),
-    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
-) -> Any:
-    """Move a single product to a new target category (SCRUM-76 AC 2)."""
-    from app.models.models import RoleCode
-    if user.role not in (RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Chỉ Quản lý kinh doanh và Quản trị viên mới có quyền chuyển nhóm hàng sản phẩm.",
-        )
-
-    from app.api.v1.endpoints.product_categories import get_category_by_id
-    target_cat = get_category_by_id(payload.target_category_id)
-    if not target_cat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Nhóm hàng đích với ID '{payload.target_category_id}' không tồn tại.",
-        )
-
-    # Update in DB if exists
-    product = db.query(Product).filter((Product.sku == sku) | (Product.sku == sku.upper())).first()
-    old_category_id = None
-    old_category_name = None
-    product_name = sku
-    if product:
-        old_category_id = product.category_id
-        product.category_id = target_cat["id"]
-        product_name = product.name
-        db.commit()
-        db.refresh(product)
-
-    # Also update in MOCK_PRODUCTS if present
-    mock_p = MOCK_PRODUCTS.get(sku.upper()) or MOCK_PRODUCTS.get(sku)
-    if mock_p:
-        old_category_id = old_category_id or mock_p.get("category_id")
-        old_category_name = mock_p.get("category")
-        product_name = mock_p.get("name", product_name)
-        mock_p["category_id"] = target_cat["id"]
-        mock_p["category"] = target_cat["name"]
-
-    if not product and not mock_p:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sản phẩm với mã SKU '{sku}' không tồn tại.",
-        )
-
-    return {
-        "message": f"Chuyển sản phẩm '{sku}' sang nhóm '{target_cat['name']}' thành công.",
-        "sku": sku,
-        "name": product_name,
-        "old_category_id": old_category_id,
-        "old_category_name": old_category_name,
-        "new_category_id": target_cat["id"],
-        "new_category_name": target_cat["name"],
-    }
-
-
+print("Successfully updated backend/app/api/v1/endpoints/products.py")

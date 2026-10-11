@@ -278,6 +278,7 @@ class ProductUnit(Base):
     unit_name: Mapped[str] = mapped_column(String(50), nullable=False)
     conversion_rate: Mapped[float] = mapped_column(Float, nullable=False)
     barcode: Mapped[Optional[str]] = mapped_column(String(100))
+    is_base_unit: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
     product: Mapped[Product] = relationship(back_populates="units")
 
@@ -351,10 +352,11 @@ class PriceList(Base):
 
 class PriceListItem(Base):
     __tablename__ = "price_list_items"
-    __table_args__ = (UniqueConstraint("price_list_id", "product_id", name="uq_price_list_items_list_prod"),)
+    __table_args__ = (UniqueConstraint("price_list_id", "sku", name="uq_price_list_items_list_sku"),)
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     price_list_id: Mapped[int] = mapped_column(ForeignKey("price_lists.id", ondelete="CASCADE"), nullable=False)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=True)
+    sku: Mapped[str] = mapped_column(String(80), nullable=False)
     sale_price: Mapped[float] = mapped_column(Float, nullable=False)
     floor_price: Mapped[float] = mapped_column(Float, nullable=False)
     price_list: Mapped[PriceList] = relationship(back_populates="items")
@@ -363,6 +365,7 @@ class PriceListItem(Base):
 # --- EP-04: Đặt hàng & Duyệt đơn ---
 class OrderStatus(str, Enum):
     DRAFT = "DRAFT"
+    PENDING = "PENDING"
     PENDING_APPROVAL = "PENDING_APPROVAL"
     APPROVED = "APPROVED"
     PROCESSING = "PROCESSING"
@@ -397,7 +400,9 @@ class OrderItem(Base):
     __tablename__ = "order_items"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
+    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=True)
+    sku: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    product_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product_units.id", ondelete="SET NULL"))
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     unit_price: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
@@ -438,6 +443,35 @@ class InventoryLot(Base):
     mfg_date: Mapped[Optional[date]] = mapped_column(Date)
     exp_date: Mapped[Optional[date]] = mapped_column(Date)
     quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+
+class InventoryTransaction(Base):
+    __tablename__ = "inventory_transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    transaction_type: Mapped[str] = mapped_column(String(3), nullable=False)
+    unit_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    conversion_rate_snapshot: Mapped[float] = mapped_column(Float, nullable=False)
+    base_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False
+    )
+
+
+class InventoryStock(Base):
+    __tablename__ = "inventory_stock"
+    __table_args__ = (
+        UniqueConstraint("product_id", "warehouse_id", name="uq_inventory_stock_product_warehouse"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    base_quantity: Mapped[float] = mapped_column(Float, default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class WarehouseReceipt(Base):
