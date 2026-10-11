@@ -1,5 +1,6 @@
 import React from "react";
-import { Layout } from "antd";
+import { Layout, Menu, Button, Typography } from "antd";
+import type { MenuProps } from "antd";
 import {
   HomeOutlined,
   TeamOutlined,
@@ -10,46 +11,44 @@ import {
 } from "@ant-design/icons";
 
 const { Sider } = Layout;
+const { Text } = Typography;
 
 export interface AdminSidebarProps {
   currentView?: string;
+  onSelect?: (key: string) => void;
   onLogout?: () => void;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
-  currentView = "users",
+  currentView = "overview",
+  onSelect,
   onLogout,
 }) => {
-  const menuItems = [
+  const menuItems: MenuProps["items"] = [
     {
       key: "overview",
-      icon: <HomeOutlined style={{ fontSize: 16 }} />,
+      icon: <HomeOutlined />,
       label: "Trang chủ",
-      href: "/admin/users?view=overview",
     },
     {
       key: "users",
-      icon: <TeamOutlined style={{ fontSize: 16 }} />,
+      icon: <TeamOutlined />,
       label: "Quản lý tài khoản",
-      href: "/admin/users?view=users",
     },
     {
       key: "rbac",
-      icon: <SafetyCertificateOutlined style={{ fontSize: 16 }} />,
+      icon: <SafetyCertificateOutlined />,
       label: "Ma trận phân quyền",
-      href: "/admin/users?view=rbac",
     },
     {
       key: "configuration",
-      icon: <AppstoreOutlined style={{ fontSize: 16 }} />,
+      icon: <AppstoreOutlined />,
       label: "Danh mục hệ thống",
-      href: "/admin/users?view=configuration",
     },
     {
       key: "audit",
-      icon: <HistoryOutlined style={{ fontSize: 16 }} />,
+      icon: <HistoryOutlined />,
       label: "Nhật ký hệ thống",
-      href: "/admin/users?view=audit",
     },
   ];
 
@@ -60,6 +59,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       window.sessionStorage.clear();
       window.localStorage.clear();
       window.location.href = "/login";
+    }
+  };
+
+  const handleMenuClick: MenuProps["onClick"] = ({ key }) => {
+    if (onSelect) {
+      onSelect(key);
+      window.history.pushState(null, "", `/admin/users?view=${key}`);
     }
   };
 
@@ -74,8 +80,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         left: 0,
         borderRight: "1px solid #f1f5f9",
         background: "#ffffff",
-        display: "flex",
-        flexDirection: "column",
         zIndex: 50,
       }}
     >
@@ -84,7 +88,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           display: "flex",
           flexDirection: "column",
           height: "100%",
-          padding: "24px 16px 20px",
+          padding: "20px 12px",
           boxSizing: "border-box",
         }}
       >
@@ -94,21 +98,21 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             display: "flex",
             alignItems: "center",
             gap: 12,
-            marginBottom: 28,
-            padding: "0 6px",
+            marginBottom: 24,
+            padding: "0 8px",
           }}
         >
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 14,
+              width: 42,
+              height: 42,
+              borderRadius: 12,
               backgroundColor: "#2563eb",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 8px 20px -4px rgba(37, 99, 235, 0.45)",
+              boxShadow: "0 6px 16px -4px rgba(37, 99, 235, 0.4)",
               flexShrink: 0,
             }}
           >
@@ -131,116 +135,79 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             <div
               style={{
                 fontWeight: 800,
-                fontSize: 18,
+                fontSize: 17,
                 color: "#1e3a8a",
-                lineHeight: 1.15,
+                lineHeight: 1.2,
               }}
             >
               WMS
             </div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+            <Text type="secondary" style={{ fontSize: 11 }}>
               Hệ thống quản lý kho &amp; bán hàng
-            </div>
+            </Text>
           </div>
         </div>
 
-        {/* Nhãn MENU */}
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 800,
-            color: "#94a3b8",
-            letterSpacing: "0.08em",
-            padding: "0 8px",
-            marginBottom: 10,
-          }}
-        >
-          MENU
-        </div>
-
-        {/* Danh sách mục chọn bo tròn */}
-        <div
-          style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}
-        >
-          {menuItems.map((item) => {
-            const isActive = currentView === item.key;
-            return (
-              <a
-                key={item.key}
-                href={item.href}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  fontSize: 14,
-                  fontWeight: isActive ? 600 : 500,
-                  color: isActive ? "#2563eb" : "#475569",
-                  backgroundColor: isActive ? "#eff6ff" : "transparent",
-                  textDecoration: "none",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 17,
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  {item.icon}
-                </span>
-                <span>{item.label}</span>
-              </a>
-            );
-          })}
-        </div>
-
-        {/* Nhãn HỆ THỐNG & Đăng xuất */}
+        {/* Tiêu đề nhóm MENU */}
         <div
           style={{
             fontSize: 11,
             fontWeight: 700,
             color: "#94a3b8",
             letterSpacing: "0.06em",
-            padding: "0 10px",
-            marginTop: 22,
-            marginBottom: 6,
+            padding: "0 12px",
+            marginBottom: 8,
           }}
         >
-          HỆ THỐNG
+          MENU
         </div>
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "9px 12px",
-            borderRadius: 8,
-            fontSize: 13.5,
-            fontWeight: 500,
-            color: "#ef4444",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            textAlign: "left",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#fef2f2";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
-          }}
-        >
-          <LogoutOutlined style={{ fontSize: 16 }} />
-          <span>Đăng xuất</span>
-        </button>
+        {/* Menu chuẩn Ant Design */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[currentView]}
+            items={menuItems}
+            onClick={handleMenuClick}
+            style={{ borderRight: "none" }}
+          />
+        </div>
+
+        {/* Khu vực HỆ THỐNG & Nút Đăng xuất Ant Design */}
+        <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#94a3b8",
+              letterSpacing: "0.06em",
+              padding: "0 12px",
+              marginBottom: 8,
+            }}
+          >
+            HỆ THỐNG
+          </div>
+
+          <Button
+            type="text"
+            danger
+            icon={<LogoutOutlined />}
+            onClick={handleLogout}
+            block
+            style={{
+              textAlign: "left",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-start",
+              gap: 8,
+              height: 40,
+              borderRadius: 8,
+              fontWeight: 500,
+            }}
+          >
+            Đăng xuất
+          </Button>
+        </div>
       </div>
     </Sider>
   );
