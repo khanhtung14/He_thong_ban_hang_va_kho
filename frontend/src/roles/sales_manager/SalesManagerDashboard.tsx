@@ -246,7 +246,29 @@ export const SalesManagerDashboard: React.FC = () => {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
+    <Layout style={{ minHeight: "100vh", position: "relative" }}>
+      {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
+      <div
+        style={{
+          position: "fixed",
+          inset: "-20px",
+          backgroundImage: "url('/bg.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(4px)",
+          transform: "scale(1.05)",
+          zIndex: 0,
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(248, 250, 252, 0.5)",
+          zIndex: 0,
+        }}
+      />
+
       {/* 1. Sidebar bên trái */}
       <SalesManagerSidebar
         currentPath={currentPath}
@@ -280,7 +302,7 @@ export const SalesManagerDashboard: React.FC = () => {
       />
 
       {/* 2. Cột nội dung bên phải */}
-      <Layout style={{ backgroundColor: "#f8fafc" }}>
+      <Layout style={{ backgroundColor: "transparent", minWidth: 0, zIndex: 1 }}>
         {/* Header trên cùng */}
         <SalesManagerHeader
           fullName={profile?.full_name || "Quản lý kinh doanh"}

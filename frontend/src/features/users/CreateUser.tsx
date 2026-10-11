@@ -259,9 +259,9 @@ export default function CreateUser() {
                   type="tel"
                   autoComplete="tel"
                   inputMode="numeric"
-                  pattern="0[0-9]{9}"
+                  pattern="0[1235789][0-9]{8}"
                   maxLength={10}
-                  title="Số điện thoại gồm 10 chữ số và bắt đầu bằng số 0."
+                  title="Số điện thoại gồm 10 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)."
                   placeholder="0901234567"
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}

@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from app.models.models import AccountStatus
 
 
-PHONE_REGEX = re.compile(r"^0\d{9}$")
+PHONE_REGEX = re.compile(r"^0[1235789]\d{8}$")
 USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_.-]+$")
 
 
@@ -62,7 +62,7 @@ class UserBase(BaseModel):
         if not v:
             return None
         if not PHONE_REGEX.match(v):
-            raise ValueError("Số điện thoại không hợp lệ. Phải gồm 10 chữ số và bắt đầu bằng số 0.")
+            raise ValueError("Số điện thoại không hợp lệ. Phải gồm 10 chữ số và bắt đầu bằng các đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02).")
         return v
 
 
@@ -100,7 +100,7 @@ class UserUpdate(BaseModel):
             if not v:
                 return None
             if not PHONE_REGEX.match(v):
-                raise ValueError("Số điện thoại không hợp lệ. Phải gồm 10 chữ số và bắt đầu bằng số 0.")
+                raise ValueError("Số điện thoại không hợp lệ. Phải gồm 10 chữ số và bắt đầu bằng các đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02).")
         return v
 
 

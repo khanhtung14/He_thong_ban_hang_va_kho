@@ -576,6 +576,7 @@ def list_products(
         else:
             products = query.all()
         
+        categories_map = {c.id: c.name for c in db.query(Category).all()}
         products_list = []
         for p in products:
             p_dict = {
@@ -584,7 +585,7 @@ def list_products(
                 "name": p.name,
                 "category_id": p.category_id,
                 "categoryId": p.category_id,
-                "category": p.category.name if p.category else None,
+                "category": categories_map.get(p.category_id) or (p.category.name if getattr(p, "category", None) else None),
                 "baseUnit": p.base_unit,
                 "unit": p.base_unit,
                 "manageByLot": p.manage_by_lot,

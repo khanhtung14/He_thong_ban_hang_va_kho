@@ -106,20 +106,36 @@ def get_category_by_id(category_id: int) -> dict[str, Any] | None:
     return _CATEGORY_REGISTRY.get(category_id)
 
 
-def count_products_for_category(category_id: int) -> int:
-    """Count products directly assigned to this category."""
+try:
+    from app.core.database import SessionLocal, get_db
+    from app.models.models import Category, Product
+except ImportError:
+    from core.database import SessionLocal, get_db
+    from models.models import Category, Product
+
+
+def count_products_for_category(category_id: int, db: Optional[Any] = None) -> int:
+    """Count products directly assigned to this category from Database and mock registry."""
+    count = 0
+    # 1. Check in real Database
+    try:
+        if db is not None:
+            count += db.query(Product).filter(Product.category_id == category_id).count()
+        else:
+            with SessionLocal() as session:
+                count += session.query(Product).filter(Product.category_id == category_id).count()
+    except Exception:
+        pass
+
+    # 2. Also check MOCK_PRODUCTS if any
     try:
         from app.api.v1.endpoints.products import MOCK_PRODUCTS
-    except ImportError:
-        try:
-            from src.backend.products import MOCK_PRODUCTS
-        except ImportError:
-            from products import MOCK_PRODUCTS
+        for p in MOCK_PRODUCTS.values():
+            if p.get("category_id") == category_id:
+                count += 1
+    except Exception:
+        pass
 
-    count = 0
-    for p in MOCK_PRODUCTS.values():
-        if p.get("category_id") == category_id:
-            count += 1
     return count
 
 
@@ -383,6 +399,7 @@ def update_category(
 @router.delete("/{category_id}")
 def delete_category(
     category_id: int,
+    db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
     """Delete category with strict integrity checks (AC 3 & Technical Safety Rule)."""
@@ -390,13 +407,16 @@ def delete_category(
 
     cat = get_category_by_id(category_id)
     if not cat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Nhóm hàng với ID '{category_id}' không tồn tại.",
-        )
+        db_cat = db.query(Category).filter(Category.id == category_id).first()
+        if not db_cat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Nhóm hàng với ID '{category_id}' không tồn tại.",
+            )
+        cat = {"id": db_cat.id, "name": db_cat.name, "code": db_cat.code}
 
     # AC 3: Nhóm còn sản phẩm thì không xoá được
-    products_count = count_products_for_category(category_id)
+    products_count = count_products_for_category(category_id, db=db)
     if products_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -419,8 +439,15 @@ def delete_category(
         )
 
     # Only delete when both products_count == 0 and children_count == 0
-    deleted_cat = _CATEGORY_REGISTRY.pop(category_id)
+    cat_name = cat.get("name", str(category_id))
+    if category_id in _CATEGORY_REGISTRY:
+        _CATEGORY_REGISTRY.pop(category_id)
+    db_cat = db.query(Category).filter(Category.id == category_id).first()
+    if db_cat:
+        db.delete(db_cat)
+        db.commit()
+
     return {
-        "message": f"Xóa nhóm hàng '{deleted_cat['name']}' thành công.",
+        "message": f"Xóa nhóm hàng '{cat_name}' thành công.",
         "deleted_category_id": category_id,
     }

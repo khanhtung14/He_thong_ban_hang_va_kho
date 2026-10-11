@@ -141,7 +141,9 @@ export const AdminUsers: React.FC = () => {
       render: (_, r) => (
         <div>
           <div style={{ fontWeight: 600, color: "#0f172a" }}>{r.full_name}</div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>{r.username}</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>
+            @{r.username} {r.email && <span style={{ color: "#2563eb" }}>· {r.email}</span>}
+          </div>
         </div>
       ),
     },
@@ -248,14 +250,14 @@ export const AdminUsers: React.FC = () => {
       >
         <Input
           prefix={<SearchOutlined />}
-          placeholder="Tìm theo tên, username, số điện thoại..."
+          placeholder="Tìm theo tên, username, email, số điện thoại..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onPressEnter={() => {
             setPage(1);
             fetchUsers();
           }}
-          style={{ width: 280, borderRadius: 8 }}
+          style={{ width: 320, borderRadius: 8 }}
         />
         <Select
           value={roleFilter}
@@ -338,7 +340,16 @@ export const AdminUsers: React.FC = () => {
           <Form.Item name="email" label="Email" rules={[{ type: "email" }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="phone" label="Số điện thoại">
+          <Form.Item
+            name="phone"
+            label="Số điện thoại"
+            rules={[
+              {
+                pattern: /^0[1235789][0-9]{8}$/,
+                message: "Số điện thoại gồm 10 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!",
+              },
+            ]}
+          >
             <Input />
           </Form.Item>
           <Form.Item label="Trạng thái">

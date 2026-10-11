@@ -268,6 +268,7 @@ class Product(Base):
     image_url: Mapped[Optional[str]] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE", nullable=False)
     
+    category: Mapped[Optional["Category"]] = relationship()
     units: Mapped[List["ProductUnit"]] = relationship(back_populates="product", cascade="all, delete-orphan")
 
 

@@ -56,14 +56,36 @@ export const WarehouseManagerDashboard: React.FC = () => {
   }, [loadProfileData]);
 
   return (
-    <Layout hasSider style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
+    <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
+      {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
+      <div
+        style={{
+          position: "fixed",
+          inset: "-20px",
+          backgroundImage: "url('/bg.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(4px)",
+          transform: "scale(1.05)",
+          zIndex: 0,
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(248, 250, 252, 0.5)",
+          zIndex: 0,
+        }}
+      />
+
       <WarehouseManagerSidebar
         selectedKey={selectedKey}
         onSelect={setSelectedKey}
         onLogout={logout}
       />
 
-      <Layout style={{ backgroundColor: "#f8fafc", minWidth: 0 }}>
+      <Layout style={{ backgroundColor: "transparent", minWidth: 0, zIndex: 1 }}>
         <WarehouseManagerHeader
           fullName={profile?.full_name || "Quản lý kho"}
           roleName={profile?.role || "Trưởng bộ phận kho"}

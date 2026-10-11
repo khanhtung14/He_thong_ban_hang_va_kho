@@ -437,8 +437,8 @@ export default function CreateUser() {
                       }
                       rules={[
                         {
-                          pattern: /^0[0-9]{9}$/,
-                          message: "Gồm 10 chữ số và bắt đầu bằng số 0!",
+                          pattern: /^0[1235789][0-9]{8}$/,
+                          message: "Số điện thoại gồm 10 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!",
                         },
                       ]}
                     >

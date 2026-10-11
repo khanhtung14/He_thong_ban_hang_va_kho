@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 try:
     from app.core.database import get_db
-    from app.models.models import Customer, Order, OrderItem, OrderStatus, User
+    from app.models.models import Customer, CustomerDebt, Order, OrderItem, OrderStatus, User
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
     from app.api.v1.endpoints.rbac import (
         PERM_CUSTOMERS_LOCK,
@@ -32,7 +32,7 @@ try:
     )
 except ImportError:  # pragma: no cover
     from app.core.database import get_db
-    from app.models.models import Customer, Order, OrderItem, OrderStatus, User
+    from app.models.models import Customer, CustomerDebt, Order, OrderItem, OrderStatus, User
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
     from app.api.v1.endpoints.rbac import (
         PERM_CUSTOMERS_LOCK,
@@ -55,10 +55,16 @@ class CustomerLockRequest(BaseModel):
     reason: str = Field(..., min_length=1, max_length=255, description="Lý do khóa đại lý (bắt buộc)")
 
 
+class CustomerTransactionStatusRequest(BaseModel):
+    status: str = Field(..., description="Trạng thái giao dịch: ACTIVE hoặc LOCKED_FOR_DEBT")
+    reason: Optional[str] = Field(None, max_length=255, description="Lý do khóa (bắt buộc nếu khóa)")
+
+
 class CustomerResponse(BaseModel):
     id: int
     code: str
     name: str
+    phone: Optional[str] = None
     sales_rep_id: Optional[int] = None
     territory_id: Optional[int] = None
     customer_group: str = "RETAIL"
@@ -67,6 +73,9 @@ class CustomerResponse(BaseModel):
     lock_reason: Optional[str] = None
     locked_at: Optional[datetime] = None
     locked_by_id: Optional[int] = None
+    current_debt: float = 0.0
+    debt_limit: float = 0.0
+    overdue_days: int = 0
     pending_orders_count: int = 0  # Số đơn hàng dở dang
     created_at: Optional[datetime] = None
 
@@ -161,7 +170,7 @@ def list_customers(
     query = select(Customer)
     if is_locked is not None:
         query = query.where(Customer.is_locked == is_locked)
-    if search:
+    if search and isinstance(search, str):
         kw = f"%{search.strip()}%"
         query = query.where((Customer.code.ilike(kw)) | (Customer.name.ilike(kw)))
 
@@ -174,8 +183,12 @@ def list_customers(
             .scalar()
             or 0
         )
+        debt_record = db.query(CustomerDebt).filter(CustomerDebt.customer_id == c.id).first()
         res = CustomerResponse.model_validate(c)
         res.pending_orders_count = pending_count
+        res.debt_limit = getattr(c, "credit_limit", 0.0)
+        if debt_record:
+            res.current_debt = debt_record.total_debt
         results.append(res)
 
     return results
@@ -323,6 +336,72 @@ def unlock_customer(
     res = CustomerResponse.model_validate(customer)
     res.pending_orders_count = pending_count
     return res
+
+
+@router.patch("/customers/{customer_id}/transaction-status", response_model=CustomerResponse)
+def update_customer_transaction_status(
+    customer_id: int,
+    payload: CustomerTransactionStatusRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_CUSTOMERS_LOCK)),
+):
+    """Khóa/Mở giao dịch bán hàng với đại lý (Theo API_SPECIFICATION.md S3-07).
+    
+    Status: 'ACTIVE' hoặc 'LOCKED_FOR_DEBT'
+    """
+    customer = db.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đại lý!")
+
+    target_status = payload.status.strip().upper()
+    if target_status in ("LOCKED_FOR_DEBT", "LOCKED"):
+        clean_reason = (payload.reason or "").strip()
+        if not clean_reason:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bắt buộc phải nhập lý do khóa đại lý!",
+            )
+        actor_user = db.query(User).filter(User.username == user.username).first()
+        customer.is_locked = True
+        customer.lock_reason = clean_reason
+        customer.locked_at = datetime.now(timezone.utc)
+        customer.locked_by_id = actor_user.id if actor_user else None
+    elif target_status in ("ACTIVE", "UNLOCKED"):
+        customer.is_locked = False
+        customer.lock_reason = None
+        customer.locked_at = None
+        customer.locked_by_id = None
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Trạng thái không hợp lệ. Chỉ chấp nhận 'ACTIVE' hoặc 'LOCKED_FOR_DEBT'.",
+        )
+
+    db.commit()
+    db.refresh(customer)
+
+    pending_count = (
+        db.query(func.count(Order.id))
+        .filter(Order.customer_id == customer.id, Order.status.in_(INCOMPLETE_STATUSES))
+        .scalar()
+        or 0
+    )
+    debt_record = db.query(CustomerDebt).filter(CustomerDebt.customer_id == customer.id).first()
+    res = CustomerResponse.model_validate(customer)
+    res.pending_orders_count = pending_count
+    res.debt_limit = getattr(customer, "credit_limit", 0.0)
+    if debt_record:
+        res.current_debt = debt_record.total_debt
+    return res
+
+
+@router.get("/accounting/agencies-debt-status", response_model=List[CustomerResponse])
+def get_agencies_debt_status(
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_permissions(PERM_CUSTOMERS_LOCK)),
+):
+    """Endpoint tương thích cho kế toán theo dõi công nợ và trạng thái khóa đại lý."""
+    return list_customers(is_locked=None, search=None, db=db)
 
 
 # ---------------------------------------------------------
