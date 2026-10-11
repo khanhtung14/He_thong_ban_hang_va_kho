@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from datetime import date
 
 import bcrypt
 
@@ -23,13 +24,19 @@ DATABASE_DIR.mkdir(exist_ok=True)
 os.environ.setdefault("DATABASE_URL", "sqlite:///./database/demo.db")
 sys.path.insert(0, str(ROOT))
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import inspect, select  # noqa: E402
 
-from src.backend.database import SessionLocal, engine  # noqa: E402
+from src.backend.database import SessionLocal, engine, migrate_pricing_schema  # noqa: E402
 from src.backend.models import (  # noqa: E402
     AccountAuditLog,
     AccountStatus,
     Base,
+    Customer,
+    Order,
+    OrderItem,
+    OrderStatus,
+    PriceList,
+    PriceListItem,
     Permission,
     Role,
     Territory,
@@ -86,19 +93,21 @@ TERRITORY_DEFINITIONS = [
 # All accounts use DEMO_PASSWORD. The locked account is useful for checking
 # that login rejects a non-ACTIVE account.
 ACCOUNT_DEFINITIONS = [
-    ("demo_customer", "customer@demo.local", "Nguyễn Đại Lý", "CUSTOMER", "ACTIVE"),
-    ("demo_sales", "sales@demo.local", "Trần Kinh Doanh", "SALES", "ACTIVE"),
-    ("demo_sales_mgr", "sales.manager@demo.local", "Lê Quản Lý Kinh Doanh", "SALES_MANAGER", "ACTIVE"),
-    ("demo_warehouse", "warehouse@demo.local", "Phạm Thủ Kho", "WAREHOUSE", "ACTIVE"),
-    ("demo_wh_mgr", "warehouse.manager@demo.local", "Võ Quản Lý Kho", "WH_MANAGER", "ACTIVE"),
-    ("demo_accountant", "accountant@demo.local", "Đặng Kế Toán", "ACCOUNTANT", "ACTIVE"),
-    ("demo_admin", "admin@demo.local", "Bùi Quản Trị", "ADMIN", "ACTIVE"),
-    ("demo_locked", "locked@demo.local", "Tài Khoản Đang Khóa", "SALES", "LOCKED"),
+    ("demo_customer", "customer@example.com", "Nguyễn Đại Lý", "CUSTOMER", "ACTIVE"),
+    ("demo_sales", "sales@example.com", "Trần Kinh Doanh", "SALES", "ACTIVE"),
+    ("demo_sales_mgr", "sales.manager@example.com", "Lê Quản Lý Kinh Doanh", "SALES_MANAGER", "ACTIVE"),
+    ("demo_warehouse", "warehouse@example.com", "Phạm Thủ Kho", "WAREHOUSE", "ACTIVE"),
+    ("demo_wh_mgr", "warehouse.manager@example.com", "Võ Quản Lý Kho", "WH_MANAGER", "ACTIVE"),
+    ("demo_accountant", "accountant@example.com", "Đặng Kế Toán", "ACCOUNTANT", "ACTIVE"),
+    ("demo_admin", "admin@example.com", "Bùi Quản Trị", "ADMIN", "ACTIVE"),
+    ("demo_locked", "locked@example.com", "Tài Khoản Đang Khóa", "SALES", "LOCKED"),
 ]
 
 
 def seed() -> Path:
+    _upgrade_legacy_demo_schema()
     Base.metadata.create_all(bind=engine)
+    migrate_pricing_schema()
     db = SessionLocal()
     try:
         permissions: dict[str, Permission] = {}
@@ -179,6 +188,7 @@ def seed() -> Path:
             login_accounts.append(
                 {
                     "username": username,
+                    "email": email,
                     "password_hash": password_hash,
                     "role_code": role_code,
                     "status": status_value,
@@ -204,6 +214,8 @@ def seed() -> Path:
                 )
             )
 
+        _seed_sales_manager_data(db, seeded_users, territories)
+
         db.commit()
         fixture_path = DATABASE_DIR / "demo_login_users.json"
         fixture_path.write_text(
@@ -216,6 +228,132 @@ def seed() -> Path:
         raise
     finally:
         db.close()
+
+
+def _upgrade_legacy_demo_schema() -> None:
+    """Add columns introduced after an existing local SQLite demo DB was created."""
+    if engine.dialect.name != "sqlite":
+        return
+
+    inspector = inspect(engine)
+    if not inspector.has_table("users"):
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("users")}
+    with engine.begin() as connection:
+        if "phone" not in existing_columns:
+            connection.exec_driver_sql("ALTER TABLE users ADD COLUMN phone VARCHAR(20)")
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_users_phone ON users (phone)"
+            )
+        if "must_change_password" not in existing_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 1"
+            )
+
+
+def _seed_sales_manager_data(db, users: dict[str, User], territories: dict[str, Territory]) -> None:
+    """Seed repeatable customer, pricing, order and approval data for the manager UI."""
+    today = date.today()
+    start_date = today.replace(month=1, day=1)
+    end_date = today.replace(month=12, day=31)
+    sales_rep_id = users["demo_sales"].id
+    territory_id = territories["HN"].id
+
+    customers_data = [
+        ("DEMO-CUST-L1", "Đại lý Minh Phát (Cấp 1)", "DEALER_LEVEL_1"),
+        ("DEMO-CUST-L2", "Đại lý An Khang (Cấp 2)", "DEALER_LEVEL_2"),
+        ("DEMO-CUST-RT", "Cửa hàng Demo (Khách lẻ)", "RETAIL"),
+    ]
+    customers: dict[str, Customer] = {}
+    for code, name, customer_group in customers_data:
+        customer = db.scalar(select(Customer).where(Customer.code == code))
+        if customer is None:
+            customer = Customer(code=code, name=name)
+            db.add(customer)
+        customer.name = name
+        customer.sales_rep_id = sales_rep_id
+        customer.territory_id = territory_id
+        customer.customer_group = customer_group
+        customer.is_active = True
+        customer.is_locked = False
+        customer.lock_reason = None
+        customers[customer_group] = customer
+    db.flush()
+
+    price_definitions = {
+        "DEALER_LEVEL_1": ("PL-DEMO-L1", [("SKU-001", 470000, 450000), ("SKU-002", 225000, 210000)]),
+        "DEALER_LEVEL_2": ("PL-DEMO-L2", [("SKU-001", 490000, 470000), ("SKU-002", 232000, 220000)]),
+        "RETAIL": ("PL-DEMO-RETAIL", [("SKU-001", 500000, 480000), ("SKU-002", 240000, 225000)]),
+    }
+    price_lists: dict[str, PriceList] = {}
+    for customer_group, (code, line_definitions) in price_definitions.items():
+        price_list = db.scalar(
+            select(PriceList).where(PriceList.code == code, PriceList.version == 1)
+        )
+        if price_list is None:
+            price_list = PriceList(code=code, version=1)
+            db.add(price_list)
+        price_list.customer_group = customer_group
+        price_list.start_date = start_date
+        price_list.end_date = end_date
+        price_list.published = True
+        price_list.items = [
+            PriceListItem(sku=sku, sale_price=sale_price, floor_price=floor_price)
+            for sku, sale_price, floor_price in line_definitions
+        ]
+        price_lists[customer_group] = price_list
+    db.flush()
+
+    order_definitions = [
+        {
+            "order_code": "DEMO-ORD-COMPLETE-001",
+            "customer": "DEALER_LEVEL_1",
+            "status": OrderStatus.COMPLETED,
+            "lines": [("SKU-001", "Nước tăng lực Red Bull 250ml", 8, 470000, 450000), ("SKU-002", "Cà phê lon Highlands 235ml", 5, 225000, 210000)],
+            "approval_reason": None,
+            "note": "Đơn demo đã hoàn tất để hiển thị báo cáo doanh số.",
+        },
+        {
+            "order_code": "DEMO-ORD-APPROVAL-001",
+            "customer": "DEALER_LEVEL_1",
+            "status": OrderStatus.PENDING,
+            "lines": [("SKU-001", "Nước tăng lực Red Bull 250ml", 2, 440000, 450000)],
+            "approval_reason": "SKU-001: 440000 dưới giá sàn 450000",
+            "note": "Đơn demo chờ quản lý duyệt giá dưới sàn.",
+        },
+        {
+            "order_code": "DEMO-ORD-PROCESSING-001",
+            "customer": "DEALER_LEVEL_2",
+            "status": OrderStatus.PROCESSING,
+            "lines": [("SKU-002", "Cà phê lon Highlands 235ml", 4, 232000, 220000)],
+            "approval_reason": None,
+            "note": "Đơn demo đang được xử lý.",
+        },
+    ]
+    for definition in order_definitions:
+        order = db.scalar(select(Order).where(Order.order_code == definition["order_code"]))
+        if order is None:
+            order = Order(order_code=definition["order_code"])
+            db.add(order)
+        customer = customers[definition["customer"]]
+        order.customer_id = customer.id
+        order.created_by_id = sales_rep_id
+        order.status = definition["status"]
+        order.approval_reason = definition["approval_reason"]
+        order.note = definition["note"]
+        order.total_amount = sum(quantity * unit_price for _, _, quantity, unit_price, _ in definition["lines"])
+        order.items = [
+            OrderItem(
+                sku=sku,
+                product_name=product_name,
+                quantity=quantity,
+                unit_price=unit_price,
+                floor_price=floor_price,
+                price_list_id=price_lists[definition["customer"]].id,
+            )
+            for sku, product_name, quantity, unit_price, floor_price in definition["lines"]
+        ]
 
 
 if __name__ == "__main__":

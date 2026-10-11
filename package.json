@@ -1,0 +1,29 @@
+{
+  "name": "he_thong_ban_hang_va_kho",
+  "version": "1.0.0",
+  "description": "> Nền tảng web quản lý bán sỉ và điều phối kho vận tập trung, kết nối thời gian thực giữa Kinh doanh, Kho hàng, Kế toán và Mạng lưới Đại lý.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khanhtung14/He_thong_ban_hang_va_kho.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/khanhtung14/He_thong_ban_hang_va_kho/issues"
+  },
+  "homepage": "https://github.com/khanhtung14/He_thong_ban_hang_va_kho#readme",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

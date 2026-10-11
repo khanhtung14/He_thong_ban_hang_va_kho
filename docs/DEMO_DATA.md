@@ -51,6 +51,42 @@ Invoke-RestMethod -Method Post `
 
 ## Quên mật khẩu
 
-Module quên mật khẩu hiện có dữ liệu giả lập riêng trong bộ nhớ, chưa đọc tài khoản từ seed database. Hai email demo được hỗ trợ là `nhanvien@congty.com` và `admin@congty.com`. Gửi yêu cầu tại `POST /forgot-password`; link test xuất hiện trong response demo hoặc tại `GET /dev/mock-outbox`. Giao diện ở `http://127.0.0.1:8000/forgot-password`.
+The forgot-password flow looks up each account email in the `users` table and records a demo reset link in `GET /dev/mock-outbox`. Seed the demo database before requesting a reset for a seeded account.
+
+For actual email delivery, configure `SMTP_HOST` and `SMTP_FROM`; optionally set
+`SMTP_PORT` (default `587`), `SMTP_USERNAME`, `SMTP_PASSWORD`, and
+`SMTP_USE_SSL=true` for implicit TLS. Set `PUBLIC_BASE_URL` to the public site
+origin so emailed links point to the deployed application. Set `APP_ENV=production`
+in deployed environments. The mock outbox and token-expiration demo endpoint
+are available only in development/demo mode and are disabled when SMTP is
+configured or `APP_ENV=production`.
+Reset tokens are stored hashed in `password_reset_tokens` and expire after 30
+minutes. The public response never contains the reset link.
 
 > Bộ dữ liệu chỉ dành cho phát triển cục bộ. Không dùng mật khẩu mẫu hay tài khoản này trên môi trường thật.
+
+### Demo account emails
+
+| Username | Email |
+|---|---|
+| `demo_customer` | `customer@example.com` |
+| `demo_sales` | `sales@example.com` |
+| `demo_sales_mgr` | `sales.manager@example.com` |
+| `demo_warehouse` | `warehouse@example.com` |
+| `demo_wh_mgr` | `warehouse.manager@example.com` |
+| `demo_accountant` | `accountant@example.com` |
+| `demo_admin` | `admin@example.com` |
+| `demo_locked` | `locked@example.com` |
+
+These addresses are stored in the `users` table and `database/demo_login_users.json`. Run `scripts/seed_demo_data.py` to refresh the demo database and regenerate the fixture.
+
+## Sales manager demo records
+
+Running `scripts/seed_demo_data.py` also seeds the business records used by the Sales Manager workspace. The operation is repeatable and updates rows with the reserved `DEMO-` codes:
+
+- Three demo customers assigned to dealer level 1, dealer level 2, and retail groups.
+- One published, currently effective price list per customer group, each with sample prices for `SKU-001` and `SKU-002`.
+- A completed order for the sales report, an order waiting for below-floor approval, and an order being processed.
+- Each order line links to the applicable price list and stores the floor price used when the order was created.
+
+The sales margin report reads eligible orders from the database for the current month. Inventory remains served by the existing in-memory demo catalog because this project does not currently define an inventory ORM table.

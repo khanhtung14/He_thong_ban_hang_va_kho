@@ -1,0 +1,34 @@
+name: Verify API & Type Compliance
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+jobs:
+  check-compliance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: Regenerate Frontend Types
+        working-directory: src/frontend
+        run: npm run generate:types
+
+      - name: Type-Check Frontend
+        working-directory: src/frontend
+        run: npm run typecheck

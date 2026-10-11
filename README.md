@@ -87,6 +87,14 @@ Dự án phát triển phần mềm quản lý bán hàng và kho theo mô hình
 - Đổi mật khẩu hiện tại sang mật khẩu mới.
 - Kiểm tra mật khẩu cũ, độ dài >= 8 ký tự, có chữ, có số, không trùng mật khẩu cũ.
 
+### 3. [SCRUM-60] Menu Điều Hướng Đúng Theo Quyền & Tối Ưu Mobile 360px
+- **User Story:** *Là người dùng của hệ thống, tôi muốn thấy menu điều hướng đúng theo quyền của mình, để không bị rối bởi những chức năng mình không được dùng.*
+- **Tiêu chí nghiệm thu (Acceptance Criteria):**
+  1. **Mục menu không thuộc quyền thì không hiển thị:** Vai trò "Warehouse" (Nhân viên kho) chỉ thấy "Soạn hàng", "Nhập kho", "Sổ tồn kho", "Chuyển kho"; ẩn hoàn toàn "Tạo đơn hàng", "Duyệt đơn", "Bảng giá", "Sổ công nợ", "Quản trị người dùng".
+  2. **Hiển thị thông tin người dùng và phạm vi:** Góc trên header hiển thị rõ Họ và tên, Vai trò và Kho/Địa bàn đang làm việc (ví dụ: "Trần Văn Kho", "Nhân viên kho", "Kho Tổng Hà Nội").
+  3. **Tối ưu màn hình 360px di động:** Thanh menu dạng ngăn kéo Drawer / Hamburger mượt mà, nút bấm tối thiểu 44x44px thao tác một tay dễ dàng, không bị thanh cuộn ngang (horizontal scrollbar).
+- **Giao diện & API:** Truy cập [http://localhost:8000/navigation](http://localhost:8000/navigation) hoặc API `GET /api/v1/navigation/menu`.
+
 ---
 
 ## 🚀 Cài đặt & Chạy ứng dụng

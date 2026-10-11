@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -7,7 +9,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.user_routes import get_db, router
+from src.backend.security import require_admin
+from src.backend.user_routes import get_db, router
 
 
 @pytest.fixture
@@ -61,11 +64,16 @@ def db_session_and_client():
         finally:
             session.close()
 
-    from types import SimpleNamespace
-    from src.user_routes import require_admin
+    from src.backend.security import require_admin
 
     test_app.dependency_overrides[get_db] = override_get_db
-    test_app.dependency_overrides[require_admin] = lambda: SimpleNamespace(id=999, username="admin")
+    # These tests exercise route behavior as an authenticated administrator.
+    # Production requests still use require_admin and must present a valid session.
+    test_app.dependency_overrides[require_admin] = lambda: SimpleNamespace(
+        id=999,
+        username="admin",
+        roles=[SimpleNamespace(code="ADMIN")],
+    )
 
     with TestClient(test_app) as client:
         yield client, engine
@@ -166,7 +174,7 @@ def test_unlock_user_success_updates_is_active_to_true(db_session_and_client):
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert "mở khóa thành công" in data["message"]
+    assert "đã được mở khóa thành công" in data["message"]
 
     # Xác nhận trực tiếp trong Database: is_active đã được cập nhật thành True (1)
     with engine.connect() as conn:
