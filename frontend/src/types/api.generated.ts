@@ -545,7 +545,7 @@ export interface paths {
         };
         /**
          * List Products
-         * @description Get list of products.
+         * @description Get list of products with optional server-side filtering and pagination.
          */
         get: operations["list_products_api_v1_products_get"];
         put?: never;
@@ -942,7 +942,7 @@ export interface paths {
          * @description Lấy danh sách người dùng có hỗ trợ (SCRUM-104, SCRUM-105):
          *     - Tìm kiếm theo họ tên, tên đăng nhập, số điện thoại
          *     - Lọc theo vai trò và trạng thái
-         *     - Phân trang chuẩn, mặc định 20 dòng/trang, hỗ trợ tham số page/size/page_size
+         *     - Phân trang chuẩn, mặc định 20 dòng/trang, hỗ trợ tham số page/size/page_size/limit
          */
         get: operations["get_users_api_v1_admin_users_get"];
         put?: never;
@@ -1006,7 +1006,7 @@ export interface paths {
          * @description Lấy danh sách người dùng có hỗ trợ (SCRUM-104, SCRUM-105):
          *     - Tìm kiếm theo họ tên, tên đăng nhập, số điện thoại
          *     - Lọc theo vai trò và trạng thái
-         *     - Phân trang chuẩn, mặc định 20 dòng/trang, hỗ trợ tham số page/size/page_size
+         *     - Phân trang chuẩn, mặc định 20 dòng/trang, hỗ trợ tham số page/size/page_size/limit
          */
         get: operations["get_users_users_get"];
         put?: never;
@@ -3584,6 +3584,8 @@ export interface operations {
                 status?: string | null;
                 page?: number | null;
                 limit?: number | null;
+                skip?: number | null;
+                offset?: number | null;
             };
             header?: never;
             path?: never;
@@ -4487,6 +4489,8 @@ export interface operations {
             query?: {
                 /** @description Tìm kiếm theo họ tên, tên đăng nhập hoặc số điện thoại */
                 search?: string | null;
+                /** @description Tìm kiếm alias keyword */
+                keyword?: string | null;
                 /** @description Lọc theo mã hoặc tên vai trò */
                 role?: string | null;
                 /** @description Lọc theo trạng thái tài khoản */
@@ -4497,6 +4501,8 @@ export interface operations {
                 page_size?: number;
                 /** @description Tham số phân trang alias size */
                 size?: number | null;
+                /** @description Tham số phân trang alias limit */
+                limit?: number | null;
             };
             header?: never;
             path?: never;
@@ -4632,6 +4638,8 @@ export interface operations {
             query?: {
                 /** @description Tìm kiếm theo họ tên, tên đăng nhập hoặc số điện thoại */
                 search?: string | null;
+                /** @description Tìm kiếm alias keyword */
+                keyword?: string | null;
                 /** @description Lọc theo mã hoặc tên vai trò */
                 role?: string | null;
                 /** @description Lọc theo trạng thái tài khoản */
@@ -4642,6 +4650,8 @@ export interface operations {
                 page_size?: number;
                 /** @description Tham số phân trang alias size */
                 size?: number | null;
+                /** @description Tham số phân trang alias limit */
+                limit?: number | null;
             };
             header?: never;
             path?: never;
