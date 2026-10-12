@@ -21,23 +21,27 @@ from sqlalchemy.orm import Session
 
 try:
     from app.core.database import get_db
-    from app.models.models import Customer, CustomerDebt, Order, OrderItem, OrderStatus, User
+    from app.models.models import Customer, CustomerDebt, Order, OrderItem, OrderStatus, RoleCode, User
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
     from app.api.v1.endpoints.rbac import (
         PERM_CUSTOMERS_LOCK,
         PERM_ORDERS_CREATE,
         AuthenticatedUser,
+        get_optional_current_user,
+        normalize_role,
         require_permissions,
         require_roles,
     )
 except ImportError:  # pragma: no cover
     from app.core.database import get_db
-    from app.models.models import Customer, CustomerDebt, Order, OrderItem, OrderStatus, User
+    from app.models.models import Customer, CustomerDebt, Order, OrderItem, OrderStatus, RoleCode, User
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
     from app.api.v1.endpoints.rbac import (
         PERM_CUSTOMERS_LOCK,
         PERM_ORDERS_CREATE,
         AuthenticatedUser,
+        get_optional_current_user,
+        normalize_role,
         require_permissions,
         require_roles,
     )
@@ -67,6 +71,7 @@ class CustomerResponse(BaseModel):
     phone: Optional[str] = None
     sales_rep_id: Optional[int] = None
     territory_id: Optional[int] = None
+    region: Optional[str] = None
     customer_group: str = "RETAIL"
     is_active: bool
     is_locked: bool
@@ -87,6 +92,7 @@ class CustomerCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     sales_rep_id: Optional[int] = None
     territory_id: Optional[int] = None
+    region: Optional[str] = None
     customer_group: CustomerGroup = CustomerGroup.RETAIL
 
 
@@ -164,15 +170,42 @@ def _check_and_build_warning(order: Order, customer: Optional[Customer]) -> tupl
 def list_customers(
     is_locked: Optional[bool] = Query(None, description="Lọc theo trạng thái khóa"),
     search: Optional[str] = Query(None, description="Tìm kiếm theo mã hoặc tên"),
+    sales_rep_id: Optional[int] = Query(None, description="Lọc theo ID NVKD phụ trách"),
+    region: Optional[str] = Query(None, description="Lọc theo khu vực"),
     db: Session = Depends(get_db),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
 ):
-    """Lấy danh sách đại lý cùng trạng thái khóa và số lượng đơn dở dang."""
+    """Lấy danh sách đại lý cùng trạng thái khóa và số lượng đơn dở dang.
+    
+    Phân quyền:
+    - Nếu role là sales (nhân viên kinh doanh), chỉ truy vấn và trả về các đại lý do chính user đó phụ trách.
+    - Nếu role là sales_manager hoặc admin, xem được toàn bộ đại lý.
+    """
     query = select(Customer)
     if is_locked is not None:
         query = query.where(Customer.is_locked == is_locked)
     if search and isinstance(search, str):
         kw = f"%{search.strip()}%"
         query = query.where((Customer.code.ilike(kw)) | (Customer.name.ilike(kw)))
+    if isinstance(region, str) and region.strip():
+        query = query.where(Customer.region == region.strip())
+
+    if isinstance(user, AuthenticatedUser):
+        norm_role = normalize_role(user.role)
+        if norm_role == RoleCode.SALES_REP.value:
+            rep_id = user.id
+            if rep_id is None:
+                db_user = db.execute(select(User).where(User.username == user.username)).scalar_one_or_none()
+                if db_user:
+                    rep_id = db_user.id
+            if rep_id is not None:
+                query = query.where(Customer.sales_rep_id == rep_id)
+            else:
+                query = query.where(Customer.sales_rep_id == -1)
+        elif isinstance(sales_rep_id, int):
+            query = query.where(Customer.sales_rep_id == sales_rep_id)
+    elif isinstance(sales_rep_id, int):
+        query = query.where(Customer.sales_rep_id == sales_rep_id)
 
     customers = db.execute(query.order_by(Customer.id.asc())).scalars().all()
     results = []
@@ -209,6 +242,7 @@ def create_customer(
         name=payload.name.strip(),
         sales_rep_id=payload.sales_rep_id,
         territory_id=payload.territory_id,
+        region=payload.region.strip() if payload.region else None,
         customer_group=payload.customer_group.value,
         is_active=True,
         is_locked=False,
@@ -401,7 +435,7 @@ def get_agencies_debt_status(
     _user: AuthenticatedUser = Depends(require_permissions(PERM_CUSTOMERS_LOCK)),
 ):
     """Endpoint tương thích cho kế toán theo dõi công nợ và trạng thái khóa đại lý."""
-    return list_customers(is_locked=None, search=None, db=db)
+    return list_customers(is_locked=None, search=None, db=db, user=_user)
 
 
 # ---------------------------------------------------------

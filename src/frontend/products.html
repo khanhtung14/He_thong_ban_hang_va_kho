@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản Lý Danh Mục Sản Phẩm (SCRUM-75) | OMS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0b0f19;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-glass: rgba(255, 255, 255, 0.03);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: #3b82f6;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --primary-glow: rgba(59, 130, 246, 0.25);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.2);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.2);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.2);
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+      --shadow-card: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+      --font-main: 'Plus Jakarta Sans', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* Container */
+    .app-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+
+    /* Top Navigation / Header */
+    header.top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 28px;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    .brand-title h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-title p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Role switcher bar */
+    .role-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      padding: 8px 14px;
+      border-radius: var(--radius-full);
+      backdrop-filter: blur(12px);
+    }
+
+    .role-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .role-select {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      color: #60a5fa;
+      font-weight: 700;
+      font-size: 0.88rem;
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      outline: none;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+
+    .role-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-glow);
+    }
+
+    /* Ticket Badge Card */
+    .story-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-card);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .story-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(to bottom, #3b82f6, #10b981);
+    }
+
+    .story-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .badge-jira {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      color: #60a5fa;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
+    }
+
+    .badge-rule {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+    }
+
+    .story-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .story-rules {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .rule-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.84rem;
+      color: var(--text-main);
+    }
+
+    .rule-item span.icon {
+      font-size: 1rem;
+    }
+
+    /* Controls Bar: Search, Category, Status, Add Button */
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(12px);
+    }
+
+    .filters-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .search-input-wrap {
+      position: relative;
+      min-width: 240px;
+      flex: 1;
+    }
+
+    .search-input-wrap input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 9px 12px 9px 36px;
+      color: var(--text-main);
+      font-size: 0.88rem;
+      outline: none;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+
+    .search-input-wrap input:focus {
+      border-color: var(--primary);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 0 2px var(--primary-glow);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .select-wrap select {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 9px 14px;
+      color: var(--text-main);
+      font-size: 0.88rem;
+      outline: none;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .select-wrap select:focus {
+      border-color: var(--primary);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.18);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: #ef4444;
+      color: white;
+    }
+
+    /* Products Table */
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+      backdrop-filter: blur(12px);
+    }
+
+    .table-responsive {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    thead {
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    th {
+      padding: 14px 18px;
+      font-weight: 700;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+      vertical-align: middle;
+    }
+
+    tbody tr {
+      transition: background 0.15s ease;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Product Cell */
+    .product-info-cell {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .product-img {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+      background: #1f2937;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .product-names {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .product-name {
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 2px;
+    }
+
+    .product-spec {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .sku-tag {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.82rem;
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: #93c5fd;
+      display: inline-block;
+    }
+
+    /* Cost price display & lock */
+    .cost-unauthorized {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #9ca3af;
+      font-size: 0.8rem;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+    }
+
+    .cost-authorized {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: #34d399;
+    }
+
+    /* Status badge */
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .badge-status.active {
+      background: var(--success-glow);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-status.inactive {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .badge-status .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .actions-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-action {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-action.delete-btn:hover {
+      background: rgba(239, 68, 68, 0.25);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    /* Modal Form */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-box {
+      background: #131b2e;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 640px;
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+      transform: translateY(20px);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .modal-overlay.open .modal-box {
+      transform: translateY(0);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .modal-header h3 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: white;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .close-btn:hover {
+      color: white;
+    }
+
+    .modal-body {
+      padding: 24px;
+      max-height: 75vh;
+      overflow-y: auto;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-grid .full-width {
+      grid-column: 1 / -1;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .form-group label span.req {
+      color: #ef4444;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      color: white;
+      font-size: 0.9rem;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-glow);
+    }
+
+    .cost-notice {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: #93c5fd;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 2000;
+    }
+
+    .toast {
+      background: #1f2937;
+      border: 1px solid var(--border-subtle);
+      padding: 14px 20px;
+      border-radius: var(--radius-sm);
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 500;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slideIn 0.3s ease;
+      max-width: 420px;
+    }
+
+    .toast.success {
+      border-left: 4px solid var(--success);
+    }
+
+    .toast.error {
+      border-left: 4px solid var(--danger);
+      background: #271418;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .loading-row {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 50px 20px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="top-bar">
+      <div class="brand-section">
+        <div class="brand-icon">📦</div>
+        <div class="brand-title">
+          <h1>Danh Mục Sản Phẩm</h1>
+          <p>Hệ Thống Quản Lý Bán Hàng & Kho (OMS) · Sprint 2</p>
+        </div>
+      </div>
+
+      <!-- Live Role Switcher (Simulate Roles) -->
+      <div class="role-bar">
+        <span class="role-label">Mô phỏng Vai trò:</span>
+        <select id="roleSelector" class="role-select" onchange="onRoleChanged()">
+          <option value="SALES_MANAGER" selected>Quản lý kinh doanh (Sales Manager)</option>
+          <option value="ADMIN">Quản trị hệ thống (Admin)</option>
+          <option value="SALES">Nhân viên kinh doanh (Sales Rep)</option>
+          <option value="WAREHOUSE">Thủ kho (Warehouse Staff)</option>
+          <option value="WH_MANAGER">Quản lý kho (WH Manager)</option>
+          <option value="ACCOUNTANT">Kế toán (Accountant)</option>
+          <option value="CUSTOMER">Đại lý (Customer)</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- User Story Acceptance Criteria Card -->
+    <div class="story-card">
+      <div class="story-header">
+        <span class="badge-jira">JIRA SCRUM-75</span>
+        <span class="badge-rule">Sprint 2 · 8 Story Points</span>
+        <span class="badge-rule" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">EP-02: Danh mục Sản phẩm & Bảng giá</span>
+      </div>
+      <div class="story-desc">
+        <strong>User Story:</strong> <em>"Là Quản lý kinh doanh, tôi muốn quản lý danh mục sản phẩm, để cả công ty gọi tên và mã hàng giống nhau thay vì mỗi người một kiểu."</em>
+      </div>
+      <div class="story-rules">
+        <div class="rule-item">
+          <span class="icon">🏷️</span>
+          <div><strong>Khai báo:</strong> Mã SKU, tên, nhóm hàng, ĐVT cơ sở, quy cách đóng gói, giá vốn, ảnh, trạng thái.</div>
+        </div>
+        <div class="rule-item">
+          <span class="icon">✨</span>
+          <div><strong>Duy nhất:</strong> Mã SKU là duy nhất trên toàn hệ thống (so khớp không phân biệt chữ hoa, chữ thường).</div>
+        </div>
+        <div class="rule-item">
+          <span class="icon">🔒</span>
+          <div><strong>Bảo mật giá vốn:</strong> Giá vốn chỉ <strong>Quản lý kinh doanh</strong> (và Admin) được xem và sửa. Các vai trò khác bị ẩn hoàn toàn.</div>
+        </div>
+        <div class="rule-item">
+          <span class="icon">🛡️</span>
+          <div><strong>Ràng buộc giao dịch:</strong> Sản phẩm đã phát sinh giao dịch thì <strong>không xóa được</strong>, chỉ được chuyển sang <strong>Ngừng kinh doanh</strong>.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar">
+      <div class="filters-group">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="Tìm theo mã SKU hoặc tên sản phẩm..." oninput="debounceSearch()">
+        </div>
+
+        <div class="select-wrap">
+          <select id="categoryFilter" onchange="loadProducts()">
+            <option value="">Tất cả nhóm hàng</option>
+          </select>
+        </div>
+
+        <div class="select-wrap">
+          <select id="statusFilter" onchange="loadProducts()">
+            <option value="">Tất cả trạng thái</option>
+            <option value="ACTIVE">Đang kinh doanh</option>
+            <option value="INACTIVE">Ngừng kinh doanh</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="btnOpenCreateModal" class="btn btn-primary" onclick="openCreateModal()">
+        <span>➕</span> Khai Báo Sản Phẩm Mới
+      </button>
+    </div>
+
+    <!-- Products Table -->
+    <div class="table-card">
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Mã SKU</th>
+              <th>Sản Phẩm & Quy Cách</th>
+              <th>Nhóm Hàng</th>
+              <th>ĐVT Cơ Sở</th>
+              <th>Giá Vốn (VND)</th>
+              <th>Giá Bán Tham Chiếu</th>
+              <th>Trạng Thái</th>
+              <th>Giao Dịch</th>
+              <th style="text-align: right;">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="productsTableBody">
+            <tr>
+              <td colspan="9" class="loading-row">Đang tải dữ liệu danh mục sản phẩm...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create / Edit Product Modal -->
+  <div id="productModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modalTitle">Khai Báo Sản Phẩm Mới</h3>
+        <button class="close-btn" onclick="closeModal()">✕</button>
+      </div>
+      <form id="productForm" onsubmit="handleFormSubmit(event)">
+        <div class="modal-body">
+          <div class="form-grid">
+            <!-- SKU -->
+            <div class="form-group">
+              <label for="formSku">Mã SKU <span class="req">*</span></label>
+              <input type="text" id="formSku" placeholder="VD: SKU-BIA-01" required>
+            </div>
+
+            <!-- Base Unit -->
+            <div class="form-group">
+              <label for="formBaseUnit">Đơn vị tính cơ sở <span class="req">*</span></label>
+              <input type="text" id="formBaseUnit" placeholder="VD: Lon, Chai, Gói, Cái" required>
+            </div>
+
+            <!-- Product Name -->
+            <div class="form-group full-width">
+              <label for="formName">Tên sản phẩm <span class="req">*</span></label>
+              <input type="text" id="formName" placeholder="VD: Nước tăng lực Red Bull 250ml" required>
+            </div>
+
+            <!-- Category -->
+            <div class="form-group">
+              <label for="formCategory">Nhóm hàng</label>
+              <select id="formCategory">
+                <option value="">Chọn nhóm hàng...</option>
+              </select>
+            </div>
+
+            <!-- Packaging Spec -->
+            <div class="form-group">
+              <label for="formPackagingSpec">Quy cách đóng gói</label>
+              <input type="text" id="formPackagingSpec" placeholder="VD: Thùng 24 lon">
+            </div>
+
+            <!-- Cost Price -->
+            <div class="form-group">
+              <label for="formCostPrice">Giá vốn (VND) <span class="req">*</span></label>
+              <input type="number" id="formCostPrice" min="0" step="1000" placeholder="VD: 350000" value="0">
+              <div class="cost-notice">
+                <span>🔒</span> <em>Chỉ Quản lý kinh doanh xem và cập nhật được.</em>
+              </div>
+            </div>
+
+            <!-- Sale Price -->
+            <div class="form-group">
+              <label for="formSalePrice">Giá bán tham chiếu (VND)</label>
+              <input type="number" id="formSalePrice" min="0" step="1000" placeholder="VD: 480000" value="0">
+            </div>
+
+            <!-- Image URL -->
+            <div class="form-group full-width">
+              <label for="formImageUrl">Đường dẫn ảnh sản phẩm</label>
+              <input type="url" id="formImageUrl" placeholder="https://example.com/images/product.jpg">
+            </div>
+
+            <!-- Status -->
+            <div class="form-group">
+              <label for="formStatus">Trạng thái kinh doanh</label>
+              <select id="formStatus">
+                <option value="ACTIVE">Đang kinh doanh</option>
+                <option value="INACTIVE">Ngừng kinh doanh</option>
+              </select>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group full-width">
+              <label for="formDescription">Mô tả sản phẩm</label>
+              <textarea id="formDescription" rows="2" placeholder="Ghi chú chi tiết, nguồn gốc xuất xứ..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Hủy</button>
+          <button type="submit" id="btnSaveProduct" class="btn btn-primary">Lưu Sản Phẩm</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Area -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script>
+    let currentRole = "SALES_MANAGER";
+    let isEditMode = false;
+    let editSku = null;
+    let categoriesList = [];
+    let searchDebounceTimer = null;
+
+    // Format currency VND
+    function formatVND(amount) {
+      if (amount === null || amount === undefined) return "—";
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    }
+
+    // Role switcher change handler
+    function onRoleChanged() {
+      currentRole = document.getElementById("roleSelector").value;
+      const isSalesMgrOrAdmin = currentRole === "SALES_MANAGER" || currentRole === "ADMIN";
+
+      // Disable/Enable Create Button according to role
+      const btnCreate = document.getElementById("btnOpenCreateModal");
+      if (isSalesMgrOrAdmin) {
+        btnCreate.style.display = "inline-flex";
+      } else {
+        btnCreate.style.display = "none";
+      }
+
+      showToast(`Đã chuyển sang vai trò: ${document.getElementById("roleSelector").selectedOptions[0].text}`, "success");
+      loadProducts();
+    }
+
+    // Show Toast
+    function showToast(message, type = "success") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<span>${type === 'success' ? '✅' : '⚠️'}</span> <div>${message}</div>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // API Headers with current simulated role
+    function getApiHeaders() {
+      return {
+        "Content-Type": "application/json",
+        "X-User-Role": currentRole,
+        "X-User-Name": currentRole.toLowerCase() + "_user"
+      };
+    }
+
+    // Load Categories for filters and dropdowns
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/v1/products/meta/categories", {
+          headers: getApiHeaders()
+        });
+        if (res.ok) {
+          categoriesList = await res.json();
+          const filterSelect = document.getElementById("categoryFilter");
+          const formSelect = document.getElementById("formCategory");
+
+          // Populate filter
+          filterSelect.innerHTML = '<option value="">Tất cả nhóm hàng</option>';
+          formSelect.innerHTML = '<option value="">Chọn nhóm hàng...</option>';
+
+          categoriesList.forEach(c => {
+            filterSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+            formSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+          });
+        }
+      } catch (err) {
+        console.error("Lỗi khi tải nhóm hàng:", err);
+      }
+    }
+
+    // Load Products List
+    async function loadProducts() {
+      const search = document.getElementById("searchInput").value.trim();
+      const categoryId = document.getElementById("categoryFilter").value;
+      const status = document.getElementById("statusFilter").value;
+
+      let url = "/api/v1/products?limit=100";
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      if (categoryId) url += `&category_id=${categoryId}`;
+      if (status) url += `&status=${status}`;
+
+      const tbody = document.getElementById("productsTableBody");
+      tbody.innerHTML = '<tr><td colspan="9" class="loading-row">Đang tải danh sách sản phẩm...</td></tr>';
+
+      try {
+        const res = await fetch(url, { headers: getApiHeaders() });
+        if (!res.ok) {
+          const err = await res.json();
+          tbody.innerHTML = `<tr><td colspan="9" class="empty-state" style="color: #f87171;">Lỗi tải dữ liệu: ${err.detail || 'Không có quyền truy cập'}</td></tr>`;
+          return;
+        }
+
+        const data = await res.json();
+        const items = data.items || [];
+
+        if (items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Không tìm thấy sản phẩm nào phù hợp với bộ lọc.</td></tr>';
+          return;
+        }
+
+        const isManager = data.can_view_cost_price;
+
+        tbody.innerHTML = items.map(p => {
+          const statusClass = p.status === 'ACTIVE' ? 'active' : 'inactive';
+          const defaultImg = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=120";
+
+          // Cost price cell content based on RBAC
+          const costHtml = isManager && p.cost_price !== null
+            ? `<span class="cost-authorized">${formatVND(p.cost_price)}</span>`
+            : `<span class="cost-unauthorized" title="Chỉ Quản lý kinh doanh và Quản trị viên mới được xem giá vốn">🔒 Được bảo mật</span>`;
+
+          const txnBadge = p.has_transactions 
+            ? `<span style="color: #60a5fa; font-size: 0.78rem; font-weight: 600;">Có đơn/phiếu</span>`
+            : `<span style="color: var(--text-dim); font-size: 0.78rem;">Chưa có</span>`;
+
+          // Buttons available for Manager
+          const canManage = currentRole === "SALES_MANAGER" || currentRole === "ADMIN";
+
+          let actionButtons = "";
+          if (canManage) {
+            actionButtons = `
+              <button class="btn-action" onclick="openEditModal('${p.sku}')" title="Sửa thông tin">✏️ Sửa</button>
+              <button class="btn-action" onclick="toggleStatus('${p.sku}', '${p.status}')" title="Đổi trạng thái">
+                ${p.status === 'ACTIVE' ? '⏸️ Tạm ngừng' : '▶️ Bật lại'}
+              </button>
+              <button class="btn-action delete-btn" onclick="confirmDeleteProduct('${p.sku}', ${p.has_transactions})" title="Xóa sản phẩm">🗑️</button>
+            `;
+          } else {
+            actionButtons = `<span style="color: var(--text-dim); font-size: 0.78rem;">Chỉ xem</span>`;
+          }
+
+          return `
+            <tr id="row-${p.sku}">
+              <td><span class="sku-tag">${p.sku}</span></td>
+              <td>
+                <div class="product-info-cell">
+                  <img class="product-img" src="${p.image_url || defaultImg}" alt="${p.name}" onerror="this.src='${defaultImg}'">
+                  <div class="product-names">
+                    <span class="product-name">${p.name}</span>
+                    <span class="product-spec">${p.packaging_spec || 'Không có quy cách đóng gói'}</span>
+                  </div>
+                </div>
+              </td>
+              <td><span style="color: #cbd5e1;">${p.category_name || 'Chưa phân nhóm'}</span></td>
+              <td><strong>${p.base_unit}</strong></td>
+              <td>${costHtml}</td>
+              <td><span style="color: #f1f5f9; font-weight: 600;">${formatVND(p.sale_price)}</span></td>
+              <td>
+                <span class="badge-status ${statusClass}">
+                  <span class="dot"></span>
+                  ${p.status_label}
+                </span>
+              </td>
+              <td>${txnBadge}</td>
+              <td style="text-align: right;">
+                <div class="actions-cell" style="justify-content: flex-end;">
+                  ${actionButtons}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state" style="color: #f87171;">Lỗi kết nối máy chủ: ${err.message}</td></tr>`;
+      }
+    }
+
+    function debounceSearch() {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(loadProducts, 300);
+    }
+
+    // Open Modal Create
+    function openCreateModal() {
+      if (currentRole !== "SALES_MANAGER" && currentRole !== "ADMIN") {
+        showToast("Chỉ Quản lý kinh doanh mới có quyền tạo sản phẩm.", "error");
+        return;
+      }
+      isEditMode = false;
+      editSku = null;
+      document.getElementById("modalTitle").innerText = "Khai Báo Sản Phẩm Mới (SCRUM-75)";
+      document.getElementById("productForm").reset();
+      document.getElementById("formSku").disabled = false;
+      document.getElementById("productModal").classList.add("open");
+    }
+
+    // Open Modal Edit
+    async function openEditModal(sku) {
+      if (currentRole !== "SALES_MANAGER" && currentRole !== "ADMIN") {
+        showToast("Chỉ Quản lý kinh doanh mới có quyền sửa sản phẩm.", "error");
+        return;
+      }
+      isEditMode = true;
+      editSku = sku;
+      document.getElementById("modalTitle").innerText = `Cập Nhật Sản Phẩm [${sku}]`;
+
+      try {
+        const res = await fetch(`/api/v1/products/${sku}`, { headers: getApiHeaders() });
+        if (!res.ok) {
+          showToast("Không tìm thấy thông tin sản phẩm.", "error");
+          return;
+        }
+        const p = await res.json();
+        document.getElementById("formSku").value = p.sku;
+        document.getElementById("formSku").disabled = true;
+        document.getElementById("formName").value = p.name;
+        document.getElementById("formBaseUnit").value = p.base_unit;
+        document.getElementById("formCategory").value = p.category_id || "";
+        document.getElementById("formPackagingSpec").value = p.packaging_spec || "";
+        document.getElementById("formCostPrice").value = p.cost_price !== null ? p.cost_price : 0;
+        document.getElementById("formSalePrice").value = p.sale_price !== null ? p.sale_price : 0;
+        document.getElementById("formImageUrl").value = p.image_url || "";
+        document.getElementById("formStatus").value = p.status;
+        document.getElementById("formDescription").value = p.description || "";
+
+        document.getElementById("productModal").classList.add("open");
+      } catch (err) {
+        showToast("Lỗi kết nối khi tải sản phẩm: " + err.message, "error");
+      }
+    }
+
+    function closeModal() {
+      document.getElementById("productModal").classList.remove("open");
+    }
+
+    // Submit Create or Edit Form
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const sku = document.getElementById("formSku").value.trim().toUpperCase();
+      const name = document.getElementById("formName").value.trim();
+      const baseUnit = document.getElementById("formBaseUnit").value.trim();
+      const categoryIdVal = document.getElementById("formCategory").value;
+      const packagingSpec = document.getElementById("formPackagingSpec").value.trim();
+      const costPrice = parseFloat(document.getElementById("formCostPrice").value) || 0;
+      const salePrice = parseFloat(document.getElementById("formSalePrice").value) || 0;
+      const imageUrl = document.getElementById("formImageUrl").value.trim();
+      const status = document.getElementById("formStatus").value;
+      const description = document.getElementById("formDescription").value.trim();
+
+      const payload = {
+        name,
+        base_unit: baseUnit,
+        category_id: categoryIdVal ? parseInt(categoryIdVal) : null,
+        packaging_spec: packagingSpec || null,
+        cost_price: costPrice,
+        sale_price: salePrice,
+        image_url: imageUrl || null,
+        status,
+        description: description || null
+      };
+
+      try {
+        if (!isEditMode) {
+          // CREATE (POST)
+          payload.sku = sku;
+          const res = await fetch("/api/v1/products", {
+            method: "POST",
+            headers: getApiHeaders(),
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (!res.ok) {
+            showToast(result.detail || "Không thể tạo sản phẩm.", "error");
+            return;
+          }
+          showToast(result.message || "Tạo sản phẩm thành công!", "success");
+        } else {
+          // UPDATE (PUT)
+          const res = await fetch(`/api/v1/products/${editSku}`, {
+            method: "PUT",
+            headers: getApiHeaders(),
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (!res.ok) {
+            showToast(result.detail || "Không thể cập nhật sản phẩm.", "error");
+            return;
+          }
+          showToast(result.message || "Cập nhật thành công!", "success");
+        }
+
+        closeModal();
+        loadProducts();
+      } catch (err) {
+        showToast("Lỗi hệ thống: " + err.message, "error");
+      }
+    }
+
+    // Toggle status (Active / Inactive)
+    async function toggleStatus(sku, currentStatus) {
+      const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+      const actionName = newStatus === "ACTIVE" ? "bật kinh doanh trở lại" : "chuyển sang ngừng kinh doanh";
+      if (!confirm(`Bạn có chắc chắn muốn ${actionName} cho sản phẩm '${sku}'?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/v1/products/${sku}/status`, {
+          method: "PATCH",
+          headers: getApiHeaders(),
+          body: JSON.stringify({ status: newStatus })
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          showToast(result.detail || "Không thể cập nhật trạng thái.", "error");
+          return;
+        }
+        showToast(result.message, "success");
+        loadProducts();
+      } catch (err) {
+        showToast("Lỗi: " + err.message, "error");
+      }
+    }
+
+    // Delete Product with Transaction Integrity (AC 4)
+    async function confirmDeleteProduct(sku, hasTransactions) {
+      if (hasTransactions) {
+        const proceed = confirm(
+          `⚠️ CẢNH BÁO RÀNG BUỘC NGHIỆP VỤ (AC 4):\n\n` +
+          `Sản phẩm '${sku}' ĐÃ PHÁT SINH GIAO DỊCH trong hệ thống nên KHÔNG THỂ XÓA!\n\n` +
+          `Bạn có muốn chuyển sản phẩm này sang trạng thái "Ngừng kinh doanh" thay vì xóa không?`
+        );
+        if (proceed) {
+          toggleStatus(sku, "ACTIVE");
+        }
+        return;
+      }
+
+      if (!confirm(`Bạn có chắc chắn muốn XÓA vĩnh viễn sản phẩm '${sku}' khỏi danh mục? (Hành động này không thể hoàn tác)`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/v1/products/${sku}`, {
+          method: "DELETE",
+          headers: getApiHeaders()
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          showToast(result.detail || "Không thể xóa sản phẩm.", "error");
+          return;
+        }
+        showToast(result.message || `Đã xóa sản phẩm '${sku}' thành công!`, "success");
+        loadProducts();
+      } catch (err) {
+        showToast("Lỗi khi xóa sản phẩm: " + err.message, "error");
+      }
+    }
+
+    // Initialize Page
+    document.addEventListener("DOMContentLoaded", async () => {
+      await loadCategories();
+      await loadProducts();
+    });
+  </script>
+</body>
+</html>

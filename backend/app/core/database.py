@@ -49,13 +49,14 @@ def init_db():
 
 def migrate_pricing_schema():
     """Create price-list tables and add pricing/approval fields to existing DBs."""
-    from app.models.models import Base, PriceList, PriceListItem
+    from app.models.models import Base, PriceList, PriceListItem, HandoverHistory
 
-    Base.metadata.create_all(bind=engine, tables=[PriceList.__table__, PriceListItem.__table__])
+    Base.metadata.create_all(bind=engine, tables=[PriceList.__table__, PriceListItem.__table__, HandoverHistory.__table__], checkfirst=True)
     inspector = inspect(engine)
     additions = {
         "customers": {
             "customer_group": "VARCHAR(30) NOT NULL DEFAULT 'RETAIL'",
+            "region": "VARCHAR(100) NULL",
             "is_locked": "BOOLEAN NOT NULL DEFAULT 0",
             "lock_reason": "VARCHAR(255) NULL",
             "locked_at": "DATETIME NULL",
