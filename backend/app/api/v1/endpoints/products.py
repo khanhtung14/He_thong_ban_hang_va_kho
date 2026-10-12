@@ -16,7 +16,20 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.database import get_db
-from app.models.models import Product, Category, ProductUnit, ProductPriceHistory
+from app.models.models import (
+    Product,
+    Category,
+    ProductUnit,
+    ProductPriceHistory,
+    RoleCode,
+    OrderItem,
+    WarehouseReceiptItem,
+    WarehouseTransferItem,
+    WarehouseAuditItem,
+    DispatchItem,
+    ReturnOrderItem,
+    InventoryAdjustmentItem,
+)
 from app.api.v1.endpoints.rbac import (
     PERM_PRODUCTS_VIEW,
     PERM_PRODUCTS_MANAGE,
@@ -26,6 +39,7 @@ from app.api.v1.endpoints.rbac import (
     require_permissions,
     require_roles,
     sanitize_financial_data,
+    can_view_financials,
 )
 from app.services.price_history_service import (
     get_price_history,
@@ -52,6 +66,40 @@ class ProductUnitRequest(BaseModel):
         if not value:
             raise ValueError("Tên đơn vị không được để trống.")
         return value
+
+class ProductUnitInput(BaseModel):
+    unitName: str
+    conversionRate: float = 1.0
+    barcode: Optional[str] = None
+    isBaseUnit: bool = False
+
+class ProductCreateRequest(BaseModel):
+    sku: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=255)
+    categoryId: Optional[int] = None
+    baseUnit: str = Field(min_length=1, max_length=20)
+    manageByLot: bool = False
+    minStock: int = 0
+    basePrice: Optional[float] = 0.0
+    costPrice: Optional[float] = 0.0
+    imageUrl: Optional[str] = None
+    status: str = "ACTIVE"
+    units: Optional[list[ProductUnitInput]] = None
+
+class ProductUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    categoryId: Optional[int] = None
+    baseUnit: Optional[str] = None
+    manageByLot: Optional[bool] = None
+    minStock: Optional[int] = None
+    basePrice: Optional[float] = None
+    costPrice: Optional[float] = None
+    imageUrl: Optional[str] = None
+    status: Optional[str] = None
+    units: Optional[list[ProductUnitInput]] = None
+
+class ProductStatusUpdateRequest(BaseModel):
+    status: str = Field(pattern="^(ACTIVE|INACTIVE)$")
 
 class ProductBase(BaseModel):
     id: int
@@ -1068,6 +1116,292 @@ compat_router.add_api_route(
     reject_price_history_mutation,
     methods=["POST", "PUT", "PATCH", "DELETE"],
 )
+
+
+def _check_product_transactions(product_id: int, db: Session) -> tuple[bool, str]:
+    """Check if a product has been used in any transactions (orders, receipts, transfers, audits, dispatches, returns, adjustments)."""
+    if db.query(OrderItem).filter(OrderItem.product_id == product_id).first():
+        return True, "đơn đặt hàng"
+    if db.query(WarehouseReceiptItem).filter(WarehouseReceiptItem.product_id == product_id).first():
+        return True, "phiếu nhập kho"
+    if db.query(WarehouseTransferItem).filter(WarehouseTransferItem.product_id == product_id).first():
+        return True, "phiếu điều chuyển kho"
+    if db.query(WarehouseAuditItem).filter(WarehouseAuditItem.product_id == product_id).first():
+        return True, "phiếu kiểm kê kho"
+    if db.query(DispatchItem).filter(DispatchItem.product_id == product_id).first():
+        return True, "phiếu xuất kho"
+    if db.query(ReturnOrderItem).filter(ReturnOrderItem.product_id == product_id).first():
+        return True, "phiếu trả hàng"
+    if db.query(InventoryAdjustmentItem).filter(InventoryAdjustmentItem.product_id == product_id).first():
+        return True, "phiếu điều chỉnh tồn kho"
+    return False, ""
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_product(
+    payload: ProductCreateRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
+) -> Any:
+    """Create a new product (Sales Manager only)."""
+    if user.role not in (RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ Quản lý kinh doanh mới có quyền khai báo danh mục sản phẩm.",
+        )
+
+    sku_clean = payload.sku.strip().upper()
+    existing = db.query(Product).filter(Product.sku == sku_clean).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Mã SKU '{sku_clean}' đã tồn tại trong hệ thống. Vui lòng chọn mã khác.",
+        )
+
+    if payload.categoryId:
+        cat = db.query(Category).filter(Category.id == payload.categoryId).first()
+        if not cat:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Không tìm thấy nhóm hàng có ID {payload.categoryId}.",
+            )
+
+    cost_price = payload.costPrice or 0.0
+    if not can_view_financials(user.role):
+        cost_price = 0.0
+
+    product = Product(
+        sku=sku_clean,
+        name=payload.name.strip(),
+        category_id=payload.categoryId,
+        base_unit=payload.baseUnit.strip(),
+        manage_by_lot=payload.manageByLot,
+        min_stock=payload.minStock,
+        base_price=payload.basePrice or 0.0,
+        cost_price=cost_price,
+        image_url=payload.imageUrl,
+        status=payload.status or "ACTIVE",
+    )
+    db.add(product)
+    db.flush()
+
+    # Base unit entry
+    base_unit_entry = ProductUnit(
+        product_id=product.id,
+        unit_name=product.base_unit,
+        conversion_rate=1.0,
+        is_base_unit=True,
+    )
+    db.add(base_unit_entry)
+
+    # Additional units if provided
+    if payload.units:
+        for u in payload.units:
+            if u.unitName.strip() != product.base_unit:
+                conv_rate = u.conversionRate if u.conversionRate > 0 else 1.0
+                extra_unit = ProductUnit(
+                    product_id=product.id,
+                    unit_name=u.unitName.strip(),
+                    conversion_rate=conv_rate,
+                    barcode=u.barcode,
+                    is_base_unit=False,
+                )
+                db.add(extra_unit)
+
+    db.commit()
+    db.refresh(product)
+
+    res_data = {
+        "id": product.id,
+        "sku": product.sku,
+        "name": product.name,
+        "categoryId": product.category_id,
+        "category_id": product.category_id,
+        "baseUnit": product.base_unit,
+        "manageByLot": product.manage_by_lot,
+        "minStock": product.min_stock,
+        "basePrice": product.base_price,
+        "costPrice": product.cost_price,
+        "imageUrl": product.image_url,
+        "status": product.status,
+    }
+    return {
+        "success": True,
+        "code": 201,
+        "message": f"Tạo sản phẩm '{product.name}' thành công.",
+        "data": sanitize_financial_data(res_data, user),
+    }
+
+
+@router.put("/{product_id}")
+def update_product(
+    product_id: int,
+    payload: ProductUpdateRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
+) -> Any:
+    """Update product information and cost price (Sales Manager only)."""
+    if user.role not in (RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ Quản lý kinh doanh mới có quyền chỉnh sửa thông tin sản phẩm.",
+        )
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy sản phẩm có ID {product_id}.",
+        )
+
+    if payload.name is not None:
+        product.name = payload.name.strip()
+    if payload.categoryId is not None:
+        if payload.categoryId > 0:
+            cat = db.query(Category).filter(Category.id == payload.categoryId).first()
+            if not cat:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Không tìm thấy nhóm hàng có ID {payload.categoryId}.",
+                )
+            product.category_id = payload.categoryId
+        else:
+            product.category_id = None
+    if payload.baseUnit is not None:
+        product.base_unit = payload.baseUnit.strip()
+        base_unit_rec = db.query(ProductUnit).filter(ProductUnit.product_id == product.id, ProductUnit.is_base_unit.is_(True)).first()
+        if base_unit_rec:
+            base_unit_rec.unit_name = product.base_unit
+    if payload.manageByLot is not None:
+        product.manage_by_lot = payload.manageByLot
+    if payload.minStock is not None:
+        product.min_stock = payload.minStock
+    if payload.basePrice is not None:
+        product.base_price = payload.basePrice
+    if payload.costPrice is not None:
+        if not can_view_financials(user.role):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ Quản lý kinh doanh mới có quyền xem và sửa giá vốn.",
+            )
+        product.cost_price = payload.costPrice
+    if payload.imageUrl is not None:
+        product.image_url = payload.imageUrl
+    if payload.status is not None:
+        product.status = payload.status
+
+    if payload.units is not None:
+        db.query(ProductUnit).filter(ProductUnit.product_id == product.id, ProductUnit.is_base_unit.is_(False)).delete()
+        for u in payload.units:
+            if u.unitName.strip() != product.base_unit:
+                db.add(ProductUnit(
+                    product_id=product.id,
+                    unit_name=u.unitName.strip(),
+                    conversion_rate=u.conversionRate if u.conversionRate > 0 else 1.0,
+                    barcode=u.barcode,
+                    is_base_unit=False,
+                ))
+
+    db.commit()
+    db.refresh(product)
+
+    res_data = {
+        "id": product.id,
+        "sku": product.sku,
+        "name": product.name,
+        "categoryId": product.category_id,
+        "category_id": product.category_id,
+        "baseUnit": product.base_unit,
+        "manageByLot": product.manage_by_lot,
+        "minStock": product.min_stock,
+        "basePrice": product.base_price,
+        "costPrice": product.cost_price,
+        "imageUrl": product.image_url,
+        "status": product.status,
+    }
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Cập nhật sản phẩm '{product.name}' thành công.",
+        "data": sanitize_financial_data(res_data, user),
+    }
+
+
+@router.patch("/{product_id}/status")
+def toggle_product_status(
+    product_id: int,
+    payload: ProductStatusUpdateRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
+) -> Any:
+    """Toggle product status (ACTIVE or INACTIVE - ngừng kinh doanh)."""
+    if user.role not in (RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ Quản lý kinh doanh mới có quyền chuyển trạng thái sản phẩm.",
+        )
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy sản phẩm có ID {product_id}.",
+        )
+
+    product.status = payload.status
+    db.commit()
+    db.refresh(product)
+
+    status_label = "Đang kinh doanh" if product.status == "ACTIVE" else "Ngừng kinh doanh"
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Đã chuyển trạng thái sản phẩm '{product.name}' sang: {status_label}.",
+        "data": {
+            "id": product.id,
+            "sku": product.sku,
+            "status": product.status,
+        },
+    }
+
+
+@router.delete("/{product_id}")
+def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
+) -> Any:
+    """Delete a product. If transaction exists, forbid deletion and advise setting to INACTIVE."""
+    if user.role not in (RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ Quản lý kinh doanh mới có quyền xoá sản phẩm.",
+        )
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy sản phẩm có ID {product_id}.",
+        )
+
+    has_tx, tx_name = _check_product_transactions(product.id, db)
+    if has_tx:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Sản phẩm '{product.sku}' đã phát sinh giao dịch ({tx_name}) nên không thể xoá, chỉ có thể chuyển sang 'Ngừng kinh doanh'.",
+        )
+
+    db.query(ProductUnit).filter(ProductUnit.product_id == product.id).delete()
+    db.delete(product)
+    db.commit()
+
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Đã xoá hoàn toàn sản phẩm '{product.sku}' khỏi hệ thống.",
+        "data": {"id": product_id, "sku": product.sku},
+    }
 
 
 
