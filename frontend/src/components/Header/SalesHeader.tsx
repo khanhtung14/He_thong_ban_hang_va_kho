@@ -34,13 +34,12 @@ export interface SalesHeaderProps {
 export const SalesHeader: React.FC<SalesHeaderProps> = ({
   fullName = "Nhân viên kinh doanh",
   roleName = "Chuyên viên bán hàng",
-  avatarUrl: _avatarUrl,
+  avatarUrl,
   notificationCount = 0,
   onProfileClick,
   onChangePassword,
   onLogout,
 }) => {
-  void _avatarUrl;
   const initials =
     fullName
       .trim()
@@ -132,7 +131,7 @@ export const SalesHeader: React.FC<SalesHeaderProps> = ({
           placement="bottomRight"
         >
           <Space style={{ cursor: "pointer", userSelect: "none" }} size="small">
-            <ProfileAvatar editable={false} size={36} initials={initials} />
+            <ProfileAvatar editable={false} size={36} initials={initials} avatarUrl={avatarUrl} />
             <div
               style={{
                 display: "flex",

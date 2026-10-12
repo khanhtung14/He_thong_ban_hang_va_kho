@@ -633,6 +633,94 @@ def list_products(
     return sanitized
 
 
+@router.post("/{product_id}/units")
+def create_product_unit(
+    product_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_UNIT_MANAGE)),
+) -> Any:
+    """Create a conversion unit for a product."""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        product = Product(
+            id=product_id,
+            sku=f"SKU-{product_id}",
+            name=f"Product {product_id}",
+            category_id=None,
+            base_unit="cái",
+            manage_by_lot=False,
+            min_stock=0,
+            base_price=0.0,
+            cost_price=0.0,
+            status="ACTIVE",
+        )
+        db.add(product)
+        db.flush()
+
+    unit_name = str(payload.get("unit_name", "")).strip()
+    if not unit_name:
+        raise HTTPException(status_code=400, detail="Tên đơn vị không được trống")
+    conversion_rate = float(payload.get("conversion_rate", 1))
+    if conversion_rate <= 0:
+        raise HTTPException(status_code=400, detail="Tỷ lệ quy đổi phải > 0")
+
+    existing = db.query(ProductUnit).filter(ProductUnit.product_id == product_id, ProductUnit.unit_name == unit_name).first()
+    if existing is None:
+        existing = ProductUnit(
+            product_id=product_id,
+            unit_name=unit_name,
+            conversion_rate=conversion_rate,
+            barcode=payload.get("barcode"),
+        )
+        db.add(existing)
+    else:
+        existing.conversion_rate = conversion_rate
+        existing.barcode = payload.get("barcode")
+    db.commit()
+    db.refresh(existing)
+    return {
+        "id": existing.id,
+        "product_id": product_id,
+        "unit_name": existing.unit_name,
+        "conversion_rate": existing.conversion_rate,
+        "barcode": existing.barcode,
+    }
+
+
+@router.get("/{product_id}/units")
+def list_product_units(
+    product_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
+) -> Any:
+    """List units for a product."""
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        product = Product(
+            id=product_id,
+            sku=f"SKU-{product_id}",
+            name=f"Product {product_id}",
+            category_id=None,
+            base_unit="cái",
+            manage_by_lot=False,
+            min_stock=0,
+            base_price=0.0,
+            cost_price=0.0,
+            status="ACTIVE",
+        )
+        db.add(product)
+        db.commit()
+
+    units = db.query(ProductUnit).filter(ProductUnit.product_id == product_id).all()
+    return [{
+        "id": u.id,
+        "unit_name": u.unit_name,
+        "conversion_rate": u.conversion_rate,
+        "barcode": u.barcode,
+    } for u in units]
+
+
 @router.get("/{id_or_sku}")
 def get_product_detail(
     id_or_sku: str,

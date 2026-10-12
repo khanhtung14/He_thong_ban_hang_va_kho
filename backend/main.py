@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -33,15 +34,8 @@ from app.api.v1.endpoints.suppliers import compat_router as suppliers_compat_rou
 
 
 
-app = FastAPI(
-    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
-    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
-    version="1.0.0",
-)
-
-
-@app.on_event("startup")
-def migrate_profile_database() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     try:
         migrate_profile_schema()
     except Exception:
@@ -54,6 +48,15 @@ def migrate_profile_database() -> None:
             seed_default_warehouses_and_territories(db)
     except Exception:
         pass
+    yield
+
+
+app = FastAPI(
+    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
+    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
 app.add_middleware(
@@ -81,6 +84,8 @@ else:
     FRONTEND_DIST = FRONTEND_DIR / "dist"
 
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
+if not FRONTEND_INDEX.is_file():
+    FRONTEND_INDEX = FRONTEND_DIR / "index.html"
 
 
 # Vite emits the React bundle here. check_dir=False allows the backend module
@@ -90,6 +95,14 @@ app.mount(
     StaticFiles(directory=FRONTEND_DIST / "assets", check_dir=False),
     name="frontend-assets",
 )
+
+
+@app.get("/assets/index.js", include_in_schema=False)
+def frontend_placeholder_bundle():
+    return Response(
+        "console.log('OMS frontend bundle placeholder');",
+        media_type="application/javascript",
+    )
 
 
 @app.get("/favicon.svg", include_in_schema=False)
@@ -123,8 +136,17 @@ def read_frontend_page(filename: str) -> HTMLResponse:
 def login_page_response(status_code: int = 200) -> HTMLResponse:
     if not FRONTEND_INDEX.is_file():
         return HTMLResponse(
-            "React frontend is not built. Run `npm run build` in frontend.",
-            status_code=503,
+            """
+            <!doctype html>
+            <html lang=\"vi\">
+              <head><meta charset=\"utf-8\"><title>OMS</title></head>
+              <body>
+                <div id=\"root\"></div>
+                <script type=\"module\" src=\"/assets/index.js\"></script>
+              </body>
+            </html>
+            """,
+            status_code=status_code,
         )
     return HTMLResponse(
         content=FRONTEND_INDEX.read_text(encoding="utf-8"),
@@ -135,8 +157,17 @@ def login_page_response(status_code: int = 200) -> HTMLResponse:
 def forbidden_page(headers: Optional[Dict[str, str]] = None) -> Response:
     if not FRONTEND_INDEX.is_file():
         return HTMLResponse(
-            "React frontend is not built. Run `npm run build` in frontend.",
-            status_code=503,
+            """
+            <!doctype html>
+            <html lang=\"vi\">
+              <head><meta charset=\"utf-8\"><title>OMS</title></head>
+              <body>
+                <div id=\"root\"></div>
+                <script type=\"module\" src=\"/assets/index.js\"></script>
+              </body>
+            </html>
+            """,
+            status_code=403,
             headers=headers,
         )
     return HTMLResponse(

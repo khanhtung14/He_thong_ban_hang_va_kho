@@ -4,29 +4,35 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
-# Ensure backend directory is in sys.path
-backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
-if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
+ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = ROOT / "backend"
+for target in (str(ROOT), str(BACKEND_ROOT)):
+    if target not in sys.path:
+        sys.path.insert(0, target)
 
-import app.core.database as database
-import app.models.models as models
-import app.core.security as security
-import app.core.session as session
-import app.api.v1.endpoints.change_password as change_password
-import app.api.v1.endpoints.login as login
-import app.api.v1.endpoints.forgot_password as forgot_password
-import app.api.v1.endpoints.rbac as rbac
-import app.api.v1.endpoints.audit_logs as audit_logs
-import app.api.v1.endpoints.navigation as navigation
-import app.api.v1.endpoints.products as products
-import app.api.v1.endpoints.price_lists as price_lists
-import app.api.v1.endpoints.user_routes as user_routes
-import app.services.email_service as email_service
-import app.services.users_service as users_service
-import app.api.v1.endpoints.suppliers as suppliers
-import main as main_module
+from . import (
+    audit_logs,
+    change_password,
+    database,
+    email_service,
+    forgot_password,
+    inventory,
+    login,
+    main as main_module,
+    models,
+    navigation,
+    price_lists,
+    products,
+    rbac,
+    reports,
+    security,
+    session,
+    suppliers,
+    user_routes,
+    users_service,
+)
 
 app = main_module.app
 
@@ -47,4 +53,29 @@ sys.modules["src.backend.user_routes"] = user_routes
 sys.modules["src.backend.email_service"] = email_service
 sys.modules["src.backend.users_service"] = users_service
 sys.modules["src.backend.suppliers"] = suppliers
+sys.modules["src.backend.inventory"] = inventory
+sys.modules["src.backend.reports"] = reports
 sys.modules["src.backend.main"] = main_module
+
+__all__ = [
+    "app",
+    "audit_logs",
+    "change_password",
+    "database",
+    "email_service",
+    "forgot_password",
+    "inventory",
+    "login",
+    "main_module",
+    "models",
+    "navigation",
+    "price_lists",
+    "products",
+    "rbac",
+    "reports",
+    "security",
+    "session",
+    "suppliers",
+    "user_routes",
+    "users_service",
+]

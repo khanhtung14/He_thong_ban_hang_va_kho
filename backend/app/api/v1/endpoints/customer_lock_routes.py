@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -68,7 +68,10 @@ class CustomerResponse(BaseModel):
     id: int
     code: str
     name: str
+    tax_code: Optional[str] = None
     phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
     sales_rep_id: Optional[int] = None
     territory_id: Optional[int] = None
     region: Optional[str] = None
@@ -87,13 +90,81 @@ class CustomerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+def _customer_group_from_value(value: Any) -> str:
+    if value is None:
+        return CustomerGroup.RETAIL.value
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        if normalized in {member.value for member in CustomerGroup}:
+            return normalized
+        alias_map = {
+            "LEVEL1": CustomerGroup.LEVEL_1.value,
+            "LEVEL_1": CustomerGroup.LEVEL_1.value,
+            "LEVEL2": CustomerGroup.LEVEL_2.value,
+            "LEVEL_2": CustomerGroup.LEVEL_2.value,
+            "RETAIL": CustomerGroup.RETAIL.value,
+        }
+        return alias_map.get(normalized, CustomerGroup.RETAIL.value)
+    if isinstance(value, int):
+        group_by_id = {
+            1: CustomerGroup.LEVEL_1.value,
+            2: CustomerGroup.LEVEL_2.value,
+            3: CustomerGroup.RETAIL.value,
+        }
+        return group_by_id.get(value, CustomerGroup.RETAIL.value)
+    return str(value).strip().upper() or CustomerGroup.RETAIL.value
+
+
 class CustomerCreateRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=40)
     name: str = Field(..., min_length=1, max_length=150)
-    sales_rep_id: Optional[int] = None
-    territory_id: Optional[int] = None
+    tax_code: Optional[str] = Field(default=None, alias="taxCode")
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    sales_rep_id: Optional[int] = Field(default=None, alias="salesRepId")
+    territory_id: Optional[int] = Field(default=None, alias="regionId")
     region: Optional[str] = None
-    customer_group: CustomerGroup = CustomerGroup.RETAIL
+    customer_group: Optional[str] = Field(default=None, alias="customerGroup")
+    customer_group_id: Optional[int] = Field(default=None, alias="customerGroupId")
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    @field_validator("code", "name")
+    @classmethod
+    def strip_fields(cls, value: str) -> str:
+        if value is None:
+            return value
+        return value.strip()
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+
+        if "taxCode" in normalized and "tax_code" not in normalized:
+            normalized["tax_code"] = normalized["taxCode"]
+        if "salesRepId" in normalized and "sales_rep_id" not in normalized:
+            normalized["sales_rep_id"] = normalized["salesRepId"]
+        if "regionId" in normalized and "territory_id" not in normalized:
+            normalized["territory_id"] = normalized["regionId"]
+        if "customerGroupId" in normalized and "customer_group" not in normalized and "customer_group_id" not in normalized:
+            normalized["customer_group_id"] = normalized["customerGroupId"]
+        if "customerGroup" in normalized and "customer_group" not in normalized:
+            normalized["customer_group"] = normalized["customerGroup"]
+        if "regionId" in normalized and "territory_id" not in normalized:
+            normalized["territory_id"] = normalized["regionId"]
+        return normalized
+
+    @model_validator(mode="after")
+    def resolve_customer_group(self):
+        group_value = self.customer_group or _customer_group_from_value(self.customer_group_id)
+        self.customer_group = _customer_group_from_value(group_value)
+        if self.territory_id is None and self.customer_group_id is not None:
+            self.territory_id = self.territory_id
+        return self
 
 
 class CustomerPricingGroupRequest(BaseModel):
@@ -233,17 +304,27 @@ def create_customer(
     db: Session = Depends(get_db),
 ):
     """Tạo mới đại lý."""
-    existing = db.execute(select(Customer).where(Customer.code == payload.code.strip())).scalar_one_or_none()
+    code = payload.code.strip()
+    existing = db.execute(select(Customer).where(Customer.code == code)).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="Mã đại lý đã tồn tại!")
 
+    if payload.tax_code and payload.tax_code.strip():
+        existing_by_tax = db.execute(select(Customer).where(Customer.tax_code == payload.tax_code.strip())).scalar_one_or_none()
+        if existing_by_tax:
+            raise HTTPException(status_code=400, detail="Mã số thuế đã tồn tại!")
+
     customer = Customer(
-        code=payload.code.strip(),
+        code=code,
         name=payload.name.strip(),
+        tax_code=payload.tax_code.strip() if payload.tax_code else None,
+        phone=payload.phone.strip() if payload.phone else None,
+        email=payload.email.strip() if payload.email else None,
+        address=payload.address.strip() if payload.address else None,
         sales_rep_id=payload.sales_rep_id,
         territory_id=payload.territory_id,
         region=payload.region.strip() if payload.region else None,
-        customer_group=payload.customer_group.value,
+        customer_group=_customer_group_from_value(payload.customer_group or payload.customer_group_id),
         is_active=True,
         is_locked=False,
     )
@@ -271,6 +352,69 @@ def get_customer(customer_id: int, db: Session = Depends(get_db)):
     res = CustomerResponse.model_validate(customer)
     res.pending_orders_count = pending_count
     return res
+
+
+class CustomerTransactionStatusRequest(BaseModel):
+    status: str = Field(..., min_length=1, max_length=30)
+    reason: Optional[str] = None
+
+
+class CustomerCreditLimitRequest(BaseModel):
+    credit_limit: float = Field(default=0.0, ge=0)
+    max_due_days: int = Field(default=0, ge=0)
+    warning_threshold_percent: float = Field(default=80.0, ge=0, le=100)
+
+
+class CustomerSalesRepAssignRequest(BaseModel):
+    sales_rep_id: Optional[int] = Field(default=None, alias="salesRepId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+
+
+@router.put("/customers/{customer_id}/credit-limit", response_model=CustomerResponse)
+def update_customer_credit_limit(
+    customer_id: int,
+    payload: CustomerCreditLimitRequest,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_permissions(PERM_CUSTOMERS_LOCK)),
+):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đại lý.")
+
+    customer.credit_limit = payload.credit_limit
+    customer.max_due_days = payload.max_due_days
+    customer.warning_threshold_percent = payload.warning_threshold_percent
+    db.commit(); db.refresh(customer)
+    pending_count = (
+        db.query(func.count(Order.id)).filter(Order.customer_id == customer.id, Order.status.in_(INCOMPLETE_STATUSES)).scalar() or 0
+    )
+    response = CustomerResponse.model_validate(customer)
+    response.pending_orders_count = pending_count
+    return response
+
+
+@router.patch("/customers/{customer_id}/assign-sales-rep", response_model=CustomerResponse)
+def assign_sales_rep_for_customer(
+    customer_id: int,
+    payload: CustomerSalesRepAssignRequest,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
+):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đại lý.")
+
+    customer.sales_rep_id = payload.sales_rep_id
+    db.commit(); db.refresh(customer)
+    pending_count = (
+        db.query(func.count(Order.id)).filter(Order.customer_id == customer.id, Order.status.in_(INCOMPLETE_STATUSES)).scalar() or 0
+    )
+    response = CustomerResponse.model_validate(customer)
+    response.pending_orders_count = pending_count
+    return response
 
 
 @router.patch("/customers/{customer_id}/pricing-group", response_model=CustomerResponse)
