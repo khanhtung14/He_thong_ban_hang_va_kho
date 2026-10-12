@@ -110,6 +110,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     },
     RoleCode.SALES_MANAGER.value: {
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_MANAGE,
         PERM_PRODUCTS_VIEW_FINANCIALS,  # Cho phÃ©p xem giÃ¡ vá»‘n & biÃªn lá»£i nhuáº­n
         PERM_PRODUCTS_IMPORT,
         PERM_INVENTORY_VIEW,
@@ -151,6 +152,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     RoleCode.ADMIN.value: {
         PERM_SYSTEM_ADMIN,
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_MANAGE,
         PERM_PRODUCTS_UNIT_MANAGE,
         PERM_PRODUCTS_IMPORT,
         PERM_INVENTORY_VIEW,

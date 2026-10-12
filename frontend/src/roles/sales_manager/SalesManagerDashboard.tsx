@@ -6,7 +6,6 @@ import {
   FileExcelOutlined,
   PlusOutlined,
   SmileOutlined,
-  DashboardOutlined,
 } from "@ant-design/icons";
 
 // Các components Ant Design
@@ -17,10 +16,10 @@ import ApprovalList, { type ApprovalItem } from "./ApprovalList";
 import TerritoryProgress from "./TerritoryProgress";
 import CreatePriceListModal from "./CreatePriceListModal";
 import ExportReportModal from "./ExportReportModal";
-import ProductExcelImport from "./ProductExcelImport";
 import CategoryManagement from "./CategoryManagement";
 import SalesAssignmentManager from "./SalesAssignmentManager";
 import SalesReportPage from "./SalesReportPage";
+import ProductManagement from "./ProductManagement";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -48,8 +47,8 @@ export const SalesManagerDashboard: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>(() => {
     if (typeof window !== "undefined") {
       if (window.location.pathname === "/sales/assignments") return "/sales/assignments";
+      if (window.location.pathname === "/manager/products") return "/manager/products";
       if (window.location.pathname === "/manager/categories") return "/manager/categories";
-      if (window.location.pathname === "/manager/products/import") return "/manager/products/import";
       if (window.location.pathname === "/manager/reports") return "/manager/reports";
     }
     return "/manager/dashboard";
@@ -138,7 +137,10 @@ export const SalesManagerDashboard: React.FC = () => {
               m.id !== "pricing" &&
               m.id !== "manager-pricing" &&
               m.path !== "/manager/pricing" &&
-              m.title !== "Bảng giá"
+              m.title !== "Bảng giá" &&
+              m.path !== "/manager/products/import" &&
+              m.id !== "excel-import" &&
+              m.title !== "Nhập sản phẩm (Excel)"
           )
           .map((m: any) => ({
             id: m.id,
@@ -152,6 +154,9 @@ export const SalesManagerDashboard: React.FC = () => {
         );
         const hasAssignmentMenu = backendNavItems.some(
           (m: any) => m.path === "/sales/assignments" || m.id === "sales-assignments"
+        );
+        const hasProductsMenu = backendNavItems.some(
+          (m: any) => m.path === "/manager/products" || m.id === "manager-products"
         );
 
         const rawMenuItems = [
@@ -172,6 +177,16 @@ export const SalesManagerDashboard: React.FC = () => {
                 icon: "user-switch",
               },
             ]),
+          ...(hasProductsMenu
+            ? []
+            : [
+              {
+                id: "manager-products",
+                title: "Sản phẩm",
+                path: "/manager/products",
+                icon: "boxes-stacked",
+              },
+            ]),
           ...(hasCategoryMenu
             ? []
             : [
@@ -182,17 +197,17 @@ export const SalesManagerDashboard: React.FC = () => {
                 icon: "appstore",
               },
             ]),
-          {
-            id: "excel-import",
-            title: "Nhập sản phẩm (Excel)",
-            path: "/manager/products/import",
-            icon: "excel",
-          },
         ];
 
-        // Đảm bảo không trùng lặp mục menu theo path và không có "Quản lý nhóm hàng"
+        // Đảm bảo không trùng lặp mục menu theo path, không có "Quản lý nhóm hàng" và "Nhập sản phẩm (Excel)"
         const uniqueMenuItems = rawMenuItems
-          .filter((item) => item.title !== "Quản lý nhóm hàng")
+          .filter(
+            (item) =>
+              item.title !== "Quản lý nhóm hàng" &&
+              item.path !== "/manager/products/import" &&
+              item.id !== "excel-import" &&
+              item.title !== "Nhập sản phẩm (Excel)"
+          )
           .filter(
             (item, index, self) =>
               index === self.findIndex((t) => t.path === item.path)
@@ -332,9 +347,9 @@ export const SalesManagerDashboard: React.FC = () => {
             setCurrentPath("/sales/assignments");
             window.history.pushState({}, "", "/sales/assignments");
             window.scrollTo({ top: 0, behavior: "smooth" });
-          } else if (path === "/manager/products/import") {
-            setCurrentPath("/manager/products/import");
-            window.history.pushState({}, "", "/manager/products/import");
+          } else if (path === "/manager/products") {
+            setCurrentPath("/manager/products");
+            window.history.pushState({}, "", "/manager/products");
             window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/categories") {
             setCurrentPath("/manager/categories");
@@ -387,33 +402,9 @@ export const SalesManagerDashboard: React.FC = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <SalesAssignmentManager />
             </div>
-          ) : currentPath === "/manager/products/import" ? (
+          ) : currentPath === "/manager/products" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <Title level={3} style={{ margin: 0 }}>
-                    Nhập danh mục sản phẩm từ Excel
-                  </Title>
-                  <Text type="secondary">
-                    Đưa hàng loạt sản phẩm mới hoặc cập nhật giá/tồn kho từ file
-                    bảng tính
-                  </Text>
-                </div>
-                <Button
-                  icon={<DashboardOutlined />}
-                  onClick={() => setCurrentPath("/manager/dashboard")}
-                >
-                  Quay lại Dashboard
-                </Button>
-              </div>
-
-              <ProductExcelImport />
+              <ProductManagement />
             </div>
           ) : currentPath === "/manager/reports" ? (
             <SalesReportPage
@@ -474,13 +465,6 @@ export const SalesManagerDashboard: React.FC = () => {
                 </div>
 
                 <Space size="middle">
-                  <Button
-                    icon={<FileExcelOutlined />}
-                    onClick={() => setCurrentPath("/manager/products/import")}
-                    style={{ borderRadius: 8, height: 38 }}
-                  >
-                    Nhập hàng loạt (Excel)
-                  </Button>
                   <Button
                     icon={<FileExcelOutlined />}
                     onClick={() => {

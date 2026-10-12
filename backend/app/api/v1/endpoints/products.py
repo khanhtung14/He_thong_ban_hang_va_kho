@@ -10,17 +10,19 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from fastapi import APIRouter, Depends, File, HTTPException, Path as PathParam, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.database import get_db
-from app.models.models import Product, Category, ProductUnit
+from app.models.models import Product, Category, ProductUnit, OrderItem, InventoryTransaction, RoleCode
 from app.api.v1.endpoints.rbac import (
     PERM_PRODUCTS_VIEW,
     PERM_PRODUCTS_MANAGE,
     PERM_PRODUCTS_UNIT_MANAGE,
     PERM_PRODUCTS_IMPORT,
     AuthenticatedUser,
+    normalize_role,
     require_permissions,
     sanitize_financial_data,
 )
@@ -851,6 +853,419 @@ def move_product_category(
         "old_category_name": old_category_name,
         "new_category_id": target_cat["id"],
         "new_category_name": target_cat["name"],
+    }
+
+
+# =====================================================================
+# Request Schemas & Helper Functions for Product Management
+# =====================================================================
+
+def is_sales_manager_or_admin(user: AuthenticatedUser) -> bool:
+    norm = normalize_role(user.role)
+    return norm in (RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value)
+
+
+def check_has_transactions(product_id: Optional[int], sku: str, db: Session) -> bool:
+    if product_id:
+        if db.query(OrderItem).filter(
+            (OrderItem.product_id == product_id) | (func.upper(OrderItem.sku) == sku.upper())
+        ).first() is not None:
+            return True
+        if db.query(InventoryTransaction).filter(
+            InventoryTransaction.product_id == product_id
+        ).first() is not None:
+            return True
+        try:
+            from app.models.models import ReturnOrderItem
+            if db.query(ReturnOrderItem).filter(
+                ReturnOrderItem.product_id == product_id
+            ).first() is not None:
+                return True
+        except Exception:
+            pass
+        try:
+            from app.models.models import InventoryStock
+            if db.query(InventoryStock).filter(
+                InventoryStock.product_id == product_id,
+                InventoryStock.base_quantity > 0,
+            ).first() is not None:
+                return True
+        except Exception:
+            pass
+
+    mock_p = MOCK_PRODUCTS.get(sku.upper()) or MOCK_PRODUCTS.get(sku)
+    if mock_p:
+        if mock_p.get("has_transactions") or (mock_p.get("stock_available") or 0) > 0:
+            return True
+
+    return False
+
+
+class ProductCreateRequest(BaseModel):
+    sku: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=255)
+    category_id: Optional[int] = Field(None, alias="categoryId")
+    base_unit: str = Field(default="Cái", min_length=1, max_length=50, alias="baseUnit")
+    cost_price: Optional[float] = Field(None, alias="costPrice")
+    base_price: Optional[float] = Field(None, alias="basePrice")
+    sale_price: Optional[float] = Field(None, alias="salePrice")
+    min_stock: int = Field(default=0, ge=0, alias="minStock")
+    image_url: Optional[str] = Field(None, alias="imageUrl")
+    manage_by_lot: bool = Field(default=False, alias="manageByLot")
+    status: str = Field(default="ACTIVE")
+    description: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ProductUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    category_id: Optional[int] = Field(None, alias="categoryId")
+    base_unit: Optional[str] = Field(None, alias="baseUnit")
+    cost_price: Optional[float] = Field(None, alias="costPrice")
+    base_price: Optional[float] = Field(None, alias="basePrice")
+    sale_price: Optional[float] = Field(None, alias="salePrice")
+    min_stock: Optional[int] = Field(None, ge=0, alias="minStock")
+    image_url: Optional[str] = Field(None, alias="imageUrl")
+    manage_by_lot: Optional[bool] = Field(None, alias="manageByLot")
+    status: Optional[str] = None
+    description: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ProductStatusUpdateRequest(BaseModel):
+    status: str = Field(..., description="Trạng thái mới: 'ACTIVE' hoặc 'DISCONTINUED'")
+
+
+# =====================================================================
+# Product Management Endpoints (SCRUM-75)
+# =====================================================================
+
+@router.post("", status_code=status.HTTP_201_CREATED, summary="Tạo sản phẩm mới thủ công")
+def create_product(
+    payload: ProductCreateRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_MANAGE)),
+) -> dict[str, Any]:
+    sku_clean = payload.sku.strip()
+    if not sku_clean:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Mã SKU không được để trống.",
+        )
+
+    # 1. Validate unique SKU in DB & MOCK
+    existing_in_db = db.query(Product).filter(func.upper(Product.sku) == sku_clean.upper()).first()
+    existing_in_mock = sku_clean.upper() in [k.upper() for k in MOCK_PRODUCTS.keys()]
+    if existing_in_db or existing_in_mock:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Mã SKU '{sku_clean}' đã tồn tại trong hệ thống.",
+        )
+
+    # 2. Check cost_price permissions: Chỉ Sales Manager hoặc Admin mới được set cost_price
+    effective_cost_price = 0.0
+    if payload.cost_price is not None and payload.cost_price > 0:
+        if not is_sales_manager_or_admin(user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ Quản lý kinh doanh và Quản trị viên mới có quyền thiết lập giá vốn.",
+            )
+        effective_cost_price = float(payload.cost_price)
+    elif payload.cost_price is not None and is_sales_manager_or_admin(user):
+        effective_cost_price = float(payload.cost_price)
+
+    effective_base_price = (
+        float(payload.base_price)
+        if payload.base_price is not None
+        else (float(payload.sale_price) if payload.sale_price is not None else 0.0)
+    )
+
+    new_prod = Product(
+        sku=sku_clean,
+        name=payload.name.strip(),
+        category_id=payload.category_id,
+        base_unit=payload.base_unit.strip(),
+        manage_by_lot=payload.manage_by_lot,
+        min_stock=payload.min_stock,
+        base_price=effective_base_price,
+        cost_price=effective_cost_price,
+        image_url=payload.image_url,
+        status=payload.status.upper() if payload.status else "ACTIVE",
+    )
+    db.add(new_prod)
+    db.flush()
+
+    # Create base unit entry in product_units
+    base_unit_entry = ProductUnit(
+        product_id=new_prod.id,
+        unit_name=new_prod.base_unit,
+        conversion_rate=1.0,
+        is_base_unit=True,
+    )
+    db.add(base_unit_entry)
+    db.commit()
+    db.refresh(new_prod)
+
+    # Sync into MOCK_PRODUCTS
+    category_name = None
+    if new_prod.category_id:
+        cat = db.query(Category).filter(Category.id == new_prod.category_id).first()
+        if cat:
+            category_name = cat.name
+
+    MOCK_PRODUCTS[sku_clean.upper()] = {
+        "id": new_prod.id,
+        "sku": new_prod.sku,
+        "name": new_prod.name,
+        "category_id": new_prod.category_id,
+        "category": category_name,
+        "base_unit": new_prod.base_unit,
+        "unit": new_prod.base_unit,
+        "manage_by_lot": new_prod.manage_by_lot,
+        "min_stock": new_prod.min_stock,
+        "sale_price": new_prod.base_price,
+        "base_price": new_prod.base_price,
+        "cost_price": new_prod.cost_price,
+        "stock_available": 0,
+        "status": new_prod.status,
+        "image_url": new_prod.image_url,
+    }
+
+    prod_dict = {
+        "id": new_prod.id,
+        "sku": new_prod.sku,
+        "name": new_prod.name,
+        "categoryId": new_prod.category_id,
+        "category_id": new_prod.category_id,
+        "category": category_name,
+        "baseUnit": new_prod.base_unit,
+        "unit": new_prod.base_unit,
+        "manageByLot": new_prod.manage_by_lot,
+        "minStock": new_prod.min_stock,
+        "basePrice": new_prod.base_price,
+        "sale_price": new_prod.base_price,
+        "costPrice": new_prod.cost_price,
+        "cost_price": new_prod.cost_price,
+        "status": new_prod.status,
+        "imageUrl": new_prod.image_url,
+    }
+
+    return {
+        "success": True,
+        "code": 201,
+        "message": f"Tạo sản phẩm '{new_prod.name}' thành công.",
+        "data": sanitize_financial_data(prod_dict, user),
+    }
+
+
+@router.put("/{id_or_sku}", summary="Cập nhật thông tin sản phẩm")
+def update_product(
+    id_or_sku: str,
+    payload: ProductUpdateRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_MANAGE)),
+) -> dict[str, Any]:
+    # Check cost_price permission
+    if payload.cost_price is not None:
+        if not is_sales_manager_or_admin(user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chỉ Quản lý kinh doanh và Quản trị viên mới có quyền sửa giá vốn.",
+            )
+
+    product = None
+    if id_or_sku.isdigit():
+        product = db.query(Product).filter(Product.id == int(id_or_sku)).first()
+    if not product:
+        product = db.query(Product).filter(
+            func.upper(Product.sku) == id_or_sku.upper()
+        ).first()
+
+    mock_p = MOCK_PRODUCTS.get(id_or_sku.upper()) or MOCK_PRODUCTS.get(id_or_sku)
+    if not product and not mock_p:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sản phẩm '{id_or_sku}' không tồn tại.",
+        )
+
+    if product:
+        if payload.name is not None:
+            product.name = payload.name.strip()
+        if payload.category_id is not None:
+            product.category_id = payload.category_id
+        if payload.base_unit is not None:
+            product.base_unit = payload.base_unit.strip()
+            base_u = db.query(ProductUnit).filter(
+                ProductUnit.product_id == product.id,
+                ProductUnit.is_base_unit.is_(True),
+            ).first()
+            if base_u:
+                base_u.unit_name = product.base_unit
+        if payload.base_price is not None:
+            product.base_price = float(payload.base_price)
+        elif payload.sale_price is not None:
+            product.base_price = float(payload.sale_price)
+        if payload.cost_price is not None and is_sales_manager_or_admin(user):
+            product.cost_price = float(payload.cost_price)
+        if payload.min_stock is not None:
+            product.min_stock = payload.min_stock
+        if payload.image_url is not None:
+            product.image_url = payload.image_url
+        if payload.manage_by_lot is not None:
+            product.manage_by_lot = payload.manage_by_lot
+        if payload.status is not None:
+            product.status = payload.status.upper()
+
+        db.commit()
+        db.refresh(product)
+
+    target_sku = product.sku if product else (mock_p.get("sku") or id_or_sku)
+    if mock_p:
+        if payload.name is not None:
+            mock_p["name"] = payload.name.strip()
+        if payload.category_id is not None:
+            mock_p["category_id"] = payload.category_id
+        if payload.base_unit is not None:
+            mock_p["base_unit"] = payload.base_unit.strip()
+            mock_p["unit"] = payload.base_unit.strip()
+        if payload.base_price is not None:
+            mock_p["sale_price"] = float(payload.base_price)
+            mock_p["base_price"] = float(payload.base_price)
+        elif payload.sale_price is not None:
+            mock_p["sale_price"] = float(payload.sale_price)
+            mock_p["base_price"] = float(payload.sale_price)
+        if payload.cost_price is not None and is_sales_manager_or_admin(user):
+            mock_p["cost_price"] = float(payload.cost_price)
+        if payload.status is not None:
+            mock_p["status"] = payload.status.upper()
+
+    if product:
+        p_dict = {
+            "id": product.id,
+            "sku": product.sku,
+            "name": product.name,
+            "categoryId": product.category_id,
+            "category_id": product.category_id,
+            "category": product.category.name if product.category else None,
+            "baseUnit": product.base_unit,
+            "unit": product.base_unit,
+            "manageByLot": product.manage_by_lot,
+            "minStock": product.min_stock,
+            "basePrice": product.base_price,
+            "sale_price": product.base_price,
+            "costPrice": product.cost_price,
+            "cost_price": product.cost_price,
+            "status": product.status,
+            "imageUrl": product.image_url,
+        }
+    else:
+        p_dict = mock_p.copy()
+
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Cập nhật sản phẩm '{target_sku}' thành công.",
+        "data": sanitize_financial_data(p_dict, user),
+    }
+
+
+@router.delete("/{product_id}", summary="Xóa sản phẩm (nếu chưa phát sinh giao dịch)")
+def delete_product(
+    product_id: str,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_MANAGE)),
+) -> dict[str, Any]:
+    product = None
+    if product_id.isdigit():
+        product = db.query(Product).filter(Product.id == int(product_id)).first()
+    if not product:
+        product = db.query(Product).filter(
+            func.upper(Product.sku) == product_id.upper()
+        ).first()
+
+    mock_p = MOCK_PRODUCTS.get(product_id.upper()) or MOCK_PRODUCTS.get(product_id)
+    if not product and not mock_p:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sản phẩm '{product_id}' không tồn tại.",
+        )
+
+    target_sku = product.sku if product else (mock_p.get("sku") or product_id)
+    p_id = product.id if product else None
+
+    # Check transactions
+    if check_has_transactions(p_id, target_sku, db):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sản phẩm đã phát sinh giao dịch, không thể xóa. Vui lòng chuyển trạng thái sang Ngừng kinh doanh (DISCONTINUED).",
+        )
+
+    # Perform deletion
+    if product:
+        db.query(ProductUnit).filter(ProductUnit.product_id == product.id).delete()
+        db.delete(product)
+        db.commit()
+
+    if target_sku.upper() in MOCK_PRODUCTS:
+        MOCK_PRODUCTS.pop(target_sku.upper(), None)
+    if target_sku in MOCK_PRODUCTS:
+        MOCK_PRODUCTS.pop(target_sku, None)
+
+    return {
+        "success": True,
+        "message": f"Xóa sản phẩm '{target_sku}' thành công.",
+        "sku": target_sku,
+    }
+
+
+@router.patch("/{product_id}/status", summary="Cập nhật trạng thái sản phẩm")
+def update_product_status(
+    product_id: str,
+    payload: ProductStatusUpdateRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_MANAGE)),
+) -> dict[str, Any]:
+    status_clean = payload.status.strip().upper()
+    if status_clean not in ("ACTIVE", "DISCONTINUED", "INACTIVE"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Trạng thái không hợp lệ. Chỉ chấp nhận ACTIVE hoặc DISCONTINUED.",
+        )
+
+    product = None
+    if product_id.isdigit():
+        product = db.query(Product).filter(Product.id == int(product_id)).first()
+    if not product:
+        product = db.query(Product).filter(
+            func.upper(Product.sku) == product_id.upper()
+        ).first()
+
+    mock_p = MOCK_PRODUCTS.get(product_id.upper()) or MOCK_PRODUCTS.get(product_id)
+    if not product and not mock_p:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sản phẩm '{product_id}' không tồn tại.",
+        )
+
+    target_sku = product.sku if product else (mock_p.get("sku") or product_id)
+    if product:
+        product.status = status_clean
+        db.commit()
+        db.refresh(product)
+
+    if mock_p:
+        mock_p["status"] = status_clean
+
+    return {
+        "success": True,
+        "message": f"Cập nhật trạng thái sản phẩm '{target_sku}' thành '{status_clean}' thành công.",
+        "data": {
+            "id": product.id if product else mock_p.get("id"),
+            "sku": target_sku,
+            "status": status_clean,
+        },
     }
 
 

@@ -62,16 +62,16 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       icon: "user-switch",
     },
     {
+      id: "manager-products",
+      title: "Sản phẩm",
+      path: "/manager/products",
+      icon: "boxes-stacked",
+    },
+    {
       id: "manager-categories",
       title: "Nhóm hàng",
       path: "/manager/categories",
       icon: "appstore",
-    },
-    {
-      id: "excel-import",
-      title: "Nhập sản phẩm (Excel)",
-      path: "/manager/products/import",
-      icon: "excel",
     },
     {
       id: "reports",
@@ -108,7 +108,28 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
     }
   }
 
-  // Lọc bỏ các mục không dùng (Bảng giá, Quản lý nhóm hàng cũ) và deduplicate
+  // Đảm bảo mục "Sản phẩm" luôn luôn có mặt trong menu của Sales Manager
+  const hasProducts = baseItems.some(
+    (item) => item.path === "/manager/products" || item.id === "manager-products"
+  );
+  if (!hasProducts) {
+    const insertIdx = baseItems.findIndex(
+      (item) => item.path === "/sales/assignments"
+    );
+    const productItem: MenuItem = {
+      id: "manager-products",
+      title: "Sản phẩm",
+      path: "/manager/products",
+      icon: "boxes-stacked",
+    };
+    if (insertIdx !== -1) {
+      baseItems.splice(insertIdx + 1, 0, productItem);
+    } else {
+      baseItems.push(productItem);
+    }
+  }
+
+  // Lọc bỏ các mục không dùng (Bảng giá, Quản lý nhóm hàng cũ, Nhập sản phẩm Excel) và deduplicate
   const filteredItems = baseItems
     .filter(
       (item) =>
@@ -118,7 +139,10 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
         item.id !== "manager-pricing" &&
         item.path !== "/manager/pricing" &&
         item.title !== "Bảng giá" &&
-        item.title !== "Chính sách giá & Chiết khấu"
+        item.title !== "Chính sách giá & Chiết khấu" &&
+        item.path !== "/manager/products/import" &&
+        item.id !== "excel-import" &&
+        item.title !== "Nhập sản phẩm (Excel)"
     )
     .filter(
       (item, index, self) =>
