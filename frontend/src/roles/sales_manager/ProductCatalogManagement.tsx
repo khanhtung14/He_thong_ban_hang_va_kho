@@ -665,7 +665,7 @@ export const ProductCatalogManagement: React.FC = () => {
                 name="costPrice"
                 rules={[{ required: true, message: "Vui lòng nhập giá vốn" }]}
               >
-                <InputNumber
+                <InputNumber<number>
                   min={0}
                   step={1000}
                   style={{ width: "100%" }}
@@ -677,7 +677,7 @@ export const ProductCatalogManagement: React.FC = () => {
             </Col>
             <Col span={12}>
               <Form.Item label="Giá bán niêm yết (Gợi ý)" name="basePrice">
-                <InputNumber
+                <InputNumber<number>
                   min={0}
                   step={1000}
                   style={{ width: "100%" }}
@@ -723,7 +723,7 @@ export const ProductCatalogManagement: React.FC = () => {
           </Row>
 
           {/* Quy cách đóng gói / Bảng đơn vị quy đổi */}
-          <Divider orientation="left" plain style={{ margin: "12px 0" }}>
+          <Divider titlePlacement="left" plain style={{ margin: "12px 0" }}>
             Quy cách đóng gói & Đơn vị quy đổi
           </Divider>
 

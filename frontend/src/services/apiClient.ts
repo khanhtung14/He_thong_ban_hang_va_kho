@@ -147,8 +147,20 @@ export const fetchNavigationMenu = async (
   return [];
 };
 
-// Thêm interface Product
-export type Product = components["schemas"]["ProductBase"];
+// Interface Product tương thích với ProductBase của backend /api/v1/products
+export interface Product {
+  id?: number;
+  sku: string;
+  name: string;
+  categoryId?: number | null;
+  baseUnit?: string;
+  manageByLot?: boolean;
+  minStock?: number;
+  basePrice?: number | null;
+  costPrice?: number | null;
+  status?: string;
+  imageUrl?: string | null;
+}
 
 // Hàm gọi API lấy danh sách sản phẩm từ backend
 export async function getProducts(): Promise<Product[]> {
