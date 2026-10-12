@@ -13,6 +13,7 @@ import {
   Typography,
   Divider,
   message,
+  Pagination,
 } from "antd";
 import {
   PlusOutlined,
@@ -177,6 +178,9 @@ export const UnitConversionManager: React.FC = () => {
   const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCTS);
   const [selectedSku, setSelectedSku] = useState<string>("SKU-BEV-001");
   const [searchKeyword, setSearchKeyword] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalRecords, setTotalRecords] = useState<number>(INITIAL_PRODUCTS.length);
+  const [loading, setLoading] = useState<boolean>(false);
 
   // Modal cấu hình
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -194,49 +198,83 @@ export const UnitConversionManager: React.FC = () => {
     quantity: 10,
   });
 
-  // Tải danh sách sản phẩm từ backend (nếu có endpoint)
-  useEffect(() => {
-    async function fetchProductList() {
-      try {
-        const res = await authenticatedFetch("/api/v1/products");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            // Map dữ liệu từ server với schema quy đổi
-            const mapped: ProductItem[] = data.map((item: any) => {
-              const base = item.unit || "Cái";
-              return {
-                sku: item.sku,
-                name: item.name,
-                category: item.category || "Hàng hóa",
-                baseUnit: base,
-                conversions: [
-                  {
-                    id: "1",
-                    unitName: base,
-                    conversionRate: 1,
-                    isBaseUnit: true,
-                  },
-                  {
-                    id: "2",
-                    unitName: "Thùng",
-                    conversionRate: 24,
-                    isBaseUnit: false,
-                  },
-                ],
-              };
-            });
-            setProducts(mapped);
+  // Tải danh sách sản phẩm từ backend với phân trang 20 dòng và lọc trên toàn bộ database
+  const fetchProducts = async (targetPage = 1, kw = searchKeyword) => {
+    setLoading(true);
+    try {
+      const limit = 20;
+      const skip = (targetPage - 1) * limit;
+      const params = new URLSearchParams();
+      params.append("page", String(targetPage));
+      params.append("limit", String(limit));
+      params.append("skip", String(skip));
+      if (kw.trim()) {
+        params.append("keyword", kw.trim());
+      }
+
+      const res = await authenticatedFetch(`/api/v1/products?${params.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        const rawList = json.data || (Array.isArray(json) ? json : []);
+        const total = json.pagination?.totalRecords ?? rawList.length;
+
+        if (rawList.length > 0) {
+          const mapped: ProductItem[] = rawList.map((item: any) => {
+            const base = item.baseUnit || item.unit || "Cái";
+            let convs: UnitConversion[] = [];
+            if (item.units && Array.isArray(item.units) && item.units.length > 0) {
+              convs = item.units.map((u: any, idx: number) => ({
+                id: String(u.id || idx + 1),
+                unitName: u.unitName || u.unit_name || base,
+                conversionRate: u.conversionRate ?? u.conversion_rate ?? 1,
+                barcode: u.barcode || "",
+                isBaseUnit: !!(u.isBaseUnit ?? u.is_base_unit),
+              }));
+            } else {
+              convs = [
+                {
+                  id: "1",
+                  unitName: base,
+                  conversionRate: 1,
+                  isBaseUnit: true,
+                },
+                {
+                  id: "2",
+                  unitName: "Thùng",
+                  conversionRate: 24,
+                  isBaseUnit: false,
+                },
+              ];
+            }
+            return {
+              sku: item.sku,
+              name: item.name,
+              category: item.category || "Hàng hóa",
+              baseUnit: base,
+              conversions: convs,
+            };
+          });
+          setProducts(mapped);
+          setTotalRecords(total);
+          setCurrentPage(targetPage);
+          if (!mapped.some((m) => m.sku === selectedSku)) {
             setSelectedSku(mapped[0].sku);
           }
+        } else {
+          setProducts([]);
+          setTotalRecords(total);
+          setCurrentPage(targetPage);
         }
-      } catch (err) {
-        console.warn(
-          "Không kết nối được API sản phẩm, dùng dữ liệu mẫu nội bộ.",
-        );
       }
+    } catch (err) {
+      console.warn("Không kết nối được API sản phẩm, dùng dữ liệu mẫu nội bộ.");
+    } finally {
+      setLoading(false);
     }
-    fetchProductList();
+  };
+
+  useEffect(() => {
+    fetchProducts(1, "");
   }, []);
 
   // Lấy sản phẩm đang được người dùng bấm chọn xem chi tiết
@@ -312,13 +350,6 @@ export const UnitConversionManager: React.FC = () => {
     }
   };
 
-  // Lọc sản phẩm theo từ khóa tìm kiếm
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchKeyword.toLowerCase()),
-  );
-
   // Cột bảng danh sách sản phẩm
   const productColumns = [
     {
@@ -389,26 +420,44 @@ export const UnitConversionManager: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <InboxOutlined style={{ color: "#2563eb", fontSize: 20 }} />
             <span>
-              Danh mục sản phẩm kho ({filteredProducts.length} mặt hàng)
+              Danh mục sản phẩm kho ({totalRecords} mặt hàng)
             </span>
           </div>
         }
         extra={
-          <Input
-            placeholder="Tìm theo tên hoặc mã SKU..."
-            prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-            style={{ width: 280 }}
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            allowClear
-          />
+          <Space>
+            <Input
+              placeholder="Tìm theo tên hoặc mã SKU..."
+              prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+              style={{ width: 240 }}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              onPressEnter={() => fetchProducts(1, searchKeyword)}
+              allowClear
+            />
+            <Button
+              type="primary"
+              onClick={() => fetchProducts(1, searchKeyword)}
+            >
+              Lọc
+            </Button>
+            <Button
+              onClick={() => {
+                setSearchKeyword("");
+                fetchProducts(1, "");
+              }}
+            >
+              Đặt lại
+            </Button>
+          </Space>
         }
       >
         <Table
-          dataSource={filteredProducts}
+          dataSource={products}
           columns={productColumns}
           rowKey="sku"
-          pagination={{ pageSize: 4 }}
+          loading={loading}
+          pagination={false}
           bordered
           size="middle"
           rowSelection={{
@@ -440,6 +489,31 @@ export const UnitConversionManager: React.FC = () => {
             style: { cursor: "pointer" },
           })}
         />
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginTop: 16,
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <Text type="secondary">
+            Hiển thị <strong>{products.length}</strong> sản phẩm trên trang này | Tổng cộng:{" "}
+            <strong>{totalRecords}</strong> sản phẩm ({Math.ceil(totalRecords / 20) || 1} trang)
+          </Text>
+          <Pagination
+            current={currentPage}
+            pageSize={20}
+            total={totalRecords}
+            showSizeChanger={false}
+            onChange={(p) => {
+              fetchProducts(p, searchKeyword);
+            }}
+          />
+        </div>
       </Card>
 
       {/* 2. KHỐI CHI TIẾT ĐƠN VỊ QUY ĐỔI CỦA SẢN PHẨM ĐANG CHỌN */}

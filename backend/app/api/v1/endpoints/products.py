@@ -15,7 +15,20 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.database import get_db
-from app.models.models import Product, Category, ProductUnit, OrderItem, InventoryTransaction, RoleCode
+from app.models.models import (
+    Product,
+    Category,
+    ProductUnit,
+    RoleCode,
+    OrderItem,
+    InventoryTransaction,
+    WarehouseReceiptItem,
+    WarehouseTransferItem,
+    WarehouseAuditItem,
+    DispatchItem,
+    ReturnOrderItem,
+    InventoryAdjustmentItem,
+)
 from app.api.v1.endpoints.rbac import (
     PERM_PRODUCTS_VIEW,
     PERM_PRODUCTS_MANAGE,
@@ -25,6 +38,7 @@ from app.api.v1.endpoints.rbac import (
     normalize_role,
     require_permissions,
     sanitize_financial_data,
+    can_view_financials,
 )
 
 class ProductUnitResponse(BaseModel):
@@ -45,6 +59,40 @@ class ProductUnitRequest(BaseModel):
         if not value:
             raise ValueError("Tên đơn vị không được để trống.")
         return value
+
+class ProductUnitInput(BaseModel):
+    unitName: str
+    conversionRate: float = 1.0
+    barcode: Optional[str] = None
+    isBaseUnit: bool = False
+
+class ProductCreateRequest(BaseModel):
+    sku: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=255)
+    categoryId: Optional[int] = None
+    baseUnit: str = Field(min_length=1, max_length=20)
+    manageByLot: bool = False
+    minStock: int = 0
+    basePrice: Optional[float] = 0.0
+    costPrice: Optional[float] = 0.0
+    imageUrl: Optional[str] = None
+    status: str = "ACTIVE"
+    units: Optional[list[ProductUnitInput]] = None
+
+class ProductUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    categoryId: Optional[int] = None
+    baseUnit: Optional[str] = None
+    manageByLot: Optional[bool] = None
+    minStock: Optional[int] = None
+    basePrice: Optional[float] = None
+    costPrice: Optional[float] = None
+    imageUrl: Optional[str] = None
+    status: Optional[str] = None
+    units: Optional[list[ProductUnitInput]] = None
+
+class ProductStatusUpdateRequest(BaseModel):
+    status: str = Field(pattern="^(ACTIVE|INACTIVE)$")
 
 class ProductBase(BaseModel):
     id: int
@@ -555,11 +603,14 @@ def list_products(
     status_filter: Optional[str] = Query(None, alias="status"),
     page: Optional[int] = None,
     limit: Optional[int] = None,
+    skip: Optional[int] = None,
+    offset: Optional[int] = None,
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
-    """Get list of products."""
+    """Get list of products with optional server-side filtering and pagination."""
     effective_cat_id = category_id if category_id is not None else category_id_legacy
+    effective_offset = offset if offset is not None else skip
     
     if db.query(Product).count() > 0:
         query = db.query(Product)
@@ -573,7 +624,9 @@ def list_products(
             query = query.filter(Product.status == status_filter)
             
         total_records = query.count()
-        if page is not None and limit is not None:
+        if effective_offset is not None and limit is not None:
+            products = query.offset(effective_offset).limit(limit).all()
+        elif page is not None and limit is not None:
             products = query.offset((page - 1) * limit).limit(limit).all()
         else:
             products = query.all()
@@ -611,23 +664,28 @@ def list_products(
             kw = keyword.lower()
             mock_items = [p for p in mock_items if kw in p.get("name", "").lower() or kw in p.get("sku", "").lower()]
         total_records = len(mock_items)
-        if page is not None and limit is not None:
+        if effective_offset is not None and limit is not None:
+            mock_items = mock_items[effective_offset : effective_offset + limit]
+        elif page is not None and limit is not None:
             mock_items = mock_items[(page - 1) * limit : page * limit]
         products_list = [p.copy() for p in mock_items]
 
     sanitized = sanitize_financial_data(products_list, user)
     
-    if page is not None and limit is not None:
+    if (effective_offset is not None and limit is not None) or (page is not None and limit is not None):
+        res_limit = limit if limit is not None else 20
+        res_page = page if page is not None else (effective_offset // res_limit + 1 if res_limit > 0 else 1)
+        total_pages = (total_records + res_limit - 1) // res_limit if res_limit > 0 else 1
         return {
             "success": True,
             "code": 200,
             "message": "Thành công",
             "data": sanitized,
             "pagination": {
-                "page": page,
-                "limit": limit,
+                "page": res_page,
+                "limit": res_limit,
                 "totalRecords": total_records,
-                "totalPages": (total_records + limit - 1) // limit if limit > 0 else 1,
+                "totalPages": total_pages,
             },
         }
     return sanitized
@@ -963,14 +1021,19 @@ def check_has_transactions(product_id: Optional[int], sku: str, db: Session) -> 
             InventoryTransaction.product_id == product_id
         ).first() is not None:
             return True
-        try:
-            from app.models.models import ReturnOrderItem
-            if db.query(ReturnOrderItem).filter(
-                ReturnOrderItem.product_id == product_id
-            ).first() is not None:
-                return True
-        except Exception:
-            pass
+        for model in (
+            WarehouseReceiptItem,
+            WarehouseTransferItem,
+            WarehouseAuditItem,
+            DispatchItem,
+            ReturnOrderItem,
+            InventoryAdjustmentItem,
+        ):
+            try:
+                if db.query(model).filter(model.product_id == product_id).first() is not None:
+                    return True
+            except Exception:
+                pass
         try:
             from app.models.models import InventoryStock
             if db.query(InventoryStock).filter(
@@ -1002,6 +1065,7 @@ class ProductCreateRequest(BaseModel):
     manage_by_lot: bool = Field(default=False, alias="manageByLot")
     status: str = Field(default="ACTIVE")
     description: Optional[str] = None
+    units: Optional[list[Any]] = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1018,6 +1082,7 @@ class ProductUpdateRequest(BaseModel):
     manage_by_lot: Optional[bool] = Field(None, alias="manageByLot")
     status: Optional[str] = None
     description: Optional[str] = None
+    units: Optional[list[Any]] = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1093,6 +1158,23 @@ def create_product(
         is_base_unit=True,
     )
     db.add(base_unit_entry)
+
+    # Additional units if provided
+    if getattr(payload, "units", None):
+        for u in payload.units:
+            uname = getattr(u, "unitName", None) or (u.get("unitName") if isinstance(u, dict) else None) or getattr(u, "unit_name", None) or (u.get("unit_name") if isinstance(u, dict) else None)
+            if uname and uname.strip() != new_prod.base_unit:
+                crate = getattr(u, "conversionRate", None) or (u.get("conversionRate") if isinstance(u, dict) else None) or getattr(u, "conversion_rate", 1.0) or (u.get("conversion_rate") if isinstance(u, dict) else 1.0)
+                bcode = getattr(u, "barcode", None) or (u.get("barcode") if isinstance(u, dict) else None)
+                extra_unit = ProductUnit(
+                    product_id=new_prod.id,
+                    unit_name=uname.strip(),
+                    conversion_rate=float(crate) if crate and float(crate) > 0 else 1.0,
+                    barcode=bcode,
+                    is_base_unit=False,
+                )
+                db.add(extra_unit)
+
     db.commit()
     db.refresh(new_prod)
 
@@ -1355,5 +1437,3 @@ def update_product_status(
             "status": status_clean,
         },
     }
-
-
