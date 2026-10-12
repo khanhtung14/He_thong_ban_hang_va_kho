@@ -8,6 +8,7 @@ import {
   AppstoreOutlined,
   HistoryOutlined,
   LogoutOutlined,
+  FileExcelOutlined,
 } from "@ant-design/icons";
 
 const { Sider } = Layout;
@@ -34,6 +35,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       key: "users",
       icon: <TeamOutlined />,
       label: "Quản lý tài khoản",
+    },
+    {
+      key: "import-users",
+      icon: <FileExcelOutlined />,
+      label: "Nhập tài khoản (Excel)",
     },
     {
       key: "rbac",

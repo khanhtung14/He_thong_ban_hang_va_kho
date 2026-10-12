@@ -28,6 +28,7 @@ const roleWorkspacePaths = [
   "/accounting/debt-book",
   "/accounting/invoices",
   "/admin/users",
+  "/admin/users/import",
 ];
 
 export default function App() {

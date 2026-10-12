@@ -6,6 +6,7 @@ import ProfileModal from "../../components/ProfileModal";
 import ChangePasswordModal from "../../components/ChangePasswordModal";
 import AdminOverview from "./AdminOverView";
 import AdminUsers from "./AdminUsers";
+import UserExcelImport from "./UserExcelImport";
 import AdminRBAC from "./AdminRBAC";
 import AdminConfiguration from "./AdminConfiguration";
 import CreateUserModal from "./CreateUser";
@@ -14,15 +15,32 @@ import AdminAudit from "./AdminAudit";
 const { Content } = Layout;
 
 export const AdminDashboard: React.FC = () => {
-  // Quản lý tab view trực tiếp bằng state như Sales
-  const [currentView, setCurrentView] = useState("overview");
+  // Quản lý tab view trực tiếp bằng state
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const viewParam = urlParams.get("view");
+      if (viewParam) return viewParam;
+      if (window.location.pathname === "/admin/users/import") return "import-users";
+    }
+    return "overview";
+  });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
 
   const renderCurrentView = () => {
     switch (currentView) {
+      case "import-users":
+        return <UserExcelImport />;
       case "users":
-        return <AdminUsers />;
+        return (
+          <AdminUsers
+            onNavigateToImport={() => {
+              setCurrentView("import-users");
+              window.history.pushState(null, "", "/admin/users?view=import-users");
+            }}
+          />
+        );
       case "rbac":
         return <AdminRBAC />;
       case "create-user":

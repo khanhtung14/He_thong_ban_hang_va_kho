@@ -37,7 +37,11 @@ interface UserRow {
   assigned_dealers_count?: number;
 }
 
-export const AdminUsers: React.FC = () => {
+export interface AdminUsersProps {
+  onNavigateToImport?: () => void;
+}
+
+export const AdminUsers: React.FC<AdminUsersProps> = ({ onNavigateToImport }) => {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -265,7 +269,13 @@ export const AdminUsers: React.FC = () => {
         <Space>
           <Button
             icon={<FileExcelOutlined />}
-            onClick={() => setIsImportModalOpen(true)}
+            onClick={() => {
+              if (onNavigateToImport) {
+                onNavigateToImport();
+              } else {
+                window.location.href = "/admin/users/import";
+              }
+            }}
             style={{ borderRadius: 8 }}
           >
             Nhập người dùng từ Excel

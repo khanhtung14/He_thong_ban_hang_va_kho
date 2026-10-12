@@ -34,6 +34,7 @@ const roleByPath: Record<string, RoleKey> = {
   "/accounting/debt-book": "accountant",
   "/accounting/invoices": "accountant",
   "/admin/users": "admin",
+  "/admin/users/import": "admin",
   "/admin/territory-handover": "admin",
   "/admin/audit-logs": "admin",
 };
@@ -60,6 +61,7 @@ const allowedRolesByPath: Record<string, RoleKey[]> = {
   "/accounting/debt-book": ["accountant", "admin"],
   "/accounting/invoices": ["accountant", "admin"],
   "/admin/users": ["admin"],
+  "/admin/users/import": ["admin"],
   "/admin/territory-handover": ["admin"],
   "/admin/audit-logs": ["admin"],
 };
