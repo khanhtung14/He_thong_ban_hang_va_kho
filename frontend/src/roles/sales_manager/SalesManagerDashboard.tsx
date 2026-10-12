@@ -19,6 +19,7 @@ import CreatePriceListModal from "./CreatePriceListModal";
 import ExportReportModal from "./ExportReportModal";
 import ProductExcelImport from "./ProductExcelImport";
 import CategoryManagement from "./CategoryManagement";
+import ProductCatalogManagement from "./ProductCatalogManagement";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -153,6 +154,12 @@ export const SalesManagerDashboard: React.FC = () => {
                   icon: "appstore",
                 },
               ]),
+          {
+            id: "manager-products",
+            title: "Danh mục sản phẩm",
+            path: "/manager/products",
+            icon: "boxes-stacked",
+          },
           {
             id: "excel-import",
             title: "Nhập sản phẩm (Excel)",
@@ -355,6 +362,10 @@ export const SalesManagerDashboard: React.FC = () => {
           ) : currentPath === "/manager/categories" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <CategoryManagement />
+            </div>
+          ) : currentPath === "/manager/products" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <ProductCatalogManagement />
             </div>
           ) : (
             /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */

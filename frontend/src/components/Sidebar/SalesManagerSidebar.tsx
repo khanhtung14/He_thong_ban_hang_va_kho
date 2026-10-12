@@ -73,6 +73,12 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       icon: "appstore",
     },
     {
+      id: "manager-products",
+      title: "Danh mục sản phẩm",
+      path: "/manager/products",
+      icon: "boxes-stacked",
+    },
+    {
       id: "excel-import",
       title: "Nhập sản phẩm (Excel)",
       path: "/manager/products/import",
