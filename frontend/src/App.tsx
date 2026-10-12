@@ -28,6 +28,11 @@ const roleWorkspacePaths = [
   "/warehouse/dashboard",
   "/accounting/debt-book",
   "/accounting/invoices",
+  "/accounting/agencies",
+  "/accountant/agencies",
+  "/accounting/customers",
+  "/accountant/customers",
+  "/accounting/agency-locks",
   "/admin/users",
 ];
 

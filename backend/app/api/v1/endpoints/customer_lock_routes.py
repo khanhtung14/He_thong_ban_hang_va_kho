@@ -11,7 +11,7 @@ Yêu cầu nghiệp vụ:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -69,25 +69,40 @@ class CustomerResponse(BaseModel):
     code: str
     name: str
     tax_code: Optional[str] = None
+    taxCode: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
     sales_rep_id: Optional[int] = None
+    salesRepId: Optional[int] = None
     territory_id: Optional[int] = None
+    regionId: Optional[int] = None
     region: Optional[str] = None
     customer_group: str = "RETAIL"
-    is_active: bool
-    is_locked: bool
+    customerGroup: str = "RETAIL"
+    person_in_charge: Optional[Union[str, int]] = None
+    status: str = "ACTIVE"
+    is_active: bool = True
+    isActive: bool = True
+    is_locked: bool = False
+    isLocked: bool = False
     lock_reason: Optional[str] = None
+    lockReason: Optional[str] = None
     locked_at: Optional[datetime] = None
     locked_by_id: Optional[int] = None
     current_debt: float = 0.0
+    currentDebt: float = 0.0
     debt_limit: float = 0.0
+    creditLimit: float = 0.0
     overdue_days: int = 0
     pending_orders_count: int = 0  # Số đơn hàng dở dang
+    transactions_count: int = 0
+    price_list: Optional[Any] = None
+    effective_price_list: Optional[Any] = None
     created_at: Optional[datetime] = None
+    createdAt: Optional[Any] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 def _customer_group_from_value(value: Any) -> str:
@@ -237,103 +252,66 @@ def _check_and_build_warning(order: Order, customer: Optional[Customer]) -> tupl
 # Customer Endpoints (SCRUM-85)
 # ---------------------------------------------------------
 
-@router.get("/customers", response_model=List[CustomerResponse])
+@router.get("/customers")
 def list_customers(
     is_locked: Optional[bool] = Query(None, description="Lọc theo trạng thái khóa"),
     search: Optional[str] = Query(None, description="Tìm kiếm theo mã hoặc tên"),
     sales_rep_id: Optional[int] = Query(None, description="Lọc theo ID NVKD phụ trách"),
     region: Optional[str] = Query(None, description="Lọc theo khu vực"),
+    region_id: Optional[int] = Query(None, alias="regionId"),
+    customer_group: Optional[str] = Query(None, alias="customerGroup"),
+    is_active: Optional[bool] = Query(None),
+    status: Optional[str] = Query(None),
+    keyword: Optional[str] = Query(None),
+    page: Optional[int] = Query(None, ge=1),
+    limit: Optional[int] = Query(None, ge=1),
     db: Session = Depends(get_db),
     user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
 ):
-    """Lấy danh sách đại lý cùng trạng thái khóa và số lượng đơn dở dang.
-    
-    Phân quyền:
-    - Nếu role là sales (nhân viên kinh doanh), chỉ truy vấn và trả về các đại lý do chính user đó phụ trách.
-    - Nếu role là sales_manager hoặc admin, xem được toàn bộ đại lý.
-    """
-    query = select(Customer)
-    if is_locked is not None:
-        query = query.where(Customer.is_locked == is_locked)
-    if search and isinstance(search, str):
-        kw = f"%{search.strip()}%"
-        query = query.where((Customer.code.ilike(kw)) | (Customer.name.ilike(kw)))
-    if isinstance(region, str) and region.strip():
-        query = query.where(Customer.region == region.strip())
-
-    if isinstance(user, AuthenticatedUser):
-        norm_role = normalize_role(user.role)
-        if norm_role == RoleCode.SALES_REP.value:
-            rep_id = user.id
-            if rep_id is None:
-                db_user = db.execute(select(User).where(User.username == user.username)).scalar_one_or_none()
-                if db_user:
-                    rep_id = db_user.id
-            if rep_id is not None:
-                query = query.where(Customer.sales_rep_id == rep_id)
-            else:
-                query = query.where(Customer.sales_rep_id == -1)
-        elif isinstance(sales_rep_id, int):
-            query = query.where(Customer.sales_rep_id == sales_rep_id)
-    elif isinstance(sales_rep_id, int):
-        query = query.where(Customer.sales_rep_id == sales_rep_id)
-
-    customers = db.execute(query.order_by(Customer.id.asc())).scalars().all()
-    results = []
-    for c in customers:
-        pending_count = (
-            db.query(func.count(Order.id))
-            .filter(Order.customer_id == c.id, Order.status.in_(INCOMPLETE_STATUSES))
-            .scalar()
-            or 0
-        )
-        debt_record = db.query(CustomerDebt).filter(CustomerDebt.customer_id == c.id).first()
-        res = CustomerResponse.model_validate(c)
-        res.pending_orders_count = pending_count
-        res.debt_limit = getattr(c, "credit_limit", 0.0)
-        if debt_record:
-            res.current_debt = debt_record.total_debt
-        results.append(res)
-
-    return results
+    """Lấy danh sách đại lý cùng trạng thái khóa và số lượng đơn dở dang."""
+    from app.api.v1.endpoints.customers import handle_list_customers
+    return handle_list_customers(
+        keyword=keyword,
+        search=search,
+        sales_rep_id=sales_rep_id,
+        region=region,
+        region_id=region_id,
+        customer_group=customer_group,
+        is_active=is_active,
+        status_filter=status,
+        is_locked=is_locked,
+        page=page,
+        limit=limit,
+        db=db,
+        user=user,
+    )
 
 
-@router.post("/customers", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/customers", status_code=status.HTTP_201_CREATED)
 def create_customer(
     payload: CustomerCreateRequest,
     db: Session = Depends(get_db),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
 ):
     """Tạo mới đại lý."""
-    code = payload.code.strip()
-    existing = db.execute(select(Customer).where(Customer.code == code)).scalar_one_or_none()
-    if existing:
-        raise HTTPException(status_code=400, detail="Mã đại lý đã tồn tại!")
-
-    if payload.tax_code and payload.tax_code.strip():
-        existing_by_tax = db.execute(select(Customer).where(Customer.tax_code == payload.tax_code.strip())).scalar_one_or_none()
-        if existing_by_tax:
-            raise HTTPException(status_code=400, detail="Mã số thuế đã tồn tại!")
-
-    customer = Customer(
-        code=code,
-        name=payload.name.strip(),
-        tax_code=payload.tax_code.strip() if payload.tax_code else None,
-        phone=payload.phone.strip() if payload.phone else None,
-        email=payload.email.strip() if payload.email else None,
-        address=payload.address.strip() if payload.address else None,
-        sales_rep_id=payload.sales_rep_id,
+    from app.api.v1.endpoints.customers import CustomerCreate, handle_create_customer
+    p = CustomerCreate(
+        code=payload.code,
+        name=payload.name,
+        tax_code=payload.tax_code,
+        customer_group=payload.customer_group,
+        customer_group_id=payload.customer_group_id,
+        region=payload.region,
         territory_id=payload.territory_id,
-        region=payload.region.strip() if payload.region else None,
-        customer_group=_customer_group_from_value(payload.customer_group or payload.customer_group_id),
-        is_active=True,
-        is_locked=False,
+        person_in_charge=getattr(payload, "person_in_charge", None),
+        sales_rep_id=payload.sales_rep_id,
+        status=getattr(payload, "status", "ACTIVE"),
+        is_active=getattr(payload, "is_active", True),
+        phone=payload.phone,
+        email=payload.email,
+        address=payload.address,
     )
-    db.add(customer)
-    db.commit()
-    db.refresh(customer)
-    res = CustomerResponse.model_validate(customer)
-    res.pending_orders_count = 0
-    return res
+    return handle_create_customer(p, db, user)
 
 
 @router.get("/customers/{customer_id}", response_model=CustomerResponse)
@@ -349,9 +327,59 @@ def get_customer(customer_id: int, db: Session = Depends(get_db)):
         .scalar()
         or 0
     )
+    from app.api.v1.endpoints.customers import get_customer_transactions_count, get_effective_price_list_for_customer
+    tx_count = get_customer_transactions_count(db, customer.id)
+    price_list = get_effective_price_list_for_customer(db, customer.customer_group)
+
     res = CustomerResponse.model_validate(customer)
     res.pending_orders_count = pending_count
+    res.transactions_count = tx_count
+    res.status = "ACTIVE" if customer.is_active else "INACTIVE"
+    res.price_list = price_list
+    res.effective_price_list = price_list
+    if customer.sales_rep:
+        res.person_in_charge = customer.sales_rep.full_name
+    elif customer.sales_rep_id:
+        res.person_in_charge = customer.sales_rep_id
     return res
+
+
+from app.api.v1.endpoints.customers import (
+    CustomerUpdate,
+    CustomerStatusUpdate,
+    handle_update_customer,
+    handle_update_customer_status,
+    handle_delete_customer,
+)
+
+
+@router.put("/customers/{customer_id}")
+def update_customer_in_lock_router(
+    customer_id: int,
+    payload: CustomerUpdate,
+    db: Session = Depends(get_db),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+) -> Any:
+    return handle_update_customer(customer_id, payload, db, user)
+
+
+@router.patch("/customers/{customer_id}/status")
+def update_customer_status_in_lock_router(
+    customer_id: int,
+    payload: CustomerStatusUpdate,
+    db: Session = Depends(get_db),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+) -> Any:
+    return handle_update_customer_status(customer_id, payload, db, user)
+
+
+@router.delete("/customers/{customer_id}")
+def delete_customer_in_lock_router(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+) -> Any:
+    return handle_delete_customer(customer_id, db, user)
 
 
 class CustomerTransactionStatusRequest(BaseModel):

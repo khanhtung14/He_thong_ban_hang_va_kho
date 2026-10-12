@@ -216,7 +216,7 @@ try:
         territories_router,
         roles_router,
     )
-    from app.api.v1.endpoints.customers import router as customers_router
+    from app.api.v1.endpoints.customers import router as customers_router, agencies_router
     from app.api.v1.endpoints.orders import router as orders_router
     from app.api.v1.endpoints.invoices import router as invoices_router
     from app.api.v1.endpoints.payments import router as payments_router
@@ -227,6 +227,7 @@ try:
     app.include_router(territories_router)
     app.include_router(roles_router)
     app.include_router(customers_router)
+    app.include_router(agencies_router)
     app.include_router(orders_router)
     app.include_router(invoices_router)
     app.include_router(payments_router)
@@ -297,6 +298,11 @@ def admin_create_user_page():
 @app.get("/warehouse/dashboard", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/debt-book", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/invoices", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/agencies", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accountant/agencies", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/customers", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accountant/customers", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/agency-locks", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/admin/audit-logs", response_class=HTMLResponse, include_in_schema=False)
 def role_workspace_page():
     """Serve the React role workspace selected by the login redirect."""
