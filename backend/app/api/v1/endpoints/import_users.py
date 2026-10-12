@@ -224,6 +224,8 @@ def validate_rows(rows, db: Optional[Session] = None):
     existing_usernames = set()
     existing_emails = set()
     existing_phones = set()
+    active_warehouses = []
+    all_territories = []
 
     if db is not None:
         db_usernames = db.query(User.username).filter(User.username.isnot(None)).all()
@@ -234,6 +236,9 @@ def validate_rows(rows, db: Optional[Session] = None):
 
         db_phones = db.query(User.phone).filter(User.phone.isnot(None)).all()
         existing_phones = {p[0].strip() for p in db_phones if p[0]}
+
+        active_warehouses = db.query(Warehouse).filter(Warehouse.is_active.is_(True)).all()
+        all_territories = db.query(Territory).all()
 
     for item in rows:
         row_number = item["row_number"]
@@ -283,6 +288,30 @@ def validate_rows(rows, db: Optional[Session] = None):
         if data.get("role") in ("warehouse_staff", "warehouse_manager"):
             if not warehouse:
                 errors.append("Nhân sự bộ phận kho bắt buộc phải được gán Kho phụ trách.")
+
+        # Kiểm tra sự tồn tại của kho phụ trách nếu có nhập
+        if warehouse and db is not None:
+            wh_match = any(
+                warehouse.lower() == w.code.lower()
+                or warehouse.lower() == w.name.lower()
+                or warehouse.lower() in w.name.lower()
+                or warehouse.lower() in w.code.lower()
+                for w in active_warehouses
+            )
+            if not wh_match:
+                errors.append(f"Kho phụ trách '{warehouse}' không tồn tại hoặc đã ngừng hoạt động trong hệ thống.")
+
+        # Kiểm tra sự tồn tại của địa bàn hoạt động nếu có nhập
+        if region and db is not None:
+            terr_match = any(
+                region.lower() == t.code.lower()
+                or region.lower() == t.name.lower()
+                or region.lower() in t.name.lower()
+                or region.lower() in t.code.lower()
+                for t in all_territories
+            )
+            if not terr_match:
+                errors.append(f"Địa bàn hoạt động '{region}' không tồn tại trong hệ thống.")
 
         # Kiểm tra trùng tên đăng nhập
         if username:
@@ -428,10 +457,11 @@ async def import_users(
             wh_obj = (
                 db.query(Warehouse)
                 .filter(
+                    Warehouse.is_active.is_(True),
                     or_(
                         Warehouse.name.ilike(f"%{warehouse_name}%"),
                         Warehouse.code.ilike(f"%{warehouse_name}%"),
-                    )
+                    ),
                 )
                 .first()
             )
