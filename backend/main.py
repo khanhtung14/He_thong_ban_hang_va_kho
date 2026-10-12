@@ -29,6 +29,7 @@ from app.api.v1.endpoints.user_routes import router as user_router
 from app.api.v1.endpoints.users import compat_router as users_compat_router, router as users_router
 from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_router
 from app.api.v1.endpoints.import_users import router as import_users_router
+from app.api.v1.endpoints.suppliers import compat_router as suppliers_compat_router, router as suppliers_router
 
 
 
@@ -57,7 +58,12 @@ def migrate_profile_database() -> None:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=[
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:5174", "http://127.0.0.1:5174",
+        "http://localhost:8000", "http://127.0.0.1:8000",
+        "http://localhost:8003", "http://127.0.0.1:8003",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -170,6 +176,8 @@ app.include_router(users_compat_router)
 app.include_router(user_router)
 app.include_router(profile_router)
 app.include_router(customer_lock_router)
+app.include_router(suppliers_router)
+app.include_router(suppliers_compat_router)
 try:
     from app.api.v1.endpoints.warehouse import (
         router as warehouse_router,
@@ -254,6 +262,7 @@ def admin_create_user_page():
 @app.get("/warehouse/picking", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/warehouse/receiving", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/warehouse/inventory", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/suppliers", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/warehouse/dashboard", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/debt-book", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/invoices", response_class=HTMLResponse, include_in_schema=False)
@@ -288,6 +297,8 @@ def get_reset_password_page():
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    port = int(os.environ.get("PORT", 8003))
+    uvicorn.run(app, host="127.0.0.1", port=port)

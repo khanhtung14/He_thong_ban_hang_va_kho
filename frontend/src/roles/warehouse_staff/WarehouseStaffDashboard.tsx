@@ -6,6 +6,7 @@ import ProfileModal from "../../components/ProfileModal";
 import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSidebar";
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
+import SupplierManagement from "./SupplierManagement";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -22,7 +23,12 @@ export const WarehouseStaffDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("scan");
+  const [selectedKey, setSelectedKey] = useState<string>(() => {
+    if (typeof window !== "undefined" && window.location.pathname === "/warehouse/suppliers") {
+      return "suppliers";
+    }
+    return "suppliers";
+  });
   const [, setLoading] = useState(false);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -105,6 +111,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
+          {selectedKey === "suppliers" && <SupplierManagement />}
           {selectedKey === "unit-conversion" && <UnitConversionManager />}
 
           {/* Các tab khác */}
