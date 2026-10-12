@@ -7,7 +7,7 @@ import os
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["TESTING"] = "1"
 for _smtp_key in ("SMTP_HOST", "SMTP_USER", "SMTP_USERNAME", "SMTP_PASSWORD"):
-    os.environ.pop(_smtp_key, None)
+    os.environ[_smtp_key] = ""
 
 import bcrypt
 import pytest

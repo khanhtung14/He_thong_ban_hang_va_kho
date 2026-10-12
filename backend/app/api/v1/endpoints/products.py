@@ -1,6 +1,8 @@
 """Products endpoints with RBAC enforcement."""
+from __future__ import annotations
 
-from typing import Any, List, Optional
+from datetime import datetime
+from typing import Any, List, Optional, Union
 import io
 import math
 import re
@@ -14,7 +16,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.database import get_db
-from app.models.models import Product, Category, ProductUnit
+from app.models.models import Product, Category, ProductUnit, ProductPriceHistory
 from app.api.v1.endpoints.rbac import (
     PERM_PRODUCTS_VIEW,
     PERM_PRODUCTS_MANAGE,
@@ -22,7 +24,14 @@ from app.api.v1.endpoints.rbac import (
     PERM_PRODUCTS_IMPORT,
     AuthenticatedUser,
     require_permissions,
+    require_roles,
     sanitize_financial_data,
+)
+from app.services.price_history_service import (
+    get_price_history,
+    parse_date_boundary,
+    record_price_history,
+    serialize_price_history,
 )
 
 class ProductUnitResponse(BaseModel):
@@ -320,7 +329,11 @@ def _annotate_import_rows(rows: list[dict[str, Any]], existing_skus: set[str]) -
     return result
 
 
-def _apply_import_rows(rows: list[dict[str, Any]], db: Session) -> dict[str, Any]:
+def _apply_import_rows(
+    rows: list[dict[str, Any]],
+    db: Session,
+    changed_by: Optional[str] = None,
+) -> dict[str, Any]:
     created_count = 0
     updated_count = 0
     category_cache: dict[str, Category] = {}
@@ -358,7 +371,20 @@ def _apply_import_rows(rows: list[dict[str, Any]], db: Session) -> dict[str, Any
             if category_obj:
                 existing_product.category_id = category_obj.id
             if item.get("sale_price") is not None:
-                existing_product.base_price = float(item["sale_price"])
+                new_p = float(item["sale_price"])
+                old_p = existing_product.base_price
+                if old_p != new_p:
+                    existing_product._suppress_auto_price_history = True
+                    existing_product.base_price = new_p
+                    record_price_history(
+                        db=db,
+                        product_id=existing_product.id,
+                        old_price=old_p,
+                        new_price=new_p,
+                        changed_by=changed_by or "System",
+                        note="Cập nhật giá bán qua import Excel",
+                        reason="Cập nhật giá bán qua import Excel",
+                    )
             if item.get("cost_price") is not None:
                 existing_product.cost_price = float(item["cost_price"])
             if item.get("unit"):
@@ -380,6 +406,17 @@ def _apply_import_rows(rows: list[dict[str, Any]], db: Session) -> dict[str, Any
             )
             db.add(new_product)
             db.flush()
+
+            if new_product.base_price > 0:
+                record_price_history(
+                    db=db,
+                    product_id=new_product.id,
+                    old_price=None,
+                    new_price=new_product.base_price,
+                    changed_by=changed_by or "System",
+                    note="Khởi tạo giá sản phẩm mới qua import",
+                    reason="Khởi tạo giá sản phẩm mới qua import",
+                )
 
             base_unit_entry = ProductUnit(
                 product_id=new_product.id,
@@ -496,7 +533,7 @@ async def commit_product_import(
                 status_code=422,
                 detail={"message": "Không có dữ liệu nào được lưu vì tệp còn dòng lỗi.", "rows": rows},
             )
-        return _apply_import_rows(rows, db)
+        return _apply_import_rows(rows, db, changed_by=user.username)
 
     try:
         body = await request.json()
@@ -522,7 +559,7 @@ async def commit_product_import(
             detail="Thiếu dữ liệu session_id hoặc danh sách items để lưu.",
         )
 
-    return _apply_import_rows(items_to_commit, db)
+    return _apply_import_rows(items_to_commit, db, changed_by=user.username)
 
 
 @router.post("/import-excel")
@@ -541,7 +578,7 @@ async def import_excel_direct(
             status_code=422,
             detail={"message": "Không thể import vì tệp chứa dòng lỗi.", "rows": rows},
         )
-    return _apply_import_rows(rows, db)
+    return _apply_import_rows(rows, db, changed_by=user.username)
 
 
 
@@ -852,5 +889,185 @@ def move_product_category(
         "new_category_id": target_cat["id"],
         "new_category_name": target_cat["name"],
     }
+
+
+class UpdateProductPriceRequest(BaseModel):
+    price: float = Field(..., ge=0, description="Giá bán mới của sản phẩm")
+    note: Optional[str] = None
+    reason: Optional[str] = None
+    effective_date: Optional[Union[datetime, str]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            p = data.get("price")
+            if p is None:
+                p = (
+                    data.get("new_price")
+                    or data.get("newPrice")
+                    or data.get("sale_price")
+                    or data.get("base_price")
+                )
+            if p is not None:
+                data["price"] = float(p)
+            note_val = data.get("note") or data.get("reason")
+            if note_val:
+                data["note"] = note_val
+                data["reason"] = note_val
+            eff_val = (
+                data.get("effective_date")
+                or data.get("effectiveDate")
+                or data.get("changed_at")
+                or data.get("changedAt")
+            )
+            if eff_val:
+                data["effective_date"] = eff_val
+        return data
+
+
+UpdateProductPriceRequest.model_rebuild()
+
+
+def _resolve_product(db: Session, id_or_sku: Union[int, str]) -> Optional[Product]:
+    id_str = str(id_or_sku).strip()
+    product = None
+    if id_str.isdigit():
+        product = db.query(Product).filter(Product.id == int(id_str)).first()
+    if not product:
+        product = db.query(Product).filter(
+            (Product.sku == id_str) | (Product.sku == id_str.upper())
+        ).first()
+    if not product:
+        mock_p = MOCK_PRODUCTS.get(id_str.upper()) or MOCK_PRODUCTS.get(id_str)
+        if mock_p:
+            sku = mock_p.get("sku", id_str.upper())
+            product = db.query(Product).filter(Product.sku == sku).first()
+            if not product:
+                product = Product(
+                    sku=sku,
+                    name=mock_p.get("name", sku),
+                    base_unit=mock_p.get("unit", "Cái"),
+                    base_price=float(mock_p.get("sale_price", 0.0)),
+                    cost_price=float(mock_p.get("cost_price", 0.0)),
+                    category_id=mock_p.get("category_id"),
+                    status="ACTIVE",
+                )
+                db.add(product)
+                db.flush()
+    return product
+
+
+# SCRUM-18: Price history endpoint
+@router.get("/{id_or_sku}/price-history")
+def get_product_price_history_endpoint(
+    id_or_sku: str,
+    fromDate: Optional[str] = Query(None, alias="fromDate"),
+    toDate: Optional[str] = Query(None, alias="toDate"),
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
+) -> Any:
+    """Retrieve product price change history (Story S3-02 / SCRUM-18)."""
+    product = _resolve_product(db, id_or_sku)
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sản phẩm '{id_or_sku}' không tồn tại.",
+        )
+    effective_from = fromDate or from_date
+    effective_to = toDate or to_date
+    histories = get_price_history(db, product.id, from_date=effective_from, to_date=effective_to)
+    return [serialize_price_history(h) for h in histories]
+
+
+# SCRUM-18: Price update endpoint
+@router.put("/{id_or_sku}/price")
+@router.patch("/{id_or_sku}/price")
+def update_product_price_endpoint(
+    id_or_sku: str,
+    payload: UpdateProductPriceRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
+) -> Any:
+    """Update product price and automatically log price history audit record (SCRUM-18)."""
+    product = _resolve_product(db, id_or_sku)
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sản phẩm '{id_or_sku}' không tồn tại.",
+        )
+
+    old_price = float(product.base_price) if product.base_price is not None else 0.0
+    new_price = float(payload.price)
+    effective_date = parse_date_boundary(payload.effective_date) if payload.effective_date else None
+
+    # Update product price
+    product._suppress_auto_price_history = True
+    product.base_price = new_price
+    if product.sku in MOCK_PRODUCTS:
+        MOCK_PRODUCTS[product.sku]["sale_price"] = new_price
+
+    note = payload.note or payload.reason or "Cập nhật giá bán sản phẩm"
+    history = record_price_history(
+        db=db,
+        product_id=product.id,
+        old_price=old_price,
+        new_price=new_price,
+        changed_by=user.username or user.role,
+        note=note,
+        reason=note,
+        effective_date=effective_date,
+    )
+    db.commit()
+    db.refresh(product)
+    db.refresh(history)
+
+    return {
+        "success": True,
+        "message": f"Cập nhật giá bán sản phẩm '{product.sku}' thành công.",
+        "product_id": product.id,
+        "sku": product.sku,
+        "old_price": old_price,
+        "new_price": new_price,
+        "history": serialize_price_history(history),
+    }
+
+
+# SCRUM-18: Reject any modification or deletion of price history (Audit Log immutability)
+@router.api_route("/{id_or_sku}/price-history", methods=["POST", "PUT", "PATCH", "DELETE"])
+@router.api_route("/{id_or_sku}/price-history/{history_id}", methods=["POST", "PUT", "PATCH", "DELETE"])
+def reject_price_history_mutation(id_or_sku: str, history_id: Optional[str] = None) -> Any:
+    """Audit Log immutability enforcement: Price history is strictly read-only."""
+    raise HTTPException(
+        status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+        detail="Lịch sử thay đổi giá là nhật ký kiểm toán bất biến (Audit Log), không cho phép chỉnh sửa hoặc xóa.",
+    )
+
+
+# Compat router for /products/... without /api/v1 prefix
+compat_router = APIRouter(prefix="/products", tags=["Products Compat"])
+compat_router.add_api_route(
+    "/{id_or_sku}/price-history",
+    get_product_price_history_endpoint,
+    methods=["GET"],
+)
+compat_router.add_api_route(
+    "/{id_or_sku}/price",
+    update_product_price_endpoint,
+    methods=["PUT", "PATCH"],
+)
+compat_router.add_api_route(
+    "/{id_or_sku}/price-history",
+    reject_price_history_mutation,
+    methods=["POST", "PUT", "PATCH", "DELETE"],
+)
+compat_router.add_api_route(
+    "/{id_or_sku}/price-history/{history_id}",
+    reject_price_history_mutation,
+    methods=["POST", "PUT", "PATCH", "DELETE"],
+)
+
 
 
