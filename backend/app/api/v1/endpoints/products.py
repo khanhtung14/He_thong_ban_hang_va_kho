@@ -600,11 +600,14 @@ def list_products(
     status_filter: Optional[str] = Query(None, alias="status"),
     page: Optional[int] = None,
     limit: Optional[int] = None,
+    skip: Optional[int] = None,
+    offset: Optional[int] = None,
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
-    """Get list of products."""
+    """Get list of products with optional server-side filtering and pagination."""
     effective_cat_id = category_id if category_id is not None else category_id_legacy
+    effective_offset = offset if offset is not None else skip
     
     if db.query(Product).count() > 0:
         query = db.query(Product)
@@ -618,7 +621,9 @@ def list_products(
             query = query.filter(Product.status == status_filter)
             
         total_records = query.count()
-        if page is not None and limit is not None:
+        if effective_offset is not None and limit is not None:
+            products = query.offset(effective_offset).limit(limit).all()
+        elif page is not None and limit is not None:
             products = query.offset((page - 1) * limit).limit(limit).all()
         else:
             products = query.all()
@@ -656,23 +661,28 @@ def list_products(
             kw = keyword.lower()
             mock_items = [p for p in mock_items if kw in p.get("name", "").lower() or kw in p.get("sku", "").lower()]
         total_records = len(mock_items)
-        if page is not None and limit is not None:
+        if effective_offset is not None and limit is not None:
+            mock_items = mock_items[effective_offset : effective_offset + limit]
+        elif page is not None and limit is not None:
             mock_items = mock_items[(page - 1) * limit : page * limit]
         products_list = [p.copy() for p in mock_items]
 
     sanitized = sanitize_financial_data(products_list, user)
     
-    if page is not None and limit is not None:
+    if (effective_offset is not None and limit is not None) or (page is not None and limit is not None):
+        res_limit = limit if limit is not None else 20
+        res_page = page if page is not None else (effective_offset // res_limit + 1 if res_limit > 0 else 1)
+        total_pages = (total_records + res_limit - 1) // res_limit if res_limit > 0 else 1
         return {
             "success": True,
             "code": 200,
             "message": "Thành công",
             "data": sanitized,
             "pagination": {
-                "page": page,
-                "limit": limit,
+                "page": res_page,
+                "limit": res_limit,
                 "totalRecords": total_records,
-                "totalPages": (total_records + limit - 1) // limit if limit > 0 else 1,
+                "totalPages": total_pages,
             },
         }
     return sanitized

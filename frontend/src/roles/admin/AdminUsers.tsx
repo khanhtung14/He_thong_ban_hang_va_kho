@@ -11,6 +11,8 @@ import {
   Form,
   message,
   Popconfirm,
+  Typography,
+  Pagination,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -54,29 +56,50 @@ export const AdminUsers: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [form] = Form.useForm();
 
-  const fetchUsers = () => {
+  const { Text } = Typography;
+
+  const fetchUsers = (
+    targetPage = page,
+    currentSearch = search,
+    currentRole = roleFilter,
+    currentStatus = statusFilter
+  ) => {
     setLoading(true);
+    const limit = 20;
     const params = new URLSearchParams({
-      page: String(page),
-      page_size: "10",
+      page: String(targetPage),
+      page_size: String(limit),
+      limit: String(limit),
     });
-    if (search.trim()) params.set("search", search.trim());
-    if (roleFilter !== "ALL") params.set("role", roleFilter);
-    if (statusFilter !== "ALL") params.set("status", statusFilter);
+    if (currentSearch.trim()) params.set("search", currentSearch.trim());
+    if (currentRole !== "ALL") params.set("role", currentRole);
+    if (currentStatus !== "ALL") params.set("status", currentStatus);
 
     authenticatedFetch(`/api/v1/admin/users?${params}`)
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => {
         setUsers(data.items || []);
         setTotal(data.total || 0);
+        setPage(targetPage);
       })
       .catch(() => message.error("Không tải được danh sách tài khoản."))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, [page, roleFilter, statusFilter]);
+    fetchUsers(1);
+  }, []);
+
+  const handleSearch = () => {
+    fetchUsers(1, search, roleFilter, statusFilter);
+  };
+
+  const handleResetFilter = () => {
+    setSearch("");
+    setRoleFilter("ALL");
+    setStatusFilter("ALL");
+    fetchUsers(1, "", "ALL", "ALL");
+  };
 
   const handleEditSubmit = async (values: any) => {
     if (!editUser) return;
@@ -93,7 +116,7 @@ export const AdminUsers: React.FC = () => {
       if (res.ok) {
         message.success("Cập nhật tài khoản thành công!");
         setEditUser(null);
-        fetchUsers();
+        fetchUsers(page);
       } else {
         message.error("Lỗi cập nhật tài khoản.");
       }
@@ -118,7 +141,7 @@ export const AdminUsers: React.FC = () => {
         message.success("Đã khóa tài khoản thành công!");
         setLockUser(null);
         setLockReason("");
-        fetchUsers();
+        fetchUsers(page);
       }
     } finally {
       setActionLoading(false);
@@ -132,7 +155,7 @@ export const AdminUsers: React.FC = () => {
       });
       if (res.ok) {
         message.success(`Đã mở khóa tài khoản ${user.username}`);
-        fetchUsers();
+        fetchUsers(page);
       }
     } catch {
       message.error("Không thể mở khóa tài khoản.");
@@ -267,17 +290,14 @@ export const AdminUsers: React.FC = () => {
           placeholder="Tìm theo tên, username, email, số điện thoại..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onPressEnter={() => {
-            setPage(1);
-            fetchUsers();
-          }}
+          onPressEnter={handleSearch}
           style={{ width: 320, borderRadius: 8 }}
         />
         <Select
           value={roleFilter}
           onChange={(val) => {
             setRoleFilter(val);
-            setPage(1);
+            fetchUsers(1, search, val, statusFilter);
           }}
           style={{ width: 180 }}
           options={[
@@ -295,7 +315,7 @@ export const AdminUsers: React.FC = () => {
           value={statusFilter}
           onChange={(val) => {
             setStatusFilter(val);
-            setPage(1);
+            fetchUsers(1, search, roleFilter, val);
           }}
           style={{ width: 170 }}
           options={[
@@ -305,16 +325,21 @@ export const AdminUsers: React.FC = () => {
             { label: "Chờ kích hoạt", value: "PENDING_ACTIVATION" },
           ]}
         />
-        <Button
-          type="primary"
-          onClick={() => {
-            setPage(1);
-            fetchUsers();
-          }}
-          style={{ borderRadius: 8 }}
-        >
-          Tìm kiếm
-        </Button>
+        <Space>
+          <Button
+            type="primary"
+            onClick={handleSearch}
+            style={{ borderRadius: 8 }}
+          >
+            Tìm kiếm
+          </Button>
+          <Button
+            onClick={handleResetFilter}
+            style={{ borderRadius: 8 }}
+          >
+            Đặt lại
+          </Button>
+        </Space>
       </div>
 
       <Table
@@ -322,14 +347,35 @@ export const AdminUsers: React.FC = () => {
         columns={columns}
         rowKey="id"
         loading={loading}
-        pagination={{
-          current: page,
-          total,
-          pageSize: 10,
-          onChange: (p) => setPage(p),
-          showTotal: (t) => `Tổng cộng ${t} tài khoản`,
-        }}
+        pagination={false}
+        bordered
+        size="middle"
       />
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: 16,
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        <Text type="secondary">
+          Hiển thị <strong>{users.length}</strong> tài khoản trên trang này | Tổng cộng:{" "}
+          <strong>{total}</strong> tài khoản ({Math.ceil(total / 20) || 1} trang)
+        </Text>
+        <Pagination
+          current={page}
+          pageSize={20}
+          total={total}
+          showSizeChanger={false}
+          onChange={(p) => {
+            fetchUsers(p, search, roleFilter, statusFilter);
+          }}
+        />
+      </div>
 
       {/* Modal Cập nhật User */}
       <Modal

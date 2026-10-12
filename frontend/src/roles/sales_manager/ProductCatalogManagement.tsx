@@ -19,6 +19,7 @@ import {
   Tooltip,
   Image,
   Divider,
+  Pagination,
 } from "antd";
 import {
   PlusOutlined,
@@ -77,6 +78,8 @@ export const ProductCatalogManagement: React.FC = () => {
   const [keyword, setKeyword] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined);
   const [selectedStatus, setSelectedStatus] = useState<string | undefined>(undefined);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Modal Thêm / Sửa sản phẩm
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -98,21 +101,40 @@ export const ProductCatalogManagement: React.FC = () => {
     }
   };
 
-  // Tải danh sách sản phẩm
-  const fetchProducts = async () => {
+  // Tải danh sách sản phẩm từ backend (20 sản phẩm mỗi trang)
+  const fetchProducts = async (
+    targetPage = 1,
+    kw = keyword,
+    catId = selectedCategory,
+    statusVal = selectedStatus
+  ) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (keyword.trim()) params.append("keyword", keyword.trim());
-      if (selectedCategory) params.append("categoryId", String(selectedCategory));
-      if (selectedStatus) params.append("status", selectedStatus);
+      const limit = 20;
+      const skip = (targetPage - 1) * limit;
 
-      const url = `/api/v1/products${params.toString() ? `?${params.toString()}` : ""}`;
+      const params = new URLSearchParams();
+      params.append("page", String(targetPage));
+      params.append("limit", String(limit));
+      params.append("skip", String(skip));
+
+      if (kw.trim()) params.append("keyword", kw.trim());
+      if (catId !== undefined && catId !== null) params.append("categoryId", String(catId));
+      if (statusVal) params.append("status", statusVal);
+
+      const url = `/api/v1/products?${params.toString()}`;
       const res = await authenticatedFetch(url);
       if (res.ok) {
         const json = await res.json();
-        const list = Array.isArray(json) ? json : json.data || [];
-        setProducts(list);
+        if (json && json.pagination) {
+          setProducts(json.data || []);
+          setTotalRecords(json.pagination.totalRecords || 0);
+        } else {
+          const list = Array.isArray(json) ? json : json.data || [];
+          setProducts(list);
+          setTotalRecords(list.length);
+        }
+        setCurrentPage(targetPage);
       } else {
         message.error("Không thể tải danh sách sản phẩm.");
       }
@@ -125,20 +147,18 @@ export const ProductCatalogManagement: React.FC = () => {
 
   useEffect(() => {
     fetchCategories();
-    fetchProducts();
+    fetchProducts(1);
   }, []);
 
   const handleSearch = () => {
-    fetchProducts();
+    fetchProducts(1, keyword, selectedCategory, selectedStatus);
   };
 
   const handleResetFilter = () => {
     setKeyword("");
     setSelectedCategory(undefined);
     setSelectedStatus(undefined);
-    setTimeout(() => {
-      fetchProducts();
-    }, 0);
+    fetchProducts(1, "", undefined, undefined);
   };
 
   // Mở modal tạo mới
@@ -249,7 +269,7 @@ export const ProductCatalogManagement: React.FC = () => {
       }
 
       setIsModalOpen(false);
-      fetchProducts();
+      fetchProducts(currentPage);
     } catch (err: any) {
       message.error(err.message || "Đã xảy ra lỗi vui lòng kiểm tra lại dữ liệu.");
     } finally {
@@ -271,7 +291,7 @@ export const ProductCatalogManagement: React.FC = () => {
         throw new Error(json.detail || "Không thể đổi trạng thái.");
       }
       message.success(json.message || "Cập nhật trạng thái thành công!");
-      fetchProducts();
+      fetchProducts(currentPage);
     } catch (err: any) {
       message.error(err.message || "Lỗi khi cập nhật trạng thái.");
     }
@@ -291,7 +311,7 @@ export const ProductCatalogManagement: React.FC = () => {
         );
       }
       message.success(json.message || "Đã xoá sản phẩm thành công!");
-      fetchProducts();
+      fetchProducts(currentPage);
     } catch (err: any) {
       Modal.error({
         title: "Không thể xoá sản phẩm",
@@ -546,7 +566,10 @@ export const ProductCatalogManagement: React.FC = () => {
             style={{ width: "100%" }}
             allowClear
             value={selectedCategory}
-            onChange={(val) => setSelectedCategory(val)}
+            onChange={(val) => {
+              setSelectedCategory(val);
+              fetchProducts(1, keyword, val, selectedStatus);
+            }}
           >
             {categories.map((c) => (
               <Option key={c.id} value={c.id}>
@@ -561,7 +584,10 @@ export const ProductCatalogManagement: React.FC = () => {
             style={{ width: "100%" }}
             allowClear
             value={selectedStatus}
-            onChange={(val) => setSelectedStatus(val)}
+            onChange={(val) => {
+              setSelectedStatus(val);
+              fetchProducts(1, keyword, selectedCategory, val);
+            }}
           >
             <Option value="ACTIVE">Đang kinh doanh</Option>
             <Option value="INACTIVE">Ngừng kinh doanh</Option>
@@ -582,10 +608,36 @@ export const ProductCatalogManagement: React.FC = () => {
         columns={columns}
         dataSource={products}
         loading={loading}
-        pagination={{ pageSize: 10, showTotal: (total) => `Tổng cộng ${total} sản phẩm` }}
+        pagination={false}
         bordered
         size="middle"
       />
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: 16,
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        <Text type="secondary">
+          Hiển thị <strong>{products.length}</strong> sản phẩm trên trang này | Tổng cộng:{" "}
+          <strong>{totalRecords}</strong> sản phẩm (
+          {Math.ceil(totalRecords / 20) || 1} trang)
+        </Text>
+        <Pagination
+          current={currentPage}
+          pageSize={20}
+          total={totalRecords}
+          showSizeChanger={false}
+          onChange={(page) => {
+            fetchProducts(page, keyword, selectedCategory, selectedStatus);
+          }}
+        />
+      </div>
 
       {/* Modal Thêm mới / Cập nhật sản phẩm */}
       <Modal
