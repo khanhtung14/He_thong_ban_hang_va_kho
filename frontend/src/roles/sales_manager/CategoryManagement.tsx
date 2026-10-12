@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
-    Row,
-    Col,
     Card,
     Tree,
     Table,
@@ -15,6 +13,8 @@ import {
     Popconfirm,
     message,
     Typography,
+    Breadcrumb,
+    Empty,
 } from "antd";
 import {
     PlusOutlined,
@@ -23,6 +23,11 @@ import {
     SwapOutlined,
     FolderOutlined,
     ReloadOutlined,
+    ArrowLeftOutlined,
+    SearchOutlined,
+    FolderOpenOutlined,
+    AppstoreOutlined,
+    EyeOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { authenticatedFetch } from "../../services/sessionService";
@@ -34,6 +39,9 @@ interface CategoryNode {
     name: string;
     code?: string;
     parent_id?: number | null;
+    level?: number;
+    products_count?: number;
+    description?: string;
     children?: CategoryNode[];
 }
 
@@ -49,10 +57,11 @@ interface ProductItem {
 
 export const CategoryManagement: React.FC = () => {
     const [treeData, setTreeData] = useState<CategoryNode[]>([]);
-    const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<CategoryNode | null>(null);
     const [products, setProducts] = useState<ProductItem[]>([]);
     const [loadingTree, setLoadingTree] = useState(false);
     const [loadingProducts, setLoadingProducts] = useState(false);
+    const [productSearch, setProductSearch] = useState("");
 
     // Modal tạo/sửa nhóm
     const [isCatModalOpen, setIsCatModalOpen] = useState(false);
@@ -80,17 +89,13 @@ export const CategoryManagement: React.FC = () => {
         }
     };
 
-    // 2. Tải danh sách sản phẩm (có lọc theo categoryId nếu được chọn)
-    const fetchProducts = async (catId?: number | null) => {
+    // 2. Tải danh sách sản phẩm theo nhóm
+    const fetchProducts = async (catId: number) => {
         setLoadingProducts(true);
         try {
-            const url = catId
-                ? `/api/v1/products?categoryId=${catId}`
-                : "/api/v1/products";
-            const res = await authenticatedFetch(url);
+            const res = await authenticatedFetch(`/api/v1/products?categoryId=${catId}`);
             if (res.ok) {
                 const result = await res.json();
-                // Xử lý linh hoạt format trả về (nếu bọc trong data hoặc mảng trực tiếp)
                 setProducts(result.data || result.items || result || []);
             }
         } catch {
@@ -100,9 +105,9 @@ export const CategoryManagement: React.FC = () => {
         }
     };
 
+    // Ban đầu chỉ tải cây ngành hàng, KHÔNG tải danh sách sản phẩm
     useEffect(() => {
         fetchCategoryTree();
-        fetchProducts();
     }, []);
 
     // Format node cho Tree / TreeSelect
@@ -111,9 +116,54 @@ export const CategoryManagement: React.FC = () => {
             title: n.name,
             value: n.id,
             key: String(n.id),
-            children: n.children ? formatTreeData(n.children) : [],
+            children: n.children && n.children.length > 0 ? formatTreeData(n.children) : [],
             data: n,
         }));
+
+    // Tìm đường dẫn từ gốc đến node hiện tại để hiển thị breadcrumb
+    const getCategoryPath = (
+        nodes: CategoryNode[],
+        targetId: number,
+        path: CategoryNode[] = []
+    ): CategoryNode[] | null => {
+        for (const node of nodes) {
+            const currentPath = [...path, node];
+            if (node.id === targetId) return currentPath;
+            if (node.children && node.children.length > 0) {
+                const found = getCategoryPath(node.children, targetId, currentPath);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+
+    // Bấm chọn nhóm hàng để xem danh sách sản phẩm của nhóm đó
+    const handleSelectCategory = (cat: CategoryNode) => {
+        setSelectedCategory(cat);
+        setProductSearch("");
+        fetchProducts(cat.id);
+    };
+
+    // Mở modal thêm nhóm con cho một node
+    const handleAddSubCategory = (parentCat: CategoryNode) => {
+        setEditingCategory(null);
+        catForm.resetFields();
+        catForm.setFieldsValue({
+            parent_id: parentCat.id,
+        });
+        setIsCatModalOpen(true);
+    };
+
+    // Mở modal sửa thông tin nhóm
+    const handleEditCategory = (cat: CategoryNode) => {
+        setEditingCategory(cat);
+        catForm.setFieldsValue({
+            code: cat.code,
+            name: cat.name,
+            parent_id: cat.parent_id || undefined,
+        });
+        setIsCatModalOpen(true);
+    };
 
     // Xử lý Lưu nhóm hàng (Tạo mới hoặc Cập nhật)
     const handleSaveCategory = async (values: any) => {
@@ -153,9 +203,11 @@ export const CategoryManagement: React.FC = () => {
             });
             if (res.ok) {
                 message.success("Đã xóa nhóm hàng");
-                if (selectedCatId === catId) setSelectedCatId(null);
+                if (selectedCategory?.id === catId) {
+                    setSelectedCategory(null);
+                    setProducts([]);
+                }
                 fetchCategoryTree();
-                fetchProducts();
             } else {
                 const err = await res.json();
                 message.error(err.detail || "Không thể xóa: nhóm này vẫn còn chứa sản phẩm!");
@@ -186,7 +238,10 @@ export const CategoryManagement: React.FC = () => {
                 setIsMoveModalOpen(false);
                 setSelectedProduct(null);
                 setTargetCatId(null);
-                fetchProducts(selectedCatId);
+                if (selectedCategory) {
+                    fetchProducts(selectedCategory.id);
+                }
+                fetchCategoryTree();
             } else {
                 const err = await res.json();
                 message.error(err.detail || "Không thể chuyển nhóm");
@@ -196,22 +251,48 @@ export const CategoryManagement: React.FC = () => {
         }
     };
 
+    // Lọc danh sách sản phẩm theo từ khóa
+    const filteredProducts = useMemo(() => {
+        if (!productSearch.trim()) return products;
+        const q = productSearch.trim().toLowerCase();
+        return products.filter(
+            (p) =>
+                p.name?.toLowerCase().includes(q) ||
+                p.sku?.toLowerCase().includes(q)
+        );
+    }, [products, productSearch]);
+
     const productColumns: ColumnsType<ProductItem> = [
-        { title: "MÃ SKU", dataIndex: "sku", key: "sku", width: 120, render: (t) => <strong>{t}</strong> },
-        { title: "TÊN SẢN PHẨM", dataIndex: "name", key: "name" },
+        {
+            title: "MÃ SKU",
+            dataIndex: "sku",
+            key: "sku",
+            width: 140,
+            render: (t) => <strong style={{ color: "#1e3a8a" }}>{t}</strong>,
+        },
+        {
+            title: "TÊN SẢN PHẨM",
+            dataIndex: "name",
+            key: "name",
+            render: (name) => <span style={{ fontWeight: 500 }}>{name}</span>,
+        },
         {
             title: "ĐƠN VỊ",
             dataIndex: "baseUnit",
             key: "unit",
-            width: 100,
+            width: 110,
             render: (u) => <Tag color="blue">{u || "Cái"}</Tag>,
         },
         {
             title: "TRẠNG THÁI",
             dataIndex: "status",
             key: "status",
-            width: 110,
-            render: (s) => <Tag color={s === "ACTIVE" ? "green" : "default"}>{s || "ACTIVE"}</Tag>,
+            width: 130,
+            render: (s) => (
+                <Tag color={s === "ACTIVE" ? "green" : "default"}>
+                    {s === "ACTIVE" ? "Đang kinh doanh" : s || "Chưa kích hoạt"}
+                </Tag>
+            ),
         },
         {
             title: "THAO TÁC",
@@ -223,7 +304,7 @@ export const CategoryManagement: React.FC = () => {
                     icon={<SwapOutlined />}
                     onClick={() => {
                         setSelectedProduct(record);
-                        setTargetCatId(record.categoryId || null);
+                        setTargetCatId(record.categoryId || selectedCategory?.id || null);
                         setIsMoveModalOpen(true);
                     }}
                 >
@@ -233,123 +314,310 @@ export const CategoryManagement: React.FC = () => {
         },
     ];
 
+    const currentBreadcrumb = selectedCategory
+        ? getCategoryPath(treeData, selectedCategory.id)
+        : null;
+
     return (
-        <div style={{ padding: 4 }}>
-            <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                    <Title level={3} style={{ margin: 0, fontWeight: 700 }}>
-                        Quản lý Ngành hàng &amp; Phân loại sản phẩm
-                    </Title>
-                    <Text type="secondary">
-                        Thiết lập cấu trúc cây nhóm hàng đa cấp và luân chuyển phân loại sản phẩm.
-                    </Text>
-                </div>
-                <Space>
-                    <Button icon={<ReloadOutlined />} onClick={() => { fetchCategoryTree(); fetchProducts(selectedCatId); }}>
-                        Làm mới
-                    </Button>
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={() => {
-                            setEditingCategory(null);
-                            catForm.resetFields();
-                            setIsCatModalOpen(true);
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* =========================================================================
+                VIEW 1: KHI CHƯA CHỌN NHÓM -> HIỂN THỊ CÂY NGÀNH HÀNG RÕ RÀNG, DỄ NHÌN
+               ========================================================================= */}
+            {!selectedCategory ? (
+                <>
+                    {/* Header Cây ngành hàng */}
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            gap: 16,
                         }}
                     >
-                        Thêm nhóm hàng
-                    </Button>
-                </Space>
-            </div>
-
-            <Row gutter={16}>
-                {/* Cột trái: Cây danh mục */}
-                <Col xs={24} md={8}>
-                    <Card
-                        title={<span><FolderOutlined style={{ marginRight: 8, color: "#2563eb" }} />Cây ngành hàng</span>}
-                        loading={loadingTree}
-                        style={{ borderRadius: 12, minHeight: 600 }}
-                    >
-                        <div style={{ marginBottom: 12 }}>
-                            <Button
-                                type={selectedCatId === null ? "primary" : "default"}
-                                size="small"
-                                block
-                                onClick={() => {
-                                    setSelectedCatId(null);
-                                    fetchProducts(null);
-                                }}
-                            >
-                                Hiển thị tất cả sản phẩm
-                            </Button>
+                        <div>
+                            <Title level={2} style={{ margin: 0, letterSpacing: "-0.5px" }}>
+                                Quản lý Cây Ngành hàng
+                            </Title>
+                            <Text type="secondary" style={{ fontSize: 13, marginTop: 4, display: "block" }}>
+                                Cấu trúc phân cấp ngành hàng theo sơ đồ cây. Nhấp vào nhóm hàng để xem danh sách sản phẩm.
+                            </Text>
                         </div>
+                        <Space>
+                            <Button
+                                icon={<ReloadOutlined />}
+                                onClick={fetchCategoryTree}
+                                loading={loadingTree}
+                                style={{ borderRadius: 8, height: 38 }}
+                            >
+                                Làm mới cây
+                            </Button>
+                            <Button
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                onClick={() => {
+                                    setEditingCategory(null);
+                                    catForm.resetFields();
+                                    setIsCatModalOpen(true);
+                                }}
+                                style={{ borderRadius: 8, height: 38, backgroundColor: "#2563eb" }}
+                            >
+                                Thêm nhóm chính
+                            </Button>
+                        </Space>
+                    </div>
 
-                        <Tree
-                            showIcon
-                            defaultExpandAll
-                            treeData={formatTreeData(treeData)}
-                            onSelect={(selectedKeys) => {
-                                const id = selectedKeys[0] ? Number(selectedKeys[0]) : null;
-                                setSelectedCatId(id);
-                                fetchProducts(id);
-                            }}
-                            titleRender={(node: any) => (
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", paddingRight: 8 }}>
-                                    <span>{node.title}</span>
-                                    <Space size={2} onClick={(e) => e.stopPropagation()}>
-                                        <Button
-                                            type="text"
-                                            size="small"
-                                            icon={<EditOutlined style={{ fontSize: 13, color: "#fa8c16" }} />}
-                                            onClick={() => {
-                                                setEditingCategory(node.data);
-                                                catForm.setFieldsValue({
-                                                    code: node.data.code,
-                                                    name: node.data.name,
-                                                    parent_id: node.data.parent_id || undefined,
-                                                });
-                                                setIsCatModalOpen(true);
-                                            }}
-                                        />
-                                        <Popconfirm
-                                            title="Xóa nhóm này?"
-                                            description="Nếu còn sản phẩm trong nhóm, hệ thống sẽ chặn không cho xóa."
-                                            onConfirm={() => handleDeleteCategory(node.data.id)}
-                                        >
-                                            <Button
-                                                type="text"
-                                                size="small"
-                                                danger
-                                                icon={<DeleteOutlined style={{ fontSize: 13 }} />}
-                                            />
-                                        </Popconfirm>
-                                    </Space>
-                                </div>
-                            )}
-                        />
-                    </Card>
-                </Col>
-
-                {/* Cột phải: Danh sách sản phẩm & Chuyển nhóm */}
-                <Col xs={24} md={16}>
+                    {/* Card Cây ngành hàng toàn màn hình */}
                     <Card
                         title={
-                            selectedCatId
-                                ? `Sản phẩm thuộc nhóm ID: #${selectedCatId}`
-                                : "Tất cả sản phẩm"
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <FolderOpenOutlined style={{ color: "#2563eb", fontSize: 20 }} />
+                                <span style={{ fontWeight: 600, fontSize: 16 }}>
+                                    Sơ đồ cây ngành hàng &amp; nhóm sản phẩm
+                                </span>
+                            </div>
+                        }
+                        loading={loadingTree}
+                        style={{
+                            borderRadius: 12,
+                            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                        }}
+                    >
+                        {treeData.length === 0 && !loadingTree ? (
+                            <Empty description="Chưa có nhóm hàng nào. Hãy thêm nhóm ngành hàng đầu tiên!" />
+                        ) : (
+                            <div style={{ padding: "8px 0" }}>
+                                <Tree
+                                    showLine={{ showLeafIcon: false }}
+                                    defaultExpandAll
+                                    blockNode
+                                    treeData={formatTreeData(treeData)}
+                                    titleRender={(nodeData: any) => {
+                                        const item: CategoryNode = nodeData.data;
+                                        return (
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "space-between",
+                                                    padding: "10px 14px",
+                                                    margin: "6px 0",
+                                                    borderRadius: 8,
+                                                    backgroundColor: "#f8fafc",
+                                                    border: "1px solid #e2e8f0",
+                                                    transition: "all 0.2s ease",
+                                                    cursor: "pointer",
+                                                }}
+                                                className="category-tree-node"
+                                                onClick={() => handleSelectCategory(item)}
+                                            >
+                                                {/* Khối bên trái: Icon + Tên nhóm + Mã + Số lượng */}
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 10,
+                                                        flex: 1,
+                                                        minWidth: 0,
+                                                    }}
+                                                >
+                                                    <FolderOutlined
+                                                        style={{
+                                                            fontSize: 16,
+                                                            color: item.children && item.children.length > 0 ? "#2563eb" : "#0284c7",
+                                                        }}
+                                                    />
+                                                    <span style={{ fontWeight: 600, color: "#0f172a", fontSize: 14 }}>
+                                                        {item.name}
+                                                    </span>
+                                                    {item.code && (
+                                                        <Tag color="blue" style={{ fontSize: 11, borderRadius: 4 }}>
+                                                            {item.code}
+                                                        </Tag>
+                                                    )}
+                                                    <Tag
+                                                        color={item.products_count ? "cyan" : "default"}
+                                                        style={{ fontSize: 11, borderRadius: 4 }}
+                                                    >
+                                                        {item.products_count ?? 0} sản phẩm
+                                                    </Tag>
+                                                </div>
+
+                                                {/* Khối bên phải: Nút thao tác */}
+                                                <Space size={6} onClick={(e) => e.stopPropagation()}>
+                                                    <Button
+                                                        type="primary"
+                                                        ghost
+                                                        size="small"
+                                                        icon={<EyeOutlined />}
+                                                        onClick={() => handleSelectCategory(item)}
+                                                        style={{ borderRadius: 6, fontSize: 12 }}
+                                                    >
+                                                        Xem sản phẩm
+                                                    </Button>
+                                                    <Button
+                                                        type="text"
+                                                        size="small"
+                                                        title="Thêm nhóm con"
+                                                        icon={<PlusOutlined style={{ color: "#16a34a" }} />}
+                                                        onClick={() => handleAddSubCategory(item)}
+                                                    />
+                                                    <Button
+                                                        type="text"
+                                                        size="small"
+                                                        title="Sửa nhóm"
+                                                        icon={<EditOutlined style={{ color: "#fa8c16" }} />}
+                                                        onClick={() => handleEditCategory(item)}
+                                                    />
+                                                    <Popconfirm
+                                                        title="Xóa nhóm này?"
+                                                        description="Nếu còn sản phẩm trong nhóm, hệ thống sẽ chặn không cho xóa."
+                                                        onConfirm={() => handleDeleteCategory(item.id)}
+                                                        okText="Xóa"
+                                                        cancelText="Hủy"
+                                                    >
+                                                        <Button
+                                                            type="text"
+                                                            size="small"
+                                                            danger
+                                                            title="Xóa nhóm"
+                                                            icon={<DeleteOutlined />}
+                                                        />
+                                                    </Popconfirm>
+                                                </Space>
+                                            </div>
+                                        );
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </Card>
+                </>
+            ) : (
+                /* =========================================================================
+                    VIEW 2: KHI ĐÃ BẤM VÀO NHÓM HÀNG -> HIỂN THỊ DANH SÁCH SẢN PHẨM CỦA NHÓM ĐÓ
+                   ========================================================================= */
+                <>
+                    {/* Header điều hướng quay lại & Breadcrumb */}
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            gap: 16,
+                        }}
+                    >
+                        <div>
+                            <Breadcrumb
+                                items={[
+                                    {
+                                        title: (
+                                            <a onClick={() => setSelectedCategory(null)} style={{ color: "#2563eb", fontWeight: 500 }}>
+                                                <AppstoreOutlined style={{ marginRight: 4 }} />
+                                                Cây ngành hàng
+                                            </a>
+                                        ),
+                                    },
+                                    ...(currentBreadcrumb || []).map((node, idx, arr) => ({
+                                        title:
+                                            idx === arr.length - 1 ? (
+                                                <span style={{ fontWeight: 600, color: "#0f172a" }}>{node.name}</span>
+                                            ) : (
+                                                <a onClick={() => handleSelectCategory(node)} style={{ color: "#64748b" }}>
+                                                    {node.name}
+                                                </a>
+                                            ),
+                                    })),
+                                ]}
+                                style={{ marginBottom: 6 }}
+                            />
+                            <Title level={2} style={{ margin: 0, letterSpacing: "-0.5px" }}>
+                                {selectedCategory.name}
+                            </Title>
+                            <Text type="secondary" style={{ fontSize: 13, marginTop: 4, display: "block" }}>
+                                Danh sách sản phẩm được phân loại trong nhóm này. Mã nhóm:{" "}
+                                <Text strong>{selectedCategory.code || `#${selectedCategory.id}`}</Text>
+                            </Text>
+                        </div>
+
+                        <Space>
+                            <Button
+                                icon={<ArrowLeftOutlined />}
+                                onClick={() => {
+                                    setSelectedCategory(null);
+                                    setProducts([]);
+                                }}
+                                style={{ borderRadius: 8, height: 38 }}
+                            >
+                                Quay lại Cây ngành hàng
+                            </Button>
+                            <Button
+                                icon={<ReloadOutlined />}
+                                onClick={() => fetchProducts(selectedCategory.id)}
+                                loading={loadingProducts}
+                                style={{ borderRadius: 8, height: 38 }}
+                            >
+                                Làm mới
+                            </Button>
+                        </Space>
+                    </div>
+
+                    {/* Card Danh sách sản phẩm của nhóm */}
+                    <Card
+                        title={
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    flexWrap: "wrap",
+                                    gap: 12,
+                                }}
+                            >
+                                <Space>
+                                    <span style={{ fontWeight: 600, fontSize: 16 }}>
+                                        Sản phẩm trong nhóm
+                                    </span>
+                                    <Tag color="blue" style={{ borderRadius: 12, padding: "0 10px" }}>
+                                        {filteredProducts.length} sản phẩm
+                                    </Tag>
+                                </Space>
+                                <Input
+                                    prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+                                    placeholder="Tìm theo SKU hoặc tên sản phẩm..."
+                                    value={productSearch}
+                                    onChange={(e) => setProductSearch(e.target.value)}
+                                    allowClear
+                                    style={{ width: 300, borderRadius: 8 }}
+                                />
+                            </div>
                         }
                         loading={loadingProducts}
-                        style={{ borderRadius: 12, minHeight: 600 }}
+                        style={{
+                            borderRadius: 12,
+                            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                        }}
                     >
                         <Table
-                            dataSource={products}
+                            dataSource={filteredProducts}
                             columns={productColumns}
                             rowKey="sku"
-                            pagination={{ pageSize: 10 }}
+                            pagination={{
+                                pageSize: 10,
+                                showTotal: (tot) => `Tổng cộng ${tot} sản phẩm`,
+                            }}
+                            locale={{
+                                emptyText: (
+                                    <Empty
+                                        description={`Chưa có sản phẩm nào thuộc nhóm "${selectedCategory.name}".`}
+                                    />
+                                ),
+                            }}
                         />
                     </Card>
-                </Col>
-            </Row>
+                </>
+            )}
 
             {/* Modal Thêm / Sửa nhóm hàng */}
             <Modal
@@ -372,10 +640,7 @@ export const CategoryManagement: React.FC = () => {
                             treeDefaultExpandAll
                         />
                     </Form.Item>
-                    <Form.Item
-                        name="code"
-                        label="Mã nhóm hàng (Tùy chọn)"
-                    >
+                    <Form.Item name="code" label="Mã nhóm hàng (Tùy chọn)">
                         <Input placeholder="Ví dụ: NGK_TRA (để trống hệ thống sẽ tự sinh mã)" />
                     </Form.Item>
                     <Form.Item
