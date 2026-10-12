@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
   Table,
@@ -10,17 +10,14 @@ import {
   Tag,
   Space,
   Typography,
-  Divider,
-  Alert,
   message,
   Tooltip,
   Popconfirm,
   Row,
   Col,
   Statistic,
-  Badge,
   Switch,
-  notification,
+  Alert,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -38,14 +35,15 @@ import {
 } from "@ant-design/icons";
 
 import {
-  fetchSuppliers,
+  getSuppliers,
   createSupplier,
   updateSupplier,
   updateSupplierStatus,
   deleteSupplier,
-  type Supplier,
-  type SupplierPayload,
-} from "../../services/apiClient";
+  type SupplierCreate,
+  type SupplierUpdate,
+} from "../../services/supplierService";
+import type { Supplier } from "../../types/supplier";
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -54,12 +52,12 @@ const { TextArea } = Input;
 // Danh sách gợi ý điều khoản thanh toán phổ biến
 const PAYMENT_TERM_OPTIONS = [
   "Thanh toán ngay (COD)",
-  "Gối đầu 15 ngày",
-  "Gối đầu 30 ngày",
   "Net 15",
   "Net 30",
   "Net 45",
   "Net 60",
+  "Gối đầu 15 ngày",
+  "Gối đầu 30 ngày",
   "Chuyển khoản trước khi giao",
 ];
 
@@ -96,7 +94,7 @@ export const SupplierManagement: React.FC = () => {
     async (page = pagination.current, limit = pagination.pageSize) => {
       setLoading(true);
       try {
-        const res = await fetchSuppliers({
+        const res = await getSuppliers({
           search: searchKeyword.trim() || undefined,
           is_active: statusFilter,
           page,
@@ -134,7 +132,7 @@ export const SupplierManagement: React.FC = () => {
     form.resetFields();
     form.setFieldsValue({
       is_active: true,
-      payment_terms: "Gối đầu 30 ngày",
+      payment_terms: "Net 30",
     });
     setIsModalOpen(true);
   };
@@ -142,6 +140,7 @@ export const SupplierManagement: React.FC = () => {
   // Mở modal chỉnh sửa
   const handleOpenEditModal = (supplier: Supplier) => {
     setEditingSupplier(supplier);
+    form.resetFields();
     form.setFieldsValue({
       code: supplier.code,
       name: supplier.name,
@@ -150,7 +149,7 @@ export const SupplierManagement: React.FC = () => {
       payment_terms: supplier.payment_terms ?? supplier.paymentTerms,
       phone: supplier.phone,
       address: supplier.address,
-      is_active: supplier.is_active ?? supplier.isActive,
+      is_active: supplier.is_active ?? supplier.isActive ?? true,
     });
     setIsModalOpen(true);
   };
@@ -161,25 +160,35 @@ export const SupplierManagement: React.FC = () => {
       const values = await form.validateFields();
       setModalLoading(true);
 
-      const payload: SupplierPayload = {
-        code: values.code.trim().toUpperCase(),
-        name: values.name.trim(),
-        tax_code: values.tax_code ? values.tax_code.trim() : undefined,
-        contact_person: values.contact_person
-          ? values.contact_person.trim()
-          : undefined,
-        payment_terms: values.payment_terms ? values.payment_terms.trim() : undefined,
-        phone: values.phone ? values.phone.trim() : undefined,
-        address: values.address ? values.address.trim() : undefined,
-        is_active: values.is_active ?? true,
-      };
-
       if (editingSupplier) {
+        const payload: SupplierUpdate = {
+          name: values.name.trim(),
+          tax_code: values.tax_code ? values.tax_code.trim() : undefined,
+          contact_person: values.contact_person
+            ? values.contact_person.trim()
+            : undefined,
+          payment_terms: values.payment_terms ? values.payment_terms.trim() : undefined,
+          phone: values.phone ? values.phone.trim() : undefined,
+          address: values.address ? values.address.trim() : undefined,
+          is_active: values.is_active ?? true,
+        };
+
         await updateSupplier(editingSupplier.id, payload);
-        message.success(
-          `Cập nhật nhà cung cấp "${payload.name}" thành công!`,
-        );
+        message.success(`Cập nhật nhà cung cấp "${payload.name}" thành công!`);
       } else {
+        const payload: SupplierCreate = {
+          code: values.code.trim().toUpperCase(),
+          name: values.name.trim(),
+          tax_code: values.tax_code ? values.tax_code.trim() : undefined,
+          contact_person: values.contact_person
+            ? values.contact_person.trim()
+            : undefined,
+          payment_terms: values.payment_terms ? values.payment_terms.trim() : undefined,
+          phone: values.phone ? values.phone.trim() : undefined,
+          address: values.address ? values.address.trim() : undefined,
+          is_active: values.is_active ?? true,
+        };
+
         await createSupplier(payload);
         message.success(`Thêm mới nhà cung cấp "${payload.name}" thành công!`);
       }
@@ -188,7 +197,7 @@ export const SupplierManagement: React.FC = () => {
       form.resetFields();
       loadSuppliers(pagination.current);
     } catch (err: any) {
-      if (err.errorFields) return; // Form validation error
+      if (err.errorFields) return; // Antd form validate error
       message.error(err.message || "Đã xảy ra lỗi khi lưu thông tin.");
     } finally {
       setModalLoading(false);
@@ -199,37 +208,40 @@ export const SupplierManagement: React.FC = () => {
   const handleToggleStatus = async (supplier: Supplier) => {
     const currentActive = supplier.is_active ?? supplier.isActive;
     const nextStatus = !currentActive;
-    const actionLabel = nextStatus ? "Kích hoạt" : "Ngừng giao dịch";
 
     try {
       setLoading(true);
       await updateSupplierStatus(supplier.id, nextStatus);
       message.success(
-        `Đã chuyển trạng thái nhà cung cấp "${supplier.name}" sang "${
-          nextStatus ? "Đang hoạt động" : "Ngừng giao dịch"
+        `Đã chuyển trạng thái nhà cung cấp "${supplier.name}" sang "${nextStatus ? "Hoạt động" : "Ngừng giao dịch"
         }".`,
       );
       loadSuppliers(pagination.current);
     } catch (err: any) {
-      message.error(
-        err.message || `Không thể ${actionLabel} nhà cung cấp này.`,
-      );
+      message.error(err.message || "Không thể cập nhật trạng thái.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Xử lý Xóa với cơ chế hứng lỗi ràng buộc phiếu nhập kho từ API (HTTP 400)
+  // Xử lý Xóa với cơ chế ràng buộc phiếu nhập kho
   const handleDeleteSupplier = async (supplier: Supplier) => {
+    const receiptsCount = supplier.receipts_count ?? supplier.receiptsCount ?? 0;
+    if (receiptsCount > 0) {
+      setConstraintModal({
+        visible: true,
+        supplier,
+        errorMessage: `Nhà cung cấp "${supplier.name}" (Mã: ${supplier.code}) đã có ${receiptsCount} phiếu nhập kho phát sinh trong hệ thống, không thể xóa. Bạn có muốn chuyển sang trạng thái Ngừng giao dịch không?`,
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await deleteSupplier(supplier.id);
-      message.success(
-        res.message || `Xóa nhà cung cấp "${supplier.name}" thành công!`,
-      );
+      message.success(res.message || `Xóa nhà cung cấp "${supplier.name}" thành công!`);
       loadSuppliers(pagination.current);
     } catch (err: any) {
-      // Bắt lỗi ràng buộc nghiệp vụ (HTTP 400 do đã có phiếu nhập kho)
       if (err.status === 400 || err.hasReceiptsConstraint) {
         setConstraintModal({
           visible: true,
@@ -244,17 +256,15 @@ export const SupplierManagement: React.FC = () => {
     }
   };
 
-  // Nút hành động nhanh: Chuyển sang Ngừng giao dịch ngay từ Modal ràng buộc
+  // Chuyển sang Ngừng giao dịch ngay từ Modal cảnh báo ràng buộc
   const handleQuickDeactivateFromConstraint = async () => {
     if (!constraintModal.supplier) return;
     try {
       setLoading(true);
       await updateSupplierStatus(constraintModal.supplier.id, false);
-      notification.success({
-        message: "Chuyển trạng thái thành công",
-        description: `Nhà cung cấp "${constraintModal.supplier.name}" đã được chuyển sang trạng thái "Ngừng giao dịch". Dữ liệu chứng từ phiếu nhập kho liên quan được bảo toàn nguyên vẹn.`,
-        duration: 5,
-      });
+      message.success(
+        `Đã chuyển nhà cung cấp "${constraintModal.supplier.name}" sang "Ngừng giao dịch". Dữ liệu chứng từ phiếu nhập kho được bảo toàn.`,
+      );
       setConstraintModal({ visible: false, supplier: null, errorMessage: "" });
       loadSuppliers(pagination.current);
     } catch (err: any) {
@@ -265,16 +275,17 @@ export const SupplierManagement: React.FC = () => {
   };
 
   // Thống kê nhanh
-  const stats = {
-    total: pagination.total,
-    active: suppliers.filter((s) => s.is_active ?? s.isActive).length,
-    inactive: suppliers.filter((s) => !(s.is_active ?? s.isActive)).length,
-    withReceipts: suppliers.filter(
+  const stats = useMemo(() => {
+    const total = pagination.total;
+    const active = suppliers.filter((s) => s.is_active ?? s.isActive).length;
+    const inactive = suppliers.filter((s) => !(s.is_active ?? s.isActive)).length;
+    const withReceipts = suppliers.filter(
       (s) => (s.receipts_count ?? s.receiptsCount ?? 0) > 0,
-    ).length,
-  };
+    ).length;
+    return { total, active, inactive, withReceipts };
+  }, [pagination.total, suppliers]);
 
-  // Định nghĩa các cột cho bảng danh sách
+  // Cấu hình các cột cho bảng danh sách
   const columns: ColumnsType<Supplier> = [
     {
       title: "Mã NCC",
@@ -306,10 +317,7 @@ export const SupplierManagement: React.FC = () => {
           </Text>
           {record.address && (
             <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-              <span role="img" aria-label="pin">
-                📍
-              </span>{" "}
-              {record.address}
+              📍 {record.address}
             </div>
           )}
         </div>
@@ -327,7 +335,7 @@ export const SupplierManagement: React.FC = () => {
           </Text>
         ) : (
           <Text type="secondary" italic style={{ fontSize: 12 }}>
-            Chưa cập nhật
+            —
           </Text>
         );
       },
@@ -358,7 +366,7 @@ export const SupplierManagement: React.FC = () => {
       },
     },
     {
-      title: "ĐK Thanh toán",
+      title: "Điều khoản thanh toán",
       key: "payment_terms",
       width: 160,
       render: (_: any, record: Supplier) => {
@@ -369,15 +377,15 @@ export const SupplierManagement: React.FC = () => {
           </Tag>
         ) : (
           <Text type="secondary" italic style={{ fontSize: 12 }}>
-            Mặc định
+            —
           </Text>
         );
       },
     },
     {
-      title: "Phiếu nhập kho",
+      title: "Số phiếu nhập",
       key: "receipts_count",
-      width: 140,
+      width: 130,
       align: "center",
       render: (_: any, record: Supplier) => {
         const count = record.receipts_count ?? record.receiptsCount ?? 0;
@@ -389,15 +397,14 @@ export const SupplierManagement: React.FC = () => {
               style={{
                 fontWeight: 600,
                 padding: "2px 8px",
-                cursor: "pointer",
               }}
             >
-              {count} phiếu nhập
+              {count} phiếu
             </Tag>
           </Tooltip>
         ) : (
           <Tag color="default" style={{ color: "#94a3b8" }}>
-            Chưa phát sinh
+            0 phiếu
           </Tag>
         );
       },
@@ -405,28 +412,26 @@ export const SupplierManagement: React.FC = () => {
     {
       title: "Trạng thái",
       key: "is_active",
-      width: 150,
+      width: 140,
       align: "center",
       render: (_: any, record: Supplier) => {
         const active = record.is_active ?? record.isActive;
         return active ? (
-          <Badge
-            status="success"
-            text={
-              <Text strong style={{ color: "#16a34a" }}>
-                Hoạt động
-              </Text>
-            }
-          />
+          <Tag
+            color="success"
+            icon={<CheckCircleOutlined />}
+            style={{ fontWeight: 500 }}
+          >
+            Hoạt động
+          </Tag>
         ) : (
-          <Badge
-            status="error"
-            text={
-              <Text strong style={{ color: "#dc2626" }}>
-                Ngừng giao dịch
-              </Text>
-            }
-          />
+          <Tag
+            color="default"
+            icon={<StopOutlined />}
+            style={{ fontWeight: 500, color: "#64748b" }}
+          >
+            Ngừng giao dịch
+          </Tag>
         );
       },
     },
@@ -464,7 +469,7 @@ export const SupplierManagement: React.FC = () => {
                 }
                 description={
                   active
-                    ? `Bạn có chắc muốn chuyển NCC "${record.name}" sang trạng thái Ngừng giao dịch?`
+                    ? `Chuyển NCC "${record.name}" sang trạng thái Ngừng giao dịch?`
                     : `Kích hoạt lại để tiếp tục lập phiếu nhập kho với NCC "${record.name}"?`
                 }
                 okText="Đồng ý"
@@ -484,36 +489,33 @@ export const SupplierManagement: React.FC = () => {
               </Popconfirm>
             </Tooltip>
 
-            <Tooltip
-              title={
-                count > 0
-                  ? "Đã có phiếu nhập kho (Có ràng buộc chặn xóa)"
-                  : "Xóa nhà cung cấp"
-              }
-            >
-              <Popconfirm
-                title={`Xóa nhà cung cấp "${record.code}"?`}
-                description={
-                  count > 0 ? (
-                    <div style={{ maxWidth: 260, color: "#dc2626" }}>
-                      ⚠️ Lưu ý: NCC này đã có {count} phiếu nhập kho. Thao tác xóa sẽ bị hệ thống chặn theo luật nghiệp vụ!
-                    </div>
-                  ) : (
-                    "Hành động này không thể hoàn tác nếu NCC chưa phát sinh dữ liệu."
-                  )
-                }
-                okText="Thực hiện xóa"
-                cancelText="Hủy"
-                okButtonProps={{ danger: true }}
-                onConfirm={() => handleDeleteSupplier(record)}
-              >
+            {count > 0 ? (
+              <Tooltip title={`Đã có ${count} phiếu nhập kho phát sinh (Không thể xóa)`}>
                 <Button
                   type="text"
                   danger
                   icon={<DeleteOutlined />}
+                  onClick={() => handleDeleteSupplier(record)}
                 />
-              </Popconfirm>
-            </Tooltip>
+              </Tooltip>
+            ) : (
+              <Tooltip title="Xóa nhà cung cấp">
+                <Popconfirm
+                  title={`Xóa nhà cung cấp "${record.code}"?`}
+                  description="Hành động này không thể hoàn tác nếu nhà cung cấp chưa phát sinh dữ liệu."
+                  okText="Xóa"
+                  cancelText="Hủy"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDeleteSupplier(record)}
+                >
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                  />
+                </Popconfirm>
+              </Tooltip>
+            )}
           </Space>
         );
       },
@@ -521,16 +523,16 @@ export const SupplierManagement: React.FC = () => {
   ];
 
   return (
-    <div style={{ paddingBottom: 40 }}>
-      {/* Tiêu đề & Nút thêm mới */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* 1. Header phong cách phẳng (Flat design) đồng bộ toàn hệ thống */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 20,
           flexWrap: "wrap",
           gap: 16,
+          padding: "20px 24px",
         }}
       >
         <div>
@@ -545,14 +547,14 @@ export const SupplierManagement: React.FC = () => {
             }}
           >
             <ShopOutlined style={{ color: "#2563eb" }} />
-            Quản lý danh mục nhà cung cấp
+            Quản lý danh mục Nhà cung cấp
           </Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            Quản lý thông tin nhà cung cấp, điều khoản thanh toán và giám sát ràng buộc phiếu nhập kho (SCRUM-79)
+          <Text type="secondary" style={{ fontSize: 13, marginTop: 4, display: "block" }}>
+            Khai báo thông tin nhà cung cấp, mã số thuế, điều khoản thanh toán phục vụ truy nguyên nguồn gốc lô hàng khi nhập kho.
           </Text>
         </div>
 
-        <Space>
+        <Space size="middle">
           <Button
             icon={<ReloadOutlined />}
             onClick={() => loadSuppliers(pagination.current)}
@@ -563,104 +565,121 @@ export const SupplierManagement: React.FC = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            size="middle"
             style={{
               backgroundColor: "#2563eb",
               borderRadius: 6,
-              fontWeight: 600,
+              fontWeight: 500,
             }}
             onClick={handleOpenAddModal}
           >
-            Thêm nhà cung cấp mới
+            Thêm nhà cung cấp
           </Button>
         </Space>
       </div>
 
-      {/* Thẻ tóm tắt chỉ số */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-        <Col xs={12} sm={6}>
-          <Card
-            bordered={false}
-            style={{
-              borderRadius: 10,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-              borderLeft: "4px solid #2563eb",
-            }}
-          >
-            <Statistic
-              title="Tổng số nhà cung cấp"
-              value={stats.total}
-              prefix={<ShopOutlined style={{ color: "#2563eb" }} />}
-              valueStyle={{ fontWeight: 700, color: "#1e293b" }}
-            />
+      {/* 2. Thống kê nhanh */}
+      <Row gutter={16}>
+        <Col xs={24} sm={8}>
+          <Card bordered={false} style={{ borderRadius: 10, border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 10,
+                  backgroundColor: "#e0f2fe",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#0284c7",
+                }}
+              >
+                <ShopOutlined style={{ fontSize: 20 }} />
+              </div>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Tổng số nhà cung cấp
+                </Text>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#0f172a" }}>
+                  {stats.total}
+                </div>
+              </div>
+            </div>
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card
-            bordered={false}
-            style={{
-              borderRadius: 10,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-              borderLeft: "4px solid #16a34a",
-            }}
-          >
-            <Statistic
-              title="Đang hoạt động"
-              value={stats.active}
-              prefix={<CheckCircleOutlined style={{ color: "#16a34a" }} />}
-              valueStyle={{ fontWeight: 700, color: "#16a34a" }}
-            />
+
+        <Col xs={24} sm={8}>
+          <Card bordered={false} style={{ borderRadius: 10, border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 10,
+                  backgroundColor: "#dcfce7",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#16a34a",
+                }}
+              >
+                <CheckCircleOutlined style={{ fontSize: 20 }} />
+              </div>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Đang hoạt động
+                </Text>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#16a34a" }}>
+                  {stats.active}
+                </div>
+              </div>
+            </div>
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card
-            bordered={false}
-            style={{
-              borderRadius: 10,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-              borderLeft: "4px solid #ef4444",
-            }}
-          >
-            <Statistic
-              title="Ngừng giao dịch"
-              value={stats.inactive}
-              prefix={<StopOutlined style={{ color: "#ef4444" }} />}
-              valueStyle={{ fontWeight: 700, color: "#ef4444" }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card
-            bordered={false}
-            style={{
-              borderRadius: 10,
-              boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-              borderLeft: "4px solid #0284c7",
-            }}
-          >
-            <Statistic
-              title="Đã có phiếu nhập kho"
-              value={stats.withReceipts}
-              prefix={<FileTextOutlined style={{ color: "#0284c7" }} />}
-              valueStyle={{ fontWeight: 700, color: "#0284c7" }}
-            />
+
+        <Col xs={24} sm={8}>
+          <Card bordered={false} style={{ borderRadius: 10, border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 10,
+                  backgroundColor: "#fee2e2",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#dc2626",
+                }}
+              >
+                <StopOutlined style={{ fontSize: 20 }} />
+              </div>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Ngừng giao dịch
+                </Text>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#dc2626" }}>
+                  {stats.inactive}
+                </div>
+              </div>
+            </div>
           </Card>
         </Col>
       </Row>
 
-      {/* Bộ lọc và tìm kiếm */}
+      {/* 3. Khối tìm kiếm & Bộ lọc */}
       <Card
         bordered={false}
         style={{
-          borderRadius: 10,
-          marginBottom: 16,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+          borderRadius: 12,
+          border: "1px solid #e2e8f0",
         }}
+        bodyStyle={{ padding: 16 }}
       >
         <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} md={12} lg={10}>
+          <Col xs={24} md={16}>
             <Input
-              placeholder="Tìm theo mã, tên, mã số thuế, người liên hệ..."
+              placeholder="Tìm kiếm theo Mã, Tên, Mã số thuế, Người liên hệ, SĐT..."
               prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
@@ -668,38 +687,31 @@ export const SupplierManagement: React.FC = () => {
               allowClear
             />
           </Col>
-          <Col xs={12} md={6} lg={6}>
+          <Col xs={24} sm={12} md={8}>
             <Select
               style={{ width: "100%" }}
-              placeholder="Lọc trạng thái hoạt động"
+              placeholder="Lọc theo trạng thái"
               value={statusFilter}
               onChange={(val) => setStatusFilter(val)}
               allowClear
             >
-              <Option value={true}>🟢 Đang hoạt động</Option>
-              <Option value={false}>🔴 Ngừng giao dịch</Option>
+              <Option value={undefined as any}>Tất cả</Option>
+              <Option value={true}>Đang hoạt động</Option>
+              <Option value={false}>Ngừng giao dịch</Option>
             </Select>
-          </Col>
-          <Col xs={12} md={6} lg={4}>
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={() => loadSuppliers(1)}
-              style={{ width: "100%", backgroundColor: "#0284c7" }}
-            >
-              Tìm kiếm
-            </Button>
           </Col>
         </Row>
       </Card>
 
-      {/* Bảng danh sách nhà cung cấp */}
+      {/* 4. Bảng danh sách nhà cung cấp */}
       <Card
         bordered={false}
         style={{
-          borderRadius: 10,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+          borderRadius: 12,
+          border: "1px solid #e2e8f0",
+          overflow: "hidden",
         }}
+        bodyStyle={{ padding: 0 }}
       >
         <Table
           columns={columns}
@@ -716,35 +728,31 @@ export const SupplierManagement: React.FC = () => {
               `Hiển thị ${range[0]}-${range[1]} / ${total} nhà cung cấp`,
             onChange: (page, pageSize) => loadSuppliers(page, pageSize),
           }}
+          scroll={{ x: 1000 }}
         />
       </Card>
 
       {/* ========================================================================= */}
-      {/* MODAL THÊM MỚI / CHỈNH SỬA NHÀ CUNG CẤP */}
+      {/* 5. MODAL THÊM MỚI / CHỈNH SỬA NHÀ CUNG CẤP */}
       {/* ========================================================================= */}
       <Modal
         title={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <ShopOutlined style={{ color: "#2563eb" }} />
-            <span>
-              {editingSupplier
-                ? `Cập nhật nhà cung cấp: ${editingSupplier.code}`
-                : "Thêm mới nhà cung cấp hàng hóa"}
-            </span>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>
+            {editingSupplier
+              ? `Chỉnh sửa nhà cung cấp: ${editingSupplier.code}`
+              : "Thêm mới nhà cung cấp"}
           </div>
         }
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         onOk={handleSubmitForm}
         confirmLoading={modalLoading}
-        okText={editingSupplier ? "Lưu thay đổi" : "Tạo mới"}
-        cancelText="Hủy"
+        okText={editingSupplier ? "Lưu thay đổi" : "Tạo nhà cung cấp"}
+        cancelText="Hủy bỏ"
         width={650}
         destroyOnClose
       >
-        <Divider style={{ margin: "12px 0 20px" }} />
-
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Row gutter={16}>
             <Col span={10}>
               <Form.Item
@@ -753,11 +761,12 @@ export const SupplierManagement: React.FC = () => {
                 rules={[
                   { required: true, message: "Vui lòng nhập mã nhà cung cấp!" },
                   { max: 50, message: "Tối đa 50 ký tự" },
+                  { pattern: /^[A-Za-z0-9_-]+$/, message: "Mã chỉ chứa chữ, số, gạch nối" },
                 ]}
-                tooltip="Mã định danh duy nhất (ví dụ: NCC-HN, NCC-SABECO)"
+                tooltip="Mã định danh duy nhất (ví dụ: NCC-VINAMILK, NCC-SABECO). Không thể thay đổi sau khi tạo."
               >
                 <Input
-                  placeholder="VD: NCC-HN-001"
+                  placeholder="VD: NCC-VINAMILK"
                   style={{ textTransform: "uppercase" }}
                   disabled={!!editingSupplier}
                 />
@@ -773,7 +782,7 @@ export const SupplierManagement: React.FC = () => {
                   { max: 150, message: "Tối đa 150 ký tự" },
                 ]}
               >
-                <Input placeholder="VD: Công ty TNHH Bia Hà Nội" />
+                <Input placeholder="VD: Công ty Cổ phần Sữa Việt Nam" />
               </Form.Item>
             </Col>
           </Row>
@@ -785,7 +794,7 @@ export const SupplierManagement: React.FC = () => {
                 label="Mã số thuế"
                 rules={[{ max: 50, message: "Tối đa 50 ký tự" }]}
               >
-                <Input placeholder="VD: 0100100998" />
+                <Input placeholder="VD: 0300588569" />
               </Form.Item>
             </Col>
 
@@ -795,7 +804,7 @@ export const SupplierManagement: React.FC = () => {
                 label="Người đại diện / liên hệ"
                 rules={[{ max: 100, message: "Tối đa 100 ký tự" }]}
               >
-                <Input placeholder="VD: Nguyễn Văn A (Phụ trách giao nhận)" />
+                <Input placeholder="VD: Nguyễn Văn A" />
               </Form.Item>
             </Col>
           </Row>
@@ -803,12 +812,22 @@ export const SupplierManagement: React.FC = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
+                name="phone"
+                label="Số điện thoại liên hệ"
+                rules={[{ max: 20, message: "Tối đa 20 ký tự" }]}
+              >
+                <Input placeholder="VD: 02854155555" />
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <Form.Item
                 name="payment_terms"
                 label="Điều khoản thanh toán"
-                tooltip="Quy định hạn trả nợ và hình thức thanh toán khi nhập hàng"
+                tooltip="Quy định kỳ hạn thanh toán khi lập phiếu nhập kho"
               >
                 <Select
-                  placeholder="Chọn hoặc nhập điều khoản"
+                  placeholder="Chọn điều khoản thanh toán"
                   allowClear
                   showSearch
                 >
@@ -820,34 +839,24 @@ export const SupplierManagement: React.FC = () => {
                 </Select>
               </Form.Item>
             </Col>
-
-            <Col span={12}>
-              <Form.Item
-                name="phone"
-                label="Số điện thoại liên hệ"
-                rules={[{ max: 20, message: "Tối đa 20 ký tự" }]}
-              >
-                <Input placeholder="VD: 02438631122" />
-              </Form.Item>
-            </Col>
           </Row>
 
           <Form.Item name="address" label="Địa chỉ văn phòng / kho">
             <TextArea
               rows={2}
-              placeholder="VD: 183 Hoàng Hoa Thám, Ba Đình, Hà Nội"
+              placeholder="VD: Số 10 Tân Trào, P. Tân Phú, Q. 7, TP.HCM"
             />
           </Form.Item>
 
           <Form.Item
             name="is_active"
-            label="Trạng thái giao dịch"
+            label="Trạng thái hoạt động"
             valuePropName="checked"
           >
             <Space align="center">
-              <Switch checkedChildren="Hoạt động" unCheckedChildren="Ngừng GD" />
+              <Switch checkedChildren="Hoạt động" unCheckedChildren="Ngừng giao dịch" />
               <Text type="secondary" style={{ fontSize: 13 }}>
-                Gạt tắt để chuyển sang "Ngừng giao dịch" nếu tạm dừng nhập hàng.
+                Gạt tắt để chuyển sang "Ngừng giao dịch" khi tạm dừng nhập hàng.
               </Text>
             </Space>
           </Form.Item>
@@ -855,7 +864,7 @@ export const SupplierManagement: React.FC = () => {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* MODAL HỨNG LỖI RÀNG BUỘC PHIẾU NHẬP KHO TỪ API (HTTP 400 CONSTRAINT) */}
+      {/* 6. MODAL CẢNH BÁO RÀNG BUỘC PHIẾU NHẬP KHO KHI XÓA */}
       {/* ========================================================================= */}
       <Modal
         open={constraintModal.visible}
@@ -883,31 +892,31 @@ export const SupplierManagement: React.FC = () => {
             loading={loading}
             onClick={handleQuickDeactivateFromConstraint}
           >
-            Chuyển sang "Ngừng giao dịch" ngay
+            Chuyển sang "Ngừng giao dịch"
           </Button>,
         ]}
         width={560}
       >
         <div style={{ textAlign: "center", padding: "16px 0 8px" }}>
           <ExclamationCircleOutlined
-            style={{ fontSize: 52, color: "#e11d48", marginBottom: 16 }}
+            style={{ fontSize: 48, color: "#faad14", marginBottom: 12 }}
           />
-          <Title level={4} style={{ color: "#9f1239", margin: 0 }}>
-            Không thể xóa nhà cung cấp do ràng buộc chứng từ
+          <Title level={4} style={{ color: "#0f172a", margin: 0 }}>
+            Nhà cung cấp đã phát sinh phiếu nhập kho
           </Title>
         </div>
 
         <Alert
-          type="error"
+          type="warning"
           showIcon
           style={{ marginTop: 16, borderRadius: 8 }}
           message={
-            <span style={{ fontWeight: 600 }}>Ràng buộc nghiệp vụ (SCRUM-79):</span>
+            <span style={{ fontWeight: 600 }}>Ràng buộc nghiệp vụ:</span>
           }
           description={
             <Paragraph style={{ margin: 0, marginTop: 4, fontSize: 13 }}>
               {constraintModal.errorMessage ||
-                "Nhà cung cấp này đã có phiếu nhập kho liên quan trong hệ thống. Tuyệt đối không được phép xóa khỏi cơ sở dữ liệu để bảo toàn tính toàn vẹn dữ liệu sổ kho."}
+                "Nhà cung cấp đã có phiếu nhập kho phát sinh, không thể xóa. Bạn có muốn chuyển sang trạng thái Ngừng giao dịch không?"}
             </Paragraph>
           }
         />
@@ -922,18 +931,14 @@ export const SupplierManagement: React.FC = () => {
           }}
         >
           <Text strong style={{ color: "#334155" }}>
-            Giải pháp xử lý nghiệp vụ khuyến nghị:
+            Tác động khi chuyển sang "Ngừng giao dịch":
           </Text>
           <ul style={{ paddingLeft: 20, margin: "6px 0 0", color: "#64748b", fontSize: 13 }}>
             <li>
-              Chuyển trạng thái nhà cung cấp sang{" "}
-              <Text strong style={{ color: "#dc2626" }}>
-                "Ngừng giao dịch" (is_active = False)
-              </Text>
-              .
+              Nhà cung cấp sẽ bị ẩn khỏi danh sách gợi ý khi nhân viên kho lập phiếu nhập mới.
             </li>
             <li>
-              Nhà cung cấp sẽ không còn được gợi ý khi nhân viên lập phiếu nhập kho mới, đồng thời các phiếu nhập kho đã ghi sổ trong quá khứ vẫn được giữ nguyên đầy đủ.
+              Tất cả các phiếu nhập kho đã lập trong quá khứ được bảo toàn nguyên vẹn phục vụ kiểm kê và đối soát sổ sách kế toán.
             </li>
           </ul>
         </div>

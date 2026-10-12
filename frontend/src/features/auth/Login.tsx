@@ -9,19 +9,9 @@ import {
 // Import ảnh banner từ thư mục assets của frontend
 import loginBanner from "../../assets/login-banner.png";
 
+import { login, persistLoginSession, AuthError } from "../../services/authService";
+
 const { Title, Text, Link } = Typography;
-
-type LoginResponse = {
-  redirect_url: string;
-  session_token?: string;
-  expires_in?: number;
-  access_token?: string;
-  user?: { username?: string; role_code?: string };
-};
-
-type ApiError = {
-  detail?: string | { message?: string; retry_after_seconds?: number };
-};
 
 export default function Login() {
   const [form] = Form.useForm();
@@ -47,97 +37,30 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: normalizedUsername,
-          password: values.password,
-        }),
+      const result = await login({
+        username: normalizedUsername,
+        password: values.password,
       });
 
-      if (response.ok) {
-        const result = (await response.json()) as LoginResponse;
+      persistLoginSession(result);
 
-        // Dọn dẹp session cũ
-        for (const key of [
-          "session_token",
-          "session_expires_at",
-          "access_token",
-          "access_token_expires_at",
-          "user_role",
-          "user_name",
-          "token",
-        ]) {
-          window.sessionStorage.removeItem(key);
-          window.localStorage.removeItem(key);
-        }
+      // Xử lý điều hướng an toàn
+      const requestedRedirect = new URLSearchParams(
+        window.location.search,
+      ).get("redirect");
+      const safeRedirect =
+        requestedRedirect?.startsWith("/") &&
+        !requestedRedirect.startsWith("//")
+          ? requestedRedirect
+          : result.redirect_url;
 
-        // Lưu session token
-        if (result.session_token) {
-          window.sessionStorage.setItem("session_token", result.session_token);
-          window.localStorage.setItem("session_token", result.session_token);
-          window.localStorage.setItem("token", result.session_token);
-          const exp = String(
-            Date.now() + (result.expires_in ?? 12 * 60 * 60) * 1000,
-          );
-          window.sessionStorage.setItem("session_expires_at", exp);
-          window.localStorage.setItem("session_expires_at", exp);
-        }
-
-        // Lưu access token
-        if (result.access_token) {
-          window.sessionStorage.setItem("access_token", result.access_token);
-          window.localStorage.setItem("access_token", result.access_token);
-          const accExp = String(Date.now() + 58 * 60 * 1000);
-          window.sessionStorage.setItem("access_token_expires_at", accExp);
-          window.localStorage.setItem("access_token_expires_at", accExp);
-        }
-
-        // Lưu thông tin người dùng
-        if (result.user?.username) {
-          window.sessionStorage.setItem("user_name", result.user.username);
-          window.localStorage.setItem("user_name", result.user.username);
-        }
-        if (result.user?.role_code) {
-          window.sessionStorage.setItem("user_role", result.user.role_code);
-          window.localStorage.setItem("user_role", result.user.role_code);
-        }
-
-        // Xử lý điều hướng an toàn
-        const requestedRedirect = new URLSearchParams(
-          window.location.search,
-        ).get("redirect");
-        const safeRedirect =
-          requestedRedirect?.startsWith("/") &&
-          !requestedRedirect.startsWith("//")
-            ? requestedRedirect
-            : result.redirect_url;
-
-        window.location.assign(safeRedirect);
-        return;
-      }
-
-      // Xử lý các mã lỗi API chi tiết của file trên
-      const result = (await response.json().catch(() => ({}))) as ApiError;
-      if (response.status === 423 && typeof result.detail === "object") {
-        setError(
-          result.detail?.message ??
-            "Tài khoản đang bị tạm khóa. Vui lòng thử lại sau.",
-        );
-      } else if (response.status === 401) {
-        setError("Tên đăng nhập hoặc mật khẩu không chính xác.");
-      } else if (response.status === 403) {
-        setError(
-          typeof result.detail === "string"
-            ? result.detail
-            : "Tài khoản không được phép truy cập.",
-        );
+      window.location.assign(safeRedirect);
+    } catch (err) {
+      if (err instanceof AuthError) {
+        setError(err.message);
       } else {
-        setError("Hệ thống đang bận. Vui lòng thử lại sau ít phút.");
+        setError("Không thể kết nối đến máy chủ. Vui lòng thử lại.");
       }
-    } catch {
-      setError("Không thể kết nối đến máy chủ. Vui lòng thử lại.");
     } finally {
       setIsSubmitting(false);
     }

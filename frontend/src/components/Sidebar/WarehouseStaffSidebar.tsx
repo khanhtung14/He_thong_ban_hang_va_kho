@@ -10,6 +10,7 @@ import {
   LogoutOutlined,
   SwapOutlined,
   ShopOutlined,
+  TruckOutlined,
 } from "@ant-design/icons";
 import BrandLogo from "../BrandLogo";
 
@@ -38,8 +39,8 @@ export const WarehouseStaffSidebar: React.FC<WarehouseStaffSidebarProps> = ({
       children: [
         {
           key: "suppliers",
-          icon: <ShopOutlined />,
-          label: "Quản lý nhà cung cấp",
+          icon: <TruckOutlined />,
+          label: "Nhà cung cấp",
         },
         {
           key: "scan",

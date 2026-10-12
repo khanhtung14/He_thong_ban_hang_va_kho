@@ -62,6 +62,16 @@ export const WarehouseStaffDashboard: React.FC = () => {
     };
   }, [loadProfileData]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.pathname === "/warehouse/suppliers") {
+        setSelectedKey("suppliers");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   return (
     <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
       {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
@@ -88,7 +98,14 @@ export const WarehouseStaffDashboard: React.FC = () => {
 
       <WarehouseStaffSidebar
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
+        onSelect={(key) => {
+          setSelectedKey(key);
+          if (key === "suppliers") {
+            window.history.pushState({}, "", "/warehouse/suppliers");
+          } else {
+            window.history.pushState({}, "", "/warehouse/dashboard");
+          }
+        }}
         onLogout={logout}
       />
 

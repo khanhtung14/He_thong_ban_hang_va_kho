@@ -21,12 +21,12 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8003',
+        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
       // Keep supporting older saved profile URLs during local development.
       '/profile/avatar': {
-        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8003',
+        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },
