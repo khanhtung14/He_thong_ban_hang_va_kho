@@ -49,11 +49,16 @@ def init_db():
 
 def migrate_pricing_schema():
     """Create price-list tables and add pricing/approval fields to existing DBs."""
-    from app.models.models import Base, PriceList, PriceListItem, CustomerHandoverHistory
+    from app.models.models import Base, PriceList, PriceListItem, CustomerHandoverHistory, ProductPriceHistory
 
     Base.metadata.create_all(
         bind=engine,
-        tables=[PriceList.__table__, PriceListItem.__table__, CustomerHandoverHistory.__table__],
+        tables=[
+            PriceList.__table__,
+            PriceListItem.__table__,
+            CustomerHandoverHistory.__table__,
+            ProductPriceHistory.__table__,
+        ],
     )
     inspector = inspect(engine)
     additions = {
@@ -105,3 +110,18 @@ def migrate_pricing_schema():
                 """))
         except Exception:
             pass
+
+    # Khởi tạo bản ghi giá ban đầu cho các sản phẩm chưa có lịch sử giá
+    inspector = inspect(engine)
+    if inspector.has_table("product_price_history") and inspector.has_table("products"):
+        try:
+            with engine.begin() as connection:
+                connection.execute(text("""
+                    INSERT INTO product_price_history (product_id, old_price, new_price, changed_by, effective_date, reason, note)
+                    SELECT id, NULL, base_price, 'Khởi tạo', CURRENT_TIMESTAMP, 'Giá khởi tạo ban đầu', 'Giá khởi tạo ban đầu'
+                    FROM products
+                    WHERE id NOT IN (SELECT DISTINCT product_id FROM product_price_history) AND base_price IS NOT NULL
+                """))
+        except Exception:
+            pass
+

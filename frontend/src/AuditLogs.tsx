@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
-import { authenticatedFetch } from "./session";
+import { useEffect, useState, type FormEvent } from "react";
+import { authenticatedFetch } from "./services/sessionService";
 
 type AuditRow = {
   id: number;

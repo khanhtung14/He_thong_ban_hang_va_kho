@@ -618,6 +618,50 @@ export interface paths {
         patch: operations["move_product_category_api_v1_products__sku__category_patch"];
         trace?: never;
     };
+    "/api/v1/products/{id_or_sku}/price-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Product Price History Endpoint
+         * @description Retrieve product price change history (Story S3-02 / SCRUM-18).
+         */
+        get: operations["get_product_price_history_endpoint_api_v1_products__id_or_sku__price_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id_or_sku}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Product Price Endpoint
+         * @description Update product price and automatically log price history audit record (SCRUM-18).
+         */
+        put: operations["update_product_price_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Product Price Endpoint
+         * @description Update product price and automatically log price history audit record (SCRUM-18).
+         */
+        patch: operations["update_product_price_patch"];
+        trace?: never;
+    };
     "/api/v1/products/{product_id}": {
         parameters: {
             query?: never;
@@ -2683,6 +2727,20 @@ export interface components {
              */
             description?: string | null;
         };
+        /** UpdateProductPriceRequest */
+        UpdateProductPriceRequest: {
+            /**
+             * Price
+             * @description Giá bán mới của sản phẩm
+             */
+            price: number;
+            /** Note */
+            note?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Effective Date */
+            effective_date?: string | null;
+        };
         /** UpdateProfileRequest */
         UpdateProfileRequest: {
             /** Full Name */
@@ -3941,6 +3999,112 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MoveProductCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_product_price_history_endpoint_api_v1_products__id_or_sku__price_history_get: {
+        parameters: {
+            query?: {
+                fromDate?: string | null;
+                toDate?: string | null;
+                from_date?: string | null;
+                to_date?: string | null;
+            };
+            header?: never;
+            path: {
+                id_or_sku: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_product_price_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id_or_sku: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductPriceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_product_price_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id_or_sku: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductPriceRequest"];
             };
         };
         responses: {

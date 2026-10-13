@@ -1041,8 +1041,8 @@ def get_product_price_history_endpoint(
 
 
 # SCRUM-18: Price update endpoint
-@router.put("/{id_or_sku}/price")
-@router.patch("/{id_or_sku}/price")
+@router.put("/{id_or_sku}/price", operation_id="update_product_price_put")
+@router.patch("/{id_or_sku}/price", operation_id="update_product_price_patch")
 def update_product_price_endpoint(
     id_or_sku: str,
     payload: UpdateProductPriceRequest,
@@ -1094,8 +1094,8 @@ def update_product_price_endpoint(
 
 
 # SCRUM-18: Reject any modification or deletion of price history (Audit Log immutability)
-@router.api_route("/{id_or_sku}/price-history", methods=["POST", "PUT", "PATCH", "DELETE"])
-@router.api_route("/{id_or_sku}/price-history/{history_id}", methods=["POST", "PUT", "PATCH", "DELETE"])
+@router.api_route("/{id_or_sku}/price-history", methods=["POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
+@router.api_route("/{id_or_sku}/price-history/{history_id}", methods=["POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
 def reject_price_history_mutation(id_or_sku: str, history_id: Optional[str] = None) -> Any:
     """Audit Log immutability enforcement: Price history is strictly read-only."""
     raise HTTPException(
@@ -1110,21 +1110,25 @@ compat_router.add_api_route(
     "/{id_or_sku}/price-history",
     get_product_price_history_endpoint,
     methods=["GET"],
+    include_in_schema=False,
 )
 compat_router.add_api_route(
     "/{id_or_sku}/price",
     update_product_price_endpoint,
     methods=["PUT", "PATCH"],
+    include_in_schema=False,
 )
 compat_router.add_api_route(
     "/{id_or_sku}/price-history",
     reject_price_history_mutation,
     methods=["POST", "PUT", "PATCH", "DELETE"],
+    include_in_schema=False,
 )
 compat_router.add_api_route(
     "/{id_or_sku}/price-history/{history_id}",
     reject_price_history_mutation,
     methods=["POST", "PUT", "PATCH", "DELETE"],
+    include_in_schema=False,
 )
 
 
