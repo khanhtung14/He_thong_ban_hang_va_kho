@@ -272,6 +272,12 @@ def manager_categories_page():
     return login_page_response()
 
 
+@app.get("/manager/customers", response_class=HTMLResponse, include_in_schema=False)
+def manager_customers_page():
+    """Serve the customer and territory assignment management screen."""
+    return login_page_response()
+
+
 @app.get("/forgot-password", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/forgot-password-ui", response_class=HTMLResponse, include_in_schema=False)
 def get_forgot_password_page():

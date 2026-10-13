@@ -20,6 +20,7 @@ import ExportReportModal from "./ExportReportModal";
 import ProductExcelImport from "./ProductExcelImport";
 import CategoryManagement from "./CategoryManagement";
 import ProductCatalogManagement from "./ProductCatalogManagement";
+import CustomerTerritoryManagement from "./CustomerTerritoryManagement";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -48,6 +49,7 @@ export const SalesManagerDashboard: React.FC = () => {
     if (typeof window !== "undefined") {
       if (window.location.pathname === "/manager/categories") return "/manager/categories";
       if (window.location.pathname === "/manager/products/import") return "/manager/products/import";
+      if (window.location.pathname === "/manager/customers") return "/manager/customers";
     }
     return "/manager/dashboard";
   });
@@ -154,6 +156,12 @@ export const SalesManagerDashboard: React.FC = () => {
                   icon: "appstore",
                 },
               ]),
+          {
+            id: "manager-customers",
+            title: "Đại lý & Địa bàn",
+            path: "/manager/customers",
+            icon: "customers",
+          },
           {
             id: "manager-products",
             title: "Danh mục sản phẩm",
@@ -366,6 +374,10 @@ export const SalesManagerDashboard: React.FC = () => {
           ) : currentPath === "/manager/products" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <ProductCatalogManagement />
+            </div>
+          ) : currentPath === "/manager/customers" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <CustomerTerritoryManagement />
             </div>
           ) : (
             /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */

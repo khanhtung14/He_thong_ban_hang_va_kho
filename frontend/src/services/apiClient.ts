@@ -182,3 +182,197 @@ export async function getProducts(): Promise<Product[]> {
   const data = await response.json();
   return Array.isArray(data) ? data : data.data || [];
 }
+
+export interface CustomerItem {
+  id: number;
+  code: string;
+  name: string;
+  phone?: string | null;
+  sales_rep_id?: number | null;
+  sales_rep_name?: string | null;
+  territory_id?: number | null;
+  territory_name?: string | null;
+  address?: string | null;
+  customer_group: string;
+  is_active: boolean;
+  is_locked: boolean;
+  lock_reason?: string | null;
+  current_debt?: number;
+  debt_limit?: number;
+  max_due_days?: number;
+  warning_threshold_percent?: number;
+  pending_orders_count?: number;
+  created_at?: string;
+}
+
+export interface TerritoryItem {
+  id: number;
+  code: string;
+  name: string;
+  parent_id?: number | null;
+}
+
+export interface CreateCustomerPayload {
+  code: string;
+  name: string;
+  customerGroup?: string;
+  salesRepId?: number | null;
+  territoryId?: number | null;
+  creditLimit?: number;
+  maxDueDays?: number;
+  warningThresholdPercent?: number;
+  phone?: string;
+  email?: string;
+  address?: string;
+  taxCode?: string;
+}
+
+export interface SalesRepUser {
+  id: number;
+  username: string;
+  full_name: string;
+  email?: string;
+}
+
+export interface HandoverLogItem {
+  id: number;
+  customer_id: number;
+  customer_code?: string;
+  customer_name?: string;
+  from_sales_rep_id?: number;
+  from_sales_rep_name?: string;
+  to_sales_rep_id: number;
+  to_sales_rep_name?: string;
+  transferred_by_name?: string;
+  reason?: string;
+  created_at?: string;
+}
+
+export interface FetchCustomersParams {
+  is_locked?: boolean;
+  status?: string;
+  search?: string;
+  keyword?: string;
+  assignedRepId?: number | string;
+  regionId?: number | string;
+  customerGroup?: string;
+  page?: number;
+  limit?: number;
+  pageSize?: number;
+}
+
+export interface FetchCustomersResult {
+  data: CustomerItem[];
+  total: number;
+}
+
+export async function fetchCustomersWithTotal(
+  params?: FetchCustomersParams
+): Promise<FetchCustomersResult> {
+  const query = new URLSearchParams();
+  if (params?.is_locked !== undefined) query.set("is_locked", String(params.is_locked));
+  if (params?.status && params.status !== "ALL") query.set("status", params.status);
+  if (params?.search && params.search.trim()) query.set("search", params.search.trim());
+  if (params?.keyword && params.keyword.trim()) query.set("keyword", params.keyword.trim());
+  if (params?.assignedRepId !== undefined && params.assignedRepId !== "ALL") {
+    query.set("assignedRepId", String(params.assignedRepId));
+  }
+  if (params?.regionId !== undefined && params.regionId !== "ALL") {
+    query.set("regionId", String(params.regionId));
+  }
+  if (params?.customerGroup && params.customerGroup !== "ALL") {
+    query.set("customerGroup", params.customerGroup);
+  }
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.pageSize) query.set("pageSize", String(params.pageSize));
+
+  const url = `/api/v1/customers${query.toString() ? `?${query.toString()}` : ""}`;
+  const res = await authenticatedFetch(url);
+  if (!res.ok) {
+    throw new Error("Không thể tải danh sách đại lý.");
+  }
+  const totalHeader = res.headers.get("x-total-count");
+  const data: CustomerItem[] = await res.json();
+  const total = totalHeader ? parseInt(totalHeader, 10) : data.length;
+  return { data, total: isNaN(total) ? data.length : total };
+}
+
+export async function fetchCustomers(params?: FetchCustomersParams): Promise<CustomerItem[]> {
+  const result = await fetchCustomersWithTotal(params);
+  return result.data;
+}
+
+export async function fetchSalesReps(): Promise<SalesRepUser[]> {
+  const res = await authenticatedFetch("/api/v1/sales-reps");
+  if (!res.ok) {
+    throw new Error("Không thể tải danh sách nhân viên kinh doanh.");
+  }
+  return res.json();
+}
+
+export async function assignSalesRep(
+  customerId: number,
+  salesRepId: number,
+): Promise<CustomerItem> {
+  const res = await authenticatedFetch(`/api/v1/customers/${customerId}/assign-sales-rep`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ salesRepId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể phân công nhân viên cho đại lý này.");
+  }
+  return res.json();
+}
+
+export async function handoverCustomers(payload: {
+  fromSalesRepId?: number;
+  toSalesRepId: number;
+  customerIds?: number[];
+  reason: string;
+}): Promise<{ success: boolean; message: string; transferred_count: number }> {
+  const res = await authenticatedFetch("/api/v1/customers/handover", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể thực hiện chuyển giao địa bàn.");
+  }
+  return res.json();
+}
+
+export async function fetchHandoverHistory(): Promise<HandoverLogItem[]> {
+  const res = await authenticatedFetch("/api/v1/customers/handover-history");
+  if (!res.ok) {
+    throw new Error("Không thể tải lịch sử bàn giao.");
+  }
+  return res.json();
+}
+
+export async function fetchTerritories(): Promise<TerritoryItem[]> {
+  const res = await authenticatedFetch("/api/v1/territories");
+  if (!res.ok) {
+    throw new Error("Không thể tải danh sách địa bàn.");
+  }
+  const data = await res.json();
+  return Array.isArray(data) ? data : data.data || [];
+}
+
+export async function createCustomer(payload: CreateCustomerPayload): Promise<CustomerItem> {
+  const res = await authenticatedFetch("/api/v1/customers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tạo đại lý mới.");
+  }
+  return res.json();
+}
+
+

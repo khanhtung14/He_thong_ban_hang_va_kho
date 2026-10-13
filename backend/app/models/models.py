@@ -303,9 +303,14 @@ class DiscountTier(Base):
 # --- EP-03: Đại lý & Hạn mức công nợ ---
 class Customer(Base):
     __tablename__ = "customers"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_customers_code"),
+        UniqueConstraint("phone", name="uq_customers_phone"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
     sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     customer_group: Mapped[str] = mapped_column(String(30), default="RETAIL", server_default="RETAIL", nullable=False)
@@ -332,6 +337,22 @@ class DeliveryAddress(Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
     address: Mapped[str] = mapped_column(Text, nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class CustomerHandoverHistory(Base):
+    __tablename__ = "customer_handover_history"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    from_sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    to_sales_rep_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    transferred_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    customer: Mapped["Customer"] = relationship(foreign_keys=[customer_id])
+    from_sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[from_sales_rep_id])
+    to_sales_rep: Mapped["User"] = relationship(foreign_keys=[to_sales_rep_id])
+    transferred_by: Mapped[Optional["User"]] = relationship(foreign_keys=[transferred_by_id])
 
 
 class PriceList(Base):

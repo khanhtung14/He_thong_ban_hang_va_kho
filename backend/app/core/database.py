@@ -49,9 +49,12 @@ def init_db():
 
 def migrate_pricing_schema():
     """Create price-list tables and add pricing/approval fields to existing DBs."""
-    from app.models.models import Base, PriceList, PriceListItem
+    from app.models.models import Base, PriceList, PriceListItem, CustomerHandoverHistory
 
-    Base.metadata.create_all(bind=engine, tables=[PriceList.__table__, PriceListItem.__table__])
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[PriceList.__table__, PriceListItem.__table__, CustomerHandoverHistory.__table__],
+    )
     inspector = inspect(engine)
     additions = {
         "customers": {
@@ -60,6 +63,7 @@ def migrate_pricing_schema():
             "lock_reason": "VARCHAR(255) NULL",
             "locked_at": "DATETIME NULL",
             "locked_by_id": "INTEGER NULL",
+            "phone": "VARCHAR(20) NULL",
         },
         "orders": {"approval_reason": "TEXT NULL"},
         "order_items": {
@@ -84,3 +88,20 @@ def migrate_pricing_schema():
             with engine.begin() as connection:
                 for name, definition in missing:
                     connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}"))
+
+    # Backfill phone từ delivery_addresses nếu cột customers.phone đang rỗng
+    if inspector.has_table("customers") and inspector.has_table("delivery_addresses"):
+        try:
+            with engine.begin() as connection:
+                connection.execute(text("""
+                    UPDATE customers
+                    SET phone = (
+                        SELECT delivery_addresses.phone
+                        FROM delivery_addresses
+                        WHERE delivery_addresses.customer_id = customers.id
+                        LIMIT 1
+                    )
+                    WHERE customers.phone IS NULL OR customers.phone = ''
+                """))
+        except Exception:
+            pass

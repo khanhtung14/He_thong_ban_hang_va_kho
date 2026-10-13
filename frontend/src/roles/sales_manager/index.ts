@@ -4,3 +4,4 @@ export { default as TerritoryProgress } from "./TerritoryProgress";
 export { default as CreatePriceListModal } from "./CreatePriceListModal";
 export { default as ExportReportModal } from "./ExportReportModal";
 export { default as CategoryManagement, CategoryManagement as CategoryManagementComponent } from "./CategoryManagement";
+export { default as CustomerTerritoryManagement } from "./CustomerTerritoryManagement";
