@@ -28,6 +28,7 @@ from app.api.v1.endpoints.user_routes import router as user_router
 from app.api.v1.endpoints.users import compat_router as users_compat_router, router as users_router
 from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_router
 from app.api.v1.endpoints.import_users import router as import_users_router
+from app.api.v1.endpoints.debt_limit import router as debt_limit_router, compat_router as debt_limit_compat_router
 
 
 
@@ -168,6 +169,8 @@ app.include_router(users_compat_router)
 app.include_router(user_router)
 app.include_router(profile_router)
 app.include_router(customer_lock_router)
+app.include_router(debt_limit_router)
+app.include_router(debt_limit_compat_router)
 try:
     from app.api.v1.endpoints.warehouse import (
         router as warehouse_router,

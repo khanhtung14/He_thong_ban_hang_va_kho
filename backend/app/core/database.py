@@ -49,7 +49,14 @@ def init_db():
 
 def migrate_pricing_schema():
     """Create price-list tables and add pricing/approval fields to existing DBs."""
-    from app.models.models import Base, PriceList, PriceListItem, CustomerHandoverHistory, ProductPriceHistory
+    from app.models.models import (
+        Base,
+        PriceList,
+        PriceListItem,
+        CustomerHandoverHistory,
+        ProductPriceHistory,
+        CreditLimitLog,
+    )
 
     Base.metadata.create_all(
         bind=engine,
@@ -58,6 +65,7 @@ def migrate_pricing_schema():
             PriceListItem.__table__,
             CustomerHandoverHistory.__table__,
             ProductPriceHistory.__table__,
+            CreditLimitLog.__table__,
         ],
     )
     inspector = inspect(engine)
@@ -69,6 +77,11 @@ def migrate_pricing_schema():
             "locked_at": "DATETIME NULL",
             "locked_by_id": "INTEGER NULL",
             "phone": "VARCHAR(20) NULL",
+            "credit_limit": "FLOAT NOT NULL DEFAULT 0.0",
+            "max_debt_days": "INTEGER NOT NULL DEFAULT 0",
+            "max_due_days": "INTEGER NOT NULL DEFAULT 0",
+            "current_debt": "FLOAT NOT NULL DEFAULT 0.0",
+            "warning_threshold_percent": "FLOAT NOT NULL DEFAULT 80.0",
         },
         "orders": {"approval_reason": "TEXT NULL"},
         "order_items": {
