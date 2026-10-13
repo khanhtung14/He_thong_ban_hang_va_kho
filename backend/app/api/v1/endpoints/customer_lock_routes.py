@@ -181,10 +181,25 @@ class OrderItemCreate(BaseModel):
     unit_price: Optional[float] = Field(default=None, ge=0)
 
 
+class DeliveryAddressBriefResponse(BaseModel):
+    id: int
+    customer_id: int
+    receiver_name: str
+    phone: str
+    address: str
+    is_default: bool
+    note: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
 class OrderCreateRequest(BaseModel):
-    customer_id: int = Field(..., description="ID của đại lý đặt hàng")
+    customer_id: int = Field(..., alias="customerId", description="ID của đại lý đặt hàng")
+    delivery_address_id: Optional[int] = Field(None, alias="deliveryAddressId", description="ID điểm giao hàng")
     items: List[OrderItemCreate] = Field(default_factory=list, min_length=1, description="Danh sách sản phẩm trong đơn")
     note: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class OrderItemResponse(BaseModel):
@@ -204,6 +219,8 @@ class OrderResponse(BaseModel):
     order_code: str
     customer_id: int
     customer_name: Optional[str] = None
+    delivery_address_id: Optional[int] = None
+    delivery_address: Optional[DeliveryAddressBriefResponse] = None
     status: OrderStatus
     total_amount: float
     note: Optional[str] = None
@@ -215,7 +232,7 @@ class OrderResponse(BaseModel):
     approval_reason: Optional[str] = None
     items: List[OrderItemResponse] = Field(default_factory=list)
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ---------------------------------------------------------
@@ -985,10 +1002,43 @@ def create_order(
 
     actor_user = db.query(User).filter(User.username == user.username).first()
 
+    # SCRUM-20 Validation điểm giao hàng
+    chosen_address_id: Optional[int] = None
+    if payload.delivery_address_id is not None:
+        addr = db.get(DeliveryAddress, payload.delivery_address_id)
+        if not addr:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Không tìm thấy điểm giao hàng với ID {payload.delivery_address_id}!",
+            )
+        if addr.customer_id != customer.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Điểm giao hàng ID {payload.delivery_address_id} không thuộc về đại lý '{customer.name}' (ID: {customer.id})!",
+            )
+        chosen_address_id = addr.id
+    else:
+        # Tự động chọn điểm giao hàng mặc định nếu có
+        default_addr = (
+            db.query(DeliveryAddress)
+            .filter(DeliveryAddress.customer_id == customer.id, DeliveryAddress.is_default == True)
+            .first()
+        )
+        if not default_addr:
+            default_addr = (
+                db.query(DeliveryAddress)
+                .filter(DeliveryAddress.customer_id == customer.id)
+                .order_by(DeliveryAddress.id.asc())
+                .first()
+            )
+        if default_addr:
+            chosen_address_id = default_addr.id
+
     new_order = Order(
         order_code=order_code,
         customer_id=customer.id,
         created_by_id=actor_user.id if actor_user else None,
+        delivery_address_id=chosen_address_id,
         status=OrderStatus.PENDING if approval_lines else OrderStatus.DRAFT,
         total_amount=total_amount,
         note=payload.note,
@@ -1015,6 +1065,10 @@ def create_order(
     res.customer_name = customer.name
     res.has_warning = False
     res.warning_message = None
+    if new_order.delivery_address_id:
+        res.delivery_address_id = new_order.delivery_address_id
+        if new_order.delivery_address:
+            res.delivery_address = DeliveryAddressBriefResponse.model_validate(new_order.delivery_address)
     return res
 
 
@@ -1041,6 +1095,10 @@ def list_orders(
         resp.customer_name = cust.name if cust else None
         resp.has_warning = has_warn
         resp.warning_message = warn_msg
+        if ord.delivery_address_id:
+            resp.delivery_address_id = ord.delivery_address_id
+            if ord.delivery_address:
+                resp.delivery_address = DeliveryAddressBriefResponse.model_validate(ord.delivery_address)
         results.append(resp)
 
     return results

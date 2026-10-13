@@ -26,8 +26,10 @@ import {
   ShopOutlined,
   UserOutlined,
   PlusOutlined,
+  EnvironmentOutlined,
 } from "@ant-design/icons";
 import CreateCustomerModal from "../admin/CreateCustomerModal";
+import DeliveryAddressesModal from "../../components/DeliveryAddressesModal";
 import {
   fetchCustomersWithTotal,
   fetchSalesReps,
@@ -46,6 +48,8 @@ const { Title, Text } = Typography;
 export const CustomerTerritoryManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState("customers");
   const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [selectedCustomerForAddress, setSelectedCustomerForAddress] = useState<CustomerItem | null>(null);
 
   // State Danh sách đại lý & bộ lọc từ server
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
@@ -347,20 +351,34 @@ export const CustomerTerritoryManagement: React.FC = () => {
     {
       title: "THAO TÁC",
       key: "actions",
+      width: 220,
       render: (_, r) => (
-        <Button
-          size="small"
-          type="primary"
-          ghost
-          icon={<UserSwitchOutlined />}
-          onClick={() => {
-            setSelectedCustomer(r);
-            setSelectedRepId(r.sales_rep_id || null);
-            setAssignModalOpen(true);
-          }}
-        >
-          {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
-        </Button>
+        <Space size="small">
+          <Button
+            size="small"
+            icon={<EnvironmentOutlined />}
+            onClick={() => {
+              setSelectedCustomerForAddress(r);
+              setIsAddressModalOpen(true);
+            }}
+            style={{ color: "#2563eb", borderColor: "#93c5fd" }}
+          >
+            Điểm giao
+          </Button>
+          <Button
+            size="small"
+            type="primary"
+            ghost
+            icon={<UserSwitchOutlined />}
+            onClick={() => {
+              setSelectedCustomer(r);
+              setSelectedRepId(r.sales_rep_id || null);
+              setAssignModalOpen(true);
+            }}
+          >
+            {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -765,6 +783,18 @@ export const CustomerTerritoryManagement: React.FC = () => {
         isOpen={isCreateCustomerModalOpen}
         onClose={() => setIsCreateCustomerModalOpen(false)}
         onSuccess={() => loadData()}
+      />
+
+      {/* Modal Quản lý điểm giao hàng (SCRUM-20) */}
+      <DeliveryAddressesModal
+        isOpen={isAddressModalOpen}
+        onClose={() => {
+          setIsAddressModalOpen(false);
+          setSelectedCustomerForAddress(null);
+        }}
+        customerId={selectedCustomerForAddress?.id || null}
+        customerName={selectedCustomerForAddress?.name}
+        customerCode={selectedCustomerForAddress?.code}
       />
     </div>
   );

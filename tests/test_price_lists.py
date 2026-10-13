@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import delete
 
 from src.backend.database import SessionLocal
-from src.backend.models import Customer, Order, OrderItem, PriceList, PriceListItem
+from src.backend.models import Customer, Order, OrderItem, PriceList, PriceListItem, DeliveryAddress
 from src.backend.rbac import create_access_token
 
 
@@ -19,6 +19,7 @@ def clear_pricing_business_data():
         db.execute(delete(Order))
         db.execute(delete(PriceListItem))
         db.execute(delete(PriceList))
+        db.execute(delete(DeliveryAddress))
         db.execute(delete(Customer))
         db.commit()
 
@@ -52,7 +53,7 @@ def create_and_publish(client, data=None):
 def create_customer(client, group="DEALER_LEVEL_1"):
     response = client.post(
         "/api/v1/customers",
-        json={"code": f"CUST-{group}", "name": f"Customer {group}", "customer_group": group},
+        json={"code": f"CUST-{group}", "name": f"Customer {group}", "customer_group": group, "phone": "0912345678"},
     )
     assert response.status_code == 201, response.text
     return response.json()

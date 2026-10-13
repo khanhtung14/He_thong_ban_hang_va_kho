@@ -70,7 +70,13 @@ def migrate_pricing_schema():
             "locked_by_id": "INTEGER NULL",
             "phone": "VARCHAR(20) NULL",
         },
-        "orders": {"approval_reason": "TEXT NULL"},
+        "delivery_addresses": {
+            "note": "TEXT NULL",
+        },
+        "orders": {
+            "approval_reason": "TEXT NULL",
+            "delivery_address_id": "INTEGER NULL",
+        },
         "order_items": {
             "floor_price": "INTEGER NULL",
             "price_list_id": "INTEGER NULL",

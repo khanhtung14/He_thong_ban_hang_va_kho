@@ -375,4 +375,187 @@ export async function createCustomer(payload: CreateCustomerPayload): Promise<Cu
   return res.json();
 }
 
+// ----------------------------------------------------------------------
+// SCRUM-20: Delivery Address Management & Order Placement
+// ----------------------------------------------------------------------
+
+export interface DeliveryAddressItem {
+  id: number;
+  customer_id: number;
+  receiver_name: string;
+  phone: string;
+  address: string;
+  is_default: boolean;
+  note?: string | null;
+}
+
+export interface CreateDeliveryAddressPayload {
+  receiverName?: string;
+  receiver_name?: string;
+  phone: string;
+  address: string;
+  isDefault?: boolean;
+  is_default?: boolean;
+  note?: string;
+}
+
+export interface UpdateDeliveryAddressPayload {
+  receiverName?: string;
+  receiver_name?: string;
+  phone?: string;
+  address?: string;
+  isDefault?: boolean;
+  is_default?: boolean;
+  note?: string;
+}
+
+export interface OrderItemInput {
+  sku: string;
+  product_name?: string;
+  quantity: number;
+  unit_price?: number;
+}
+
+export interface CreateOrderPayload {
+  customer_id: number;
+  delivery_address_id?: number | null;
+  deliveryAddressId?: number | null;
+  items: OrderItemInput[];
+  note?: string;
+}
+
+export interface OrderItemView {
+  id: number;
+  sku: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+export interface OrderResponseItem {
+  id: number;
+  order_code: string;
+  customer_id: number;
+  customer_name: string;
+  total_amount: number;
+  status: string;
+  warning_type?: string | null;
+  delivery_address_id?: number | null;
+  delivery_address?: DeliveryAddressItem | null;
+  items?: OrderItemView[];
+  created_at: string;
+}
+
+export async function fetchDeliveryAddresses(
+  customerId: number,
+): Promise<DeliveryAddressItem[]> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses`,
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách điểm giao hàng.");
+  }
+  return res.json();
+}
+
+export async function createDeliveryAddress(
+  customerId: number,
+  payload: CreateDeliveryAddressPayload,
+): Promise<DeliveryAddressItem> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể thêm điểm giao hàng.");
+  }
+  return res.json();
+}
+
+export async function updateDeliveryAddress(
+  customerId: number,
+  addressId: number,
+  payload: UpdateDeliveryAddressPayload,
+): Promise<DeliveryAddressItem> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses/${addressId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể cập nhật điểm giao hàng.");
+  }
+  return res.json();
+}
+
+export async function deleteDeliveryAddress(
+  customerId: number,
+  addressId: number,
+): Promise<{ message: string; reallocated_default_id?: number | null }> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses/${addressId}`,
+    {
+      method: "DELETE",
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể xóa điểm giao hàng.");
+  }
+  return res.json();
+}
+
+export async function setDefaultDeliveryAddress(
+  customerId: number,
+  addressId: number,
+): Promise<DeliveryAddressItem> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses/${addressId}/default`,
+    {
+      method: "PATCH",
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể đặt làm điểm giao mặc định.");
+  }
+  return res.json();
+}
+
+export async function fetchOrders(): Promise<OrderResponseItem[]> {
+  const res = await authenticatedFetch("/api/v1/orders");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function createOrder(
+  payload: CreateOrderPayload,
+): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch("/api/v1/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tạo đơn hàng.");
+  }
+  return res.json();
+}
+
+
 

@@ -401,6 +401,7 @@ class Customer(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+    delivery_addresses: Mapped[List["DeliveryAddress"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
 
 
 class DeliveryAddress(Base):
@@ -411,6 +412,9 @@ class DeliveryAddress(Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
     address: Mapped[str] = mapped_column(Text, nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    customer: Mapped["Customer"] = relationship(back_populates="delivery_addresses")
 
 
 class CustomerHandoverHistory(Base):
@@ -481,6 +485,9 @@ class Order(Base):
         nullable=False,
     )
     total_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    delivery_address_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("delivery_addresses.id", ondelete="SET NULL"), nullable=True
+    )
     note: Mapped[Optional[str]] = mapped_column(Text)
     approval_reason: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -489,6 +496,7 @@ class Order(Base):
     )
 
     customer: Mapped[Customer] = relationship(back_populates="orders")
+    delivery_address: Mapped[Optional[DeliveryAddress]] = relationship()
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
 
