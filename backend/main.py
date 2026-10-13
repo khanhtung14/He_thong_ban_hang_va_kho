@@ -18,7 +18,7 @@ from app.api.v1.endpoints.inventory import router as inventory_router, legacy_ro
 from app.api.v1.endpoints.login import router as login_router
 from app.api.v1.endpoints.navigation import router as navigation_router
 from app.api.v1.endpoints.product_categories import router as product_categories_router
-from app.api.v1.endpoints.products import router as products_router
+from app.api.v1.endpoints.products import compat_router as products_compat_router, router as products_router
 from app.api.v1.endpoints.price_lists import router as price_lists_router
 from app.api.v1.endpoints.profile import migrate_profile_schema, router as profile_router
 from app.api.v1.endpoints.reports import router as reports_router
@@ -157,6 +157,7 @@ app.include_router(login_router)
 app.include_router(inventory_router)
 app.include_router(legacy_inventory_router)
 app.include_router(products_router)
+app.include_router(products_compat_router)
 app.include_router(product_categories_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
