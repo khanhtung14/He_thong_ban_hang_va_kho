@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,20 +8,22 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.backend.database import get_db
-from src.backend.main import app
-from src.backend.models import (
+from app.core.database import get_db
+from backend.main import app
+from app.models.models import (
     AccountStatus,
     Base,
-    CatalogProduct,
-    CatalogProductUnit,
     Customer,
-    CustomerDeliveryPoint,
+    DeliveryAddress,
+    DiscountPolicy,
+    DiscountTier,
+    Product,
+    ProductUnit,
     Role,
     Territory,
     User,
 )
-from src.backend.rbac import create_access_token
+from app.api.v1.endpoints.rbac import create_access_token
 
 
 @pytest.fixture
@@ -87,54 +88,58 @@ def sales_order_env():
         )
         db.add_all([customer, territory_customer, outside_customer])
         db.flush()
-        delivery_point = CustomerDeliveryPoint(
+        delivery_point = DeliveryAddress(
             customer_id=customer.id,
-            name="Cửa hàng chính",
+            receiver_name="Cửa hàng chính",
             address="Địa chỉ do đại lý cung cấp",
+            phone="0900000000",
             is_default=True,
-            is_active=True,
         )
-        product = CatalogProduct(
+        other_delivery_point = DeliveryAddress(
+            customer_id=customer.id,
+            receiver_name="Cửa hàng phụ",
+            address="Địa chỉ giao hàng phụ",
+            phone="0900000001",
+            is_default=False,
+        )
+        product = Product(
             sku="REAL-001",
             name="Sản phẩm catalog thật",
-            sale_price=Decimal("1200.50"),
-            discount_percent=Decimal("10.00"),
-            is_active=True,
+            base_unit="Cái",
+            base_price=1200.50,
+            status="ACTIVE",
         )
-        second_product = CatalogProduct(
+        second_product = Product(
             sku="REAL-002",
             name="Sản phẩm catalog thứ hai",
-            sale_price=Decimal("1000.00"),
-            discount_percent=Decimal("0.00"),
-            is_active=True,
+            base_unit="Cái",
+            base_price=1000.00,
+            status="ACTIVE",
         )
-        db.add_all([delivery_point, product, second_product])
+        db.add_all([delivery_point, other_delivery_point, product, second_product])
         db.flush()
-        case_unit = CatalogProductUnit(
+        case_unit = ProductUnit(
             product_id=product.id,
-            unit_code="CASE",
             unit_name="Thùng",
-            conversion_factor=Decimal("24.0000"),
+            conversion_rate=24,
             is_base_unit=False,
-            is_active=True,
         )
-        piece_unit = CatalogProductUnit(
+        piece_unit = ProductUnit(
             product_id=product.id,
-            unit_code="EACH",
             unit_name="Cái",
-            conversion_factor=Decimal("1.0000"),
+            conversion_rate=1,
             is_base_unit=True,
-            is_active=True,
         )
-        second_unit = CatalogProductUnit(
+        second_unit = ProductUnit(
             product_id=second_product.id,
-            unit_code="EACH",
             unit_name="Cái",
-            conversion_factor=Decimal("1.0000"),
+            conversion_rate=1,
             is_base_unit=True,
-            is_active=True,
         )
-        db.add_all([case_unit, piece_unit, second_unit])
+        policy = DiscountPolicy(name="Mua từ 2", scope="PRODUCT", target_id=product.id)
+        db.add_all([case_unit, piece_unit, second_unit, policy])
+        db.flush()
+        db.add(DiscountTier(policy_id=policy.id, min_qty=2, discount_percent=10))
         db.commit()
         ids = {
             "sales_user": sales_user.id,
@@ -143,6 +148,7 @@ def sales_order_env():
             "territory_customer": territory_customer.id,
             "outside_customer": outside_customer.id,
             "delivery_point": delivery_point.id,
+            "other_delivery_point": other_delivery_point.id,
             "product": product.id,
             "second_product": second_product.id,
             "case_unit": case_unit.id,
@@ -158,7 +164,7 @@ def sales_order_env():
     engine.dispose()
 
 
-def sales_headers(username: str = "sales-draft-user", role: str = "SALES_REP") -> dict[str, str]:
+def sales_headers(username: str = "sales-draft-user", role: str = "Sales Rep") -> dict[str, str]:
     token = create_access_token({"sub": username, "role": role})
     return {"Authorization": f"Bearer {token}"}
 
@@ -175,7 +181,7 @@ def draft_payload(ids: dict[str, int]) -> dict:
     }
 
 
-def test_create_draft_calculates_multiple_lines_from_persisted_catalog(sales_order_env):
+def test_create_draft_calculates_catalog_price_and_quantity_discount(sales_order_env):
     client, _, ids = sales_order_env
 
     response = client.post(
@@ -197,26 +203,24 @@ def test_create_draft_calculates_multiple_lines_from_persisted_catalog(sales_ord
 
 
 def test_draft_persists_lists_reopens_and_updates(sales_order_env):
-    client, session_factory, ids = sales_order_env
+    client, _, ids = sales_order_env
+    payload = draft_payload(ids)
+    payload["delivery_point_id"] = ids["other_delivery_point"]
     created = client.post(
         "/api/v1/sales-orders/drafts",
-        json=draft_payload(ids),
+        json=payload,
         headers=sales_headers(),
     )
     order_id = created.json()["id"]
-
-    with session_factory() as db:
-        from src.backend.models import Order
-
-        assert db.get(Order, order_id) is not None
 
     listing = client.get("/api/v1/sales-orders/drafts", headers=sales_headers())
     reopened = client.get(f"/api/v1/sales-orders/drafts/{order_id}", headers=sales_headers())
     assert listing.status_code == reopened.status_code == 200
     assert len(listing.json()) == 1
     assert reopened.json()["items"][0]["quantity"] == 2
+    assert reopened.json()["delivery_point_id"] == ids["other_delivery_point"]
+    assert reopened.json()["delivery_point_name"] == "Cửa hàng phụ"
 
-    payload = draft_payload(ids)
     payload["items"][0]["quantity"] = 4
     updated = client.put(
         f"/api/v1/sales-orders/drafts/{order_id}",
@@ -244,10 +248,12 @@ def test_sales_api_searches_catalog_and_scopes_customers_and_delivery_points(sal
     )
 
     assert [item["sku"] for item in product_search.json()] == ["REAL-002"]
+    assert product_search.json()[0]["units"][0]["unit_name"] == "Cái"
     assert {item["id"] for item in customers.json()} == {
-        ids["customer"], ids["territory_customer"]
+        ids["customer"],
+        ids["territory_customer"],
     }
-    assert len(points.json()) == 1
+    assert len(points.json()) == 2
     assert outside_points.status_code == 404
 
 
@@ -273,13 +279,17 @@ def test_invalid_draft_data_is_rejected(sales_order_env, change, expected_status
     assert response.status_code == expected_status
 
 
-def test_invalid_product_unit_pair_locked_customer_and_non_sales_role_are_rejected(sales_order_env):
+def test_invalid_unit_locked_customer_and_non_sales_role_are_rejected(sales_order_env):
     client, session_factory, ids = sales_order_env
     headers = sales_headers()
 
     invalid_unit = draft_payload(ids)
     invalid_unit["items"][0]["unit_id"] = ids["second_unit"]
-    assert client.post("/api/v1/sales-orders/drafts", json=invalid_unit, headers=headers).status_code == 400
+    assert client.post(
+        "/api/v1/sales-orders/drafts",
+        json=invalid_unit,
+        headers=headers,
+    ).status_code == 400
 
     with session_factory() as db:
         customer = db.get(Customer, ids["customer"])
@@ -294,7 +304,7 @@ def test_invalid_product_unit_pair_locked_customer_and_non_sales_role_are_reject
 
     assert client.get(
         "/api/v1/sales-orders/products",
-        headers=sales_headers(role="CUSTOMER"),
+        headers=sales_headers(role="Customer"),
     ).status_code == 403
 
 

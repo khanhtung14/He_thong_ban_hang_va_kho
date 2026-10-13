@@ -17,5 +17,5 @@ python -m pytest -q
 
 
 chạy lại frontend khi thay đổi frontend:
-cd C:\Users\Admin\He_thong_ban_hang_va_kho\src\frontend
+cd src/frontend
 npm.cmd run build

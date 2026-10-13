@@ -1,0 +1,1 @@
+Read and strictly enforce all guidelines defined in AGENTS.md and docs/API_SPECIFICATION.md before generating code.

@@ -1,11 +1,31 @@
 import React from "react";
+import {
+  Card,
+  List,
+  Tag,
+  Button,
+  Typography,
+  Space,
+  Skeleton,
+  Empty,
+  Popconfirm,
+  Badge,
+} from "antd";
+import {
+  CheckOutlined,
+  CloseOutlined,
+  // ExclamationCircleOutlined,
+  RightOutlined,
+} from "@ant-design/icons";
+
+const { Text } = Typography;
 
 export interface ApprovalItem {
   id: string;
   type: "price_list" | "below_floor" | "credit_limit";
   typeLabel: string;
-  badgeBg: string;
-  badgeText: string;
+  badgeBg?: string;
+  badgeText?: string;
   title: string;
   reason: string;
   amount: string;
@@ -31,111 +51,223 @@ export const ApprovalList: React.FC<ApprovalListProps> = ({
   onViewAll,
   loading = false,
 }) => {
+  // Bản đồ màu Tag dựa trên loại duyệt đơn
+  const getTypeTagColor = (type: ApprovalItem["type"]) => {
+    switch (type) {
+      case "credit_limit":
+        return "error"; // Đỏ: Vượt hạn mức nợ
+      case "below_floor":
+        return "warning"; // Cam: Dưới giá sàn
+      case "price_list":
+        return "processing"; // Xanh dương: Bảng giá mới
+      default:
+        return "default";
+    }
+  };
+
   return (
-    <section className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-50 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-          <h2 className="text-base font-bold text-slate-800">
+    <Card
+      style={{
+        borderRadius: 16,
+        border: "1px solid #f0f0f0",
+        backgroundColor: "#ffffff",
+        boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)",
+      }}
+      styles={{
+        header: { padding: "16px 24px", borderBottom: "1px solid #f5f5f5" },
+        body: { padding: "16px 24px" },
+      }}
+      title={
+        <Space align="center" size={8}>
+          <Badge color="#1677ff" />
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#1f1f1f" }}>
             Hộp thư phê duyệt hạn mức & đơn ngoại lệ
-          </h2>
-        </div>
-        <button
+          </span>
+        </Space>
+      }
+      extra={
+        <Button
+          type="link"
           onClick={onViewAll}
-          className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+          style={{ padding: 0, fontWeight: 600, fontSize: 13 }}
         >
-          Xem tất cả ({items.length.toString().padStart(2, "0")})
-        </button>
-      </div>
-
+          Xem tất cả ({items.length.toString().padStart(2, "0")}){" "}
+          <RightOutlined style={{ fontSize: 11 }} />
+        </Button>
+      }
+    >
       {/* Loading Skeleton */}
-      {loading && (
-        <div className="space-y-4 animate-pulse">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="p-4 rounded-xl bg-slate-50 border border-slate-100 h-28"></div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && items.length === 0 && (
-        <div className="py-12 text-center text-slate-400 text-sm">
-          <svg className="w-10 h-10 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Hiện tại không có yêu cầu phê duyệt nào cần xử lý.
-        </div>
-      )}
-
-      {/* Approval Items List */}
-      {!loading && (
-        <div className="space-y-4">
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all flex flex-col justify-between gap-4"
+      {loading ? (
+        <List
+          itemLayout="vertical"
+          dataSource={[1, 2, 3]}
+          renderItem={(i) => (
+            <Card
+              key={i}
+              style={{
+                marginBottom: 12,
+                borderRadius: 12,
+                backgroundColor: "#fafafa",
+              }}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3.5">
-                  {/* Badge square icon */}
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${item.badgeBg} ${item.badgeText}`}
+              <Skeleton active avatar paragraph={{ rows: 2 }} />
+            </Card>
+          )}
+        />
+      ) : items.length === 0 ? (
+        /* Empty State */
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="Hiện tại không có yêu cầu phê duyệt nào cần xử lý."
+          style={{ padding: "32px 0" }}
+        />
+      ) : (
+        /* Danh sách các yêu cầu chờ duyệt */
+        <List
+          itemLayout="vertical"
+          dataSource={items}
+          split={false}
+          renderItem={(item) => (
+            <Card
+              key={item.id}
+              hoverable
+              style={{
+                marginBottom: 12,
+                borderRadius: 12,
+                borderColor: "#f0f0f0",
+                transition: "all 0.2s ease",
+              }}
+              styles={{ body: { padding: "16px 20px" } }}
+            >
+              {/* Phần thông tin chính */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 16,
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{ display: "flex", gap: 12, alignItems: "flex-start" }}
+                >
+                  <Tag
+                    color={getTypeTagColor(item.type)}
+                    style={{
+                      margin: 0,
+                      fontWeight: 700,
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                    }}
                   >
                     {item.typeLabel}
-                  </div>
-
-                  {/* Title & Reason */}
+                  </Tag>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-800 leading-tight">
+                    <Text
+                      strong
+                      style={{
+                        fontSize: 14,
+                        color: "#262626",
+                        display: "block",
+                      }}
+                    >
                       {item.title}
-                    </h3>
-                    <p className="text-xs text-amber-700 bg-amber-50/60 px-2 py-0.5 rounded mt-1.5 inline-block font-medium border border-amber-100/50">
-                      Lý do: {item.reason}
-                    </p>
+                    </Text>
+                    <div style={{ marginTop: 6 }}>
+                      <Tag
+                        color="orange"
+                        style={{
+                          margin: 0,
+                          borderRadius: 4,
+                          fontSize: 12,
+                          border: "1px solid #ffd591",
+                        }}
+                      >
+                        Lý do: {item.reason}
+                      </Tag>
+                    </div>
                   </div>
                 </div>
 
-                {/* Amount & Code */}
-                <div className="text-right shrink-0">
-                  <div className="text-sm font-extrabold text-slate-900 tracking-tight">
+                {/* Số tiền & Mã đơn */}
+                <div style={{ textAlign: "right", minWidth: 100 }}>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 800,
+                      color: "#1f1f1f",
+                      letterSpacing: "-0.2px",
+                    }}
+                  >
                     {item.amount}
                   </div>
-                  <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                  <Text
+                    type="secondary"
+                    style={{ fontSize: 11, fontFamily: "monospace" }}
+                  >
                     {item.code}
-                  </div>
+                  </Text>
                 </div>
               </div>
 
-              {/* Footer action bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-50">
-                <div className="text-xs text-slate-500">
-                  <span>{item.assigneeLabel}: </span>
-                  <strong className="text-slate-700 font-semibold">
-                    {item.assigneeName}
-                  </strong>
+              {/* Footer thanh thao tác */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingTop: 12,
+                  borderTop: "1px solid #f8f8f8",
+                }}
+              >
+                <div style={{ fontSize: 12 }}>
+                  <Text type="secondary">{item.assigneeLabel}: </Text>
+                  <Text strong>{item.assigneeName}</Text>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onReject(item)}
-                    className="px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 transition-colors"
+                {/* Hai nút Phê duyệt / Từ chối kèm xác nhận an toàn */}
+                <Space size="small">
+                  <Popconfirm
+                    title="Từ chối yêu cầu"
+                    description={`Bạn có chắc muốn từ chối ${item.code}?`}
+                    onConfirm={() => onReject(item)}
+                    okText="Từ chối"
+                    cancelText="Đóng"
+                    okButtonProps={{ danger: true }}
                   >
-                    Từ chối
-                  </button>
-                  <button
-                    onClick={() => onApprove(item)}
-                    className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-600/20 transition-all"
+                    <Button
+                      size="small"
+                      icon={<CloseOutlined />}
+                      style={{ borderRadius: 6, fontSize: 12 }}
+                    >
+                      Từ chối
+                    </Button>
+                  </Popconfirm>
+
+                  <Popconfirm
+                    title="Xác nhận phê duyệt"
+                    description={`Duyệt yêu cầu ngoại lệ cho ${item.code}?`}
+                    onConfirm={() => onApprove(item)}
+                    okText="Duyệt"
+                    cancelText="Hủy"
                   >
-                    {item.approveActionLabel}
-                  </button>
-                </div>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CheckOutlined />}
+                      style={{ borderRadius: 6, fontSize: 12 }}
+                    >
+                      {item.approveActionLabel}
+                    </Button>
+                  </Popconfirm>
+                </Space>
               </div>
-            </article>
-          ))}
-        </div>
+            </Card>
+          )}
+        />
       )}
-    </section>
+    </Card>
   );
 };
 

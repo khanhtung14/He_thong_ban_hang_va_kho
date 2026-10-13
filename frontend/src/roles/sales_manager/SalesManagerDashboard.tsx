@@ -1,12 +1,28 @@
+import ChangePasswordModal from "../../components/ChangePasswordModal";
+import ProfileModal from "../../components/ProfileModal";
 import React, { useEffect, useState, useCallback } from "react";
-import HeaderTailwind from "../../components/Header/HeaderTailwind";
-import SidebarTailwind from "../../components/Sidebar/SidebarTailwind";
+import { Layout, Button, Space, Typography, Alert, message } from "antd";
+import {
+  FileExcelOutlined,
+  PlusOutlined,
+  SmileOutlined,
+  DashboardOutlined,
+} from "@ant-design/icons";
+
+// Các components Ant Design
+import SalesManagerHeader from "../../components/Header/SalesManagerHeader";
+import SalesManagerSidebar from "../../components/Sidebar/SalesManagerSidebar";
 import StatCard from "../../components/StatCard";
 import ApprovalList, { type ApprovalItem } from "./ApprovalList";
 import TerritoryProgress from "./TerritoryProgress";
 import CreatePriceListModal from "./CreatePriceListModal";
 import ExportReportModal from "./ExportReportModal";
-import { logout } from "../../session";
+import ProductExcelImport from "./ProductExcelImport";
+import CategoryManagement from "./CategoryManagement";
+import ProductCatalogManagement from "./ProductCatalogManagement";
+import CustomerTerritoryManagement from "./CustomerTerritoryManagement";
+
+import { logout } from "../../services/sessionService";
 import {
   fetchProfile,
   fetchSalesMarginReport,
@@ -16,7 +32,10 @@ import {
   type UserProfile,
   type SalesMarginReport,
   type PriceListItem,
-} from "../../api";
+} from "../../services/apiClient";
+
+const { Content } = Layout;
+const { Title, Text } = Typography;
 
 export const SalesManagerDashboard: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -25,34 +44,39 @@ export const SalesManagerDashboard: React.FC = () => {
   const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
   const [menuItems, setMenuItems] = useState<any[]>([]);
 
+  // State điều hướng màn hình hiển thị
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      if (window.location.pathname === "/manager/categories") return "/manager/categories";
+      if (window.location.pathname === "/manager/products/import") return "/manager/products/import";
+      if (window.location.pathname === "/manager/customers") return "/manager/customers";
+    }
+    return "/manager/dashboard";
+  });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState<{ message: string; type: "success" | "info" | "error" } | null>(null);
 
-  // Modals state
+  // Trạng thái mở modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-
-  const showToast = (message: string, type: "success" | "info" | "error" = "success") => {
-    setToast({ message, type });
-    setTimeout(() => {
-      setToast(null);
-    }, 3500);
-  };
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isChangePassModalOpen, setIsChangePassModalOpen] = useState(false);
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const [profileData, reportData, priceListsData, navItems] = await Promise.allSettled([
-        fetchProfile(),
-        fetchSalesMarginReport(),
-        fetchPriceLists(),
-        fetchNavigationMenu("SALES_MANAGER"),
-      ]);
+      const [profileData, reportData, priceListsData, navItems] =
+        await Promise.allSettled([
+          fetchProfile(),
+          fetchSalesMarginReport(),
+          fetchPriceLists(),
+          fetchNavigationMenu("SALES_MANAGER"),
+        ]);
 
-      // 1. Profile
+      // 1. Hồ sơ người dùng
       if (profileData.status === "fulfilled") {
         setProfile(profileData.value);
       } else {
@@ -60,27 +84,24 @@ export const SalesManagerDashboard: React.FC = () => {
         setError("Không thể tải thông tin cá nhân từ máy chủ.");
       }
 
-      // 2. Report
+      // 2. Báo cáo doanh số & biên lợi nhuận
       if (reportData.status === "fulfilled") {
         setReport(reportData.value);
       } else {
         console.error("Report load error:", reportData.reason);
       }
 
-      // 3. Price lists & Draft Approvals
+      // 3. Danh sách bảng giá & Lọc đơn nháp cần duyệt
       if (priceListsData.status === "fulfilled") {
         const lists = priceListsData.value;
         setPriceLists(lists);
 
-        // Derive draft price lists requiring manager publish
         const draftItems: ApprovalItem[] = lists
-          .filter((p) => !p.published)
-          .map((draft) => ({
+          .filter((p: any) => !p.published)
+          .map((draft: any) => ({
             id: `pl-${draft.id}`,
             type: "price_list",
-            typeLabel: "BG",
-            badgeBg: "bg-blue-50 border border-blue-200",
-            badgeText: "text-blue-700",
+            typeLabel: "Bảng giá",
             title: `Bảng giá ${draft.code} (${draft.customer_group})`,
             reason: `Bảng giá nháp v${draft.version} chờ phát hành · Hiệu lực ${draft.start_date} đến ${draft.end_date}`,
             amount: `${draft.items?.length || 0} SKUs`,
@@ -96,24 +117,74 @@ export const SalesManagerDashboard: React.FC = () => {
         console.error("Price lists load error:", priceListsData.reason);
       }
 
-      // 4. Navigation Menu (Strictly filter out unauthorized /admin/ routes)
+      // 4. Menu điều hướng
       if (navItems.status === "fulfilled" && navItems.value.length > 0) {
-        setMenuItems([
+        // Lọc bỏ route admin và loại bỏ mục "Quản lý nhóm hàng" (nếu có từ backend)
+        const backendNavItems = navItems.value
+          .filter(
+            (m: any) =>
+              !m.path.startsWith("/admin/") &&
+              m.title !== "Quản lý nhóm hàng" &&
+              m.id !== "category-management"
+          )
+          .map((m: any) => ({
+            id: m.id,
+            title: m.path === "/manager/categories" ? "Nhóm hàng" : m.title,
+            path: m.path,
+            icon: m.icon,
+          }));
+
+        const hasCategoryMenu = backendNavItems.some(
+          (m: any) => m.path === "/manager/categories" || m.id === "manager-categories"
+        );
+
+        const rawMenuItems = [
           {
             id: "home",
             title: "Trang chủ",
             path: "/manager/dashboard",
             icon: "home",
           },
-          ...navItems.value
-            .filter((m: any) => !m.path.startsWith("/admin/"))
-            .map((m: any) => ({
-              id: m.id,
-              title: m.title,
-              path: m.path,
-              icon: m.icon,
-            })),
-        ]);
+          ...backendNavItems,
+          ...(hasCategoryMenu
+            ? []
+            : [
+                {
+                  id: "manager-categories",
+                  title: "Nhóm hàng",
+                  path: "/manager/categories",
+                  icon: "appstore",
+                },
+              ]),
+          {
+            id: "manager-customers",
+            title: "Đại lý & Địa bàn",
+            path: "/manager/customers",
+            icon: "customers",
+          },
+          {
+            id: "manager-products",
+            title: "Danh mục sản phẩm",
+            path: "/manager/products",
+            icon: "boxes-stacked",
+          },
+          {
+            id: "excel-import",
+            title: "Nhập sản phẩm (Excel)",
+            path: "/manager/products/import",
+            icon: "excel",
+          },
+        ];
+
+        // Đảm bảo không trùng lặp mục menu theo path và không có "Quản lý nhóm hàng"
+        const uniqueMenuItems = rawMenuItems
+          .filter((item) => item.title !== "Quản lý nhóm hàng")
+          .filter(
+            (item, index, self) =>
+              index === self.findIndex((t) => t.path === item.path)
+          );
+
+        setMenuItems(uniqueMenuItems);
       }
     } catch (err: any) {
       setError(err.message || "Đã xảy ra lỗi khi kết nối với máy chủ.");
@@ -126,35 +197,35 @@ export const SalesManagerDashboard: React.FC = () => {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  // Handle Approve action: Calls real API POST /api/v1/price-lists/{price_list_id}/publish
+  // Phê duyệt bảng giá
   const handleApprove = async (item: ApprovalItem) => {
     if (item.type === "price_list" && item.priceListId) {
       try {
         await publishPriceList(item.priceListId);
-        showToast(`Đã phát hành thành công bảng giá ${item.title}!`, "success");
+        message.success(`Đã phát hành thành công bảng giá ${item.title}!`);
         setApprovals((prev) => prev.filter((a) => a.id !== item.id));
 
-        // Refresh price lists state so the count updates
         const updatedLists = await fetchPriceLists().catch(() => null);
         if (updatedLists) setPriceLists(updatedLists);
       } catch (err: any) {
-        showToast(err.message || "Lỗi khi phát hành bảng giá", "error");
+        message.error(err.message || "Lỗi khi phát hành bảng giá");
       }
       return;
     }
 
-    showToast(`Đã xử lý: ${item.title}`, "success");
+    message.success(`Đã xử lý: ${item.title}`);
     setApprovals((prev) => prev.filter((a) => a.id !== item.id));
   };
 
-  // Handle Reject action
+  // Từ chối yêu cầu
   const handleReject = (item: ApprovalItem) => {
-    showToast(`Đã từ chối: ${item.title}`, "info");
+    message.info(`Đã từ chối: ${item.title}`);
     setApprovals((prev) => prev.filter((a) => a.id !== item.id));
   };
 
+  // Callback khi tạo mới bảng giá thành công
   const handlePriceListCreated = async (newPriceList: PriceListItem) => {
-    showToast(`Tạo thành công bảng giá nháp ${newPriceList.code}!`, "success");
+    message.success(`Tạo thành công bảng giá nháp ${newPriceList.code}!`);
     setPriceLists((prev) => [newPriceList, ...prev]);
 
     if (!newPriceList.published) {
@@ -162,9 +233,7 @@ export const SalesManagerDashboard: React.FC = () => {
         {
           id: `pl-${newPriceList.id}`,
           type: "price_list",
-          typeLabel: "BG",
-          badgeBg: "bg-blue-50 border border-blue-200",
-          badgeText: "text-blue-700",
+          typeLabel: "Bảng giá",
           title: `Bảng giá ${newPriceList.code} (${newPriceList.customer_group})`,
           reason: `Bảng giá nháp mới tạo · Hiệu lực ${newPriceList.start_date} đến ${newPriceList.end_date}`,
           amount: `${newPriceList.items?.length || 0} SKUs`,
@@ -179,206 +248,343 @@ export const SalesManagerDashboard: React.FC = () => {
     }
   };
 
-  // Format currency
+  // Định dạng số tiền
   const formatMoney = (val?: number) => {
     if (val === undefined || val === null) return "0 ₫";
     if (val >= 1_000_000_000) {
       return `${(val / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} Tỷ ₫`;
     }
     if (val >= 1_000_000) {
-      return `${(val / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} Triệu ₫`;
+      return `${(val / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} Tr ₫`;
     }
     return `${val.toLocaleString("vi-VN")} ₫`;
   };
 
   return (
-    <div className="flex bg-[#F8FAFC] min-h-screen font-sans text-slate-800">
-      {/* 1. Sidebar */}
-      <SidebarTailwind
-        currentPath="/manager/dashboard"
+    <Layout style={{ minHeight: "100vh", position: "relative" }}>
+      {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
+      <div
+        style={{
+          position: "fixed",
+          inset: "-20px",
+          backgroundImage: "url('/bg.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(4px)",
+          transform: "scale(1.05)",
+          zIndex: 0,
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "rgba(248, 250, 252, 0.5)",
+          zIndex: 0,
+        }}
+      />
+
+      {/* 1. Sidebar bên trái */}
+      <SalesManagerSidebar
+        currentPath={currentPath}
         pendingApprovalCount={approvals.length}
         menuItems={menuItems}
         onLogout={logout}
         onNavigate={(path) => {
           if (path === "/manager/dashboard" || path === "/") {
+            setCurrentPath("/manager/dashboard");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (path === "/manager/products/import") {
+            setCurrentPath("/manager/products/import");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (path === "/manager/categories") {
+            setCurrentPath("/manager/categories");
             window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/orders/approval") {
-            const el = document.getElementById("approvals-section");
-            if (el) el.scrollIntoView({ behavior: "smooth" });
-            else window.location.assign(path);
+            setCurrentPath("/manager/dashboard");
+            setTimeout(() => {
+              const el = document.getElementById("approvals-section");
+              if (el) el.scrollIntoView({ behavior: "smooth" });
+            }, 100);
           } else if (path === "/manager/pricing") {
             setIsCreateModalOpen(true);
           } else if (path === "/manager/reports") {
             setIsExportModalOpen(true);
           } else {
-            window.location.assign(path);
+            setCurrentPath(path);
           }
         }}
       />
 
-      {/* 2. Main content area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header */}
-        <HeaderTailwind
-          fullName={profile?.full_name || (loading ? "Đang tải..." : "Người dùng")}
+      {/* 2. Cột nội dung bên phải */}
+      <Layout style={{ backgroundColor: "transparent", minWidth: 0, zIndex: 1 }}>
+        {/* Header trên cùng */}
+        <SalesManagerHeader
+          fullName={profile?.full_name || "Quản lý kinh doanh"}
           roleName={profile?.role || "Quản lý kinh doanh"}
-          avatarUrl={profile?.avatar_url}
+          avatarUrl={profile?.avatar_url || undefined}
           notificationCount={approvals.length}
           onLogout={logout}
-          onProfileClick={() => window.location.assign("/profile")}
+          onProfileClick={() => setIsProfileModalOpen(true)}
+          onChangePassword={() => setIsChangePassModalOpen(true)}
         />
 
-        {/* Dashboard Body */}
-        <main className="p-6 sm:p-8 max-w-7xl w-full mx-auto space-y-6">
-          {/* Toast alert */}
-          {toast && (
-            <div
-              className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between border shadow-sm animate-fade-in ${
-                toast.type === "success"
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                  : toast.type === "error"
-                  ? "bg-rose-50 text-rose-800 border-rose-200"
-                  : "bg-blue-50 text-blue-800 border-blue-200"
-              }`}
-            >
-              <span>{toast.message}</span>
-              <button
-                onClick={() => setToast(null)}
-                className="text-sm font-bold opacity-70 hover:opacity-100 cursor-pointer"
+        {/* Nội dung chính */}
+        <Content
+          style={{
+            padding: "24px 32px",
+            maxWidth: 1400,
+            width: "100%",
+            margin: "0 auto",
+          }}
+        >
+          {/* TAB 1: MÀN HÌNH NHẬP EXCEL SẢN PHẨM HÀNG LOẠT */}
+          {currentPath === "/manager/products/import" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
               >
-                ✕
-              </button>
+                <div>
+                  <Title level={3} style={{ margin: 0 }}>
+                    Nhập danh mục sản phẩm từ Excel
+                  </Title>
+                  <Text type="secondary">
+                    Đưa hàng loạt sản phẩm mới hoặc cập nhật giá/tồn kho từ file
+                    bảng tính
+                  </Text>
+                </div>
+                <Button
+                  icon={<DashboardOutlined />}
+                  onClick={() => setCurrentPath("/manager/dashboard")}
+                >
+                  Quay lại Dashboard
+                </Button>
+              </div>
+
+              <ProductExcelImport />
             </div>
+          ) : currentPath === "/manager/categories" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <CategoryManagement />
+            </div>
+          ) : currentPath === "/manager/products" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <ProductCatalogManagement />
+            </div>
+          ) : currentPath === "/manager/customers" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <CustomerTerritoryManagement />
+            </div>
+          ) : (
+            /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */
+            <Space direction="vertical" size="large" style={{ width: "100%" }}>
+              {/* Cảnh báo lỗi nếu có */}
+              {error && (
+                <Alert
+                  message="Lỗi kết nối"
+                  description={error}
+                  type="error"
+                  showIcon
+                  closable
+                  onClose={() => setError("")}
+                />
+              )}
+
+              {/* Khối tiêu đề chào mừng & Nút thao tác nhanh */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 16,
+                }}
+              >
+                <div>
+                  <Title
+                    level={2}
+                    style={{ margin: 0, letterSpacing: "-0.5px" }}
+                  >
+                    Xin chào, {profile?.full_name || "Quản lý kinh doanh"}{" "}
+                    <SmileOutlined style={{ color: "#faad14" }} />
+                  </Title>
+                  <Text
+                    type="secondary"
+                    style={{ fontSize: 13, marginTop: 4, display: "block" }}
+                  >
+                    Bàn làm việc Quản lý Kinh doanh · Giám sát doanh số, duyệt
+                    đơn và quản lý <Text strong>{priceLists.length}</Text> bảng
+                    giá niêm yết
+                  </Text>
+                </div>
+
+                <Space size="middle">
+                  <Button
+                    icon={<FileExcelOutlined />}
+                    onClick={() => setCurrentPath("/manager/products/import")}
+                    style={{ borderRadius: 8, height: 38 }}
+                  >
+                    Nhập hàng loạt (Excel)
+                  </Button>
+                  <Button
+                    icon={<FileExcelOutlined />}
+                    onClick={() => setIsExportModalOpen(true)}
+                    style={{ borderRadius: 8, height: 38 }}
+                  >
+                    Xuất báo cáo
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => setIsCreateModalOpen(true)}
+                    style={{ borderRadius: 8, height: 38 }}
+                  >
+                    Tạo bảng giá mới
+                  </Button>
+                </Space>
+              </div>
+
+              {/* Dòng 4 thẻ StatCard KPI */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gap: 16,
+                }}
+              >
+                <StatCard
+                  title="Doanh thu toàn kênh"
+                  value={formatMoney(report?.total_revenue)}
+                  target={report?.period ? `Kỳ: ${report.period}` : undefined}
+                  subText={
+                    report && report.total_revenue > 0
+                      ? "Doanh số lũy kế ghi nhận"
+                      : "Chưa phát sinh doanh số"
+                  }
+                  tagText={report?.period || undefined}
+                  iconType="trend-up"
+                  loading={loading}
+                />
+
+                <StatCard
+                  title="Biên lợi nhuận gộp"
+                  value={report?.margin || "0%"}
+                  badgeText={
+                    report && report.total_revenue > 0
+                      ? "Định mức hệ thống"
+                      : undefined
+                  }
+                  badgeTone="green"
+                  subText={
+                    report && report.total_revenue > 0
+                      ? "Tính trên giá vốn & doanh thu"
+                      : "Chưa có phát sinh"
+                  }
+                  iconType="shield"
+                  loading={loading}
+                />
+
+                <StatCard
+                  title="Lợi nhuận gộp"
+                  value={formatMoney(report?.gross_profit)}
+                  badgeText={
+                    report && report.gross_profit > 0
+                      ? "Doanh thu - Giá vốn"
+                      : undefined
+                  }
+                  badgeTone="green"
+                  subText={
+                    report && report.total_cogs > 0
+                      ? `Giá vốn: ${formatMoney(report.total_cogs)}`
+                      : "Chưa phát sinh giá vốn"
+                  }
+                  iconType="clock"
+                  loading={loading}
+                />
+
+                <StatCard
+                  title="Bảng giá & Đơn chờ duyệt"
+                  value={`${String(approvals.length).padStart(2, "0")} Cần xử lý`}
+                  badgeText={approvals.length > 0 ? "Cần xử lý" : "Trống"}
+                  badgeTone={approvals.length > 0 ? "rose" : "green"}
+                  subText={
+                    approvals.length > 0
+                      ? "Bảng giá nháp chờ phát hành"
+                      : "Không có yêu cầu chờ duyệt"
+                  }
+                  iconType="alert"
+                  isUrgent={approvals.length > 0}
+                  loading={loading}
+                />
+              </div>
+
+              {/* Khu vực nội dung chính */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(12, 1fr)",
+                  gap: 24,
+                  alignItems: "start",
+                }}
+              >
+                <div id="approvals-section" style={{ gridColumn: "span 7" }}>
+                  <ApprovalList
+                    items={approvals}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                    onViewAll={() =>
+                      message.info(
+                        `Tổng cộng ${approvals.length} yêu cầu đang chờ bạn xử lý`,
+                      )
+                    }
+                    loading={loading}
+                  />
+                </div>
+
+                <div style={{ gridColumn: "span 5" }}>
+                  <TerritoryProgress
+                    area={profile?.area}
+                    productMargins={report?.details}
+                    loading={loading}
+                  />
+                </div>
+              </div>
+            </Space>
           )}
+        </Content>
+      </Layout>
 
-          {/* Error alert */}
-          {error && (
-            <div className="p-4 rounded-xl text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200 flex items-center justify-between">
-              <span>{error}</span>
-              <button
-                onClick={() => setError("")}
-                className="text-sm font-bold opacity-70 hover:opacity-100 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Welcome Header block */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                Xin chào, {profile?.full_name || (loading ? "Quản lý kinh doanh" : "Quản lý kinh doanh")} <span className="inline-block animate-bounce">👋</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Bàn làm việc Quản lý Kinh doanh · Giám sát doanh số, duyệt đơn và quản lý {priceLists.length} bảng giá niêm yết
-              </p>
-            </div>
-
-            {/* Quick action buttons */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsExportModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-white border border-slate-200/90 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>Xuất báo cáo</span>
-              </button>
-
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-600/25 transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <span className="text-base leading-none">+</span>
-                <span>Tạo bảng giá mới</span>
-              </button>
-            </div>
-          </div>
-
-          {/* KPI Metric Cards Row (4 cards populated purely from real API) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            <StatCard
-              title="Doanh thu toàn kênh"
-              value={formatMoney(report?.total_revenue)}
-              target={report?.period ? `Kỳ: ${report.period}` : undefined}
-              subText={report && report.total_revenue > 0 ? "Doanh số lũy kế ghi nhận" : "Chưa phát sinh doanh số"}
-              tagText={report?.period || undefined}
-              iconType="trend-up"
-              loading={loading}
-            />
-
-            <StatCard
-              title="Biên lợi nhuận gộp"
-              value={report?.margin || "0%"}
-              badgeText={report && report.total_revenue > 0 ? "Định mức hệ thống" : undefined}
-              badgeTone="green"
-              subText={report && report.total_revenue > 0 ? "Tính trên giá vốn & doanh thu" : "Chưa có phát sinh"}
-              iconType="shield"
-              loading={loading}
-            />
-
-            <StatCard
-              title="Lợi nhuận gộp"
-              value={formatMoney(report?.gross_profit)}
-              badgeText={report && report.gross_profit > 0 ? "Doanh thu - Giá vốn" : undefined}
-              badgeTone="green"
-              subText={report && report.total_cogs > 0 ? `Giá vốn: ${formatMoney(report.total_cogs)}` : "Chưa phát sinh giá vốn"}
-              iconType="clock"
-              loading={loading}
-            />
-
-            <StatCard
-              title="Bảng giá & Đơn chờ duyệt"
-              value={`${String(approvals.length).padStart(2, "0")} Cần xử lý`}
-              badgeText={approvals.length > 0 ? "Cần xử lý" : "Trống"}
-              badgeTone={approvals.length > 0 ? "rose" : "green"}
-              subText={approvals.length > 0 ? "Bảng giá nháp chờ phát hành" : "Không có yêu cầu chờ duyệt"}
-              iconType="alert"
-              isUrgent={approvals.length > 0}
-              loading={loading}
-            />
-          </div>
-
-          {/* Main Content Grid: Left Column 7/12 & Right Column 5/12 */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Approval list (7 of 12) */}
-            <div id="approvals-section" className="lg:col-span-7">
-              <ApprovalList
-                items={approvals}
-                onApprove={handleApprove}
-                onReject={handleReject}
-                onViewAll={() => showToast(`Tổng cộng ${approvals.length} yêu cầu đang chờ bạn xử lý`, "info")}
-                loading={loading}
-              />
-            </div>
-
-            {/* Right Column: Territory Scope & Margin Products (5 of 12) */}
-            <div className="lg:col-span-5">
-              <TerritoryProgress
-                area={profile?.area}
-                productMargins={report?.details}
-                loading={loading}
-              />
-            </div>
-          </div>
-        </main>
-      </div>
-
-      {/* Modals */}
+      {/* Modal Khai báo Bảng giá */}
       <CreatePriceListModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={handlePriceListCreated}
       />
 
+      {/* Modal Xuất Báo cáo */}
       <ExportReportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         reportData={report}
       />
-    </div>
+
+      {/* Modal Hồ sơ cá nhân */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        onProfileUpdated={(updated) => setProfile(updated)}
+      />
+
+      {/* Modal Đổi mật khẩu */}
+      <ChangePasswordModal
+        isOpen={isChangePassModalOpen}
+        onClose={() => setIsChangePassModalOpen(false)}
+      />
+    </Layout>
   );
 };
 

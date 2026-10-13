@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import Login from "./auth/Login";
-import ForgotPassword from "./auth/ForgotPassword";
-import ChangePassword from "./auth/ChangePassword";
-import CreateUser from "./CreateUser";
-import Profile from "./Profile";
+import Login from "./features/auth/Login";
+import ForgotPassword from "./features/auth/ForgotPassword";
+import ResetPassword from "./features/auth/ResetPassword";
+import ChangePassword from "./features/auth/ChangePassword";
+import CreateUser from "./roles/admin/CreateUser";
+import Profile from "./features/profile/Profile";
 import Navigation from "./Navigation";
 import RoleWorkspace from "./RoleWorkspace";
 import Error403 from "./Error403";
-import {
-  hasValidSession,
-  getCurrentUserRole,
-} from "./session";
+import { hasValidSession, getCurrentUserRole } from "./services/sessionService";
 
 const roleWorkspacePaths = [
   "/portal/orders",
@@ -20,6 +18,9 @@ const roleWorkspacePaths = [
   "/manager/orders/approval",
   "/manager/pricing",
   "/manager/reports",
+  "/manager/categories",
+  "/manager/products",
+  "/manager/products/import",
   "/warehouse/picking",
   "/warehouse/receiving",
   "/warehouse/inventory",
@@ -27,6 +28,7 @@ const roleWorkspacePaths = [
   "/accounting/debt-book",
   "/accounting/invoices",
   "/admin/users",
+  "/admin/users/import",
 ];
 
 export default function App() {
@@ -53,6 +55,9 @@ export default function App() {
   if (currentPath === "/forgot-password") {
     return <ForgotPassword />;
   }
+  if (currentPath === "/reset-password") {
+    return <ResetPassword />;
+  }
   if (currentPath === "/errors/403") {
     return <Error403 />;
   }
@@ -71,7 +76,10 @@ export default function App() {
 
   // 4. Admin create user route
   if (currentPath === "/admin/users/create") {
-    const normalized = (userRole ?? "").trim().toUpperCase().replace(/[ -]/g, "_");
+    const normalized = (userRole ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[ -]/g, "_");
     if (["ADMIN", "ADMINISTRATOR"].includes(normalized)) {
       return <CreateUser />;
     }
@@ -90,7 +98,10 @@ export default function App() {
   }
 
   // 6. Role workspace routes (e.g. /manager/dashboard, /sales/orders, etc.)
-  if (roleWorkspacePaths.includes(currentPath) || currentPath.startsWith("/admin/")) {
+  if (
+    roleWorkspacePaths.includes(currentPath) ||
+    currentPath.startsWith("/admin/")
+  ) {
     return <RoleWorkspace />;
   }
 

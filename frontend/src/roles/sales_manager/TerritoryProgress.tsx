@@ -1,4 +1,17 @@
 import React from "react";
+import {
+  Card,
+  List,
+  Tag,
+  Typography,
+  Space,
+  Skeleton,
+  Empty,
+  Badge,
+} from "antd";
+import { ThunderboltOutlined } from "@ant-design/icons";
+
+const { Text } = Typography;
 
 export interface TerritoryItem {
   id: string;
@@ -38,60 +51,116 @@ export const TerritoryProgress: React.FC<TerritoryProgressProps> = ({
   loading = false,
 }) => {
   const formatMoney = (val: number) =>
-    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(val);
+    new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(val || 0);
 
-
+  // Hiệu ứng Loading Skeleton
   if (loading) {
     return (
-      <section className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)] animate-pulse">
-        <div className="h-4 bg-slate-100 rounded w-44 mb-4"></div>
-        <div className="space-y-3">
-          <div className="h-10 bg-slate-50 rounded-lg"></div>
-          <div className="h-10 bg-slate-50 rounded-lg"></div>
-        </div>
-      </section>
+      <Card style={{ borderRadius: 16, border: "1px solid #f0f0f0" }}>
+        <Skeleton active paragraph={{ rows: 4 }} />
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
-
-      {/* 3. Top Margin Products (From Real API Data: /api/v1/reports/sales-margin) */}
-      <section className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)]">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-50 mb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-            <h2 className="text-sm font-bold text-slate-800">
-              Hiệu quả SKU sinh lời (Margin)
-            </h2>
-          </div>
-          <span className="text-[11px] text-slate-400 font-medium">Từ Báo cáo Doanh số</span>
-        </div>
-
-        {productMargins.length > 0 ? (
-          <div className="divide-y divide-slate-50">
-            {productMargins.map((p) => (
-              <div key={p.sku} className="py-2.5 flex items-center justify-between gap-2 text-xs">
-                <div>
-                  <div className="font-semibold text-slate-800">{p.name}</div>
-                  <div className="text-[11px] text-slate-400">{p.sku} · {p.units_sold} đơn vị bán</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-slate-900">{formatMoney(p.revenue)}</div>
-                  <span className="inline-block text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                    Lãi {p.margin}
-                  </span>
-                </div>
+    <Card
+      style={{
+        borderRadius: 16,
+        border: "1px solid #f0f0f0",
+        backgroundColor: "#ffffff",
+        boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)",
+      }}
+      styles={{
+        header: { padding: "16px 20px", borderBottom: "1px solid #f5f5f5" },
+        body: { padding: "12px 20px" },
+      }}
+      title={
+        <Space align="center" size={8}>
+          <Badge color="#722ed1" />
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#1f1f1f" }}>
+            Hiệu quả SKU sinh lời (Margin)
+          </span>
+        </Space>
+      }
+      extra={
+        <Text type="secondary" style={{ fontSize: 11 }}>
+          Từ Báo cáo Doanh số
+        </Text>
+      }
+    >
+      {productMargins.length > 0 ? (
+        <List
+          itemLayout="horizontal"
+          dataSource={productMargins}
+          renderItem={(p) => (
+            <List.Item
+              key={p.sku}
+              style={{
+                padding: "12px 0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              {/* Tên sản phẩm, Mã SKU & Số lượng bán */}
+              <div style={{ maxWidth: "60%" }}>
+                <Text
+                  strong
+                  style={{ fontSize: 13, color: "#262626", display: "block" }}
+                >
+                  {p.name}
+                </Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  <Tag
+                    color="default"
+                    style={{
+                      fontSize: 10,
+                      padding: "0 4px",
+                      marginInlineEnd: 4,
+                    }}
+                  >
+                    {p.sku}
+                  </Tag>{" "}
+                  · {p.units_sold?.toLocaleString("vi-VN")} đơn vị bán
+                </Text>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-6 text-center text-xs text-slate-400">
-            Chưa có số liệu sản phẩm sinh lời từ báo cáo.
-          </div>
-        )}
-      </section>
-    </div>
+
+              {/* Doanh thu & Tag Biên lợi nhuận */}
+              <div style={{ textAlign: "right" }}>
+                <div
+                  style={{ fontWeight: 700, fontSize: 14, color: "#1f1f1f" }}
+                >
+                  {formatMoney(p.revenue)}
+                </div>
+                <Tag
+                  color="success"
+                  icon={<ThunderboltOutlined />}
+                  style={{
+                    marginInlineEnd: 0,
+                    marginTop: 3,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    borderRadius: 4,
+                  }}
+                >
+                  Lãi {p.margin}
+                </Tag>
+              </div>
+            </List.Item>
+          )}
+        />
+      ) : (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="Chưa có số liệu sản phẩm sinh lời từ báo cáo."
+          style={{ padding: "24px 0" }}
+        />
+      )}
+    </Card>
   );
 };
 
