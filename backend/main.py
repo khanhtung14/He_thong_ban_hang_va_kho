@@ -22,7 +22,7 @@ from app.api.v1.endpoints.products import router as products_router
 from app.api.v1.endpoints.price_lists import router as price_lists_router
 from app.api.v1.endpoints.profile import migrate_profile_schema, router as profile_router
 from app.api.v1.endpoints.reports import router as reports_router
-from app.core.session import router as session_router
+
 from app.api.v1.endpoints.user_assignment import router as user_assignment_router
 from app.api.v1.endpoints.user_routes import router as user_router
 from app.api.v1.endpoints.users import compat_router as users_compat_router, router as users_router
@@ -154,7 +154,6 @@ app.include_router(audit_logs_router)
 app.include_router(forgot_password_router)
 app.include_router(import_users_router)
 app.include_router(login_router)
-app.include_router(session_router)
 app.include_router(inventory_router)
 app.include_router(legacy_inventory_router)
 app.include_router(products_router)
@@ -175,18 +174,13 @@ try:
         territories_router,
         roles_router,
     )
-    from app.api.v1.endpoints.customers import router as customers_router
-    from app.api.v1.endpoints.orders import router as orders_router
     from app.api.v1.endpoints.invoices import router as invoices_router
     from app.api.v1.endpoints.payments import router as payments_router
     from app.api.v1.endpoints.returns import router as returns_router
-
     app.include_router(warehouse_router)
     app.include_router(warehouses_router)
     app.include_router(territories_router)
     app.include_router(roles_router)
-    app.include_router(customers_router)
-    app.include_router(orders_router)
     app.include_router(invoices_router)
     app.include_router(payments_router)
     app.include_router(returns_router)
