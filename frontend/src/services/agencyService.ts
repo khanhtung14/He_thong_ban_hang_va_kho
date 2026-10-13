@@ -10,6 +10,7 @@ import type {
   AgencyUpdatePayload,
   AgencyListParams,
   AgencyListResponse,
+  SalesRepUser,
 } from "../types/agency";
 
 /**
@@ -163,4 +164,20 @@ export async function deleteAgency(
     success: true,
     message: "Xóa hồ sơ đại lý thành công.",
   }));
+}
+
+/**
+ * 7. Lấy danh sách nhân viên kinh doanh (Sales Reps) để phân công đại lý
+ */
+export async function getSalesReps(): Promise<SalesRepUser[]> {
+  const res = await authenticatedFetch("/api/v1/sales/reps");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.detail || "Không thể tải danh sách nhân viên kinh doanh.",
+    );
+  }
+  const result = await res.json();
+  if (Array.isArray(result)) return result;
+  return result.data || [];
 }

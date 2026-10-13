@@ -28,6 +28,8 @@ const roleByPath: Record<string, RoleKey> = {
   "/manager/reports": "salesManager",
   "/manager/categories": "salesManager",
   "/manager/products": "salesManager",
+  "/manager/products/import-excel": "salesManager",
+  "/manager/products/import": "salesManager",
   "/warehouse/picking": "warehouse",
   "/warehouse/receiving": "warehouse",
   "/warehouse/inventory": "warehouse",
@@ -57,6 +59,8 @@ const allowedRolesByPath: Record<string, RoleKey[]> = {
   "/manager/reports": ["salesManager", "admin"],
   "/manager/categories": ["salesManager", "admin"],
   "/manager/products": ["salesManager", "admin"],
+  "/manager/products/import-excel": ["salesManager", "admin"],
+  "/manager/products/import": ["salesManager", "admin"],
   "/warehouse/picking": ["warehouse", "warehouseManager", "admin"],
   "/warehouse/receiving": ["warehouse", "warehouseManager", "admin"],
   "/warehouse/inventory": [

@@ -44,11 +44,13 @@ import {
   updateAgency,
   updateAgencyStatus,
   deleteAgency,
+  getSalesReps,
 } from "../../services/agencyService";
 import type {
   Agency,
   AgencyCreatePayload,
   AgencyUpdatePayload,
+  SalesRepUser,
 } from "../../types/agency";
 
 const { Title, Text, Paragraph } = Typography;
@@ -85,6 +87,45 @@ export const AgencyManagement: React.FC = () => {
     pageSize: 10,
     total: 0,
   });
+
+  // Danh sách nhân viên kinh doanh
+  const [salesReps, setSalesReps] = useState<SalesRepUser[]>([]);
+  const [loadingSalesReps, setLoadingSalesReps] = useState<boolean>(false);
+
+  // Tải danh sách nhân viên kinh doanh phụ trách
+  const loadSalesReps = useCallback(async () => {
+    setLoadingSalesReps(true);
+    try {
+      const reps = await getSalesReps();
+      setSalesReps(reps);
+    } catch (err: any) {
+      console.error("Không thể tải danh sách nhân viên kinh doanh:", err);
+    } finally {
+      setLoadingSalesReps(false);
+    }
+  }, []);
+
+  // Lấy tên hiển thị của nhân viên kinh doanh phụ trách
+  const getRepDisplayName = useCallback(
+    (agency: Agency | null | undefined): string => {
+      if (!agency) return "Chưa phân công";
+      const repId = agency.sales_rep_id ?? agency.salesRepId;
+      if (repId) {
+        const found = salesReps.find((u) => u.id === Number(repId));
+        if (found) return found.full_name;
+      }
+      if (agency.person_in_charge) {
+        const asNum = Number(agency.person_in_charge);
+        if (!isNaN(asNum) && asNum > 0) {
+          const found = salesReps.find((u) => u.id === asNum);
+          if (found) return found.full_name;
+        }
+        return String(agency.person_in_charge);
+      }
+      return "Chưa phân công";
+    },
+    [salesReps],
+  );
 
   // Modal Thêm / Sửa
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -151,7 +192,8 @@ export const AgencyManagement: React.FC = () => {
 
   useEffect(() => {
     loadAgencies(1);
-  }, [loadAgencies]);
+    loadSalesReps();
+  }, [loadAgencies, loadSalesReps]);
 
   // Mở modal thêm mới đại lý
   const handleOpenAddModal = () => {
@@ -160,6 +202,7 @@ export const AgencyManagement: React.FC = () => {
     form.setFieldsValue({
       customer_group: "DEALER_LEVEL_1",
       region: "Miền Bắc",
+      person_in_charge: undefined,
       is_active: true,
     });
     setIsModalOpen(true);
@@ -169,13 +212,34 @@ export const AgencyManagement: React.FC = () => {
   const handleOpenEditModal = (agency: Agency) => {
     setEditingAgency(agency);
     form.resetFields();
+
+    // Xác định ID hoặc giá trị người phụ trách ban đầu
+    let initialRep: number | string | undefined = undefined;
+    if (agency.sales_rep_id != null && Number(agency.sales_rep_id) > 0) {
+      initialRep = Number(agency.sales_rep_id);
+    } else if (agency.salesRepId != null && Number(agency.salesRepId) > 0) {
+      initialRep = Number(agency.salesRepId);
+    } else if (agency.person_in_charge != null) {
+      const asNum = Number(agency.person_in_charge);
+      if (!isNaN(asNum) && asNum > 0) {
+        initialRep = asNum;
+      } else {
+        const found = salesReps.find(
+          (u) =>
+            u.full_name?.toLowerCase() === String(agency.person_in_charge).trim().toLowerCase() ||
+            u.username?.toLowerCase() === String(agency.person_in_charge).trim().toLowerCase(),
+        );
+        initialRep = found ? found.id : String(agency.person_in_charge);
+      }
+    }
+
     form.setFieldsValue({
       code: agency.code,
       name: agency.name,
       tax_code: agency.tax_code ?? agency.taxCode,
       customer_group: agency.customer_group ?? agency.customerGroup ?? "DEALER_LEVEL_1",
       region: agency.region,
-      person_in_charge: agency.person_in_charge ?? agency.sales_rep_id,
+      person_in_charge: initialRep,
       phone: agency.phone,
       email: agency.email,
       address: agency.address,
@@ -201,20 +265,59 @@ export const AgencyManagement: React.FC = () => {
       const values = await form.validateFields();
       setModalLoading(true);
 
+      // 1. Chuẩn hóa Sales Rep ID: Chỉ gửi số nguyên (integer) của User được chọn, tuyệt đối không gửi text, nếu không chọn thì gửi null
+      const repValue = values.person_in_charge;
+      let salesRepId: number | null = null;
+
+      if (typeof repValue === "number" && Number.isInteger(repValue) && repValue > 0) {
+        salesRepId = repValue;
+      } else if (typeof repValue === "string" && repValue.trim()) {
+        const asNum = Number(repValue.trim());
+        if (!isNaN(asNum) && Number.isInteger(asNum) && asNum > 0) {
+          salesRepId = asNum;
+        } else {
+          const found = salesReps.find(
+            (u) =>
+              u.full_name?.toLowerCase() === repValue.trim().toLowerCase() ||
+              u.username?.toLowerCase() === repValue.trim().toLowerCase(),
+          );
+          salesRepId = found ? found.id : null;
+        }
+      } else {
+        salesRepId = null;
+      }
+
+      // 2. Helper cắt tỉa khoảng trắng (trim), nếu rỗng trả về null
+      const cleanStr = (val: any): string | null => {
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          return trimmed.length > 0 ? trimmed : null;
+        }
+        return null;
+      };
+
+      const codeClean = typeof values.code === "string" ? values.code.trim().toUpperCase() : "";
+      const nameClean = typeof values.name === "string" ? values.name.trim() : "";
+      const taxCodeClean = cleanStr(values.tax_code);
+      const customerGroupClean = cleanStr(values.customer_group) || "DEALER_LEVEL_1";
+      const regionClean = cleanStr(values.region);
+      const phoneClean = cleanStr(values.phone);
+      const emailClean = cleanStr(values.email);
+      const addressClean = cleanStr(values.address);
+
       if (editingAgency) {
         const payload: AgencyUpdatePayload = {
-          name: values.name.trim(),
-          tax_code: values.tax_code ? values.tax_code.trim() : undefined,
-          customer_group: values.customer_group,
-          region: values.region ? values.region.trim() : undefined,
-          person_in_charge: values.person_in_charge
-            ? typeof values.person_in_charge === "string"
-              ? values.person_in_charge.trim()
-              : values.person_in_charge
-            : undefined,
-          phone: values.phone ? values.phone.trim() : undefined,
-          email: values.email ? values.email.trim() : undefined,
-          address: values.address ? values.address.trim() : undefined,
+          name: nameClean,
+          tax_code: taxCodeClean,
+          customer_group: customerGroupClean,
+          region: regionClean,
+          sales_rep_id: salesRepId,
+          salesRepId: salesRepId,
+          assigned_sales_id: salesRepId,
+          person_in_charge: salesRepId,
+          phone: phoneClean,
+          email: emailClean,
+          address: addressClean,
           is_active: values.is_active ?? true,
         };
 
@@ -222,19 +325,18 @@ export const AgencyManagement: React.FC = () => {
         message.success(`Cập nhật hồ sơ đại lý "${payload.name}" thành công!`);
       } else {
         const payload: AgencyCreatePayload = {
-          code: values.code.trim().toUpperCase(),
-          name: values.name.trim(),
-          tax_code: values.tax_code ? values.tax_code.trim() : undefined,
-          customer_group: values.customer_group,
-          region: values.region ? values.region.trim() : undefined,
-          person_in_charge: values.person_in_charge
-            ? typeof values.person_in_charge === "string"
-              ? values.person_in_charge.trim()
-              : values.person_in_charge
-            : undefined,
-          phone: values.phone ? values.phone.trim() : undefined,
-          email: values.email ? values.email.trim() : undefined,
-          address: values.address ? values.address.trim() : undefined,
+          code: codeClean,
+          name: nameClean,
+          tax_code: taxCodeClean,
+          customer_group: customerGroupClean,
+          region: regionClean,
+          sales_rep_id: salesRepId,
+          salesRepId: salesRepId,
+          assigned_sales_id: salesRepId,
+          person_in_charge: salesRepId,
+          phone: phoneClean,
+          email: emailClean,
+          address: addressClean,
           is_active: values.is_active ?? true,
         };
 
@@ -432,11 +534,12 @@ export const AgencyManagement: React.FC = () => {
       key: "person_in_charge",
       width: 180,
       render: (_: any, record: Agency) => {
-        const person = record.person_in_charge;
+        const person = getRepDisplayName(record);
+        const isAssigned = person !== "Chưa phân công";
         return (
           <div>
             <div style={{ fontWeight: 500, color: "#334155" }}>
-              {person ? (
+              {isAssigned ? (
                 <span>
                   <UserOutlined style={{ marginRight: 4, color: "#64748b" }} />
                   {person}
@@ -983,7 +1086,42 @@ export const AgencyManagement: React.FC = () => {
                 label="Người phụ trách / NVKD"
                 tooltip="Nhân viên kinh doanh quản lý tuyến đại lý này"
               >
-                <Input placeholder="VD: Nguyễn Văn A hoặc User ID" />
+                <Select
+                  showSearch
+                  placeholder="Chọn nhân viên kinh doanh phụ trách"
+                  allowClear
+                  loading={loadingSalesReps}
+                  optionFilterProp="filterLabel"
+                  filterOption={(input, option) => {
+                    const label = String(option?.filterLabel || option?.children || "");
+                    return label.toLowerCase().includes(input.toLowerCase().trim());
+                  }}
+                >
+                  {salesReps.map((u) => (
+                    <Option
+                      key={u.id}
+                      value={u.id}
+                      filterLabel={`${u.full_name} ${u.username} ${u.email || ""}`}
+                    >
+                      {`${u.full_name} (${u.username || u.email})`}
+                    </Option>
+                  ))}
+                  {editingAgency &&
+                    form.getFieldValue("person_in_charge") &&
+                    !salesReps.some(
+                      (u) =>
+                        u.id === form.getFieldValue("person_in_charge") ||
+                        u.full_name === form.getFieldValue("person_in_charge"),
+                    ) && (
+                      <Option
+                        key={`legacy_${form.getFieldValue("person_in_charge")}`}
+                        value={form.getFieldValue("person_in_charge")}
+                        filterLabel={String(form.getFieldValue("person_in_charge"))}
+                      >
+                        {String(form.getFieldValue("person_in_charge"))}
+                      </Option>
+                    )}
+                </Select>
               </Form.Item>
             </Col>
           </Row>
@@ -1076,7 +1214,7 @@ export const AgencyManagement: React.FC = () => {
               </Col>
               <Col span={12}>
                 <Text type="secondary">Người phụ trách: </Text>
-                <Text strong>{detailModal.agency.person_in_charge || "Chưa phân công"}</Text>
+                <Text strong>{getRepDisplayName(detailModal.agency)}</Text>
               </Col>
               <Col span={12}>
                 <Text type="secondary">Số giao dịch đã phát sinh: </Text>

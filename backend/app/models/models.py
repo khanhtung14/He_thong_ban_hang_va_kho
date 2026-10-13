@@ -311,6 +311,7 @@ class Customer(Base):
     email: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    assigned_sales_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     customer_group: Mapped[str] = mapped_column(String(30), default="RETAIL", server_default="RETAIL", nullable=False)

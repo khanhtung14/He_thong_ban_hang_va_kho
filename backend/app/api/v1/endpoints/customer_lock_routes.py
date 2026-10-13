@@ -138,6 +138,7 @@ class CustomerCreateRequest(BaseModel):
     email: Optional[str] = None
     address: Optional[str] = None
     sales_rep_id: Optional[int] = Field(default=None, alias="salesRepId")
+    assigned_sales_id: Optional[int] = None
     territory_id: Optional[int] = Field(default=None, alias="regionId")
     region: Optional[str] = None
     customer_group: Optional[str] = Field(default=None, alias="customerGroup")
@@ -161,8 +162,11 @@ class CustomerCreateRequest(BaseModel):
 
         if "taxCode" in normalized and "tax_code" not in normalized:
             normalized["tax_code"] = normalized["taxCode"]
-        if "salesRepId" in normalized and "sales_rep_id" not in normalized:
-            normalized["sales_rep_id"] = normalized["salesRepId"]
+        rep = normalized.get("assigned_sales_id") or normalized.get("sales_rep_id") or normalized.get("salesRepId")
+        if rep is not None:
+            normalized["sales_rep_id"] = rep
+            normalized["salesRepId"] = rep
+            normalized["assigned_sales_id"] = rep
         if "regionId" in normalized and "territory_id" not in normalized:
             normalized["territory_id"] = normalized["regionId"]
         if "customerGroupId" in normalized and "customer_group" not in normalized and "customer_group_id" not in normalized:
@@ -304,7 +308,8 @@ def create_customer(
         region=payload.region,
         territory_id=payload.territory_id,
         person_in_charge=getattr(payload, "person_in_charge", None),
-        sales_rep_id=payload.sales_rep_id,
+        sales_rep_id=payload.sales_rep_id or payload.assigned_sales_id,
+        assigned_sales_id=payload.sales_rep_id or payload.assigned_sales_id,
         status=getattr(payload, "status", "ACTIVE"),
         is_active=getattr(payload, "is_active", True),
         phone=payload.phone,

@@ -18,6 +18,7 @@ from typing import Any, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
@@ -217,7 +218,8 @@ def serialize_customer(customer: Customer, db: Session) -> dict:
             rep_name = u.full_name
 
     status_str = "ACTIVE" if customer.is_active else "INACTIVE"
-    person = rep_name or (customer.sales_rep_id if customer.sales_rep_id else None)
+    rep_id = getattr(customer, "assigned_sales_id", None) or customer.sales_rep_id
+    person = rep_name or (rep_id if rep_id else None)
 
     return {
         "id": customer.id,
@@ -234,8 +236,9 @@ def serialize_customer(customer: Customer, db: Session) -> dict:
         "regionId": customer.territory_id,
         "territory_id": customer.territory_id,
         "person_in_charge": person,
-        "sales_rep_id": customer.sales_rep_id,
-        "salesRepId": customer.sales_rep_id,
+        "sales_rep_id": rep_id,
+        "salesRepId": rep_id,
+        "assigned_sales_id": rep_id,
         "status": status_str,
         "is_active": customer.is_active,
         "isActive": customer.is_active,
@@ -291,8 +294,9 @@ class CustomerCreate(BaseModel):
     regionId: Optional[int] = Field(default=None, alias="territory_id")
     territory_id: Optional[int] = None
     person_in_charge: Optional[Union[str, int]] = None
-    sales_rep_id: Optional[int] = Field(default=None, alias="salesRepId")
+    sales_rep_id: Optional[int] = None
     salesRepId: Optional[int] = None
+    assigned_sales_id: Optional[int] = None
     status: Optional[str] = Field(default="ACTIVE")
     is_active: Optional[bool] = Field(default=True)
     phone: Optional[str] = Field(default=None, max_length=25)
@@ -314,8 +318,11 @@ class CustomerCreate(BaseModel):
         normalized = dict(data)
         if "taxCode" in normalized and "tax_code" not in normalized:
             normalized["tax_code"] = normalized["taxCode"]
-        if "salesRepId" in normalized and "sales_rep_id" not in normalized:
-            normalized["sales_rep_id"] = normalized["salesRepId"]
+        rep = normalized.get("assigned_sales_id") or normalized.get("sales_rep_id") or normalized.get("salesRepId")
+        if rep is not None:
+            normalized["sales_rep_id"] = rep
+            normalized["salesRepId"] = rep
+            normalized["assigned_sales_id"] = rep
         if "regionId" in normalized and "territory_id" not in normalized:
             normalized["territory_id"] = normalized["regionId"]
         if "customerGroupId" in normalized and "customer_group_id" not in normalized:
@@ -338,8 +345,9 @@ class CustomerUpdate(BaseModel):
     regionId: Optional[int] = Field(default=None, alias="territory_id")
     territory_id: Optional[int] = None
     person_in_charge: Optional[Union[str, int]] = None
-    sales_rep_id: Optional[int] = Field(default=None, alias="salesRepId")
+    sales_rep_id: Optional[int] = None
     salesRepId: Optional[int] = None
+    assigned_sales_id: Optional[int] = None
     status: Optional[str] = None
     is_active: Optional[bool] = None
     phone: Optional[str] = None
@@ -356,8 +364,11 @@ class CustomerUpdate(BaseModel):
         normalized = dict(data)
         if "taxCode" in normalized and "tax_code" not in normalized:
             normalized["tax_code"] = normalized["taxCode"]
-        if "salesRepId" in normalized and "sales_rep_id" not in normalized:
-            normalized["sales_rep_id"] = normalized["salesRepId"]
+        rep = normalized.get("assigned_sales_id") or normalized.get("sales_rep_id") or normalized.get("salesRepId")
+        if rep is not None:
+            normalized["sales_rep_id"] = rep
+            normalized["salesRepId"] = rep
+            normalized["assigned_sales_id"] = rep
         if "regionId" in normalized and "territory_id" not in normalized:
             normalized["territory_id"] = normalized["regionId"]
         if "customerGroupId" in normalized and "customer_group_id" not in normalized:
@@ -571,7 +582,7 @@ def handle_create_customer(
     if existing_code:
         raise HTTPException(
             status_code=400,
-            detail=f"Mã đại lý '{code_clean}' đã tồn tại trên hệ thống!",
+            detail="Mã đại lý đã tồn tại trên hệ thống",
         )
 
     tax_val = payload.tax_code or payload.taxCode
@@ -596,8 +607,25 @@ def handle_create_customer(
     )
     group_str = _coerce_customer_group(group_raw)
 
+    rep_to_resolve = (
+        payload.assigned_sales_id
+        if payload.assigned_sales_id is not None
+        else payload.sales_rep_id
+        if payload.sales_rep_id is not None
+        else payload.salesRepId
+    )
+
+    # Kiểm tra xem user_id có tồn tại trong bảng users không
+    if rep_to_resolve is not None:
+        user_exists = db.get(User, rep_to_resolve)
+        if not user_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Nhân viên kinh doanh có ID '{rep_to_resolve}' không tồn tại trên hệ thống.",
+            )
+
     rep_id, _ = resolve_person_in_charge(
-        db, payload.person_in_charge, payload.sales_rep_id or payload.salesRepId
+        db, payload.person_in_charge, rep_to_resolve
     )
     reg_id = payload.territory_id or payload.regionId
 
@@ -619,13 +647,27 @@ def handle_create_customer(
         region=payload.region.strip() if payload.region else None,
         territory_id=reg_id,
         sales_rep_id=rep_id,
+        assigned_sales_id=rep_id,
         customer_group=group_str,
         is_active=is_active_val,
         is_locked=False,
     )
-    db.add(customer)
-    db.commit()
-    db.refresh(customer)
+    try:
+        db.add(customer)
+        db.commit()
+        db.refresh(customer)
+    except IntegrityError as exc:
+        db.rollback()
+        err_msg = str(exc.orig) if hasattr(exc, "orig") else str(exc)
+        if "code" in err_msg.lower() or "unique" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mã đại lý đã tồn tại trên hệ thống",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Lỗi ràng buộc dữ liệu khi lưu đại lý: {err_msg}",
+        )
 
     c_data = serialize_customer(customer, db)
     price_list = get_effective_price_list_for_customer(db, customer.customer_group)
@@ -716,11 +758,36 @@ def handle_update_customer(
     if reg_id is not None:
         customer.territory_id = reg_id
 
-    if payload.person_in_charge is not None or payload.sales_rep_id is not None or payload.salesRepId is not None:
+    if (
+        "person_in_charge" in payload.model_fields_set
+        or "sales_rep_id" in payload.model_fields_set
+        or "salesRepId" in payload.model_fields_set
+        or "assigned_sales_id" in payload.model_fields_set
+        or payload.person_in_charge is not None
+        or payload.sales_rep_id is not None
+        or payload.salesRepId is not None
+        or payload.assigned_sales_id is not None
+    ):
+        rep_to_resolve = (
+            payload.assigned_sales_id
+            if payload.assigned_sales_id is not None
+            else payload.sales_rep_id
+            if payload.sales_rep_id is not None
+            else payload.salesRepId
+        )
+        if rep_to_resolve is not None:
+            user_exists = db.get(User, rep_to_resolve)
+            if not user_exists:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Nhân viên kinh doanh có ID '{rep_to_resolve}' không tồn tại trên hệ thống.",
+                )
+
         rep_id, _ = resolve_person_in_charge(
-            db, payload.person_in_charge, payload.sales_rep_id or payload.salesRepId
+            db, payload.person_in_charge, rep_to_resolve
         )
         customer.sales_rep_id = rep_id
+        customer.assigned_sales_id = rep_id
 
     if payload.status is not None:
         st = payload.status.strip().upper()
@@ -739,8 +806,21 @@ def handle_update_customer(
     if payload.address is not None:
         customer.address = payload.address.strip() if payload.address.strip() else None
 
-    db.commit()
-    db.refresh(customer)
+    try:
+        db.commit()
+        db.refresh(customer)
+    except IntegrityError as exc:
+        db.rollback()
+        err_msg = str(exc.orig) if hasattr(exc, "orig") else str(exc)
+        if "code" in err_msg.lower() or "unique" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mã đại lý đã tồn tại trên hệ thống",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Lỗi ràng buộc dữ liệu khi lưu đại lý: {err_msg}",
+        )
 
     c_data = serialize_customer(customer, db)
     price_list = get_effective_price_list_for_customer(db, customer.customer_group)

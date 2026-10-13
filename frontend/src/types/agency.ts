@@ -77,27 +77,42 @@ export interface AgencyListResponse {
 export interface AgencyCreatePayload {
   code: string;
   name: string;
-  tax_code?: string;
+  tax_code?: string | null;
   customer_group: string;
-  region?: string;
-  person_in_charge?: string | number;
+  region?: string | null;
+  person_in_charge?: string | number | null;
+  sales_rep_id?: number | null;
+  salesRepId?: number | null;
+  assigned_sales_id?: number | null;
   status?: string;
   is_active?: boolean;
-  phone?: string;
-  email?: string;
-  address?: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
 }
 
 export interface AgencyUpdatePayload {
   code?: string;
   name?: string;
-  tax_code?: string;
+  tax_code?: string | null;
   customer_group?: string;
-  region?: string;
-  person_in_charge?: string | number;
+  region?: string | null;
+  person_in_charge?: string | number | null;
+  sales_rep_id?: number | null;
+  salesRepId?: number | null;
+  assigned_sales_id?: number | null;
   status?: string;
   is_active?: boolean;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+}
+
+export interface SalesRepUser {
+  id: number;
+  username: string;
+  full_name: string;
+  email: string;
   phone?: string;
-  email?: string;
-  address?: string;
+  role?: string;
 }

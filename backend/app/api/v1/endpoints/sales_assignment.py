@@ -172,9 +172,12 @@ def _perform_assignment(
 # ---------------------------------------------------------------------------
 
 @router.get("/api/v1/sales/reps")
+@router.get("/api/v1/users/sales-reps")
+@router.get("/api/v1/users")
 def list_sales_reps(
+    role: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
-    _actor: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
+    _actor: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin", "Accountant")),
 ):
     """Lấy danh sách nhân viên kinh doanh để chọn trong dropdown phân công / bàn giao."""
     users = (

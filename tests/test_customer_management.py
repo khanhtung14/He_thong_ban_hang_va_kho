@@ -366,3 +366,64 @@ def test_agencies_alias_endpoints(agency_env):
     assert resp.status_code == 200
     assert resp.json()["success"] is True
     assert len(resp.json()["data"]) >= 1
+
+
+def test_sales_rep_select_and_assignment(agency_env):
+    """8. Kiểm tra endpoint lấy danh sách sales reps cho Accountant và lưu assigned_sales_id/sales_rep_id."""
+    client, SessionLocal = agency_env
+    acc_headers = make_token("Accountant", "accountant01")
+
+    # 1. Gọi GET /api/v1/sales/reps bằng tài khoản Kế toán
+    resp = client.get("/api/v1/sales/reps", headers=acc_headers)
+    assert resp.status_code == 200
+    reps_data = resp.json()["data"]
+    assert len(reps_data) >= 1
+    sales_rep = next((r for r in reps_data if r["username"] == "srep01"), None)
+    assert sales_rep is not None
+    assert sales_rep["full_name"] == "Lê Bán Hàng"
+    rep_id = sales_rep["id"]
+
+    # 2. Thử tạo đại lý với sales rep ID không tồn tại -> HTTP 400
+    invalid_rep_payload = {
+        "code": "DL-INVALID-REP",
+        "name": "Đại lý Sales Rep ảo",
+        "customer_group": "DEALER_LEVEL_1",
+        "assigned_sales_id": 999999,
+    }
+    invalid_resp = client.post("/api/v1/customers", json=invalid_rep_payload, headers=acc_headers)
+    assert invalid_resp.status_code == 400
+    assert "không tồn tại trên hệ thống" in invalid_resp.json()["detail"]
+
+    # 3. Tạo đại lý mới hợp lệ với assigned_sales_id
+    create_payload = {
+        "code": "DL-TEST-SALES-01",
+        "name": "Đại lý Test Sales Rep",
+        "customer_group": "DEALER_LEVEL_1",
+        "assigned_sales_id": rep_id,
+        "region": "Miền Bắc",
+        "tax_code": "0109988776",
+        "phone": "0987654321",
+        "email": "sales_agency@test.com",
+        "address": "123 Đường Test",
+    }
+    create_resp = client.post("/api/v1/customers", json=create_payload, headers=acc_headers)
+    assert create_resp.status_code == 201
+    created_cust = create_resp.json()["data"]
+    assert created_cust["sales_rep_id"] == rep_id
+    assert created_cust["person_in_charge"] == "Lê Bán Hàng"
+    cust_id = created_cust["id"]
+
+    # 4. Thử tạo trùng mã đại lý -> HTTP 400 ("Mã đại lý đã tồn tại trên hệ thống")
+    dup_resp = client.post("/api/v1/customers", json=create_payload, headers=acc_headers)
+    assert dup_resp.status_code == 400
+    assert "Mã đại lý đã tồn tại trên hệ thống" in dup_resp.json()["detail"]
+
+    # 5. Chỉnh sửa bỏ phân công (allowClear / None)
+    update_payload = {
+        "sales_rep_id": None,
+        "person_in_charge": None,
+    }
+    update_resp = client.put(f"/api/v1/customers/{cust_id}", json=update_payload, headers=acc_headers)
+    assert update_resp.status_code == 200
+    updated_cust = update_resp.json()["data"]
+    assert updated_cust["sales_rep_id"] is None

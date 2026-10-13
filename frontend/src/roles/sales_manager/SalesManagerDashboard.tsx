@@ -20,6 +20,7 @@ import CategoryManagement from "./CategoryManagement";
 import SalesAssignmentManager from "./SalesAssignmentManager";
 import SalesReportPage from "./SalesReportPage";
 import ProductManagement from "./ProductManagement";
+import ProductImportPage from "./ProductImportPage";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -47,6 +48,12 @@ export const SalesManagerDashboard: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>(() => {
     if (typeof window !== "undefined") {
       if (window.location.pathname === "/sales/assignments") return "/sales/assignments";
+      if (
+        window.location.pathname === "/manager/products/import-excel" ||
+        window.location.pathname === "/manager/products/import"
+      ) {
+        return "/manager/products/import-excel";
+      }
       if (window.location.pathname === "/manager/products") return "/manager/products";
       if (window.location.pathname === "/manager/categories") return "/manager/categories";
       if (window.location.pathname === "/manager/reports") return "/manager/reports";
@@ -347,6 +354,10 @@ export const SalesManagerDashboard: React.FC = () => {
             setCurrentPath("/sales/assignments");
             window.history.pushState({}, "", "/sales/assignments");
             window.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (path === "/manager/products/import-excel" || path === "/manager/products/import") {
+            setCurrentPath("/manager/products/import-excel");
+            window.history.pushState({}, "", "/manager/products/import-excel");
+            window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/products") {
             setCurrentPath("/manager/products");
             window.history.pushState({}, "", "/manager/products");
@@ -402,9 +413,25 @@ export const SalesManagerDashboard: React.FC = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <SalesAssignmentManager />
             </div>
+          ) : currentPath === "/manager/products/import-excel" || currentPath === "/manager/products/import" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <ProductImportPage
+                onBack={() => {
+                  setCurrentPath("/manager/products");
+                  window.history.pushState({}, "", "/manager/products");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            </div>
           ) : currentPath === "/manager/products" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <ProductManagement />
+              <ProductManagement
+                onNavigate={(path) => {
+                  setCurrentPath(path);
+                  window.history.pushState({}, "", path);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
             </div>
           ) : currentPath === "/manager/reports" ? (
             <SalesReportPage
