@@ -8,9 +8,10 @@ Enforces:
    - Stripped/hidden for Warehouse, WH Manager, Sales Rep, Customer, Accountant.
    - Strictly permitted ONLY for Sales Manager.
 """
+from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -180,7 +181,7 @@ class AuthenticatedUser(BaseModel):
     role: str
     full_name: Optional[str] = None
     warehouse_id: Optional[int] = None
-    warehouse_ids: list[int] = Field(default_factory=list)
+    warehouse_ids: List[int] = Field(default_factory=list)
     territory_id: Optional[int] = None
 
     def has_permission(self, permission: str) -> bool:

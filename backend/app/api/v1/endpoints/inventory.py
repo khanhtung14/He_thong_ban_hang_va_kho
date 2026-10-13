@@ -1,6 +1,7 @@
 """Inventory endpoints with RBAC enforcement and financial data protection."""
+from __future__ import annotations
 
-from typing import Any, Optional, List, Literal
+from typing import Any, Optional, List, Literal, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
@@ -358,7 +359,7 @@ class TransactionResponse(BaseModel):
 
 
 def _record_stock_movement(
-    payload: TransactionCreateRequest | LegacyTransactionCreateRequest,
+    payload: Union[TransactionCreateRequest, LegacyTransactionCreateRequest],
     user: AuthenticatedUser,
     db: Session,
 ) -> InventoryTransaction:

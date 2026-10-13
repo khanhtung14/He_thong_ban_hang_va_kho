@@ -11,6 +11,7 @@ import AdminRBAC from "./AdminRBAC";
 import AdminConfiguration from "./AdminConfiguration";
 import CreateUserModal from "./CreateUser";
 import AdminAudit from "./AdminAudit";
+import AdminCustomers from "./AdminCustomers";
 
 const { Content } = Layout;
 
@@ -22,6 +23,7 @@ export const AdminDashboard: React.FC = () => {
       const viewParam = urlParams.get("view");
       if (viewParam) return viewParam;
       if (window.location.pathname === "/admin/users/import") return "import-users";
+      if (window.location.pathname === "/admin/customers") return "customers";
     }
     return "overview";
   });
@@ -41,6 +43,8 @@ export const AdminDashboard: React.FC = () => {
             }}
           />
         );
+      case "customers":
+        return <AdminCustomers />;
       case "rbac":
         return <AdminRBAC />;
       case "create-user":

@@ -290,10 +290,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Refresh Session
-         * @description Extend an active session; revoked, expired, or disabled sessions stay invalid.
-         */
+        /** Refresh Session */
         post: operations["refresh_session_api_v1_auth_refresh_post"];
         delete?: never;
         options?: never;
@@ -310,11 +307,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Logout
-         * @description Revoke the server-side session before confirming logout.
-         */
-        post: operations["logout_api_v1_auth_logout_post"];
+        /** Logout Session */
+        post: operations["logout_session_api_v1_auth_logout_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -622,6 +616,50 @@ export interface paths {
          * @description Move a single product to a new target category (SCRUM-76 AC 2).
          */
         patch: operations["move_product_category_api_v1_products__sku__category_patch"];
+        trace?: never;
+    };
+    "/api/v1/products/{id_or_sku}/price-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Product Price History Endpoint
+         * @description Retrieve product price change history (Story S3-02 / SCRUM-18).
+         */
+        get: operations["get_product_price_history_endpoint_api_v1_products__id_or_sku__price_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id_or_sku}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Product Price Endpoint
+         * @description Update product price and automatically log price history audit record (SCRUM-18).
+         */
+        put: operations["update_product_price_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Product Price Endpoint
+         * @description Update product price and automatically log price history audit record (SCRUM-18).
+         */
+        patch: operations["update_product_price_patch"];
         trace?: never;
     };
     "/api/v1/products/{product_id}": {
@@ -1168,11 +1206,59 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Customers */
+        /**
+         * List Customers
+         * @description Lấy danh sách đại lý cùng trạng thái khóa và số lượng đơn dở dang, hỗ trợ tìm kiếm và lọc đa điều kiện từ server.
+         */
         get: operations["list_customers_api_v1_customers_get"];
         put?: never;
-        /** Create Customers */
-        post: operations["create_customers_api_v1_customers_post"];
+        /**
+         * Create Customer
+         * @description Tạo mới đại lý.
+         */
+        post: operations["create_customer_api_v1_customers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/handover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Handover Customers
+         * @description Chuyển giao địa bàn / đại lý hàng loạt khi nhân viên nghỉ việc.
+         *
+         *     Phân quyền: Chỉ Quản lý kinh doanh (Sales Manager).
+         */
+        post: operations["handover_customers_api_v1_customers_handover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/handover-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Handover History
+         * @description Lấy danh sách lịch sử chuyển giao đại lý / địa bàn (Sales Manager).
+         */
+        get: operations["get_handover_history_api_v1_customers_handover_history_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1303,6 +1389,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-reps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sales Reps
+         * @description Lấy danh sách các nhân sự có vai trò Sales Rep (Nhân viên kinh doanh) đang hoạt động để phân công hoặc tiếp nhận bàn giao.
+         */
+        get: operations["list_sales_reps_api_v1_sales_reps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/assign-sales-rep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Assign Sales Rep
+         * @description Gán một nhân viên kinh doanh phụ trách chính cho đại lý (API_SPECIFICATION.md S3-06).
+         *
+         *     Phân quyền: Sales Manager.
+         */
+        patch: operations["assign_sales_rep_api_v1_customers__customer_id__assign_sales_rep_patch"];
+        trace?: never;
+    };
     "/api/v1/orders": {
         parameters: {
             query?: never;
@@ -1310,11 +1438,23 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Orders */
+        /**
+         * List Orders
+         * @description Danh sách đơn hàng kèm cờ cảnh báo nếu đại lý đang bị khóa (SCRUM-85).
+         */
         get: operations["list_orders_api_v1_orders_get"];
         put?: never;
-        /** Create Orders */
-        post: operations["create_orders_api_v1_orders_post"];
+        /**
+         * Create Order
+         * @description Tạo mới đơn hàng (SCRUM-85).
+         *
+         *     Quy tắc nghiệp vụ:
+         *     - Kiểm tra xem đại lý có tồn tại và đang bị khóa hay không.
+         *     - NẾU ĐẠI LÝ BỊ KHÓA (`is_locked == True`):
+         *       -> CHẶN TẠO ĐƠN NGAY LẬP TỨC!
+         *       -> Trả về HTTP 400 Bad Request kèm lý do khóa chi tiết.
+         */
+        post: operations["create_order_api_v1_orders_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1702,6 +1842,14 @@ export interface components {
          * @enum {string}
          */
         AccountStatus: "ACTIVE" | "LOCKED" | "DISABLED" | "PENDING_ACTIVATION";
+        /** AssignSalesRepRequest */
+        AssignSalesRepRequest: {
+            /**
+             * Salesrepid
+             * @description ID nhân viên kinh doanh phụ trách
+             */
+            salesRepId: number;
+        };
         /** AssignmentUpdateRequest */
         AssignmentUpdateRequest: {
             /** Role Ids */
@@ -1832,26 +1980,104 @@ export interface components {
             /** Activation Link */
             activation_link?: string | null;
         };
-        /** CustomerCreate */
-        CustomerCreate: Record<string, never>;
         /** CustomerCreateRequest */
         CustomerCreateRequest: {
             /** Code */
             code: string;
             /** Name */
             name: string;
-            /** Sales Rep Id */
-            sales_rep_id?: number | null;
-            /** Territory Id */
-            territory_id?: number | null;
-            /** @default RETAIL */
-            customer_group: components["schemas"]["CustomerGroup"];
+            /** Salesrepid */
+            salesRepId?: number | null;
+            /** Territoryid */
+            territoryId?: number | null;
+            /** Regionid */
+            regionId?: number | null;
+            /**
+             * Customergroup
+             * @default RETAIL
+             */
+            customerGroup: unknown | null;
+            /** Customergroupid */
+            customerGroupId?: unknown | null;
+            /**
+             * Creditlimit
+             * @default 0
+             */
+            creditLimit: number | null;
+            /**
+             * Maxduedays
+             * @default 0
+             */
+            maxDueDays: number | null;
+            /**
+             * Warningthresholdpercent
+             * @default 80
+             */
+            warningThresholdPercent: number | null;
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Taxcode */
+            taxCode?: string | null;
         };
         /**
          * CustomerGroup
          * @enum {string}
          */
         CustomerGroup: "DEALER_LEVEL_1" | "DEALER_LEVEL_2" | "RETAIL";
+        /** CustomerHandoverHistoryResponse */
+        CustomerHandoverHistoryResponse: {
+            /** Id */
+            id: number;
+            /** Customer Id */
+            customer_id: number;
+            /** Customer Code */
+            customer_code?: string | null;
+            /** Customer Name */
+            customer_name?: string | null;
+            /** From Sales Rep Id */
+            from_sales_rep_id?: number | null;
+            /** From Sales Rep Name */
+            from_sales_rep_name?: string | null;
+            /** To Sales Rep Id */
+            to_sales_rep_id: number;
+            /** To Sales Rep Name */
+            to_sales_rep_name?: string | null;
+            /** Transferred By Id */
+            transferred_by_id?: number | null;
+            /** Transferred By Name */
+            transferred_by_name?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /** CustomerHandoverRequest */
+        CustomerHandoverRequest: {
+            /**
+             * Fromsalesrepid
+             * @description ID nhân viên nghỉ việc / cần bàn giao
+             */
+            fromSalesRepId?: number | null;
+            /**
+             * Tosalesrepid
+             * @description ID nhân viên mới tiếp nhận
+             */
+            toSalesRepId: number;
+            /**
+             * Customerids
+             * @description Danh sách ID đại lý cần chuyển giao (nếu để trống sẽ chuyển toàn bộ)
+             */
+            customerIds?: number[] | null;
+            /**
+             * Reason
+             * @description Lý do chuyển giao bàn giao
+             */
+            reason: string;
+        };
         /** CustomerLockRequest */
         CustomerLockRequest: {
             /**
@@ -1876,8 +2102,14 @@ export interface components {
             phone?: string | null;
             /** Sales Rep Id */
             sales_rep_id?: number | null;
+            /** Sales Rep Name */
+            sales_rep_name?: string | null;
             /** Territory Id */
             territory_id?: number | null;
+            /** Territory Name */
+            territory_name?: string | null;
+            /** Address */
+            address?: string | null;
             /**
              * Customer Group
              * @default RETAIL
@@ -2027,8 +2259,6 @@ export interface components {
             /** Categoryid */
             categoryId?: number | null;
         };
-        /** OrderCreate */
-        OrderCreate: Record<string, never>;
         /** OrderCreateRequest */
         OrderCreateRequest: {
             /**
@@ -2496,6 +2726,20 @@ export interface components {
              * @description Mô tả mới
              */
             description?: string | null;
+        };
+        /** UpdateProductPriceRequest */
+        UpdateProductPriceRequest: {
+            /**
+             * Price
+             * @description Giá bán mới của sản phẩm
+             */
+            price: number;
+            /** Note */
+            note?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Effective Date */
+            effective_date?: string | null;
         };
         /** UpdateProfileRequest */
         UpdateProfileRequest: {
@@ -3207,14 +3451,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: number | string;
-                    };
+                    "application/json": unknown;
                 };
             };
         };
     };
-    logout_api_v1_auth_logout_post: {
+    logout_session_api_v1_auth_logout_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -3229,9 +3471,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": unknown;
                 };
             };
         };
@@ -3759,6 +3999,112 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MoveProductCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_product_price_history_endpoint_api_v1_products__id_or_sku__price_history_get: {
+        parameters: {
+            query?: {
+                fromDate?: string | null;
+                toDate?: string | null;
+                from_date?: string | null;
+                to_date?: string | null;
+            };
+            header?: never;
+            path: {
+                id_or_sku: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_product_price_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id_or_sku: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductPriceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_product_price_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id_or_sku: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductPriceRequest"];
             };
         };
         responses: {
@@ -4983,7 +5329,28 @@ export interface operations {
     };
     list_customers_api_v1_customers_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Lọc theo trạng thái khóa */
+                is_locked?: boolean | null;
+                /** @description Lọc theo trạng thái hoạt động: ACTIVE, LOCKED, ALL */
+                status?: string | null;
+                /** @description Tìm kiếm theo mã, tên hoặc SĐT */
+                search?: string | null;
+                /** @description Từ khóa tìm kiếm */
+                keyword?: string | null;
+                /** @description Lọc theo NVKD phụ trách */
+                assignedRepId?: number | string | null;
+                /** @description Lọc theo địa bàn/khu vực */
+                regionId?: number | string | null;
+                /** @description Lọc theo phân nhóm đại lý */
+                customerGroup?: string | null;
+                /** @description Trang (1-indexed) */
+                page?: number | null;
+                /** @description Số lượng bản ghi mỗi trang */
+                limit?: number | null;
+                /** @description Số lượng bản ghi mỗi trang */
+                pageSize?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4996,12 +5363,21 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CustomerResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
     };
-    create_customers_api_v1_customers_post: {
+    create_customer_api_v1_customers_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -5010,7 +5386,40 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CustomerCreate"];
+                "application/json": components["schemas"]["CustomerCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handover_customers_api_v1_customers_handover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerHandoverRequest"];
             };
         };
         responses: {
@@ -5021,6 +5430,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_handover_history_api_v1_customers_handover_history_get: {
+        parameters: {
+            query?: {
+                customer_id?: number | null;
+                sales_rep_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerHandoverHistoryResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -5221,7 +5663,7 @@ export interface operations {
             };
         };
     };
-    list_orders_api_v1_orders_get: {
+    list_sales_reps_api_v1_sales_reps_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5241,16 +5683,18 @@ export interface operations {
             };
         };
     };
-    create_orders_api_v1_orders_post: {
+    assign_sales_rep_api_v1_customers__customer_id__assign_sales_rep_patch: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                customer_id: number;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["OrderCreate"];
+                "application/json": components["schemas"]["AssignSalesRepRequest"];
             };
         };
         responses: {
@@ -5260,7 +5704,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CustomerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_orders_api_v1_orders_get: {
+        parameters: {
+            query?: {
+                customer_id?: number | null;
+                status?: components["schemas"]["OrderStatus"] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_order_api_v1_orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
                 };
             };
             /** @description Validation Error */

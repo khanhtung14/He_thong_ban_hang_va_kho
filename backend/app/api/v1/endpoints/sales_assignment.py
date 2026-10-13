@@ -262,7 +262,7 @@ def create_sales_assignment(
     }
 
 
-@router.patch("/api/v1/customers/{customer_id}/assign-sales-rep")
+@router.patch("/api/v1/sales-assignments/customers/{customer_id}/assign-sales-rep", include_in_schema=False)
 def assign_sales_rep_spec_compat(
     customer_id: int,
     payload: AssignSalesRepSpecRequest,

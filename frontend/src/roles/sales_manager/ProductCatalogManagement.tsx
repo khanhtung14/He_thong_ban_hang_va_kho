@@ -31,9 +31,11 @@ import {
   CheckCircleOutlined,
   PictureOutlined,
   DollarOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import { authenticatedFetch } from "../../services/sessionService";
+import { ProductPriceHistoryModal } from "./ProductPriceHistoryModal";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -86,6 +88,15 @@ export const ProductCatalogManagement: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+
+  // Modal Xem lịch sử thay đổi giá (SCRUM-18)
+  const [isPriceHistoryOpen, setIsPriceHistoryOpen] = useState(false);
+  const [priceHistoryProduct, setPriceHistoryProduct] = useState<ProductItem | null>(null);
+
+  const handleOpenPriceHistory = (record: ProductItem) => {
+    setPriceHistoryProduct(record);
+    setIsPriceHistoryOpen(true);
+  };
 
   // Tải danh mục nhóm hàng
   const fetchCategories = async () => {
@@ -401,12 +412,25 @@ export const ProductCatalogManagement: React.FC = () => {
       title: "Giá bán niêm yết",
       dataIndex: "basePrice",
       key: "basePrice",
-      width: 130,
+      width: 155,
       align: "right",
-      render: (price) =>
-        price !== undefined && price !== null
-          ? `${Number(price).toLocaleString("vi-VN")} ₫`
-          : "-",
+      render: (price, record) => (
+        <Space size={4}>
+          <Text strong style={{ color: "#1677ff" }}>
+            {price !== undefined && price !== null
+              ? `${Number(price).toLocaleString("vi-VN")} ₫`
+              : "-"}
+          </Text>
+          <Tooltip title="Xem lịch sử thay đổi giá">
+            <Button
+              type="text"
+              size="small"
+              icon={<HistoryOutlined style={{ color: "#722ed1", fontSize: 13 }} />}
+              onClick={() => handleOpenPriceHistory(record)}
+            />
+          </Tooltip>
+        </Space>
+      ),
     },
     {
       title: (
@@ -448,10 +472,18 @@ export const ProductCatalogManagement: React.FC = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 150,
+      width: 175,
       align: "center",
       render: (_, record) => (
         <Space size="small">
+          <Tooltip title="Lịch sử thay đổi giá">
+            <Button
+              type="text"
+              size="small"
+              icon={<HistoryOutlined style={{ color: "#722ed1" }} />}
+              onClick={() => handleOpenPriceHistory(record)}
+            />
+          </Tooltip>
           <Tooltip title="Chỉnh sửa sản phẩm & Giá vốn">
             <Button
               type="text"
@@ -824,6 +856,16 @@ export const ProductCatalogManagement: React.FC = () => {
           </Form.List>
         </Form>
       </Modal>
+
+      {/* Modal Lịch sử thay đổi giá sản phẩm (SCRUM-18) */}
+      <ProductPriceHistoryModal
+        visible={isPriceHistoryOpen}
+        product={priceHistoryProduct}
+        onClose={() => {
+          setIsPriceHistoryOpen(false);
+          setPriceHistoryProduct(null);
+        }}
+      />
     </Card>
   );
 };

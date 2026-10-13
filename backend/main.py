@@ -19,11 +19,11 @@ from app.api.v1.endpoints.inventory import router as inventory_router, legacy_ro
 from app.api.v1.endpoints.login import router as login_router
 from app.api.v1.endpoints.navigation import router as navigation_router
 from app.api.v1.endpoints.product_categories import router as product_categories_router
-from app.api.v1.endpoints.products import router as products_router
+from app.api.v1.endpoints.products import compat_router as products_compat_router, router as products_router
 from app.api.v1.endpoints.price_lists import router as price_lists_router
 from app.api.v1.endpoints.profile import migrate_profile_schema, router as profile_router
 from app.api.v1.endpoints.reports import router as reports_router
-from app.core.session import router as session_router
+
 from app.api.v1.endpoints.user_assignment import router as user_assignment_router
 from app.api.v1.endpoints.sales_assignment import router as sales_assignment_router
 from app.api.v1.endpoints.user_routes import router as user_router
@@ -192,10 +192,10 @@ app.include_router(audit_logs_router)
 app.include_router(forgot_password_router)
 app.include_router(import_users_router)
 app.include_router(login_router)
-app.include_router(session_router)
 app.include_router(inventory_router)
 app.include_router(legacy_inventory_router)
 app.include_router(products_router)
+app.include_router(products_compat_router)
 app.include_router(product_categories_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
@@ -221,7 +221,6 @@ try:
     from app.api.v1.endpoints.invoices import router as invoices_router
     from app.api.v1.endpoints.payments import router as payments_router
     from app.api.v1.endpoints.returns import router as returns_router
-
     app.include_router(warehouse_router)
     app.include_router(warehouses_router)
     app.include_router(territories_router)
@@ -318,6 +317,12 @@ def territory_handover_page():
 @app.get("/manager/categories", response_class=HTMLResponse, include_in_schema=False)
 def manager_categories_page():
     """Serve the product categories management screen (SCRUM-76)."""
+    return login_page_response()
+
+
+@app.get("/manager/customers", response_class=HTMLResponse, include_in_schema=False)
+def manager_customers_page():
+    """Serve the customer and territory assignment management screen."""
     return login_page_response()
 
 

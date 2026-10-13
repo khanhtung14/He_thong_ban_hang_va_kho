@@ -68,6 +68,12 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       icon: "boxes-stacked",
     },
     {
+      id: "manager-customers",
+      title: "Đại lý & Địa bàn",
+      path: "/manager/customers",
+      icon: "customers",
+    },
+    {
       id: "manager-categories",
       title: "Nhóm hàng",
       path: "/manager/categories",

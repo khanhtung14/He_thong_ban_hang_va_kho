@@ -1,4 +1,5 @@
 """SQLAlchemy models for the OMS domain, updated with all Epics."""
+from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
@@ -20,6 +21,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     Float,
+    event,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -270,6 +272,78 @@ class Product(Base):
     
     category: Mapped[Optional["Category"]] = relationship()
     units: Mapped[List["ProductUnit"]] = relationship(back_populates="product", cascade="all, delete-orphan")
+    price_history: Mapped[List["ProductPriceHistory"]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="desc(ProductPriceHistory.effective_date)",
+    )
+
+
+class ProductPriceHistory(Base):
+    __tablename__ = "product_price_history"
+    __table_args__ = (
+        Index("ix_product_price_history_product_date", "product_id", "effective_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    old_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    new_price: Mapped[float] = mapped_column(Float, nullable=False)
+    changed_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    effective_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False
+    )
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    product: Mapped[Optional["Product"]] = relationship(back_populates="price_history")
+
+    def __init__(self, **kwargs):
+        if "note" in kwargs and "reason" not in kwargs:
+            kwargs["reason"] = kwargs["note"]
+        elif "reason" in kwargs and "note" not in kwargs:
+            kwargs["note"] = kwargs["reason"]
+        super().__init__(**kwargs)
+
+    @property
+    def changed_at(self) -> datetime:
+        return self.effective_date
+
+
+@event.listens_for(ProductPriceHistory, "before_update")
+def _prevent_price_history_update(mapper, connection, target):
+    raise ValueError("Lịch sử thay đổi giá là nhật ký kiểm toán bất biến (Audit Log), không thể chỉnh sửa.")
+
+
+@event.listens_for(ProductPriceHistory, "before_delete")
+def _prevent_price_history_delete(mapper, connection, target):
+    raise ValueError("Lịch sử thay đổi giá là nhật ký kiểm toán bất biến (Audit Log), không thể xóa.")
+
+
+@event.listens_for(Product.base_price, "set")
+def _product_base_price_set_listener(target, value, oldvalue, initiator):
+    from sqlalchemy.orm.attributes import NEVER_SET, NO_VALUE
+
+    if getattr(target, "_suppress_auto_price_history", False):
+        return
+    if oldvalue not in (NO_VALUE, NEVER_SET) and oldvalue is not None:
+        try:
+            float_old = float(oldvalue)
+            float_new = float(value)
+        except (TypeError, ValueError):
+            return
+        if float_old != float_new:
+            hist = ProductPriceHistory(
+                product_id=target.id if target.id is not None else None,
+                old_price=float_old,
+                new_price=float_new,
+                changed_by="System",
+                note="Cập nhật giá bán sản phẩm",
+                reason="Cập nhật giá bán sản phẩm",
+            )
+            target.price_history.append(hist)
 
 
 class ProductUnit(Base):
@@ -303,11 +377,15 @@ class DiscountTier(Base):
 # --- EP-03: Đại lý & Hạn mức công nợ ---
 class Customer(Base):
     __tablename__ = "customers"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_customers_code"),
+        UniqueConstraint("phone", name="uq_customers_phone"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     tax_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
     email: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
@@ -327,7 +405,7 @@ class Customer(Base):
     warning_threshold_percent: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+    orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
 
 
@@ -363,6 +441,22 @@ class DeliveryAddress(Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
     address: Mapped[str] = mapped_column(Text, nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class CustomerHandoverHistory(Base):
+    __tablename__ = "customer_handover_history"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    from_sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    to_sales_rep_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    transferred_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    customer: Mapped["Customer"] = relationship(foreign_keys=[customer_id])
+    from_sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[from_sales_rep_id])
+    to_sales_rep: Mapped["User"] = relationship(foreign_keys=[to_sales_rep_id])
+    transferred_by: Mapped[Optional["User"]] = relationship(foreign_keys=[transferred_by_id])
 
 
 class PriceList(Base):
@@ -428,7 +522,7 @@ class Order(Base):
     )
 
     customer: Mapped[Customer] = relationship(back_populates="orders")
-    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderItem(Base):

@@ -21,6 +21,8 @@ import SalesAssignmentManager from "./SalesAssignmentManager";
 import SalesReportPage from "./SalesReportPage";
 import ProductManagement from "./ProductManagement";
 import ProductImportPage from "./ProductImportPage";
+import ProductCatalogManagement from "./ProductCatalogManagement";
+import CustomerTerritoryManagement from "./CustomerTerritoryManagement";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -57,6 +59,7 @@ export const SalesManagerDashboard: React.FC = () => {
       if (window.location.pathname === "/manager/products") return "/manager/products";
       if (window.location.pathname === "/manager/categories") return "/manager/categories";
       if (window.location.pathname === "/manager/reports") return "/manager/reports";
+      if (window.location.pathname === "/manager/customers") return "/manager/customers";
     }
     return "/manager/dashboard";
   });
@@ -197,13 +200,19 @@ export const SalesManagerDashboard: React.FC = () => {
           ...(hasCategoryMenu
             ? []
             : [
-              {
-                id: "manager-categories",
-                title: "Nhóm hàng",
-                path: "/manager/categories",
-                icon: "appstore",
-              },
-            ]),
+                {
+                  id: "manager-categories",
+                  title: "Nhóm hàng",
+                  path: "/manager/categories",
+                  icon: "appstore",
+                },
+              ]),
+          {
+            id: "manager-customers",
+            title: "Đại lý & Địa bàn",
+            path: "/manager/customers",
+            icon: "customers",
+          },
         ];
 
         // Đảm bảo không trùng lặp mục menu theo path, không có "Quản lý nhóm hàng" và "Nhập sản phẩm (Excel)"
@@ -447,6 +456,10 @@ export const SalesManagerDashboard: React.FC = () => {
           ) : currentPath === "/manager/categories" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <CategoryManagement />
+            </div>
+          ) : currentPath === "/manager/customers" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <CustomerTerritoryManagement />
             </div>
           ) : (
             /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */

@@ -142,10 +142,27 @@ export const AdminUsers: React.FC<AdminUsersProps> = ({ onNavigateToImport }) =>
         }),
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         message.success("Đã khóa tài khoản thành công!");
         setLockUser(null);
         setLockReason("");
         fetchUsers(page);
+
+        if (data.handover_required && data.warning) {
+          Modal.warning({
+            title: "CẢNH BÁO BÀN GIAO ĐỊA BÀN",
+            content: (
+              <div>
+                <p style={{ fontWeight: 600, color: "#b45309" }}>{data.warning}</p>
+                <p style={{ marginTop: 8, color: "#64748b" }}>
+                  Nhân viên này đang phụ trách <strong>{data.assigned_dealers_count}</strong> đại lý.
+                  Quản lý kinh doanh cần thực hiện chuyển giao đại bàn để không làm gián đoạn tiếp nhận đơn hàng.
+                </p>
+              </div>
+            ),
+            okText: "Đã ghi nhận",
+          });
+        }
       }
     } finally {
       setActionLoading(false);
