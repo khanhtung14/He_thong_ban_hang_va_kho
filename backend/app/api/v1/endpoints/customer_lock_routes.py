@@ -260,6 +260,7 @@ def list_customers(
     assigned_rep_id: Optional[Union[int, str]] = Query(None, alias="assignedRepId", description="Lọc theo NVKD phụ trách"),
     region_id: Optional[Union[int, str]] = Query(None, alias="regionId", description="Lọc theo địa bàn/khu vực"),
     customer_group: Optional[str] = Query(None, alias="customerGroup", description="Lọc theo phân nhóm đại lý"),
+    customer_group_id: Optional[str] = Query(None, alias="customerGroupId", description="Lọc theo phân nhóm đại lý (alias)"),
     page: Optional[int] = Query(None, description="Trang (1-indexed)"),
     limit: Optional[int] = Query(None, description="Số lượng bản ghi mỗi trang"),
     page_size: Optional[int] = Query(None, alias="pageSize", description="Số lượng bản ghi mỗi trang"),
@@ -307,8 +308,9 @@ def list_customers(
                 pass
 
     # 3. Lọc theo Phân nhóm đại lý
-    if customer_group and isinstance(customer_group, str):
-        grp = customer_group.strip()
+    effective_group = customer_group if customer_group is not None else customer_group_id
+    if effective_group and isinstance(effective_group, str):
+        grp = effective_group.strip()
         if grp and grp != "ALL":
             query = query.where(Customer.customer_group == grp)
 
@@ -818,7 +820,7 @@ def get_agencies_debt_status(
 @router.get("/sales-reps")
 def list_sales_reps(
     db: Session = Depends(get_db),
-    _user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
+    _user: AuthenticatedUser = Depends(require_roles("Sales Rep", "Sales Manager", "Admin")),
 ):
     """Lấy danh sách các nhân sự có vai trò Sales Rep (Nhân viên kinh doanh) đang hoạt động để phân công hoặc tiếp nhận bàn giao."""
     # Chỉ lọc đúng các vai trò Nhân viên kinh doanh

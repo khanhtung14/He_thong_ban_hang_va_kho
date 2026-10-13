@@ -461,4 +461,114 @@ def test_create_customer_phone_constraints(client, test_setup_users):
     assert "đã được đăng ký" in res_dup.json()["detail"].lower()
 
 
+def test_sales_rep_search_and_filters(client, test_setup_users):
+    """Test US S3-08: Nhân viên kinh doanh tìm kiếm nhanh và lọc danh sách đại lý."""
+    setup = test_setup_users
+    with SessionLocal() as db:
+        c1 = Customer(
+            code="DL-HN-001",
+            name="Đại lý Bách Hóa Cầu Giấy",
+            phone="0901234567",
+            customer_group="DEALER_LEVEL_1",
+            territory_id=1,
+            sales_rep_id=setup["rep1_id"],
+            is_active=True,
+            is_locked=False,
+        )
+        c2 = Customer(
+            code="DL-HN-002",
+            name="Cửa hàng Tiện lợi Ba Đình",
+            phone="0988776655",
+            customer_group="DEALER_LEVEL_2",
+            territory_id=2,
+            sales_rep_id=setup["rep1_id"],
+            is_active=True,
+            is_locked=True,
+            lock_reason="Nợ quá hạn trên 45 ngày",
+        )
+        c3 = Customer(
+            code="DL-HCM-003",
+            name="Tạp hóa Quận 1",
+            phone="0933112233",
+            customer_group="RETAIL",
+            territory_id=3,
+            sales_rep_id=setup["rep1_id"],
+            is_active=False,
+            is_locked=False,
+        )
+        db.add_all([c1, c2, c3])
+        db.commit()
+
+    headers = make_auth_headers(RoleCode.SALES_REP.value, setup["rep1_username"])
+
+    # 1. Tìm nhanh theo mã đại lý
+    res = client.get("/api/v1/customers?search=DL-HN-001", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HN-001"
+
+    # 2. Tìm nhanh theo tên
+    res = client.get("/api/v1/customers?search=Ba%20Đình", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HN-002"
+
+    # 3. Tìm nhanh theo số điện thoại
+    res = client.get("/api/v1/customers?keyword=0933112233", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HCM-003"
+
+    # 4. Lọc theo khu vực (regionId)
+    res = client.get("/api/v1/customers?regionId=1", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HN-001"
+
+    # 5. Lọc theo nhóm khách hàng (customerGroup)
+    res = client.get("/api/v1/customers?customerGroup=DEALER_LEVEL_1", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HN-001"
+
+    # 6. Lọc theo nhóm khách hàng (customerGroupId alias)
+    res = client.get("/api/v1/customers?customerGroupId=DEALER_LEVEL_2", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HN-002"
+
+    # 7. Lọc theo trạng thái ACTIVE
+    res = client.get("/api/v1/customers?status=ACTIVE", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HN-001"
+
+    # 8. Lọc theo trạng thái LOCKED
+    res = client.get("/api/v1/customers?status=LOCKED", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HN-002"
+
+    # 9. Lọc theo trạng thái INACTIVE
+    res = client.get("/api/v1/customers?status=INACTIVE", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["code"] == "DL-HCM-003"
+
+    # 10. Sales Rep được phép gọi /sales-reps
+    res_reps = client.get("/api/v1/sales-reps", headers=headers)
+    assert res_reps.status_code == 200
+    assert isinstance(res_reps.json(), list)
+
+
+
 

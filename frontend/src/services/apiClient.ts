@@ -256,6 +256,7 @@ export interface FetchCustomersParams {
   assignedRepId?: number | string;
   regionId?: number | string;
   customerGroup?: string;
+  customerGroupId?: number | string;
   page?: number;
   limit?: number;
   pageSize?: number;
@@ -282,6 +283,9 @@ export async function fetchCustomersWithTotal(
   }
   if (params?.customerGroup && params.customerGroup !== "ALL") {
     query.set("customerGroup", params.customerGroup);
+  }
+  if (params?.customerGroupId !== undefined && params.customerGroupId !== "ALL") {
+    query.set("customerGroupId", String(params.customerGroupId));
   }
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
