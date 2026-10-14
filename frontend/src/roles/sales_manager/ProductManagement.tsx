@@ -47,11 +47,14 @@ import {
   type CategoryOption,
 } from "../../services/productService";
 import { getCurrentUserRole } from "../../services/sessionService";
-import ProductImportModal from "./ProductImportModal";
 
 const { Title, Text } = Typography;
 
-export const ProductManagement: React.FC = () => {
+export interface ProductManagementProps {
+  onNavigate?: (path: string) => void;
+}
+
+export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate }) => {
   // State danh sách & bộ lọc
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -66,8 +69,14 @@ export const ProductManagement: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [form] = Form.useForm();
 
-  // State Modal Nhập Excel
-  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const handleNavigateToImport = () => {
+    if (onNavigate) {
+      onNavigate("/manager/products/import-excel");
+    } else {
+      window.history.pushState({}, "", "/manager/products/import-excel");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  };
 
   // Kiểm tra quyền xem/sửa giá vốn
   const userRole = getCurrentUserRole() || "";
@@ -531,7 +540,7 @@ export const ProductManagement: React.FC = () => {
 
           <Button
             icon={<FileExcelOutlined />}
-            onClick={() => setIsImportModalOpen(true)}
+            onClick={handleNavigateToImport}
           >
             Nhập Excel
           </Button>
@@ -858,16 +867,6 @@ export const ProductManagement: React.FC = () => {
           </Row>
         </Form>
       </Modal>
-
-      {/* 6. Modal Nhập danh mục sản phẩm từ Excel */}
-      <ProductImportModal
-        open={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onSuccess={() => {
-          setIsImportModalOpen(false);
-          loadProducts();
-        }}
-      />
     </div>
   );
 };

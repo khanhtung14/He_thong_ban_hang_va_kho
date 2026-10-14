@@ -384,8 +384,12 @@ class Customer(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
+    tax_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    assigned_sales_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
     region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     customer_group: Mapped[str] = mapped_column(String(30), default="RETAIL", server_default="RETAIL", nullable=False)
@@ -394,7 +398,7 @@ class Customer(Base):
     lock_reason: Mapped[Optional[str]] = mapped_column(String(255))
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     locked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    
+
     # NEW FIELDS: Credit limit
     credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     max_due_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -474,11 +478,14 @@ class PriceList(Base):
 
 class PriceListItem(Base):
     __tablename__ = "price_list_items"
-    __table_args__ = (UniqueConstraint("price_list_id", "sku", name="uq_price_list_items_list_sku"),)
+    __table_args__ = (
+        UniqueConstraint("price_list_id", "sku", name="uq_price_list_items_list_sku"),
+        UniqueConstraint("price_list_id", "product_id", name="uq_price_list_items_list_prod"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     price_list_id: Mapped[int] = mapped_column(ForeignKey("price_lists.id", ondelete="CASCADE"), nullable=False)
+    sku: Mapped[str] = mapped_column(String(80), nullable=False, default="", index=True)
     product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=True)
-    sku: Mapped[str] = mapped_column(String(80), nullable=False)
     sale_price: Mapped[float] = mapped_column(Float, nullable=False)
     floor_price: Mapped[float] = mapped_column(Float, nullable=False)
     price_list: Mapped[PriceList] = relationship(back_populates="items")

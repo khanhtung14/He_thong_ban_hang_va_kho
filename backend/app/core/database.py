@@ -89,6 +89,13 @@ def migrate_pricing_schema():
         "customers": {
             "customer_group": "VARCHAR(30) NOT NULL DEFAULT 'RETAIL'",
             "region": "VARCHAR(100) NULL",
+            "tax_code": "VARCHAR(50) NULL",
+            "phone": "VARCHAR(25) NULL",
+            "email": "VARCHAR(150) NULL",
+            "address": "TEXT NULL",
+            "sales_rep_id": "INTEGER NULL",
+            "assigned_sales_id": "INTEGER NULL",
+            "is_active": "BOOLEAN NOT NULL DEFAULT 1",
             "is_locked": "BOOLEAN NOT NULL DEFAULT 0",
             "lock_reason": "VARCHAR(255) NULL",
             "locked_at": "DATETIME NULL",

@@ -39,6 +39,9 @@ export interface PreviewRow {
   stock_available?: number;
   action_type: "CREATE" | "UPDATE" | "ERROR";
   error_message?: string;
+  is_new_category?: boolean;
+  category_status?: "NEW" | "EXISTING";
+  category_note?: string;
 }
 
 export interface PreviewSummary {
@@ -255,9 +258,23 @@ export const ProductImportModal: React.FC<ProductImportModalProps> = ({
       title: "Nhóm hàng",
       dataIndex: "category",
       key: "category",
-      width: 140,
-      render: (category?: string) =>
-        category ? <Tag color="purple">{category}</Tag> : <span style={{ color: "#94a3b8" }}>—</span>,
+      width: 170,
+      render: (category?: string, record?: PreviewRow) => {
+        if (!category) return <span style={{ color: "#94a3b8" }}>—</span>;
+        const isNew = record?.is_new_category || record?.category_status === "NEW";
+        return (
+          <div>
+            <Tag color={isNew ? "orange" : "purple"} style={{ fontWeight: 500 }}>
+              {category}
+            </Tag>
+            {isNew && (
+              <div style={{ fontSize: 11, color: "#d97706", marginTop: 2 }}>
+                Danh mục mới (sẽ được tự động tạo)
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: "ĐVT",

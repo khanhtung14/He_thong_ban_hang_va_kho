@@ -7,8 +7,9 @@ import {
   BarChartOutlined,
   BookOutlined,
   LogoutOutlined,
+  LockOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
-import { LockOutlined } from "@ant-design/icons";
 
 interface AccountantSidebarProps {
   selectedKey: string;
@@ -23,12 +24,13 @@ export const AccountantSidebar: React.FC<AccountantSidebarProps> = ({
 }) => {
   const menuItems = [
     { key: "dashboard", label: "Tổng quan", icon: <HomeOutlined /> },
+    { key: "agencies", label: "Hồ sơ Đại lý", icon: <TeamOutlined /> },
     { key: "debt", label: "Công nợ đại lý", icon: <DollarCircleOutlined /> },
     {
       key: "agency-locks",
       label: "Khóa / Mở giao dịch",
       icon: <LockOutlined />,
-    }, // <-- Thêm mục này
+    },
     {
       key: "invoices",
       label: "Hóa đơn & Chứng từ",

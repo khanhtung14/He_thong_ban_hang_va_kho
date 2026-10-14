@@ -34,13 +34,12 @@ export interface AccountantHeaderProps {
 export const AccountantHeader: React.FC<AccountantHeaderProps> = ({
   fullName = "Đặng Kế Toán",
   roleName = "Kế toán tài chính",
-  avatarUrl: _avatarUrl,
+  avatarUrl,
   notificationCount = 0,
   onProfileClick,
   onChangePassword,
   onLogout,
 }) => {
-  void _avatarUrl;
   const initials =
     fullName
       .trim()
@@ -134,7 +133,7 @@ export const AccountantHeader: React.FC<AccountantHeaderProps> = ({
           placement="bottomRight"
         >
           <Space style={{ cursor: "pointer", userSelect: "none" }} size="small">
-            <ProfileAvatar editable={false} size={36} initials={initials} />
+            <ProfileAvatar editable={false} size={36} initials={initials} avatarUrl={avatarUrl} />
             <div
               style={{
                 display: "flex",

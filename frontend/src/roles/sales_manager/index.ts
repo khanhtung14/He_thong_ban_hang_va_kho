@@ -9,4 +9,4 @@ export { default as SalesReportPage, SalesReportPage as SalesReportPageComponent
 export { default as CustomerTerritoryManagement } from "./CustomerTerritoryManagement";
 export { default as ProductPriceHistoryModal } from "./ProductPriceHistoryModal";
 export { default as ProductCatalogManagement } from "./ProductCatalogManagement";
-
+export { default as ProductManagement } from "./ProductManagement";

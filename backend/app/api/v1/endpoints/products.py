@@ -427,14 +427,54 @@ def _get_existing_skus(db: Session) -> set[str]:
     return skus
 
 
-def _annotate_import_rows(rows: list[dict[str, Any]], existing_skus: set[str]) -> list[dict[str, Any]]:
+def _annotate_import_rows(
+    rows: list[dict[str, Any]],
+    existing_skus: set[str],
+    db: Optional[Session] = None,
+) -> list[dict[str, Any]]:
     seen_skus: set[str] = set()
+    category_check_cache: dict[str, bool] = {}
     result: list[dict[str, Any]] = []
 
     for r in rows:
         row = dict(r)
         errors = list(row.get("errors", []))
         sku = row.get("sku", "").upper()
+        category_name = str(row.get("category") or "").strip()
+
+        is_new_category = False
+        if category_name:
+            cat_key = category_name.lower()
+            if cat_key in category_check_cache:
+                exists = category_check_cache[cat_key]
+            else:
+                exists = False
+                if db is not None:
+                    db_cat = db.query(Category).filter(
+                        (func.lower(func.trim(Category.name)) == cat_key)
+                        | (func.lower(func.trim(Category.code)) == cat_key)
+                    ).first()
+                    exists = db_cat is not None
+                if not exists:
+                    try:
+                        from app.api.v1.endpoints.product_categories import _CATEGORY_REGISTRY
+                        exists = any(
+                            reg_cat["name"].strip().lower() == cat_key or reg_cat["code"].strip().lower() == cat_key
+                            for reg_cat in _CATEGORY_REGISTRY.values()
+                        )
+                    except Exception:
+                        pass
+                category_check_cache[cat_key] = exists
+
+            if not exists:
+                is_new_category = True
+                row["is_new_category"] = True
+                row["category_status"] = "NEW"
+                row["category_note"] = "Danh mục mới (sẽ được tự động tạo)"
+            else:
+                row["is_new_category"] = False
+                row["category_status"] = "EXISTING"
+                row["category_note"] = "Danh mục đã tồn tại"
 
         if sku and sku in seen_skus:
             errors.append("SKU bị lặp trong tệp Excel.")
@@ -449,12 +489,14 @@ def _annotate_import_rows(rows: list[dict[str, Any]], existing_skus: set[str]) -
         elif sku in existing_skus:
             action = "update"
             action_type = "UPDATE"
-            msg = "SKU đã tồn tại trong hệ thống, dữ liệu sẽ được cập nhật."
+            cat_suffix = " Danh mục mới (sẽ được tự động tạo)." if is_new_category else ""
+            msg = f"SKU đã tồn tại trong hệ thống, dữ liệu sẽ được cập nhật.{cat_suffix}"
             err_msg = None
         else:
             action = "create"
             action_type = "CREATE"
-            msg = "Sản phẩm sẽ được tạo mới."
+            cat_suffix = " Danh mục mới (sẽ được tự động tạo)." if is_new_category else ""
+            msg = f"Sản phẩm sẽ được tạo mới.{cat_suffix}"
             err_msg = None
 
         row["action"] = action
@@ -630,7 +672,7 @@ async def preview_product_import(
     content = await _read_import_file(file)
     parsed_rows = _parse_import_workbook(content)
     existing_skus = _get_existing_skus(db)
-    rows = _annotate_import_rows(parsed_rows, existing_skus)
+    rows = _annotate_import_rows(parsed_rows, existing_skus, db=db)
 
     session_id = str(uuid.uuid4())
     IMPORT_SESSIONS[session_id] = rows
