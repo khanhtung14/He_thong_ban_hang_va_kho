@@ -33,6 +33,9 @@ interface PreviewRow {
   stock_available?: number;
   action_type: "CREATE" | "UPDATE" | "ERROR";
   error_message?: string;
+  is_new_category?: boolean;
+  category_status?: "NEW" | "EXISTING";
+  category_note?: string;
 }
 
 interface PreviewSummary {
@@ -197,6 +200,26 @@ export const ProductExcelImport: React.FC = () => {
       key: "name",
       render: (name: string) =>
         name || <span style={{ color: "#94a3b8" }}>(Trống)</span>,
+    },
+    {
+      title: "Danh mục",
+      dataIndex: "category",
+      key: "category",
+      width: 170,
+      render: (category?: string, record?: PreviewRow) => {
+        if (!category) return <span style={{ color: "#94a3b8" }}>—</span>;
+        const isNew = record?.is_new_category || record?.category_status === "NEW";
+        return (
+          <Space direction="vertical" size={2}>
+            <Tag color={isNew ? "orange" : "purple"}>{category}</Tag>
+            {isNew && (
+              <span style={{ fontSize: 11, color: "#d97706", display: "block" }}>
+                Danh mục mới (sẽ được tự động tạo)
+              </span>
+            )}
+          </Space>
+        );
+      },
     },
     {
       title: "Đơn vị tính",

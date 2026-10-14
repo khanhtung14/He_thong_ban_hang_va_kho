@@ -54,7 +54,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
     }
 
     const rows = [
-      ["BÁO CÁO DOANH SỐ VÀ BIÊN LỢI NHUẬN GỘP - WMS"],
+      ["BÁO CÁO DOANH SỐ VÀ BIÊN LỢI NHUẬN GỘP - OMS"],
       ["Kỳ báo cáo", reportData.period || "2026-Q3"],
       ["Tổng doanh thu", reportData.total_revenue || 0],
       ["Tổng giá vốn (COGS)", reportData.total_cogs || 0],

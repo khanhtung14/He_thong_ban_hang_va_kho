@@ -360,18 +360,56 @@ class ProductUnit(Base):
 
 class DiscountPolicy(Base):
     __tablename__ = "discount_policies"
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    scope: Mapped[str] = mapped_column(String(30), nullable=False) # e.g. 'PRODUCT', 'CATEGORY'
-    target_id: Mapped[Optional[int]] = mapped_column(Integer) # ID of product or category
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(20), default="SKU", nullable=False)  # 'SKU' | 'CATEGORY'
+    target_id: Mapped[str] = mapped_column(String(100), nullable=False)  # SKU or Category ID
+    discount_type: Mapped[str] = mapped_column(String(20), default="PERCENTAGE", nullable=False)  # 'PERCENTAGE' | 'FIXED_AMOUNT'
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    tiers: Mapped[list["DiscountTier"]] = relationship(
+        back_populates="policy",
+        cascade="all, delete-orphan",
+        order_by="DiscountTier.min_quantity",
+    )
+
+    @property
+    def scope(self) -> str:
+        return self.target_type
+
+    @scope.setter
+    def scope(self, val: str) -> None:
+        self.target_type = val
 
 
 class DiscountTier(Base):
     __tablename__ = "discount_tiers"
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     policy_id: Mapped[int] = mapped_column(ForeignKey("discount_policies.id", ondelete="CASCADE"), nullable=False)
-    min_qty: Mapped[int] = mapped_column(Integer, nullable=False)
-    discount_percent: Mapped[float] = mapped_column(Float, nullable=False)
+    min_quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    max_quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    discount_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    policy: Mapped["DiscountPolicy"] = relationship(back_populates="tiers")
+
+    @property
+    def min_qty(self) -> int:
+        return self.min_quantity
+
+    @min_qty.setter
+    def min_qty(self, val: int) -> None:
+        self.min_quantity = val
+
+    @property
+    def discount_percent(self) -> float:
+        return self.discount_value
+
+    @discount_percent.setter
+    def discount_percent(self, val: float) -> None:
+        self.discount_value = val
 
 
 # --- EP-03: Đại lý & Hạn mức công nợ ---
@@ -384,24 +422,73 @@ class Customer(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
+    tax_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    assigned_sales_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
+    region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     customer_group: Mapped[str] = mapped_column(String(30), default="RETAIL", server_default="RETAIL", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     lock_reason: Mapped[Optional[str]] = mapped_column(String(255))
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     locked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    
-    # NEW FIELDS: Credit limit
+
+    # Credit limit & payment terms
     credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    max_due_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_due_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    max_debt_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     warning_threshold_percent: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
+    warning_threshold: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     delivery_addresses: Mapped[List["DeliveryAddress"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
+    sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
+
+
+class CreditLimitLog(Base):
+    __tablename__ = "credit_limit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    old_credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    new_credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    old_max_debt_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    new_max_debt_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    changed_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changed_by_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    customer: Mapped["Customer"] = relationship(backref="credit_limit_logs")
+
+
+class HandoverHistory(Base):
+    __tablename__ = "handover_history"
+    __table_args__ = (
+        Index("ix_handover_history_from_user", "from_user_id"),
+        Index("ix_handover_history_to_user", "to_user_id"),
+        Index("ix_handover_history_created_at", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
+    from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    to_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    transferred_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    customer_ids: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    customer_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    from_user: Mapped[Optional["User"]] = relationship(foreign_keys=[from_user_id])
+    to_user: Mapped[Optional["User"]] = relationship(foreign_keys=[to_user_id])
+    transferred_by: Mapped[Optional["User"]] = relationship(foreign_keys=[transferred_by_id])
 
 
 class DeliveryAddress(Base):
@@ -452,11 +539,14 @@ class PriceList(Base):
 
 class PriceListItem(Base):
     __tablename__ = "price_list_items"
-    __table_args__ = (UniqueConstraint("price_list_id", "sku", name="uq_price_list_items_list_sku"),)
+    __table_args__ = (
+        UniqueConstraint("price_list_id", "sku", name="uq_price_list_items_list_sku"),
+        UniqueConstraint("price_list_id", "product_id", name="uq_price_list_items_list_prod"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     price_list_id: Mapped[int] = mapped_column(ForeignKey("price_lists.id", ondelete="CASCADE"), nullable=False)
+    sku: Mapped[str] = mapped_column(String(80), nullable=False, default="", index=True)
     product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=True)
-    sku: Mapped[str] = mapped_column(String(80), nullable=False)
     sale_price: Mapped[float] = mapped_column(Float, nullable=False)
     floor_price: Mapped[float] = mapped_column(Float, nullable=False)
     price_list: Mapped[PriceList] = relationship(back_populates="items")
@@ -523,9 +613,16 @@ class Supplier(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     tax_code: Mapped[Optional[str]] = mapped_column(String(50))
+    contact_person: Mapped[Optional[str]] = mapped_column(String(100))
+    payment_terms: Mapped[Optional[str]] = mapped_column(String(100))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     phone: Mapped[Optional[str]] = mapped_column(String(20))
     address: Mapped[Optional[str]] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    receipts: Mapped[List["WarehouseReceipt"]] = relationship("WarehouseReceipt", back_populates="supplier")
 
 
 class Inventory(Base):
@@ -585,6 +682,8 @@ class WarehouseReceipt(Base):
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False)
     receipt_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     status: Mapped[str] = mapped_column(String(30), default="COMPLETED")
+
+    supplier: Mapped[Optional["Supplier"]] = relationship("Supplier", back_populates="receipts")
 
 
 class WarehouseReceiptItem(Base):
@@ -760,3 +859,7 @@ class SalesTarget(Base):
     month: Mapped[int] = mapped_column(Integer, nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     target_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+
+
+

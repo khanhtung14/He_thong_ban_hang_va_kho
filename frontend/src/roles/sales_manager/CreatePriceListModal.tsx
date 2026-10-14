@@ -33,8 +33,8 @@ const { RangePicker } = DatePicker;
 // Hàm tạo mã bảng giá tự động theo ngày hiện tại và 4 số ngẫu nhiên
 const generatePriceListCode = () => {
   const dateStr = dayjs().format("YYYYMMDD");
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  return `PL-${dateStr}-${randomSuffix}`;
+  const randOMSuffix = Math.floor(1000 + Math.random() * 9000);
+  return `PL-${dateStr}-${randOMSuffix}`;
 };
 
 export interface CreatePriceListModalProps {

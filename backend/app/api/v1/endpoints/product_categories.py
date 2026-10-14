@@ -11,7 +11,7 @@ Implements:
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -99,12 +99,52 @@ def reset_category_registry() -> None:
     _NEXT_CATEGORY_ID = 4
 
 
-def get_all_categories() -> list[dict[str, Any]]:
+def sync_categories_from_db(db: Optional[Any] = None) -> None:
+    """Sync real categories from DB into _CATEGORY_REGISTRY."""
+    global _CATEGORY_REGISTRY, _NEXT_CATEGORY_ID
+    try:
+        session = db
+        should_close = False
+        if session is None:
+            session = SessionLocal()
+            should_close = True
+        try:
+            db_cats = session.query(Category).all()
+            for c in db_cats:
+                if c.id not in _CATEGORY_REGISTRY:
+                    _CATEGORY_REGISTRY[c.id] = {
+                        "id": c.id,
+                        "code": c.code,
+                        "name": c.name,
+                        "parent_id": c.parent_id,
+                        "description": c.description,
+                    }
+                else:
+                    if _CATEGORY_REGISTRY[c.id].get("code") not in ("NGK", "ENERGY", "ENERGY_GAS"):
+                        _CATEGORY_REGISTRY[c.id]["name"] = c.name
+                        _CATEGORY_REGISTRY[c.id]["code"] = c.code
+                        _CATEGORY_REGISTRY[c.id]["parent_id"] = c.parent_id
+                        _CATEGORY_REGISTRY[c.id]["description"] = c.description
+                if c.id >= _NEXT_CATEGORY_ID:
+                    _NEXT_CATEGORY_ID = c.id + 1
+        finally:
+            if should_close:
+                session.close()
+    except Exception:
+        pass
+
+
+def get_all_categories(db: Optional[Any] = None) -> list[dict[str, Any]]:
+    sync_categories_from_db(db)
     return list(_CATEGORY_REGISTRY.values())
 
 
-def get_category_by_id(category_id: int) -> dict[str, Any] | None:
-    return _CATEGORY_REGISTRY.get(category_id)
+def get_category_by_id(category_id: int, db: Optional[Any] = None) -> dict[str, Any] | None:
+    cat = _CATEGORY_REGISTRY.get(category_id)
+    if not cat:
+        sync_categories_from_db(db)
+        cat = _CATEGORY_REGISTRY.get(category_id)
+    return cat
 
 
 try:
@@ -185,9 +225,9 @@ def would_cause_cycle(category_id: int, new_parent_id: int | None) -> bool:
 def build_category_tree(parent_id: int | None = None) -> list[dict[str, Any]]:
     """Build nested tree structure starting from parent_id."""
     nodes = []
-    # Find direct children sorted by id
+    # Find direct children sorted with NGK first, then by id
     children = [c for c in _CATEGORY_REGISTRY.values() if c.get("parent_id") == parent_id]
-    children.sort(key=lambda x: x["id"])
+    children.sort(key=lambda x: (0 if x.get("code") == "NGK" else 1, x["id"]))
 
     for cat in children:
         c_id = cat["id"]
@@ -220,19 +260,25 @@ def verify_write_permission(user: AuthenticatedUser) -> None:
 
 @router.get("/tree")
 def get_categories_tree(
+    db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
     """Get nested hierarchical category tree (AC 1)."""
+    sync_categories_from_db(db)
     return build_category_tree(parent_id=None)
 
 
 @router.get("")
 def list_categories(
     parent_id: Optional[int] = None,
+    page_size: Optional[int] = Query(None, alias="pageSize"),
+    limit: Optional[int] = Query(None),
+    page: Optional[int] = None,
+    db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
     """Get flat list of categories with level and products count."""
-    categories = get_all_categories()
+    categories = get_all_categories(db=db)
     if parent_id is not None:
         categories = [c for c in categories if c.get("parent_id") == parent_id]
 
@@ -240,6 +286,11 @@ def list_categories(
     for c in sorted(categories, key=lambda x: x["id"]):
         c_id = c["id"]
         parent = _CATEGORY_REGISTRY.get(c.get("parent_id")) if c.get("parent_id") else None
+        if not parent and c.get("parent_id") and db:
+            p_cat = db.query(Category).filter(Category.id == c.get("parent_id")).first()
+            if p_cat:
+                parent = {"id": p_cat.id, "name": p_cat.name, "code": p_cat.code}
+
         result.append({
             "id": c_id,
             "code": c["code"],
@@ -248,18 +299,38 @@ def list_categories(
             "parent_name": parent["name"] if parent else None,
             "description": c.get("description"),
             "level": calculate_category_level(c_id),
-            "products_count": count_products_for_category(c_id),
+            "products_count": count_products_for_category(c_id, db=db),
+            "is_active": True,
+            "status": "ACTIVE",
         })
+
+    effective_limit = limit or page_size
+    if effective_limit and effective_limit > 0:
+        result = result[:effective_limit]
+
     return result
 
 
 @router.get("/{category_id}")
 def get_category_detail(
     category_id: int,
+    db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
     """Get detailed category information by ID."""
-    cat = get_category_by_id(category_id)
+    sync_categories_from_db(db)
+    cat = get_category_by_id(category_id, db=db)
+    if not cat and db:
+        db_cat = db.query(Category).filter(Category.id == category_id).first()
+        if db_cat:
+            cat = {
+                "id": db_cat.id,
+                "code": db_cat.code,
+                "name": db_cat.name,
+                "parent_id": db_cat.parent_id,
+                "description": db_cat.description,
+            }
+            _CATEGORY_REGISTRY[db_cat.id] = cat
     if not cat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -274,14 +345,17 @@ def get_category_detail(
         "parent_name": parent["name"] if parent else None,
         "description": cat.get("description"),
         "level": calculate_category_level(category_id),
-        "products_count": count_products_for_category(category_id),
+        "products_count": count_products_for_category(category_id, db=db),
         "children_count": count_child_categories(category_id),
+        "is_active": True,
+        "status": "ACTIVE",
     }
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_category(
     payload: CreateCategoryRequest,
+    db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
     """Create a new product category."""
@@ -328,6 +402,19 @@ def create_category(
     }
     _CATEGORY_REGISTRY[new_id] = new_category
 
+    try:
+        db_cat = Category(
+            id=new_id,
+            code=code_clean,
+            name=name_clean,
+            parent_id=payload.parent_id,
+            description=payload.description.strip() if payload.description else None,
+        )
+        db.add(db_cat)
+        db.commit()
+    except Exception:
+        db.rollback()
+
     return {
         "message": "Tạo nhóm hàng mới thành công",
         "category": {
@@ -342,6 +429,7 @@ def create_category(
 def update_category(
     category_id: int,
     payload: UpdateCategoryRequest,
+    db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
 ) -> Any:
     """Update category information."""
@@ -386,6 +474,21 @@ def update_category(
                     detail=f"Không thể gán nhóm '{new_parent_id}' làm nhóm cha vì sẽ tạo vòng lặp phân cấp.",
                 )
         cat["parent_id"] = new_parent_id
+
+    try:
+        db_cat = db.query(Category).filter(Category.id == category_id).first()
+        if db_cat:
+            if payload.code is not None:
+                db_cat.code = cat["code"]
+            if payload.name is not None:
+                db_cat.name = cat["name"]
+            if payload.description is not None:
+                db_cat.description = cat["description"]
+            if payload.parent_id is not None or "parent_id" in payload.model_fields_set:
+                db_cat.parent_id = cat["parent_id"]
+            db.commit()
+    except Exception:
+        db.rollback()
 
     return {
         "message": "Cập nhật nhóm hàng thành công",

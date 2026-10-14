@@ -69,7 +69,7 @@ export interface RoleItem {
 }
 
 // ---------------------------------------------------------------------
-// Fallback Datasets (Chuẩn nghiệp vụ OMS/WMS)
+// Fallback Datasets (Chuẩn nghiệp vụ OMS/OMS)
 // ---------------------------------------------------------------------
 
 const FALLBACK_WAREHOUSES: WarehouseItem[] = [
@@ -856,7 +856,7 @@ export const AdminConfiguration: React.FC = () => {
           </Title>
         </div>
         <Text type="secondary" style={{ marginTop: 4, display: "inline-block", fontSize: 13 }}>
-          Quản trị danh mục kho bãi, địa bàn kinh doanh và ma trận vai trò phân quyền OMS/WMS.
+          Quản trị danh mục kho bãi, địa bàn kinh doanh và ma trận vai trò phân quyền OMS/OMS.
         </Text>
       </div>
 

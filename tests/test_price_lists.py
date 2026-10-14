@@ -5,8 +5,9 @@ from datetime import date
 import pytest
 from sqlalchemy import delete
 
+import uuid
 from src.backend.database import SessionLocal
-from src.backend.models import Customer, Order, OrderItem, PriceList, PriceListItem, DeliveryAddress
+from src.backend.models import Customer, DeliveryAddress, Order, OrderItem, PriceList, PriceListItem
 from src.backend.rbac import create_access_token
 
 
@@ -51,9 +52,16 @@ def create_and_publish(client, data=None):
 
 
 def create_customer(client, group="DEALER_LEVEL_1"):
+    suffix = uuid.uuid4().hex[:6]
+    phone_digits = f"{uuid.uuid4().int % 10000000:07d}"
     response = client.post(
         "/api/v1/customers",
-        json={"code": f"CUST-{group}", "name": f"Customer {group}", "customer_group": group, "phone": "0912345678"},
+        json={
+            "code": f"CUST-{group}-{suffix}",
+            "name": f"Customer {group}",
+            "customer_group": group,
+            "phone": f"091{phone_digits}",
+        },
     )
     assert response.status_code == 201, response.text
     return response.json()

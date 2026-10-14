@@ -36,6 +36,9 @@ import CreateOrderModal from "../../components/CreateOrderModal";
 import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
 import { SalesHeader } from "../../components/Header/SalesHeader";
 
+// Customer List Module (S3-08)
+import { SalesCustomerList } from "./SalesCustomerList";
+
 // Auth & API
 import { logout } from "../../services/sessionService";
 import {
@@ -49,6 +52,11 @@ import {
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
+
+const formatMoney = (val?: number) => {
+  if (!val) return "0 ₫";
+  return `${val.toLocaleString("vi-VN")} ₫`;
+};
 
 export const SalesDashboard: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(() => {
@@ -133,9 +141,10 @@ export const SalesDashboard: React.FC = () => {
     };
   }, [loadProfileData, loadMyCustomers, loadOrders, selectedKey]);
 
-  const formatMoney = (val?: number) => {
-    if (!val) return "0 ₫";
-    return `${val.toLocaleString("vi-VN")} ₫`;
+  const handleSelectCustomerForOrder = (customer: CustomerItem) => {
+    // Lưu tạm khách hàng để lên đơn
+    localStorage.setItem("selectedOrderCustomer", JSON.stringify(customer));
+    setSelectedKey("orders");
   };
 
   const totalDebt = customers.reduce((sum, c) => sum + (c.current_debt || 0), 0);
@@ -347,19 +356,19 @@ export const SalesDashboard: React.FC = () => {
         style={{
           position: "fixed",
           inset: 0,
-          backgroundColor: "rgba(248, 250, 252, 0.5)",
+          backgroundColor: "rgba(248, 250, 252, 0.7)",
           zIndex: 0,
         }}
       />
 
-      {/* 1. Sidebar Sales */}
+      {/* 2. Sidebar Sales */}
       <SalesSidebar
         selectedKey={selectedKey}
         onSelect={setSelectedKey}
         onLogout={logout}
       />
 
-      {/* 2. Cột nội dung */}
+      {/* 3. Cột nội dung */}
       <Layout style={{ backgroundColor: "transparent", minWidth: 0, zIndex: 1 }}>
         <SalesHeader
           fullName={profile?.full_name || "Nhân viên kinh doanh"}
@@ -373,8 +382,8 @@ export const SalesDashboard: React.FC = () => {
 
         <Content
           style={{
-            padding: "24px 32px",
-            maxWidth: 1400,
+            padding: "20px 28px",
+            maxWidth: 1500,
             width: "100%",
             margin: "0 auto",
           }}
@@ -468,32 +477,10 @@ export const SalesDashboard: React.FC = () => {
                 />
               </Card>
             ) : (
-              <Card style={{ borderRadius: 12 }}>
-                <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
-                  <Input
-                    prefix={<SearchOutlined />}
-                    placeholder="Tìm kiếm theo mã, tên đại lý..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onPressEnter={() => loadMyCustomers()}
-                    style={{ maxWidth: 360, borderRadius: 8 }}
-                    allowClear
-                  />
-                  <Button icon={<ReloadOutlined />} onClick={loadMyCustomers} loading={loading}>
-                    Làm mới
-                  </Button>
-                </div>
-
-                <Table
-                  columns={customerColumns}
-                  dataSource={customers}
-                  rowKey="id"
-                  loading={loading}
-                  pagination={{ pageSize: 15, showTotal: (t) => `Tổng cộng: ${t} đại lý` }}
-                  bordered
-                  size="middle"
-                />
-              </Card>
+              <SalesCustomerList
+                currentRepName={profile?.full_name}
+                onSelectCustomerForOrder={handleSelectCustomerForOrder}
+              />
             )}
           </div>
         </Content>

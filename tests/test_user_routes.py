@@ -64,11 +64,14 @@ def db_session_and_client():
         finally:
             session.close()
 
+    from src.backend.security import require_admin
+
     test_app.dependency_overrides[get_db] = override_get_db
     # These tests exercise route behavior as an authenticated administrator.
     # Production requests still use require_admin and must present a valid session.
     test_app.dependency_overrides[require_admin] = lambda: SimpleNamespace(
         id=999,
+        username="admin",
         roles=[SimpleNamespace(code="ADMIN")],
     )
 

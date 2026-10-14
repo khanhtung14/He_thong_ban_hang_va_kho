@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DistriCare CRM - Hệ Thống Phân Công & Chuyển Giao Đại Lý</title>
+  <meta name="description" content="Phân hệ Quản lý Phân công Nhân viên Kinh doanh theo Đại lý & Khu vực, Chuyển giao địa bàn hàng loạt khi nhân viên nghỉ việc có ghi lịch sử.">
+  
+  <!-- CSS Design System -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/print.css">
+</head>
+<body>
+
+  <!-- ==================== HEADER BAR ==================== -->
+  <header class="app-header">
+    <div class="app-container header-inner">
+      <!-- Brand & Jira Epic Badge -->
+      <div class="brand-section">
+        <div class="brand-logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-extrabold text-slate-900 tracking-tight" style="line-height: 1.2;">DISTRICARE CRM</h1>
+            <span class="badge badge-secondary text-2xs">Sprint 3</span>
+          </div>
+          <p class="text-2xs text-slate-500 font-medium">Hệ Thống Phân Công & Chăm Sóc Mạng Lưới Đại Lý Toàn Quốc</p>
+        </div>
+      </div>
+
+      <!-- Quick Role Switcher (Mô phỏng Phân Quyền) & Header Actions -->
+      <div class="header-controls">
+        <!-- Role Impersonation Dropdown -->
+        <div class="role-switcher-box">
+          <label for="selectRoleSwitcher" class="text-2xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            Vai trò:
+          </label>
+          <select id="selectRoleSwitcher" class="form-select form-select-sm font-semibold text-slate-800" style="min-width: 250px;">
+            <option value="NV001">👔 Nguyễn Hồng Vĩnh (Quản lý KD - Toàn quyền)</option>
+            <option value="NV002">👤 Trần Minh Quang (NVKD Miền Bắc - 5 ĐL)</option>
+            <option value="NV003">👤 Lê Thu Hà (NVKD Miền Trung - 3 ĐL)</option>
+            <option value="NV004">👤 Phạm Văn Đức (NVKD Miền Nam - 5 ĐL)</option>
+            <option value="NV005">👤 Vũ Thị Mai Anh (NVKD Tây Nam Bộ - 4 ĐL)</option>
+            <option value="NV006">⚠️ Hoàng Kim Ngân (NVKD Sắp nghỉ việc - 5 ĐL)</option>
+            <option value="NV007">👤 Đỗ Tuấn Kiệt (NVKD Mới - Sẵn sàng nhận ĐL)</option>
+          </select>
+        </div>
+
+        <div id="headerUserBadge" class="flex items-center gap-1.5 text-xs px-2.5 py-1 bg-white rounded-lg border border-slate-200">
+          <!-- Rendered by UI -->
+        </div>
+
+        <!-- CTA Buttons -->
+        <button class="btn btn-primary btn-sm" id="btnOpenBulkHandover" title="Chuyển giao địa bàn khi nhân viên nghỉ việc">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="16 3 21 3 21 8"></polyline>
+            <line x1="4" y1="20" x2="21" y2="3"></line>
+            <polyline points="21 16 21 21 16 21"></polyline>
+            <line x1="15" y1="15" x2="21" y2="21"></line>
+            <line x1="4" y1="4" x2="9" y2="9"></line>
+          </svg>
+          Chuyển Giao Hàng Loạt
+        </button>
+
+        <button class="btn btn-secondary btn-sm" id="btnOpenTechDocs" title="Xem báo cáo kiến trúc kỹ thuật bảo vệ đồ án">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          Tài Liệu Nghiệm Thu
+        </button>
+
+        <button class="btn btn-secondary btn-sm" id="btnResetData" title="Khôi phục dữ liệu ban đầu để kiểm thử">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+          </svg>
+          Reset Demo
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN WORKSPACE ==================== -->
+  <main class="app-container">
+
+    <!-- Row-Level Security & Role Status Banner (Chứng minh Tiêu chí 2) -->
+    <section id="securityContextBanner">
+      <!-- Injected by UIController -->
+    </section>
+
+    <!-- KPI Metrics Dashboard -->
+    <section class="dashboard-grid" id="dashboardMetricsContainer">
+      <!-- Injected by UIController -->
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs-container" aria-label="Phân hệ chức năng">
+      <button class="nav-tab-btn active" data-tab="agencies">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        Quản Lý Đại Lý & Phân Công
+      </button>
+
+      <button class="nav-tab-btn" data-tab="handovers">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        Lịch Sử Chuyển Giao & Audit Trail
+      </button>
+
+      <button class="nav-tab-btn" data-tab="analytics">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        Phân Tích Cân Bằng Địa Bàn
+      </button>
+    </nav>
+
+    <!-- ==================== TAB 1: DANH SÁCH ĐẠI LÝ & PHÂN CÔNG ==================== -->
+    <section id="tabAgenciesContent">
+      <div class="card overflow-hidden">
+        <!-- Filter and Search Toolbar -->
+        <div class="p-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <!-- Search box -->
+          <div class="flex items-center gap-2 flex-1 min-w-[280px]">
+            <div class="relative w-full">
+              <input type="text" id="inpGlobalSearch" class="form-input pl-9" placeholder="Tìm theo tên đại lý, mã đại lý, MST, tỉnh thành...">
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <!-- Khu vực -->
+            <select id="filterRegion" class="form-select form-select-sm" style="width: 150px;">
+              <option value="ALL">Tất cả khu vực</option>
+              <option value="Miền Bắc">Miền Bắc</option>
+              <option value="Miền Trung">Miền Trung</option>
+              <option value="Miền Nam">Miền Nam</option>
+              <option value="Tây Nguyên">Tây Nguyên</option>
+              <option value="Tây Nam Bộ">Tây Nam Bộ</option>
+            </select>
+
+            <!-- Hạng đại lý -->
+            <select id="filterTier" class="form-select form-select-sm" style="width: 140px;">
+              <option value="ALL">Tất cả phân hạng</option>
+              <option value="DIAMOND">Kim Cương (VIP)</option>
+              <option value="GOLD">Hạng Vàng</option>
+              <option value="SILVER">Hạng Bạc</option>
+              <option value="BRONZE">Hạng Đồng</option>
+            </select>
+
+            <!-- Người phụ trách (Chỉ Quản lý) -->
+            <select id="filterAssignee" class="form-select form-select-sm" style="width: 210px;">
+              <!-- Dynamic by UI -->
+            </select>
+
+            <span class="badge badge-secondary font-mono font-bold text-xs" id="agencyResultCount">
+              23 đại lý
+            </span>
+          </div>
+        </div>
+
+        <!-- Table Data -->
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="w-10 text-center">
+                  <input type="checkbox" id="chkSelectAllAgencies" class="custom-checkbox">
+                </th>
+                <th>Mã & Tên Đại Lý</th>
+                <th>Địa Bàn / Vùng</th>
+                <th>Phân Hạng & Doanh Số</th>
+                <th>Người Phụ Trách Chính (Phân Công)</th>
+                <th>Lần Chăm Sóc Gần Nhất</th>
+                <th class="text-center">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="agenciesTableBody">
+              <!-- Injected by UIController -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: LỊCH SỬ CHUYỂN GIAO & AUDIT TRAIL ==================== -->
+    <section id="tabHandoversContent" class="hidden">
+      <div id="handoversContainer">
+        <!-- Injected by UIController -->
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: TRỰC QUAN HÓA TẢI ĐỊA BÀN ==================== -->
+    <section id="tabAnalyticsContent" class="hidden">
+      <div id="analyticsContainer">
+        <!-- Injected by UIController -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Script Modules -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
