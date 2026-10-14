@@ -1,6 +1,7 @@
 """Inventory endpoints with RBAC enforcement and financial data protection."""
+from __future__ import annotations
 
-from typing import Any, Optional, List, Literal
+from typing import Any, Optional, List, Literal, Union
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
@@ -30,7 +31,7 @@ from app.models.models import (
 )
 
 router = APIRouter(prefix="/api/v1/inventory", tags=["Inventory"])
-legacy_router = APIRouter(tags=["Inventory"])
+legacy_router = APIRouter(tags=["Inventory Legacy"])
 
 
 class InventoryAdjustmentRequest(BaseModel):
@@ -66,6 +67,8 @@ MOCK_INVENTORY_ITEMS = [
         "unit": "Thùng 24 lon",
     },
 ]
+
+
 
 
 def _sync_warehouse_scope(user: AuthenticatedUser, db: Session) -> None:
@@ -130,6 +133,8 @@ def adjust_inventory(
     }
 
 
+
+
 @router.get("/items")
 def list_inventory_items_compat(
     warehouse_id: Optional[int] = Query(None, alias="warehouse_id"),
@@ -137,6 +142,27 @@ def list_inventory_items_compat(
     db: Session = Depends(get_db),
 ) -> Any:
     """List inventory items (compat endpoint)."""
+    try:
+        db_query = db.query(Inventory, Product, Warehouse).join(Product, Inventory.product_id == Product.id).join(Warehouse, Inventory.warehouse_id == Warehouse.id)
+        if warehouse_id:
+            db_query = db_query.filter(Inventory.warehouse_id == warehouse_id)
+        db_items = db_query.all()
+        if db_items:
+            items = []
+            for inv, prod, wh in db_items:
+                items.append({
+                    "product_id": prod.id,
+                    "sku": prod.sku,
+                    "product_name": prod.name,
+                    "warehouse_id": wh.id,
+                    "warehouse_name": wh.name,
+                    "quantity_available": inv.available_qty,
+                    "base_quantity": inv.physical_qty,
+                })
+            return items
+    except Exception:
+        pass
+
     _sync_warehouse_scope(user, db)
     warehouse_role = normalize_role(user.role) in {"Warehouse", "WH Manager"}
     if warehouse_role and user.warehouse_ids and warehouse_id is not None and warehouse_id not in user.warehouse_ids:
@@ -166,6 +192,16 @@ def list_inventory_items_compat(
 
     return sanitize_financial_data(items, user)
 
+
+
+
+@legacy_router.get("/inventory/items")
+def legacy_get_inventory_items(
+    warehouse_id: Optional[int] = Query(None, alias="warehouse_id"),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_INVENTORY_VIEW)),
+    db: Session = Depends(get_db),
+) -> Any:
+    return list_inventory_items_compat(warehouse_id, user, db)
 
 
 @router.get("")
@@ -323,7 +359,7 @@ class TransactionResponse(BaseModel):
 
 
 def _record_stock_movement(
-    payload: TransactionCreateRequest | LegacyTransactionCreateRequest,
+    payload: Union[TransactionCreateRequest, LegacyTransactionCreateRequest],
     user: AuthenticatedUser,
     db: Session,
 ) -> InventoryTransaction:

@@ -62,18 +62,49 @@ def init_db():
 
 def migrate_pricing_schema():
     """Create price-list tables and add pricing/approval fields to existing DBs."""
-    from app.models.models import Base, PriceList, PriceListItem, HandoverHistory, Supplier
+    from app.models.models import (
+        Base,
+        PriceList,
+        PriceListItem,
+        HandoverHistory,
+        CustomerHandoverHistory,
+        ProductPriceHistory,
+        Supplier,
+        DiscountPolicy,
+        DiscountTier,
+    )
 
-    Base.metadata.create_all(bind=engine, tables=[PriceList.__table__, PriceListItem.__table__, HandoverHistory.__table__, Supplier.__table__], checkfirst=True)
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[
+            PriceList.__table__,
+            PriceListItem.__table__,
+            HandoverHistory.__table__,
+            CustomerHandoverHistory.__table__,
+            ProductPriceHistory.__table__,
+            Supplier.__table__,
+            DiscountPolicy.__table__,
+            DiscountTier.__table__,
+        ],
+        checkfirst=True,
+    )
     inspector = inspect(engine)
     additions = {
         "customers": {
             "customer_group": "VARCHAR(30) NOT NULL DEFAULT 'RETAIL'",
             "region": "VARCHAR(100) NULL",
+            "tax_code": "VARCHAR(50) NULL",
+            "phone": "VARCHAR(25) NULL",
+            "email": "VARCHAR(150) NULL",
+            "address": "TEXT NULL",
+            "sales_rep_id": "INTEGER NULL",
+            "assigned_sales_id": "INTEGER NULL",
+            "is_active": "BOOLEAN NOT NULL DEFAULT 1",
             "is_locked": "BOOLEAN NOT NULL DEFAULT 0",
             "lock_reason": "VARCHAR(255) NULL",
             "locked_at": "DATETIME NULL",
             "locked_by_id": "INTEGER NULL",
+            "phone": "VARCHAR(20) NULL",
         },
         "suppliers": {
             "contact_person": "VARCHAR(100) NULL",
@@ -95,6 +126,20 @@ def migrate_pricing_schema():
         "price_list_items": {
             "sku": "VARCHAR(50) NULL",
         },
+        "discount_policies": {
+            "name": "VARCHAR(255) NOT NULL DEFAULT ''",
+            "target_type": "VARCHAR(20) NOT NULL DEFAULT 'SKU'",
+            "target_id": "VARCHAR(100) NOT NULL DEFAULT ''",
+            "discount_type": "VARCHAR(20) NOT NULL DEFAULT 'PERCENTAGE'",
+            "is_active": "BOOLEAN NOT NULL DEFAULT 1",
+            "created_at": "DATETIME NULL",
+        },
+        "discount_tiers": {
+            "policy_id": "INTEGER NOT NULL DEFAULT 0",
+            "min_quantity": "INTEGER NOT NULL DEFAULT 1",
+            "max_quantity": "INTEGER NULL",
+            "discount_value": "FLOAT NOT NULL DEFAULT 0.0",
+        },
     }
     for table_name, columns_to_add in additions.items():
         if not inspector.has_table(table_name):
@@ -105,3 +150,35 @@ def migrate_pricing_schema():
             with engine.begin() as connection:
                 for name, definition in missing:
                     connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}"))
+
+    # Backfill phone từ delivery_addresses nếu cột customers.phone đang rỗng
+    if inspector.has_table("customers") and inspector.has_table("delivery_addresses"):
+        try:
+            with engine.begin() as connection:
+                connection.execute(text("""
+                    UPDATE customers
+                    SET phone = (
+                        SELECT delivery_addresses.phone
+                        FROM delivery_addresses
+                        WHERE delivery_addresses.customer_id = customers.id
+                        LIMIT 1
+                    )
+                    WHERE customers.phone IS NULL OR customers.phone = ''
+                """))
+        except Exception:
+            pass
+
+    # Khởi tạo bản ghi giá ban đầu cho các sản phẩm chưa có lịch sử giá
+    inspector = inspect(engine)
+    if inspector.has_table("product_price_history") and inspector.has_table("products"):
+        try:
+            with engine.begin() as connection:
+                connection.execute(text("""
+                    INSERT INTO product_price_history (product_id, old_price, new_price, changed_by, effective_date, reason, note)
+                    SELECT id, NULL, base_price, 'Khởi tạo', CURRENT_TIMESTAMP, 'Giá khởi tạo ban đầu', 'Giá khởi tạo ban đầu'
+                    FROM products
+                    WHERE id NOT IN (SELECT DISTINCT product_id FROM product_price_history) AND base_price IS NOT NULL
+                """))
+        except Exception:
+            pass
+

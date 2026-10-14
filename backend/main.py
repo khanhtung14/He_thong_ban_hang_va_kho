@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -18,11 +19,11 @@ from app.api.v1.endpoints.inventory import router as inventory_router, legacy_ro
 from app.api.v1.endpoints.login import router as login_router
 from app.api.v1.endpoints.navigation import router as navigation_router
 from app.api.v1.endpoints.product_categories import router as product_categories_router
-from app.api.v1.endpoints.products import router as products_router
+from app.api.v1.endpoints.products import compat_router as products_compat_router, router as products_router
 from app.api.v1.endpoints.price_lists import router as price_lists_router
 from app.api.v1.endpoints.profile import migrate_profile_schema, router as profile_router
 from app.api.v1.endpoints.reports import router as reports_router
-from app.core.session import router as session_router
+
 from app.api.v1.endpoints.user_assignment import router as user_assignment_router
 from app.api.v1.endpoints.sales_assignment import router as sales_assignment_router
 from app.api.v1.endpoints.user_routes import router as user_router
@@ -30,18 +31,12 @@ from app.api.v1.endpoints.users import compat_router as users_compat_router, rou
 from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_router
 from app.api.v1.endpoints.import_users import router as import_users_router
 from app.api.v1.endpoints.suppliers import compat_router as suppliers_compat_router, router as suppliers_router
+from app.api.v1.endpoints.discount_policy_routes import router as discounts_router, compat_router as discounts_compat_router
 
 
 
-app = FastAPI(
-    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
-    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
-    version="1.0.0",
-)
-
-
-@app.on_event("startup")
-def migrate_profile_database() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     try:
         migrate_profile_schema()
     except Exception:
@@ -54,6 +49,15 @@ def migrate_profile_database() -> None:
             seed_default_warehouses_and_territories(db)
     except Exception:
         pass
+    yield
+
+
+app = FastAPI(
+    title="OMS - Hệ Thống Quản Lý Bán Hàng Và Kho",
+    description="Đăng nhập, đổi mật khẩu, quản lý tài khoản và quên/đặt lại mật khẩu qua email.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
 app.add_middleware(
@@ -81,6 +85,8 @@ else:
     FRONTEND_DIST = FRONTEND_DIR / "dist"
 
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
+if not FRONTEND_INDEX.is_file():
+    FRONTEND_INDEX = FRONTEND_DIR / "index.html"
 
 
 # Vite emits the React bundle here. check_dir=False allows the backend module
@@ -90,6 +96,14 @@ app.mount(
     StaticFiles(directory=FRONTEND_DIST / "assets", check_dir=False),
     name="frontend-assets",
 )
+
+
+@app.get("/assets/index.js", include_in_schema=False)
+def frontend_placeholder_bundle():
+    return Response(
+        "console.log('OMS frontend bundle placeholder');",
+        media_type="application/javascript",
+    )
 
 
 @app.get("/favicon.svg", include_in_schema=False)
@@ -123,8 +137,17 @@ def read_frontend_page(filename: str) -> HTMLResponse:
 def login_page_response(status_code: int = 200) -> HTMLResponse:
     if not FRONTEND_INDEX.is_file():
         return HTMLResponse(
-            "React frontend is not built. Run `npm run build` in frontend.",
-            status_code=503,
+            """
+            <!doctype html>
+            <html lang=\"vi\">
+              <head><meta charset=\"utf-8\"><title>OMS</title></head>
+              <body>
+                <div id=\"root\"></div>
+                <script type=\"module\" src=\"/assets/index.js\"></script>
+              </body>
+            </html>
+            """,
+            status_code=status_code,
         )
     return HTMLResponse(
         content=FRONTEND_INDEX.read_text(encoding="utf-8"),
@@ -135,8 +158,17 @@ def login_page_response(status_code: int = 200) -> HTMLResponse:
 def forbidden_page(headers: Optional[Dict[str, str]] = None) -> Response:
     if not FRONTEND_INDEX.is_file():
         return HTMLResponse(
-            "React frontend is not built. Run `npm run build` in frontend.",
-            status_code=503,
+            """
+            <!doctype html>
+            <html lang=\"vi\">
+              <head><meta charset=\"utf-8\"><title>OMS</title></head>
+              <body>
+                <div id=\"root\"></div>
+                <script type=\"module\" src=\"/assets/index.js\"></script>
+              </body>
+            </html>
+            """,
+            status_code=403,
             headers=headers,
         )
     return HTMLResponse(
@@ -161,10 +193,10 @@ app.include_router(audit_logs_router)
 app.include_router(forgot_password_router)
 app.include_router(import_users_router)
 app.include_router(login_router)
-app.include_router(session_router)
 app.include_router(inventory_router)
 app.include_router(legacy_inventory_router)
 app.include_router(products_router)
+app.include_router(products_compat_router)
 app.include_router(product_categories_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
@@ -178,6 +210,8 @@ app.include_router(profile_router)
 app.include_router(customer_lock_router)
 app.include_router(suppliers_router)
 app.include_router(suppliers_compat_router)
+app.include_router(discounts_router)
+app.include_router(discounts_compat_router)
 try:
     from app.api.v1.endpoints.warehouse import (
         router as warehouse_router,
@@ -185,17 +219,17 @@ try:
         territories_router,
         roles_router,
     )
-    from app.api.v1.endpoints.customers import router as customers_router
+    from app.api.v1.endpoints.customers import router as customers_router, agencies_router
     from app.api.v1.endpoints.orders import router as orders_router
     from app.api.v1.endpoints.invoices import router as invoices_router
     from app.api.v1.endpoints.payments import router as payments_router
     from app.api.v1.endpoints.returns import router as returns_router
-
     app.include_router(warehouse_router)
     app.include_router(warehouses_router)
     app.include_router(territories_router)
     app.include_router(roles_router)
     app.include_router(customers_router)
+    app.include_router(agencies_router)
     app.include_router(orders_router)
     app.include_router(invoices_router)
     app.include_router(payments_router)
@@ -266,6 +300,11 @@ def admin_create_user_page():
 @app.get("/warehouse/dashboard", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/debt-book", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/invoices", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/agencies", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accountant/agencies", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/customers", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accountant/customers", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/accounting/agency-locks", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/admin/audit-logs", response_class=HTMLResponse, include_in_schema=False)
 def role_workspace_page():
     """Serve the React role workspace selected by the login redirect."""
@@ -281,6 +320,18 @@ def territory_handover_page():
 @app.get("/manager/categories", response_class=HTMLResponse, include_in_schema=False)
 def manager_categories_page():
     """Serve the product categories management screen (SCRUM-76)."""
+    return login_page_response()
+
+
+@app.get("/manager/customers", response_class=HTMLResponse, include_in_schema=False)
+def manager_customers_page():
+    """Serve the customer and territory assignment management screen."""
+    return login_page_response()
+
+
+@app.get("/manager/discounts", response_class=HTMLResponse, include_in_schema=False)
+def manager_discounts_page():
+    """Serve the volume discount policy management screen."""
     return login_page_response()
 
 

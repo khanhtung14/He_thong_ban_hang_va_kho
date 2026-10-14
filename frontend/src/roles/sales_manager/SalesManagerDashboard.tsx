@@ -20,6 +20,10 @@ import CategoryManagement from "./CategoryManagement";
 import SalesAssignmentManager from "./SalesAssignmentManager";
 import SalesReportPage from "./SalesReportPage";
 import ProductManagement from "./ProductManagement";
+import ProductImportPage from "./ProductImportPage";
+import ProductCatalogManagement from "./ProductCatalogManagement";
+import CustomerTerritoryManagement from "./CustomerTerritoryManagement";
+import DiscountPolicyManagement from "./DiscountPolicyManagement";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -47,9 +51,17 @@ export const SalesManagerDashboard: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string>(() => {
     if (typeof window !== "undefined") {
       if (window.location.pathname === "/sales/assignments") return "/sales/assignments";
+      if (
+        window.location.pathname === "/manager/products/import-excel" ||
+        window.location.pathname === "/manager/products/import"
+      ) {
+        return "/manager/products/import-excel";
+      }
       if (window.location.pathname === "/manager/products") return "/manager/products";
       if (window.location.pathname === "/manager/categories") return "/manager/categories";
+      if (window.location.pathname === "/manager/discounts") return "/manager/discounts";
       if (window.location.pathname === "/manager/reports") return "/manager/reports";
+      if (window.location.pathname === "/manager/customers") return "/manager/customers";
     }
     return "/manager/dashboard";
   });
@@ -190,13 +202,19 @@ export const SalesManagerDashboard: React.FC = () => {
           ...(hasCategoryMenu
             ? []
             : [
-              {
-                id: "manager-categories",
-                title: "Nhóm hàng",
-                path: "/manager/categories",
-                icon: "appstore",
-              },
-            ]),
+                {
+                  id: "manager-categories",
+                  title: "Nhóm hàng",
+                  path: "/manager/categories",
+                  icon: "appstore",
+                },
+              ]),
+          {
+            id: "manager-customers",
+            title: "Đại lý & Địa bàn",
+            path: "/manager/customers",
+            icon: "customers",
+          },
         ];
 
         // Đảm bảo không trùng lặp mục menu theo path, không có "Quản lý nhóm hàng" và "Nhập sản phẩm (Excel)"
@@ -347,6 +365,10 @@ export const SalesManagerDashboard: React.FC = () => {
             setCurrentPath("/sales/assignments");
             window.history.pushState({}, "", "/sales/assignments");
             window.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (path === "/manager/products/import-excel" || path === "/manager/products/import") {
+            setCurrentPath("/manager/products/import-excel");
+            window.history.pushState({}, "", "/manager/products/import-excel");
+            window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/products") {
             setCurrentPath("/manager/products");
             window.history.pushState({}, "", "/manager/products");
@@ -402,9 +424,25 @@ export const SalesManagerDashboard: React.FC = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <SalesAssignmentManager />
             </div>
+          ) : currentPath === "/manager/products/import-excel" || currentPath === "/manager/products/import" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <ProductImportPage
+                onBack={() => {
+                  setCurrentPath("/manager/products");
+                  window.history.pushState({}, "", "/manager/products");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            </div>
           ) : currentPath === "/manager/products" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <ProductManagement />
+              <ProductManagement
+                onNavigate={(path) => {
+                  setCurrentPath(path);
+                  window.history.pushState({}, "", path);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
             </div>
           ) : currentPath === "/manager/reports" ? (
             <SalesReportPage
@@ -420,6 +458,14 @@ export const SalesManagerDashboard: React.FC = () => {
           ) : currentPath === "/manager/categories" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <CategoryManagement />
+            </div>
+          ) : currentPath === "/manager/customers" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <CustomerTerritoryManagement />
+            </div>
+          ) : currentPath === "/manager/discounts" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <DiscountPolicyManagement />
             </div>
           ) : (
             /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */

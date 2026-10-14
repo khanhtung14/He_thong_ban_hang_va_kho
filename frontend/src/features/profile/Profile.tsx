@@ -45,7 +45,7 @@ export default function Profile({ embedded = false, onClose }: { embedded?: bool
 
   const [profileForm] = Form.useForm();
   const [pwdForm] = Form.useForm();
-  
+
   const [profileMsg, setProfileMsg] = useState<{ type: "success" | "error", text: string } | null>(null);
   const [pwdMsg, setPwdMsg] = useState<{ type: "success" | "error", text: string } | null>(null);
 
@@ -84,7 +84,7 @@ export default function Profile({ embedded = false, onClose }: { embedded?: bool
       if (!response.ok) throw new Error(errorMessage(result));
       if (result.profile) {
         setProfile(result.profile);
-        window.dispatchEvent(new Event("oms:profile-avatar-updated"));
+        window.dispatchEvent(new Event("OMS:profile-avatar-updated"));
       }
       setProfileMsg({ type: "success", text: result.message ?? "Cập nhật hồ sơ thành công." });
     } catch (error) {
@@ -220,7 +220,7 @@ export default function Profile({ embedded = false, onClose }: { embedded?: bool
         footer={null}
         width={700}
         className="glass-profile-modal"
-        styles={{ 
+        styles={{
           header: { background: "transparent", borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: 16 },
         }}
         closeIcon={<span style={{ color: "#475569", fontSize: 18 }}>✕</span>}

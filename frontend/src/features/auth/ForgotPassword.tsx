@@ -45,7 +45,7 @@ export default function ForgotPassword() {
         setIsError(true);
         setMessage(
           result.detail ??
-            "Không thể gửi yêu cầu. Vui lòng kiểm tra địa chỉ email.",
+          "Không thể gửi yêu cầu. Vui lòng kiểm tra địa chỉ email.",
         );
         return;
       }
@@ -53,7 +53,7 @@ export default function ForgotPassword() {
       setIsError(false);
       setMessage(
         result.message ||
-          "Yêu cầu đã được gửi. Vui lòng kiểm tra email.",
+        "Yêu cầu đã được gửi. Vui lòng kiểm tra email.",
       );
       setIsDemoMode(!!result.demo_mode);
     } catch {
@@ -131,7 +131,7 @@ export default function ForgotPassword() {
             zIndex: 2,
           }}
         >
-          {/* Logo nhận diện WMS */}
+          {/* Logo nhận diện OMS */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
               style={{
@@ -170,7 +170,7 @@ export default function ForgotPassword() {
                   letterSpacing: "0.5px",
                 }}
               >
-                WMS &amp; OMS
+                OMS
               </div>
               <div
                 style={{
@@ -341,7 +341,7 @@ export default function ForgotPassword() {
         >
           <img
             src={loginBanner}
-            alt="WMS Banner"
+            alt="OMS Banner"
             style={{
               width: "100%",
               maxHeight: "540px",

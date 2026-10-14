@@ -30,23 +30,26 @@ compat_router = APIRouter(prefix="/users", tags=["User Management (Direct)"])
 @compat_router.get("", response_model=UserListResponse, dependencies=[Depends(require_admin)])
 def get_users(
     search: Optional[str] = Query(None, description="Tìm kiếm theo họ tên, tên đăng nhập hoặc số điện thoại"),
+    keyword: Optional[str] = Query(None, description="Tìm kiếm alias keyword"),
     role: Optional[str] = Query(None, description="Lọc theo mã hoặc tên vai trò"),
     status: Optional[AccountStatus] = Query(None, description="Lọc theo trạng thái tài khoản"),
     page: int = Query(default=1, ge=1, description="Số thứ tự trang"),
     page_size: int = Query(default=20, ge=1, le=100, description="Số dòng mỗi trang (mặc định 20)"),
     size: Optional[int] = Query(default=None, ge=1, le=100, description="Tham số phân trang alias size"),
+    limit: Optional[int] = Query(default=None, ge=1, le=100, description="Tham số phân trang alias limit"),
     db: Session = Depends(get_db)
 ):
     """
     Lấy danh sách người dùng có hỗ trợ (SCRUM-104, SCRUM-105):
     - Tìm kiếm theo họ tên, tên đăng nhập, số điện thoại
     - Lọc theo vai trò và trạng thái
-    - Phân trang chuẩn, mặc định 20 dòng/trang, hỗ trợ tham số page/size/page_size
+    - Phân trang chuẩn, mặc định 20 dòng/trang, hỗ trợ tham số page/size/page_size/limit
     """
-    effective_page_size = size if size is not None else page_size
+    effective_search = keyword if keyword is not None else search
+    effective_page_size = limit if limit is not None else (size if size is not None else page_size)
     users, total, total_pages = list_users(
         db=db,
-        search=search,
+        search=effective_search,
         role=role,
         status_filter=status,
         page=page,

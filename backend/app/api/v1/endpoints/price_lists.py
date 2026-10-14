@@ -1,4 +1,5 @@
 """Persistent customer-group price lists and effective-price lookup."""
+from __future__ import annotations
 
 from datetime import date
 from enum import Enum
@@ -11,11 +12,11 @@ from sqlalchemy.orm import Session, selectinload
 
 try:
     from app.core.database import get_db
-    from app.models.models import PriceList, PriceListItem
+    from app.models.models import PriceList, PriceListItem, Product
     from app.api.v1.endpoints.rbac import AuthenticatedUser, require_roles
 except ImportError:  # pragma: no cover
     from app.core.database import get_db
-    from app.models.models import PriceList, PriceListItem
+    from app.models.models import PriceList, PriceListItem, Product
     from app.api.v1.endpoints.rbac import AuthenticatedUser, require_roles
 
 router = APIRouter(prefix="/api/v1/price-lists", tags=["Price Lists"])
@@ -220,6 +221,25 @@ def publish_price_list(
     if conflicting:
         raise HTTPException(status_code=409, detail=f"Trùng thời hạn và SKU với bảng {conflicting.code} v{conflicting.version}; hãy dùng cùng mã bảng để phát hành phiên bản kế tiếp hoặc chỉnh thời hạn.")
     row.published = True
+    try:
+        from app.services.price_history_service import record_price_history
+        for item in row.items:
+            prod = db.query(Product).filter((Product.sku == item.sku) | (Product.id == item.product_id)).first()
+            if prod:
+                old_p = prod.base_price
+                new_p = float(item.sale_price)
+                record_price_history(
+                    db,
+                    product_id=prod.id,
+                    old_price=old_p,
+                    new_price=new_p,
+                    changed_by=_user.username,
+                    note=f"Áp dụng bảng giá {row.code} v{row.version} ({row.customer_group})",
+                )
+                prod._suppress_auto_price_history = True
+                prod.base_price = new_p
+    except Exception:
+        pass
     db.commit()
     return _serialize(_load_price_list(db, row.id))
 
