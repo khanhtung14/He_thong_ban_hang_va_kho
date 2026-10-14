@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quản Lý Danh Mục Sản Phẩm (SCRUM-75) | OMS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --bg-primary: #0b0f19;
@@ -44,7 +47,7 @@
 
     body {
       background-color: var(--bg-primary);
-      background-image: 
+      background-image:
         radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.12) 0px, transparent 50%),
         radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
       background-attachment: fixed;
@@ -690,8 +693,15 @@
     }
 
     @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
     }
 
     .loading-row {
@@ -707,6 +717,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <div class="app-container">
@@ -740,27 +751,33 @@
       <div class="story-header">
         <span class="badge-jira">JIRA SCRUM-75</span>
         <span class="badge-rule">Sprint 2 · 8 Story Points</span>
-        <span class="badge-rule" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">EP-02: Danh mục Sản phẩm & Bảng giá</span>
+        <span class="badge-rule" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">EP-02: Danh mục Sản phẩm
+          & Bảng giá</span>
       </div>
       <div class="story-desc">
-        <strong>User Story:</strong> <em>"Là Quản lý kinh doanh, tôi muốn quản lý danh mục sản phẩm, để cả công ty gọi tên và mã hàng giống nhau thay vì mỗi người một kiểu."</em>
+        <strong>User Story:</strong> <em>"Là Quản lý kinh doanh, tôi muốn quản lý danh mục sản phẩm, để cả công ty gọi
+          tên và mã hàng giống nhau thay vì mỗi người một kiểu."</em>
       </div>
       <div class="story-rules">
         <div class="rule-item">
           <span class="icon">🏷️</span>
-          <div><strong>Khai báo:</strong> Mã SKU, tên, nhóm hàng, ĐVT cơ sở, quy cách đóng gói, giá vốn, ảnh, trạng thái.</div>
+          <div><strong>Khai báo:</strong> Mã SKU, tên, nhóm hàng, ĐVT cơ sở, quy cách đóng gói, giá vốn, ảnh, trạng
+            thái.</div>
         </div>
         <div class="rule-item">
           <span class="icon">✨</span>
-          <div><strong>Duy nhất:</strong> Mã SKU là duy nhất trên toàn hệ thống (so khớp không phân biệt chữ hoa, chữ thường).</div>
+          <div><strong>Duy nhất:</strong> Mã SKU là duy nhất trên toàn hệ thống (so khớp không phân biệt chữ hoa, chữ
+            thường).</div>
         </div>
         <div class="rule-item">
           <span class="icon">🔒</span>
-          <div><strong>Bảo mật giá vốn:</strong> Giá vốn chỉ <strong>Quản lý kinh doanh</strong> (và Admin) được xem và sửa. Các vai trò khác bị ẩn hoàn toàn.</div>
+          <div><strong>Bảo mật giá vốn:</strong> Giá vốn chỉ <strong>Quản lý kinh doanh</strong> (và Admin) được xem và
+            sửa. Các vai trò khác bị ẩn hoàn toàn.</div>
         </div>
         <div class="rule-item">
           <span class="icon">🛡️</span>
-          <div><strong>Ràng buộc giao dịch:</strong> Sản phẩm đã phát sinh giao dịch thì <strong>không xóa được</strong>, chỉ được chuyển sang <strong>Ngừng kinh doanh</strong>.</div>
+          <div><strong>Ràng buộc giao dịch:</strong> Sản phẩm đã phát sinh giao dịch thì <strong>không xóa
+              được</strong>, chỉ được chuyển sang <strong>Ngừng kinh doanh</strong>.</div>
         </div>
       </div>
     </div>
@@ -770,7 +787,8 @@
       <div class="filters-group">
         <div class="search-input-wrap">
           <span class="search-icon">🔍</span>
-          <input type="text" id="searchInput" placeholder="Tìm theo mã SKU hoặc tên sản phẩm..." oninput="debounceSearch()">
+          <input type="text" id="searchInput" placeholder="Tìm theo mã SKU hoặc tên sản phẩm..."
+            oninput="debounceSearch()">
         </div>
 
         <div class="select-wrap">
@@ -1029,7 +1047,7 @@
             ? `<span class="cost-authorized">${formatVND(p.cost_price)}</span>`
             : `<span class="cost-unauthorized" title="Chỉ Quản lý kinh doanh và Quản trị viên mới được xem giá vốn">🔒 Được bảo mật</span>`;
 
-          const txnBadge = p.has_transactions 
+          const txnBadge = p.has_transactions
             ? `<span style="color: #60a5fa; font-size: 0.78rem; font-weight: 600;">Có đơn/phiếu</span>`
             : `<span style="color: var(--text-dim); font-size: 0.78rem;">Chưa có</span>`;
 
@@ -1276,4 +1294,5 @@
     });
   </script>
 </body>
+
 </html>

@@ -207,9 +207,8 @@ export async function fetchSuppliers(
   if (params?.page) searchParams.append("page", String(params.page));
   if (params?.limit) searchParams.append("limit", String(params.limit));
 
-  const url = `/api/v1/suppliers${
-    searchParams.toString() ? `?${searchParams.toString()}` : ""
-  }`;
+  const url = `/api/v1/suppliers${searchParams.toString() ? `?${searchParams.toString()}` : ""
+    }`;
   const res = await fetch(url, { headers });
 
   if (!res.ok) {
@@ -463,7 +462,7 @@ export async function assignSalesRep(
 }
 
 export async function handoverCustomers(payload: {
-  fromSalesRepId?: number;
+  frOMSalesRepId?: number;
   toSalesRepId: number;
   customerIds?: number[];
   reason: string;

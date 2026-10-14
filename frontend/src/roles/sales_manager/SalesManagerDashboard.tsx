@@ -24,6 +24,7 @@ import ProductImportPage from "./ProductImportPage";
 import ProductCatalogManagement from "./ProductCatalogManagement";
 import ProductExcelImport from "./ProductExcelImport";
 import CustomerTerritoryManagement from "./CustomerTerritoryManagement";
+import DiscountPolicyManagement from "./DiscountPolicyManagement";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -59,6 +60,7 @@ export const SalesManagerDashboard: React.FC = () => {
       }
       if (window.location.pathname === "/manager/products") return "/manager/products";
       if (window.location.pathname === "/manager/categories") return "/manager/categories";
+      if (window.location.pathname === "/manager/discounts") return "/manager/discounts";
       if (window.location.pathname === "/manager/reports") return "/manager/reports";
 
       if (window.location.pathname === "/manager/customers") return "/manager/customers";
@@ -475,6 +477,10 @@ export const SalesManagerDashboard: React.FC = () => {
           ) : currentPath === "/manager/customers" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <CustomerTerritoryManagement />
+            </div>
+          ) : currentPath === "/manager/discounts" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <DiscountPolicyManagement />
             </div>
           ) : (
             /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */

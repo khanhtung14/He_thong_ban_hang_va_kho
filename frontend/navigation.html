@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
@@ -38,7 +39,8 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    html, body {
+    html,
+    body {
       width: 100%;
       min-height: 100vh;
       overflow-x: hidden;
@@ -557,9 +559,11 @@
       .app-header {
         padding: 0 10px;
       }
+
       .brand-title-text {
         display: none;
       }
+
       .user-avatar {
         width: 36px;
         height: 36px;
@@ -567,10 +571,12 @@
         min-height: 36px;
         font-size: 13px;
       }
+
       .user-info-text .user-full-name {
         font-size: 13px;
         max-width: 100px;
       }
+
       .badge {
         font-size: 10px;
         padding: 2px 6px;
@@ -583,23 +589,29 @@
         padding: 0 8px;
         height: 60px;
       }
+
       .app-main {
         padding: 72px 10px 24px;
       }
+
       .user-avatar {
         display: none;
       }
+
       .user-full-name {
         max-width: 90px;
         font-size: 12px;
       }
+
       .badge {
         font-size: 9.5px;
         padding: 1px 5px;
       }
+
       .card {
         padding: 14px 12px;
       }
+
       .btn-role-tab {
         font-size: 12px;
         padding: 6px 8px;
@@ -607,352 +619,362 @@
     }
   </style>
 </head>
+
 <body>
 
-<div class="app-layout" id="appLayout">
-  <!-- Backdrop Overlay for Mobile Drawer -->
-  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()" aria-hidden="true"></div>
+  <div class="app-layout" id="appLayout">
+    <!-- Backdrop Overlay for Mobile Drawer -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()" aria-hidden="true"></div>
 
-  <!-- Responsive Sidebar / Drawer (ST-028) -->
-  <aside class="app-sidebar" id="appSidebar" aria-label="Menu điều hướng chính" role="navigation">
-    <div class="sidebar-header">
-      <div class="sidebar-title">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-        <span>Danh Mục Nghiệp Vụ</span>
-      </div>
-      <!-- Nút đóng Drawer với kích thước tối thiểu 44x44px -->
-      <button class="btn-close-drawer" id="btnCloseSidebar" onclick="closeSidebar()" aria-label="Đóng thanh điều hướng">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-    </div>
-
-    <!-- Danh sách menu động sẽ được render bằng Javascript -->
-    <nav class="sidebar-nav" id="sidebarNav">
-      <!-- Injected dynamically -->
-    </nav>
-  </aside>
-
-  <!-- Main Container -->
-  <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
-    <!-- Header Bar (ST-027) -->
-    <header class="app-header">
-      <div class="header-left">
-        <!-- Hamburger Menu Button - Touch Target >= 44x44px -->
-        <button class="btn-hamburger" id="btnHamburger" onclick="toggleSidebar()" aria-label="Mở thanh điều hướng">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
+    <!-- Responsive Sidebar / Drawer (ST-028) -->
+    <aside class="app-sidebar" id="appSidebar" aria-label="Menu điều hướng chính" role="navigation">
+      <div class="sidebar-header">
+        <div class="sidebar-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>Danh Mục Nghiệp Vụ</span>
+        </div>
+        <!-- Nút đóng Drawer với kích thước tối thiểu 44x44px -->
+        <button class="btn-close-drawer" id="btnCloseSidebar" onclick="closeSidebar()"
+          aria-label="Đóng thanh điều hướng">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
-
-        <a href="/navigation" class="brand-logo">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-          </svg>
-          <span class="brand-title-text">OMS Bán hàng &amp; Kho</span>
-        </a>
       </div>
 
-      <!-- Góc trên hiển thị Họ tên, Vai trò, Phạm vi (AC-2) -->
-      <div class="user-profile-header" id="userHeaderProfile">
-        <div class="user-avatar" id="avatarText">VK</div>
-        <div class="user-info-text">
-          <div class="user-full-name" id="userFullName" title="Họ và tên">Trần Văn Kho</div>
-          <div class="user-badges">
-            <span class="badge badge-role" id="userRoleBadge" title="Vai trò người dùng">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <span id="userRoleName">Nhân viên kho</span>
-            </span>
-            <span class="badge badge-scope" id="userScopeBadge" title="Kho hoặc Địa bàn làm việc">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
-              <span id="userScopeName">Kho Tổng Hà Nội</span>
-            </span>
+      <!-- Danh sách menu động sẽ được render bằng Javascript -->
+      <nav class="sidebar-nav" id="sidebarNav">
+        <!-- Injected dynamically -->
+      </nav>
+    </aside>
+
+    <!-- Main Container -->
+    <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+      <!-- Header Bar (ST-027) -->
+      <header class="app-header">
+        <div class="header-left">
+          <!-- Hamburger Menu Button - Touch Target >= 44x44px -->
+          <button class="btn-hamburger" id="btnHamburger" onclick="toggleSidebar()" aria-label="Mở thanh điều hướng">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <a href="/navigation" class="brand-logo">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+            <span class="brand-title-text">OMS Bán hàng &amp; Kho</span>
+          </a>
+        </div>
+
+        <!-- Góc trên hiển thị Họ tên, Vai trò, Phạm vi (AC-2) -->
+        <div class="user-profile-header" id="userHeaderProfile">
+          <div class="user-avatar" id="avatarText">VK</div>
+          <div class="user-info-text">
+            <div class="user-full-name" id="userFullName" title="Họ và tên">Trần Văn Kho</div>
+            <div class="user-badges">
+              <span class="badge badge-role" id="userRoleBadge" title="Vai trò người dùng">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span id="userRoleName">Nhân viên kho</span>
+              </span>
+              <span class="badge badge-scope" id="userScopeBadge" title="Kho hoặc Địa bàn làm việc">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <span id="userScopeName">Kho Tổng Hà Nội</span>
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <!-- Main Content Area -->
-    <main class="app-main">
-      <div class="main-container">
-        
-        <!-- Bảng điều khiển kiểm thử và nghiệm thu SCRUM-60 -->
-        <section class="card" aria-labelledby="card-title-scrum60">
-          <h1 class="card-title" id="card-title-scrum60">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-            </svg>
-            SCRUM-60: Menu Điều Hướng Đúng Theo Quyền &amp; Tối Ưu Mobile 360px
-          </h1>
-          <p class="card-desc">
-            Chọn các vai trò bên dưới để kiểm tra menu điều hướng động theo quyền thực tế.
-            Menu chỉ hiển thị chức năng được phân quyền, đồng thời hiển thị thông tin người dùng và kho/địa bàn tương ứng.
-          </p>
+      <!-- Main Content Area -->
+      <main class="app-main">
+        <div class="main-container">
 
-          <!-- Nút chọn vai trò thử nghiệm -->
-          <div class="role-grid" role="group" aria-label="Chọn vai trò thử nghiệm">
-            <button class="btn-role-tab active" data-role="WAREHOUSE" onclick="switchRole('WAREHOUSE')">
-              Nhân viên kho
-            </button>
-            <button class="btn-role-tab" data-role="SALES" onclick="switchRole('SALES')">
-              Kinh doanh
-            </button>
-            <button class="btn-role-tab" data-role="SALES_MANAGER" onclick="switchRole('SALES_MANAGER')">
-              Quản lý KD
-            </button>
-            <button class="btn-role-tab" data-role="WH_MANAGER" onclick="switchRole('WH_MANAGER')">
-              Quản lý kho
-            </button>
-            <button class="btn-role-tab" data-role="ACCOUNTANT" onclick="switchRole('ACCOUNTANT')">
-              Kế toán
-            </button>
-            <button class="btn-role-tab" data-role="ADMIN" onclick="switchRole('ADMIN')">
-              Quản trị viên
-            </button>
-            <button class="btn-role-tab" data-role="CUSTOMER" onclick="switchRole('CUSTOMER')">
-              Đại lý
-            </button>
-          </div>
-
-          <!-- Trạng thái nghiệm thu BDD (Acceptance Criteria) -->
-          <div class="ac-status-box" id="acStatusBox">
-            <div class="ac-status-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          <!-- Bảng điều khiển kiểm thử và nghiệm thu SCRUM-60 -->
+          <section class="card" aria-labelledby="card-title-scrum60">
+            <h1 class="card-title" id="card-title-scrum60">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
-              Trạng Thái Nghiệm Thu Tiêu Chí (BDD Criteria)
-            </div>
-            <ul class="ac-list">
-              <li class="ac-item">
-                <span class="ac-check">✔</span>
-                <span><strong>Tiêu chí 1:</strong> Mục menu không thuộc quyền thì hoàn toàn không hiển thị.</span>
-              </li>
-              <li class="ac-item">
-                <span class="ac-check">✔</span>
-                <span><strong>Tiêu chí 2:</strong> Hiển thị đầy đủ Họ tên, Vai trò và Phạm vi kho/địa bàn tại góc trên header.</span>
-              </li>
-              <li class="ac-item">
-                <span class="ac-check">✔</span>
-                <span><strong>Tiêu chí 3:</strong> Hoạt động thuận tiện dạng ngăn kéo Drawer trên màn hình 360px, nút bấm cảm ứng tối thiểu 44x44px, không tràn cuộn ngang.</span>
-              </li>
-            </ul>
+              SCRUM-60: Menu Điều Hướng Đúng Theo Quyền &amp; Tối Ưu Mobile 360px
+            </h1>
+            <p class="card-desc">
+              Chọn các vai trò bên dưới để kiểm tra menu điều hướng động theo quyền thực tế.
+              Menu chỉ hiển thị chức năng được phân quyền, đồng thời hiển thị thông tin người dùng và kho/địa bàn tương
+              ứng.
+            </p>
 
-            <div style="margin-top: 14px; font-size: 13px; font-weight: 600; color: #1e293b;">
-              Danh sách menu đang hiển thị (<span id="visibleCount">4</span> mục):
+            <!-- Nút chọn vai trò thử nghiệm -->
+            <div class="role-grid" role="group" aria-label="Chọn vai trò thử nghiệm">
+              <button class="btn-role-tab active" data-role="WAREHOUSE" onclick="switchRole('WAREHOUSE')">
+                Nhân viên kho
+              </button>
+              <button class="btn-role-tab" data-role="SALES" onclick="switchRole('SALES')">
+                Kinh doanh
+              </button>
+              <button class="btn-role-tab" data-role="SALES_MANAGER" onclick="switchRole('SALES_MANAGER')">
+                Quản lý KD
+              </button>
+              <button class="btn-role-tab" data-role="WH_MANAGER" onclick="switchRole('WH_MANAGER')">
+                Quản lý kho
+              </button>
+              <button class="btn-role-tab" data-role="ACCOUNTANT" onclick="switchRole('ACCOUNTANT')">
+                Kế toán
+              </button>
+              <button class="btn-role-tab" data-role="ADMIN" onclick="switchRole('ADMIN')">
+                Quản trị viên
+              </button>
+              <button class="btn-role-tab" data-role="CUSTOMER" onclick="switchRole('CUSTOMER')">
+                Đại lý
+              </button>
             </div>
-            <div class="menu-summary-tags" id="visibleTags"></div>
 
-            <div style="margin-top: 12px; font-size: 13px; font-weight: 600; color: #64748b;">
-              Chức năng đã bị ẩn do không đủ quyền (<span id="hiddenCount">12</span> mục):
+            <!-- Trạng thái nghiệm thu BDD (Acceptance Criteria) -->
+            <div class="ac-status-box" id="acStatusBox">
+              <div class="ac-status-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                Trạng Thái Nghiệm Thu Tiêu Chí (BDD Criteria)
+              </div>
+              <ul class="ac-list">
+                <li class="ac-item">
+                  <span class="ac-check">✔</span>
+                  <span><strong>Tiêu chí 1:</strong> Mục menu không thuộc quyền thì hoàn toàn không hiển thị.</span>
+                </li>
+                <li class="ac-item">
+                  <span class="ac-check">✔</span>
+                  <span><strong>Tiêu chí 2:</strong> Hiển thị đầy đủ Họ tên, Vai trò và Phạm vi kho/địa bàn tại góc trên
+                    header.</span>
+                </li>
+                <li class="ac-item">
+                  <span class="ac-check">✔</span>
+                  <span><strong>Tiêu chí 3:</strong> Hoạt động thuận tiện dạng ngăn kéo Drawer trên màn hình 360px, nút
+                    bấm cảm ứng tối thiểu 44x44px, không tràn cuộn ngang.</span>
+                </li>
+              </ul>
+
+              <div style="margin-top: 14px; font-size: 13px; font-weight: 600; color: #1e293b;">
+                Danh sách menu đang hiển thị (<span id="visibleCount">4</span> mục):
+              </div>
+              <div class="menu-summary-tags" id="visibleTags"></div>
+
+              <div style="margin-top: 12px; font-size: 13px; font-weight: 600; color: #64748b;">
+                Chức năng đã bị ẩn do không đủ quyền (<span id="hiddenCount">12</span> mục):
+              </div>
+              <div class="menu-summary-tags" id="hiddenTags"></div>
             </div>
-            <div class="menu-summary-tags" id="hiddenTags"></div>
-          </div>
 
-          <!-- Công cụ giả lập màn hình di động 360px -->
-          <div class="sim-toggle-bar">
-            <span style="font-size: 13px; color: #334155; font-weight: 500;">
-              Thử nghiệm chế độ hiển thị điện thoại 360px:
-            </span>
-            <button class="btn-sim" id="btnToggleSim" onclick="toggle360Simulation()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            <!-- Công cụ giả lập màn hình di động 360px -->
+            <div class="sim-toggle-bar">
+              <span style="font-size: 13px; color: #334155; font-weight: 500;">
+                Thử nghiệm chế độ hiển thị điện thoại 360px:
+              </span>
+              <button class="btn-sim" id="btnToggleSim" onclick="toggle360Simulation()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                  <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                </svg>
+                <span id="simBtnText">Bật giả lập màn hình 360px</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Hướng dẫn thao tác nhanh cho người dùng di động -->
+          <section class="card">
+            <h2 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
               </svg>
-              <span id="simBtnText">Bật giả lập màn hình 360px</span>
-            </button>
-          </div>
-        </section>
+              Hướng dẫn thao tác trên thiết bị di động
+            </h2>
+            <p class="card-desc" style="margin-bottom: 0;">
+              • Nhấn vào nút biểu tượng <strong>3 dấu gạch (Hamburger Menu)</strong> ở góc trái trên cùng để mở thanh
+              điều hướng dạng ngăn kéo (Drawer).<br>
+              • Chạm vào vùng tối (Overlay) bên ngoài hoặc nút <strong>✕</strong> để đóng ngăn kéo.<br>
+              • Tất cả các nút bấm và mục chọn đều có kích thước tối thiểu <strong>44x44 pixel</strong> để dễ dàng thao
+              tác bằng một ngón tay cái khi đang đi thị trường.
+            </p>
+          </section>
 
-        <!-- Hướng dẫn thao tác nhanh cho người dùng di động -->
-        <section class="card">
-          <h2 class="card-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-            Hướng dẫn thao tác trên thiết bị di động
-          </h2>
-          <p class="card-desc" style="margin-bottom: 0;">
-            • Nhấn vào nút biểu tượng <strong>3 dấu gạch (Hamburger Menu)</strong> ở góc trái trên cùng để mở thanh điều hướng dạng ngăn kéo (Drawer).<br>
-            • Chạm vào vùng tối (Overlay) bên ngoài hoặc nút <strong>✕</strong> để đóng ngăn kéo.<br>
-            • Tất cả các nút bấm và mục chọn đều có kích thước tối thiểu <strong>44x44 pixel</strong> để dễ dàng thao tác bằng một ngón tay cái khi đang đi thị trường.
-          </p>
-        </section>
-
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   </div>
-</div>
 
-<script>
-  // Icon SVG mapping
-  const ICON_SVGS = {
-    "package-check": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>',
-    "arrow-down-to-bracket": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"></path><path d="m8 11 4 4 4-4"></path><path d="M8 21h8"></path><rect x="4" y="17" width="16" height="4" rx="1"></rect></svg>',
-    "boxes-stacked": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.5 9.4 7.55 4.24"></path><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="M3.29 7 12 12.01 20.71 7"></path><path d="M12 12v9"></path></svg>',
-    "arrow-left-right": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 3 4 8 5-5"></path><path d="m16 21-4-8-5 5"></path><path d="M4 12h16"></path></svg>',
-    "plus-circle": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>',
-    "shopping-cart": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>',
-    "building": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg>',
-    "archive": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="5" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path></svg>',
-    "clipboard-check": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="m9 14 2 2 4-4"></path></svg>',
-    "tag": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"></path><path d="M7 7h.01"></path></svg>',
-    "bar-chart": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>',
-    "book": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>',
-    "receipt": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"></path><path d="M16 8h-8"></path><path d="M16 12h-8"></path><path d="M16 16h-5"></path></svg>',
-    "users-cog": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><circle cx="19" cy="11" r="2"></circle><path d="M19 8v1"></path><path d="M19 13v1"></path></svg>',
-    "map-pin": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>',
-    "shield-check": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>'
-  };
+  <script>
+    // Icon SVG mapping
+    const ICON_SVGS = {
+      "package-check": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>',
+      "arrow-down-to-bracket": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"></path><path d="m8 11 4 4 4-4"></path><path d="M8 21h8"></path><rect x="4" y="17" width="16" height="4" rx="1"></rect></svg>',
+      "boxes-stacked": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16.5 9.4 7.55 4.24"></path><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="M3.29 7 12 12.01 20.71 7"></path><path d="M12 12v9"></path></svg>',
+      "arrow-left-right": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 3 4 8 5-5"></path><path d="m16 21-4-8-5 5"></path><path d="M4 12h16"></path></svg>',
+      "plus-circle": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>',
+      "shopping-cart": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>',
+      "building": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg>',
+      "archive": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="5" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path></svg>',
+      "clipboard-check": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="m9 14 2 2 4-4"></path></svg>',
+      "tag": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"></path><path d="M7 7h.01"></path></svg>',
+      "bar-chart": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>',
+      "book": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>',
+      "receipt": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"></path><path d="M16 8h-8"></path><path d="M16 12h-8"></path><path d="M16 16h-5"></path></svg>',
+      "users-cog": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><circle cx="19" cy="11" r="2"></circle><path d="M19 8v1"></path><path d="M19 13v1"></path></svg>',
+      "map-pin": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>',
+      "shield-check": '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>'
+    };
 
-  let currentRole = "WAREHOUSE";
+    let currentRole = "WAREHOUSE";
 
-  // Sidebar Drawer Functions (Touch target >= 44x44px)
-  function toggleSidebar() {
-    const sidebar = document.getElementById("appSidebar");
-    const overlay = document.getElementById("sidebarOverlay");
-    const isOpen = sidebar.classList.contains("open");
-    if (isOpen) {
-      closeSidebar();
-    } else {
-      openSidebar();
-    }
-  }
-
-  function openSidebar() {
-    document.getElementById("appSidebar").classList.add("open");
-    document.getElementById("sidebarOverlay").classList.add("active");
-    document.body.style.overflow = "hidden"; // Prevent background scroll
-  }
-
-  function closeSidebar() {
-    document.getElementById("appSidebar").classList.remove("open");
-    document.getElementById("sidebarOverlay").classList.remove("active");
-    document.body.style.overflow = "";
-  }
-
-  // 360px Simulation Toggle
-  function toggle360Simulation() {
-    const layout = document.getElementById("appLayout");
-    const btnText = document.getElementById("simBtnText");
-    const isSim = layout.classList.toggle("sim-360");
-    btnText.textContent = isSim ? "Tắt giả lập (Xem giao diện đầy đủ)" : "Bật giả lập màn hình 360px";
-  }
-
-  // Fetch navigation data from Backend Python API
-  async function loadNavigation(roleCode) {
-    try {
-      const response = await fetch(`/api/v1/navigation/menu?role=${encodeURIComponent(roleCode)}`);
-      if (!response.ok) throw new Error("API error");
-      const data = await response.json();
-      renderNavigation(data);
-    } catch (err) {
-      console.warn("Backend API not reachable, using offline fallback context:", err);
-      // Fallback local renderer for unit demo
-      renderFallback(roleCode);
-    }
-  }
-
-  function renderNavigation(data) {
-    const user = data.user;
-    const items = data.menu_items;
-
-    // 1. Update Header User Information (AC-2)
-    document.getElementById("userFullName").textContent = user.full_name;
-    document.getElementById("userRoleName").textContent = user.role_name;
-    document.getElementById("userScopeName").textContent = user.scope;
-
-    // Initials Avatar
-    const initials = user.full_name.split(" ").map(w => w[0]).join("").slice(-2).toUpperCase();
-    document.getElementById("avatarText").textContent = initials || "OM";
-
-    // 2. Render Sidebar Menu Items (AC-1)
-    const sidebarNav = document.getElementById("sidebarNav");
-    sidebarNav.innerHTML = "";
-
-    let currentCategory = "";
-    items.forEach((item, index) => {
-      if (item.category && item.category !== currentCategory) {
-        currentCategory = item.category;
-        const catDiv = document.createElement("div");
-        catDiv.className = "nav-category";
-        catDiv.textContent = currentCategory;
-        sidebarNav.appendChild(catDiv);
+    // Sidebar Drawer Functions (Touch target >= 44x44px)
+    function toggleSidebar() {
+      const sidebar = document.getElementById("appSidebar");
+      const overlay = document.getElementById("sidebarOverlay");
+      const isOpen = sidebar.classList.contains("open");
+      if (isOpen) {
+        closeSidebar();
+      } else {
+        openSidebar();
       }
+    }
 
-      const link = document.createElement("a");
-      link.href = item.path;
-      link.className = `nav-item ${index === 0 ? "active" : ""}`;
-      link.id = `nav-${item.id}`;
-      link.setAttribute("role", "button");
-      
-      const iconHtml = ICON_SVGS[item.icon] || '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>';
-      link.innerHTML = `
+    function openSidebar() {
+      document.getElementById("appSidebar").classList.add("open");
+      document.getElementById("sidebarOverlay").classList.add("active");
+      document.body.style.overflow = "hidden"; // Prevent background scroll
+    }
+
+    function closeSidebar() {
+      document.getElementById("appSidebar").classList.remove("open");
+      document.getElementById("sidebarOverlay").classList.remove("active");
+      document.body.style.overflow = "";
+    }
+
+    // 360px Simulation Toggle
+    function toggle360Simulation() {
+      const layout = document.getElementById("appLayout");
+      const btnText = document.getElementById("simBtnText");
+      const isSim = layout.classList.toggle("sim-360");
+      btnText.textContent = isSim ? "Tắt giả lập (Xem giao diện đầy đủ)" : "Bật giả lập màn hình 360px";
+    }
+
+    // Fetch navigation data from Backend Python API
+    async function loadNavigation(roleCode) {
+      try {
+        const response = await fetch(`/api/v1/navigation/menu?role=${encodeURIComponent(roleCode)}`);
+        if (!response.ok) throw new Error("API error");
+        const data = await response.json();
+        renderNavigation(data);
+      } catch (err) {
+        console.warn("Backend API not reachable, using offline fallback context:", err);
+        // Fallback local renderer for unit demo
+        renderFallback(roleCode);
+      }
+    }
+
+    function renderNavigation(data) {
+      const user = data.user;
+      const items = data.menu_items;
+
+      // 1. Update Header User Information (AC-2)
+      document.getElementById("userFullName").textContent = user.full_name;
+      document.getElementById("userRoleName").textContent = user.role_name;
+      document.getElementById("userScopeName").textContent = user.scope;
+
+      // Initials Avatar
+      const initials = user.full_name.split(" ").map(w => w[0]).join("").slice(-2).toUpperCase();
+      document.getElementById("avatarText").textContent = initials || "OM";
+
+      // 2. Render Sidebar Menu Items (AC-1)
+      const sidebarNav = document.getElementById("sidebarNav");
+      sidebarNav.innerHTML = "";
+
+      let currentCategory = "";
+      items.forEach((item, index) => {
+        if (item.category && item.category !== currentCategory) {
+          currentCategory = item.category;
+          const catDiv = document.createElement("div");
+          catDiv.className = "nav-category";
+          catDiv.textContent = currentCategory;
+          sidebarNav.appendChild(catDiv);
+        }
+
+        const link = document.createElement("a");
+        link.href = item.path;
+        link.className = `nav-item ${index === 0 ? "active" : ""}`;
+        link.id = `nav-${item.id}`;
+        link.setAttribute("role", "button");
+
+        const iconHtml = ICON_SVGS[item.icon] || '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>';
+        link.innerHTML = `
         <span class="nav-icon">${iconHtml}</span>
         <span>${item.title}</span>
       `;
-      link.onclick = (e) => {
-        e.preventDefault();
-        document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
-        link.classList.add("active");
-        if (window.innerWidth <= 768) {
-          closeSidebar();
-        }
-      };
-      sidebarNav.appendChild(link);
+        link.onclick = (e) => {
+          e.preventDefault();
+          document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+          link.classList.add("active");
+          if (window.innerWidth <= 768) {
+            closeSidebar();
+          }
+        };
+        sidebarNav.appendChild(link);
+      });
+
+      // 3. Update Summary & Acceptance Criteria Tags
+      document.getElementById("visibleCount").textContent = items.length;
+      const visibleTagsContainer = document.getElementById("visibleTags");
+      visibleTagsContainer.innerHTML = items.map(i => `<span class="menu-tag-visible">✓ ${i.title}</span>`).join("");
+
+      // Identify hidden items
+      const allKnownItems = [
+        "Soạn hàng", "Nhập kho", "Sổ tồn kho", "Chuyển kho",
+        "Tạo đơn hàng", "Đơn hàng", "Khách hàng / Đại lý", "Tồn kho khả dụng",
+        "Duyệt đơn", "Bảng giá", "Báo cáo doanh số",
+        "Sổ công nợ", "Hóa đơn & Thanh toán",
+        "Quản trị người dùng", "Phân bổ địa bàn", "Nhật ký kiểm toán"
+      ];
+      const visibleTitles = new Set(items.map(i => i.title));
+      const hiddenItems = allKnownItems.filter(t => !visibleTitles.has(t));
+
+      document.getElementById("hiddenCount").textContent = hiddenItems.length;
+      const hiddenTagsContainer = document.getElementById("hiddenTags");
+      hiddenTagsContainer.innerHTML = hiddenItems.map(t => `<span class="menu-tag-hidden">✕ ${t}</span>`).join("");
+    }
+
+    function switchRole(role) {
+      currentRole = role;
+      document.querySelectorAll(".btn-role-tab").forEach(btn => {
+        btn.classList.toggle("active", btn.getAttribute("data-role") === role);
+      });
+      loadNavigation(role);
+    }
+
+    // Initialize
+    document.addEventListener("DOMContentLoaded", () => {
+      loadNavigation(currentRole);
     });
-
-    // 3. Update Summary & Acceptance Criteria Tags
-    document.getElementById("visibleCount").textContent = items.length;
-    const visibleTagsContainer = document.getElementById("visibleTags");
-    visibleTagsContainer.innerHTML = items.map(i => `<span class="menu-tag-visible">✓ ${i.title}</span>`).join("");
-
-    // Identify hidden items
-    const allKnownItems = [
-      "Soạn hàng", "Nhập kho", "Sổ tồn kho", "Chuyển kho",
-      "Tạo đơn hàng", "Đơn hàng", "Khách hàng / Đại lý", "Tồn kho khả dụng",
-      "Duyệt đơn", "Bảng giá", "Báo cáo doanh số",
-      "Sổ công nợ", "Hóa đơn & Thanh toán",
-      "Quản trị người dùng", "Phân bổ địa bàn", "Nhật ký kiểm toán"
-    ];
-    const visibleTitles = new Set(items.map(i => i.title));
-    const hiddenItems = allKnownItems.filter(t => !visibleTitles.has(t));
-
-    document.getElementById("hiddenCount").textContent = hiddenItems.length;
-    const hiddenTagsContainer = document.getElementById("hiddenTags");
-    hiddenTagsContainer.innerHTML = hiddenItems.map(t => `<span class="menu-tag-hidden">✕ ${t}</span>`).join("");
-  }
-
-  function switchRole(role) {
-    currentRole = role;
-    document.querySelectorAll(".btn-role-tab").forEach(btn => {
-      btn.classList.toggle("active", btn.getAttribute("data-role") === role);
-    });
-    loadNavigation(role);
-  }
-
-  // Initialize
-  document.addEventListener("DOMContentLoaded", () => {
-    loadNavigation(currentRole);
-  });
-</script>
+  </script>
 
 </body>
+
 </html>

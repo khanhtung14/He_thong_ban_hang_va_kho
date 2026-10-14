@@ -24,7 +24,7 @@ except ModuleNotFoundError:  # pragma: no cover
     from app.models.models import RoleCode
 
 # Secret key & algorithm for JWT tokens
-JWT_SECRET = "oms-rbac-jwt-secret-key-2026-production"
+JWT_SECRET = "OMS-rbac-jwt-secret-key-2026-production"
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 

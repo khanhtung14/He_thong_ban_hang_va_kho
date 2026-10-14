@@ -169,7 +169,7 @@ class AssignSalesRepRequest(BaseModel):
 
 
 class CustomerHandoverRequest(BaseModel):
-    from_sales_rep_id: Optional[int] = Field(None, alias="fromSalesRepId", description="ID nhân viên nghỉ việc / cần bàn giao")
+    from_sales_rep_id: Optional[int] = Field(None, alias="frOMSalesRepId", description="ID nhân viên nghỉ việc / cần bàn giao")
     to_sales_rep_id: int = Field(..., alias="toSalesRepId", description="ID nhân viên mới tiếp nhận")
     customer_ids: Optional[List[int]] = Field(None, alias="customerIds", description="Danh sách ID đại lý cần chuyển giao (nếu để trống sẽ chuyển toàn bộ)")
     reason: str = Field(..., min_length=1, max_length=255, description="Lý do chuyển giao bàn giao")

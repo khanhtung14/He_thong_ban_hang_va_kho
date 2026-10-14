@@ -70,6 +70,8 @@ def migrate_pricing_schema():
         CustomerHandoverHistory,
         ProductPriceHistory,
         Supplier,
+        DiscountPolicy,
+        DiscountTier,
     )
 
     Base.metadata.create_all(
@@ -81,6 +83,8 @@ def migrate_pricing_schema():
             CustomerHandoverHistory.__table__,
             ProductPriceHistory.__table__,
             Supplier.__table__,
+            DiscountPolicy.__table__,
+            DiscountTier.__table__,
         ],
         checkfirst=True,
     )
@@ -121,6 +125,20 @@ def migrate_pricing_schema():
         },
         "price_list_items": {
             "sku": "VARCHAR(50) NULL",
+        },
+        "discount_policies": {
+            "name": "VARCHAR(255) NOT NULL DEFAULT ''",
+            "target_type": "VARCHAR(20) NOT NULL DEFAULT 'SKU'",
+            "target_id": "VARCHAR(100) NOT NULL DEFAULT ''",
+            "discount_type": "VARCHAR(20) NOT NULL DEFAULT 'PERCENTAGE'",
+            "is_active": "BOOLEAN NOT NULL DEFAULT 1",
+            "created_at": "DATETIME NULL",
+        },
+        "discount_tiers": {
+            "policy_id": "INTEGER NOT NULL DEFAULT 0",
+            "min_quantity": "INTEGER NOT NULL DEFAULT 1",
+            "max_quantity": "INTEGER NULL",
+            "discount_value": "FLOAT NOT NULL DEFAULT 0.0",
         },
     }
     for table_name, columns_to_add in additions.items():

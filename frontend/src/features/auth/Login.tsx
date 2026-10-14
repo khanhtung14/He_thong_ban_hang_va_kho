@@ -50,7 +50,7 @@ export default function Login() {
       ).get("redirect");
       const safeRedirect =
         requestedRedirect?.startsWith("/") &&
-        !requestedRedirect.startsWith("//")
+          !requestedRedirect.startsWith("//")
           ? requestedRedirect
           : result.redirect_url;
 
@@ -133,7 +133,7 @@ export default function Login() {
             zIndex: 2,
           }}
         >
-          {/* Brand Logo chuẩn hệ thống WMS & OMS */}
+          {/* Brand Logo chuẩn hệ thống OMS & OMS */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
               style={{
@@ -172,7 +172,7 @@ export default function Login() {
                   letterSpacing: "0.5px",
                 }}
               >
-                WMS &amp; OMS
+                OMS
               </div>
               <div
                 style={{
@@ -354,7 +354,7 @@ export default function Login() {
           </div>
         </div>
 
-        {/* CỘT PHẢI: BANNER WMS MINH HỌA */}
+        {/* CỘT PHẢI: BANNER OMS MINH HỌA */}
         <div
           style={{
             flex: "0 0 58%",
@@ -371,7 +371,7 @@ export default function Login() {
           {!imgError ? (
             <img
               src={loginBanner}
-              alt="WMS Banner"
+              alt="OMS Banner"
               onError={() => setImgError(true)}
               style={{
                 width: "100%",

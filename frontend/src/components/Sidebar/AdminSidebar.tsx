@@ -152,7 +152,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 lineHeight: 1.2,
               }}
             >
-              WMS
+              OMS
             </div>
             <Text type="secondary" style={{ fontSize: 11 }}>
               Hệ thống quản lý kho &amp; bán hàng

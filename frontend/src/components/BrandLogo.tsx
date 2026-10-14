@@ -8,7 +8,7 @@ interface BrandLogoProps {
 }
 
 export const BrandLogo: React.FC<BrandLogoProps> = ({
-  title = "WMS",
+  title = "OMS",
   subtitle = "Hệ thống quản lý kho & bán hàng",
   icon = <HomeOutlined />,
 }) => {

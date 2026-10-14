@@ -360,18 +360,56 @@ class ProductUnit(Base):
 
 class DiscountPolicy(Base):
     __tablename__ = "discount_policies"
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    scope: Mapped[str] = mapped_column(String(30), nullable=False) # e.g. 'PRODUCT', 'CATEGORY'
-    target_id: Mapped[Optional[int]] = mapped_column(Integer) # ID of product or category
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(20), default="SKU", nullable=False)  # 'SKU' | 'CATEGORY'
+    target_id: Mapped[str] = mapped_column(String(100), nullable=False)  # SKU or Category ID
+    discount_type: Mapped[str] = mapped_column(String(20), default="PERCENTAGE", nullable=False)  # 'PERCENTAGE' | 'FIXED_AMOUNT'
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    tiers: Mapped[list["DiscountTier"]] = relationship(
+        back_populates="policy",
+        cascade="all, delete-orphan",
+        order_by="DiscountTier.min_quantity",
+    )
+
+    @property
+    def scope(self) -> str:
+        return self.target_type
+
+    @scope.setter
+    def scope(self, val: str) -> None:
+        self.target_type = val
 
 
 class DiscountTier(Base):
     __tablename__ = "discount_tiers"
+
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     policy_id: Mapped[int] = mapped_column(ForeignKey("discount_policies.id", ondelete="CASCADE"), nullable=False)
-    min_qty: Mapped[int] = mapped_column(Integer, nullable=False)
-    discount_percent: Mapped[float] = mapped_column(Float, nullable=False)
+    min_quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    max_quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    discount_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    policy: Mapped["DiscountPolicy"] = relationship(back_populates="tiers")
+
+    @property
+    def min_qty(self) -> int:
+        return self.min_quantity
+
+    @min_qty.setter
+    def min_qty(self, val: int) -> None:
+        self.min_quantity = val
+
+    @property
+    def discount_percent(self) -> float:
+        return self.discount_value
+
+    @discount_percent.setter
+    def discount_percent(self, val: float) -> None:
+        self.discount_value = val
 
 
 # --- EP-03: Đại lý & Hạn mức công nợ ---
@@ -794,3 +832,7 @@ class SalesTarget(Base):
     month: Mapped[int] = mapped_column(Integer, nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     target_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+
+
+

@@ -245,7 +245,7 @@ DEMO_PROFILES: Dict[str, Dict[str, Any]] = {
         "role_code": "WAREHOUSE",
         "role_name": "Nhân viên kho",
         "scope": "Kho Tổng Hà Nội",
-        "email": "kho.tran@demo.oms.local",
+        "email": "kho.tran@demo.OMS.local",
     },
     "SALES": {
         "username": "trankinhdoanh",
@@ -253,7 +253,7 @@ DEMO_PROFILES: Dict[str, Dict[str, Any]] = {
         "role_code": "SALES",
         "role_name": "Nhân viên kinh doanh",
         "scope": "Địa bàn Hà Nội",
-        "email": "kinhdoanh.tran@demo.oms.local",
+        "email": "kinhdoanh.tran@demo.OMS.local",
     },
     "SALES_MANAGER": {
         "username": "lequanlykd",
@@ -261,7 +261,7 @@ DEMO_PROFILES: Dict[str, Dict[str, Any]] = {
         "role_code": "SALES_MANAGER",
         "role_name": "Quản lý kinh doanh",
         "scope": "Toàn quốc",
-        "email": "quanlykd.le@demo.oms.local",
+        "email": "quanlykd.le@demo.OMS.local",
     },
     "WH_MANAGER": {
         "username": "voquanlykho",
@@ -269,7 +269,7 @@ DEMO_PROFILES: Dict[str, Dict[str, Any]] = {
         "role_code": "WH_MANAGER",
         "role_name": "Quản lý kho",
         "scope": "Toàn bộ hệ thống kho",
-        "email": "quanlykho.vo@demo.oms.local",
+        "email": "quanlykho.vo@demo.OMS.local",
     },
     "ACCOUNTANT": {
         "username": "dangketoan",
@@ -277,7 +277,7 @@ DEMO_PROFILES: Dict[str, Dict[str, Any]] = {
         "role_code": "ACCOUNTANT",
         "role_name": "Kế toán",
         "scope": "Toàn hệ thống",
-        "email": "ketoan.dang@demo.oms.local",
+        "email": "ketoan.dang@demo.OMS.local",
     },
     "ADMIN": {
         "username": "buiquantri",
@@ -285,7 +285,7 @@ DEMO_PROFILES: Dict[str, Dict[str, Any]] = {
         "role_code": "ADMIN",
         "role_name": "Quản trị hệ thống",
         "scope": "Toàn hệ thống",
-        "email": "admin.bui@demo.oms.local",
+        "email": "admin.bui@demo.OMS.local",
     },
     "CUSTOMER": {
         "username": "nguyendaily",
@@ -293,7 +293,7 @@ DEMO_PROFILES: Dict[str, Dict[str, Any]] = {
         "role_code": "CUSTOMER",
         "role_name": "Đại lý",
         "scope": "Đại lý Tạp Hóa Long Biên",
-        "email": "daily.nguyen@demo.oms.local",
+        "email": "daily.nguyen@demo.OMS.local",
     },
 }
 

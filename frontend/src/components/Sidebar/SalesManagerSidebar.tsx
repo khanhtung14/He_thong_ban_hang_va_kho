@@ -13,6 +13,7 @@ import {
   LogoutOutlined,
   UserSwitchOutlined,
   FileExcelOutlined,
+  PercentageOutlined,
 } from "@ant-design/icons";
 import BrandLogo from "components/BrandLogo";
 
@@ -80,16 +81,10 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       icon: "appstore",
     },
     {
-      id: "manager-products",
-      title: "Danh mục sản phẩm",
-      path: "/manager/products",
-      icon: "boxes-stacked",
-    },
-    {
-      id: "excel-import",
-      title: "Nhập sản phẩm (Excel)",
-      path: "/manager/products/import",
-      icon: "excel",
+      id: "manager-discounts",
+      title: "Chính sách chiết khấu",
+      path: "/manager/discounts",
+      icon: "percentage",
     },
     {
       id: "reports",
@@ -144,6 +139,27 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       baseItems.splice(insertIdx + 1, 0, productItem);
     } else {
       baseItems.push(productItem);
+    }
+  }
+
+  // Đảm bảo mục "Chính sách chiết khấu" luôn luôn có mặt trong menu của Sales Manager
+  const hasDiscounts = baseItems.some(
+    (item) => item.path === "/manager/discounts" || item.id === "manager-discounts"
+  );
+  if (!hasDiscounts) {
+    const insertIdx = baseItems.findIndex(
+      (item) => item.path === "/manager/categories"
+    );
+    const discountItem: MenuItem = {
+      id: "manager-discounts",
+      title: "Chính sách chiết khấu",
+      path: "/manager/discounts",
+      icon: "percentage",
+    };
+    if (insertIdx !== -1) {
+      baseItems.splice(insertIdx + 1, 0, discountItem);
+    } else {
+      baseItems.push(discountItem);
     }
   }
 
@@ -222,6 +238,10 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       case "boxes-stacked":
       case "inventory":
         return <InboxOutlined />;
+      case "percentage":
+      case "discount":
+      case "discounts":
+        return <PercentageOutlined />;
       default:
         return <AppstoreOutlined />;
     }
@@ -293,7 +313,7 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       }}
     >
       <div style={{ flex: 1, overflowY: "auto", background: "#ffffff" }}>
-        {/* Logo WMS & Icon ngôi nhà nguyên bản */}
+        {/* Logo OMS & Icon ngôi nhà nguyên bản */}
         <BrandLogo></BrandLogo>
 
         {/* Tiêu đề nhóm Menu */}
