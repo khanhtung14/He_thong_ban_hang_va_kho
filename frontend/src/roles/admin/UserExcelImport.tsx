@@ -215,42 +215,50 @@ export const UserExcelImport: React.FC = () => {
 
   const previewColumns: ColumnsType<PreviewRow> = [
     {
-      title: "Dòng",
+      title: <span style={{ whiteSpace: "nowrap" }}>Dòng</span>,
       dataIndex: "row_number",
       key: "row_number",
-      width: 70,
+      width: 55,
+      align: "center",
       render: (r: number) => <strong>#{r}</strong>,
     },
     {
-      title: "Tên đăng nhập",
+      title: <span style={{ whiteSpace: "nowrap" }}>Tên đăng nhập</span>,
       dataIndex: ["data", "username"],
       key: "username",
-      width: 140,
+      width: 125,
       render: (u: string) => (
-        <strong style={{ color: "#1d4ed8", fontFamily: "monospace" }}>
+        <strong style={{ color: "#1d4ed8", fontFamily: "monospace", whiteSpace: "nowrap" }}>
           {u || "(Trống)"}
         </strong>
       ),
     },
     {
-      title: "Họ và tên",
+      title: <span style={{ whiteSpace: "nowrap" }}>Họ và tên</span>,
       dataIndex: ["data", "full_name"],
       key: "full_name",
-      width: 160,
+      width: 140,
+      render: (name?: string) => (
+        <span style={{ whiteSpace: "nowrap" }}>{name || "—"}</span>
+      ),
     },
     {
-      title: "Email",
+      title: <span style={{ whiteSpace: "nowrap" }}>Email</span>,
       dataIndex: ["data", "email"],
       key: "email",
-      width: 180,
+      width: 160,
+      render: (email?: string) => (
+        <span style={{ whiteSpace: "nowrap" }}>{email || "—"}</span>
+      ),
     },
     {
-      title: "Vai trò",
+      title: <span style={{ whiteSpace: "nowrap" }}>Vai trò</span>,
       dataIndex: ["data", "role"],
       key: "role",
-      width: 140,
+      width: 115,
+      align: "center",
       render: (role: string) => {
-        if (!role) return <Tag color="default">(Trống)</Tag>;
+        if (!role) return <Tag color="default" style={{ whiteSpace: "nowrap" }}>(Trống)</Tag>;
         const roleMeta: Record<string, { label: string; color: string }> = {
           sales: { label: "NV Kinh doanh", color: "blue" },
           sales_rep: { label: "NV Kinh doanh", color: "blue" },
@@ -266,73 +274,77 @@ export const UserExcelImport: React.FC = () => {
         };
         const meta = roleMeta[role.toLowerCase()];
         if (meta) {
-          return <Tag color={meta.color}>{meta.label}</Tag>;
+          return <Tag color={meta.color} style={{ whiteSpace: "nowrap" }}>{meta.label}</Tag>;
         }
-        return <Tag color="default">{role}</Tag>;
+        return <Tag color="default" style={{ whiteSpace: "nowrap" }}>{role}</Tag>;
       },
     },
     {
-      title: "Số ĐT",
+      title: <span style={{ whiteSpace: "nowrap" }}>Số ĐT</span>,
       dataIndex: ["data", "phone"],
       key: "phone",
-      width: 120,
+      width: 105,
+      align: "center",
       render: (phone?: string) =>
-        phone ? <span>{phone}</span> : <Text type="secondary" italic>—</Text>,
+        phone ? <span style={{ whiteSpace: "nowrap" }}>{phone}</span> : <Text type="secondary" italic>—</Text>,
     },
     {
-      title: "Kho phụ trách",
+      title: <span style={{ whiteSpace: "nowrap" }}>Kho phụ trách</span>,
       dataIndex: ["data", "warehouse"],
       key: "warehouse",
-      width: 140,
+      width: 120,
       render: (wh: string, record: PreviewRow) => {
         const isWarehouseRole = ["warehouse", "warehouse_staff", "warehouse_manager", "wh_manager"].includes(
           record.data?.role?.toLowerCase() || ""
         );
         if (!wh) {
           return isWarehouseRole ? (
-            <Text type="danger" italic style={{ fontWeight: 600 }}>
+            <Text type="danger" italic style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
               (Chưa gán kho)
             </Text>
           ) : (
             <Text type="secondary" italic>—</Text>
           );
         }
-        return <Tag color="cyan">{wh}</Tag>;
+        return <Tag color="cyan" style={{ whiteSpace: "nowrap" }}>{wh}</Tag>;
       },
     },
     {
-      title: "Địa bàn",
+      title: <span style={{ whiteSpace: "nowrap" }}>Địa bàn</span>,
       dataIndex: ["data", "region"],
       key: "region",
-      width: 130,
+      width: 105,
+      align: "center",
       render: (rg?: string) =>
-        rg ? <Tag color="purple">{rg}</Tag> : <Text type="secondary" italic>—</Text>,
+        rg ? <Tag color="purple" style={{ whiteSpace: "nowrap" }}>{rg}</Tag> : <Text type="secondary" italic>—</Text>,
     },
     {
-      title: "Trạng thái",
+      title: <span style={{ whiteSpace: "nowrap" }}>Trạng thái</span>,
       dataIndex: "valid",
       key: "valid",
-      width: 120,
+      width: 95,
+      align: "center",
       render: (valid: boolean) =>
         valid ? (
-          <Tag color="success" icon={<CheckCircleOutlined />}>
+          <Tag color="success" icon={<CheckCircleOutlined />} style={{ whiteSpace: "nowrap" }}>
             Hợp lệ
           </Tag>
         ) : (
-          <Tag color="error" icon={<CloseCircleOutlined />} style={{ fontWeight: 600 }}>
+          <Tag color="error" icon={<CloseCircleOutlined />} style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
             Lỗi
           </Tag>
         ),
     },
     {
-      title: "Ghi chú / Chi tiết lỗi",
+      title: <span style={{ whiteSpace: "nowrap" }}>Ghi chú / Chi tiết lỗi</span>,
       dataIndex: "errors",
       key: "errors",
+      minWidth: 320,
       render: (errs: string[]) =>
         errs && errs.length > 0 ? (
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={2} style={{ width: "100%" }}>
             {errs.map((e, idx) => (
-              <Text type="danger" key={idx} style={{ fontSize: 12, fontWeight: 500 }}>
+              <Text type="danger" key={idx} style={{ fontSize: 12, fontWeight: 500, display: "block" }}>
                 • {e}
               </Text>
             ))}
@@ -531,7 +543,7 @@ export const UserExcelImport: React.FC = () => {
             pagination={{ pageSize: 10 }}
             bordered
             size="middle"
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1300 }}
           />
         </Card>
       )}

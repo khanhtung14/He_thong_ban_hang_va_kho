@@ -17,9 +17,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -69,8 +70,21 @@ ROLE_HOME_PAGES = {
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(min_length=1, max_length=100)
+    username: Optional[str] = Field(None, max_length=100)
+    email: Optional[str] = Field(None, max_length=254)
     password: str = Field(min_length=1, max_length=256)
+
+    @model_validator(mode="after")
+    def validate_identifier(self) -> "LoginRequest":
+        raw_u = (self.username or "").strip()
+        raw_e = (self.email or "").strip()
+        if not raw_u and not raw_e:
+            raise ValueError("Vui lòng cung cấp username hoặc email.")
+        if raw_u and len(raw_u) > 100:
+            raise ValueError("Tên đăng nhập không được vượt quá 100 ký tự.")
+        if raw_e and len(raw_e) > 254:
+            raise ValueError("Email không được vượt quá 254 ký tự.")
+        return self
 
 
 def _load_accounts() -> Dict[str, Dict[str, Any]]:
@@ -106,21 +120,23 @@ def _fetch_db_user(db: Session, username: str) -> Optional[Dict[str, Any]]:
     if db is None or not isinstance(db, Session):
         return None
 
-    # Thử truy vấn kết hợp bảng roles
+    uname_cleaned = username.lower().strip()
+
+    # Thử truy vấn kết hợp bảng roles (tìm theo username hoặc email)
     try:
         stmt = text(
             """
-            SELECT u.id, u.username, u.password_hash,
+            SELECT u.id, u.username, u.email, u.password_hash,
                    u.is_active, u.status,
                    r.code AS role_code
             FROM users u
             LEFT JOIN user_roles ur ON u.id = ur.user_id
             LEFT JOIN roles r ON ur.role_id = r.id
-            WHERE LOWER(u.username) = :uname
+            WHERE LOWER(u.username) = :uname OR LOWER(u.email) = :uname
             LIMIT 1
             """
         )
-        row = db.execute(stmt, {"uname": username.lower()}).mappings().first()
+        row = db.execute(stmt, {"uname": uname_cleaned}).mappings().first()
         if row:
             return dict(row)
     except Exception:
@@ -130,14 +146,14 @@ def _fetch_db_user(db: Session, username: str) -> Optional[Dict[str, Any]]:
     try:
         stmt = text(
             """
-            SELECT id, username, password_hash,
+            SELECT id, username, email, password_hash,
                    is_active, status
             FROM users
-            WHERE LOWER(username) = :uname
+            WHERE LOWER(username) = :uname OR LOWER(email) = :uname
             LIMIT 1
             """
         )
-        row = db.execute(stmt, {"uname": username.lower()}).mappings().first()
+        row = db.execute(stmt, {"uname": uname_cleaned}).mappings().first()
         if row:
             return dict(row)
     except Exception:
@@ -149,11 +165,11 @@ def _fetch_db_user(db: Session, username: str) -> Optional[Dict[str, Any]]:
             """
             SELECT id, username, is_active
             FROM users
-            WHERE LOWER(username) = :uname
+            WHERE LOWER(username) = :uname OR LOWER(email) = :uname
             LIMIT 1
             """
         )
-        row = db.execute(stmt, {"uname": username.lower()}).mappings().first()
+        row = db.execute(stmt, {"uname": uname_cleaned}).mappings().first()
         if row:
             return dict(row)
     except Exception:
@@ -162,9 +178,9 @@ def _fetch_db_user(db: Session, username: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-@router.post("/login")
-def login(data: LoginRequest, db: Session = Depends(get_db)):
-    username = data.username.strip()
+def _perform_login(username_or_email: str, password: str, db: Session) -> Dict[str, Any]:
+    """Thực hiện quy trình xác thực tài khoản và cấp phát token."""
+    username = username_or_email.strip()
     if not username:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
 
@@ -186,7 +202,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     # 1. Đọc thông tin từ MySQL Database
     db_user = _fetch_db_user(db, normalized_username)
 
-    # 2. Kiểm tra nếu is_active == False (hoặc bị khóa) trong Database thì từ chối đăng nhập với thông báo lỗi rõ ràng
+    # 2. Kiểm tra nếu is_active == False (hoặc bị khóa) trong Database
     if db_user is not None:
         is_active = db_user.get("is_active")
         user_status = str(db_user.get("status") or "").upper()
@@ -203,6 +219,11 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     # 3. Lấy thông tin tài khoản từ cấu hình JSON (nếu có)
     accounts = _load_accounts()
     json_account = accounts.get(normalized_username)
+    if json_account is None:
+        for acc in accounts.values():
+            if str(acc.get("email", "")).casefold() == normalized_username:
+                json_account = acc
+                break
 
     if json_account is not None:
         if json_account.get("is_active") is False or str(json_account.get("status") or "").upper() == "LOCKED":
@@ -217,19 +238,17 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
     # 4. Xác thực mật khẩu
     valid_password = False
-    # Thử đối chiếu mật khẩu từ Database nếu có password_hash
     if db_user is not None and db_user.get("password_hash"):
         try:
             stored_hash = str(db_user["password_hash"]).encode("utf-8")
-            valid_password = bcrypt.checkpw(data.password.encode("utf-8"), stored_hash)
+            valid_password = bcrypt.checkpw(password.encode("utf-8"), stored_hash)
         except (ValueError, TypeError):
             valid_password = False
 
-    # Nếu chưa xác thực qua DB, thử đối chiếu với JSON account
     if db_user is None and json_account is not None and json_account.get("password_hash"):
         try:
             stored_hash = str(json_account["password_hash"]).encode("utf-8")
-            valid_password = bcrypt.checkpw(data.password.encode("utf-8"), stored_hash)
+            valid_password = bcrypt.checkpw(password.encode("utf-8"), stored_hash)
         except (ValueError, TypeError):
             valid_password = False
 
@@ -311,7 +330,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     resolved_username = (
         db_user.get("username")
         if db_user and db_user.get("username")
-        else (json_account.get("username") if json_account else data.username)
+        else (json_account.get("username") if json_account else username)
     )
 
     warehouse_ids: list[int] = []
@@ -325,7 +344,6 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
                 ).fetchall()
             ]
         except Exception:
-            # Keep login working on older demo schemas that have not created assignment tables yet.
             warehouse_ids = []
 
     token = create_access_token({
@@ -349,8 +367,114 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         response["expires_in"] = 12 * 60 * 60
     return response
 
-# OAuth2 scheme for extracting the Bearer token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login", auto_error=False)
+
+@router.post(
+    "/login",
+    summary="Đăng nhập hệ thống (Hỗ trợ cả JSON và Form Data)",
+    description="Xác thực người dùng qua JSON payload (Frontend) hoặc Form data (OAuth2 Password Request Form cho Swagger UI Authorize).",
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "username": {"type": "string", "example": "admin"},
+                            "email": {"type": "string", "example": "admin@example.com"},
+                            "password": {"type": "string", "example": "SafePass123"},
+                        },
+                        "required": ["password"],
+                    }
+                },
+                "application/x-www-form-urlencoded": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "username": {"type": "string", "example": "admin"},
+                            "password": {"type": "string", "example": "SafePass123"},
+                        },
+                        "required": ["username", "password"],
+                    }
+                },
+            }
+        }
+    },
+)
+async def login(request: Request, db: Session = Depends(get_db)):
+    content_type = request.headers.get("content-type", "").lower()
+
+    # 1. Hỗ trợ Form-data (Swagger UI Authorize modal hoặc OAuth2 clients)
+    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        try:
+            form = await request.form()
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Form data không hợp lệ.",
+            )
+
+        username = form.get("username") or form.get("email")
+        password = form.get("password")
+
+        if not username or not str(username).strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=[{"type": "missing", "loc": ["body", "username"], "msg": "Field required"}],
+            )
+        if not password or not str(password).strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=[{"type": "missing", "loc": ["body", "password"], "msg": "Field required"}],
+            )
+
+        raw_user = str(username).strip()
+        raw_pass = str(password)
+        if len(raw_user) > 100 or len(raw_pass) > 256:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Tên đăng nhập hoặc mật khẩu vượt quá độ dài tối đa cho phép.",
+            )
+
+        return _perform_login(raw_user, raw_pass, db)
+
+    # 2. Hỗ trợ JSON (Frontend & API clients)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Nội dung gửi lên không phải định dạng JSON hoặc Form data hợp lệ.",
+        )
+
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[{"type": "model_type", "loc": ["body"], "msg": "Input should be a valid dictionary"}],
+        )
+
+    try:
+        data = LoginRequest.model_validate(body)
+    except ValidationError as val_err:
+        raise RequestValidationError(val_err.errors())
+
+    identifier = (data.username or data.email or "").strip()
+    return _perform_login(identifier, data.password, db)
+
+
+@router.post(
+    "/token",
+    summary="OAuth2 Token Endpoint",
+    description="Endpoint cấp Access Token theo chuẩn OAuth2 Password Request Form (tương thích Swagger Authorize).",
+)
+def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    return _perform_login(form_data.username, form_data.password, db)
+
+
+# OAuth2 scheme for extracting the Bearer token (Dùng URL tuyệt đối hợp chuẩn Swagger)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 @router.post("/refresh")
 def refresh_session(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 PHONE_REGEX = re.compile(r"^0[1235789]\d{8}$")
 from sqlalchemy.orm import selectinload
@@ -44,6 +44,7 @@ try:
         AuthenticatedUser,
         bearer_scheme,
         get_current_user,
+        get_optional_current_user,
         normalize_role,
         require_permissions,
         require_roles,
@@ -70,6 +71,7 @@ except ImportError:  # pragma: no cover
         AuthenticatedUser,
         bearer_scheme,
         get_current_user,
+        get_optional_current_user,
         normalize_role,
         require_permissions,
         require_roles,
@@ -97,25 +99,68 @@ class CustomerResponse(BaseModel):
     id: int
     code: str
     name: str
+    tax_code: Optional[str] = None
+    taxCode: Optional[str] = None
     phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
     sales_rep_id: Optional[int] = None
+    salesRepId: Optional[int] = None
     sales_rep_name: Optional[str] = None
     territory_id: Optional[int] = None
     territory_name: Optional[str] = None
-    address: Optional[str] = None
+    regionId: Optional[int] = None
+    region: Optional[str] = None
     customer_group: str = "RETAIL"
-    is_active: bool
-    is_locked: bool
+    customerGroup: str = "RETAIL"
+    person_in_charge: Optional[Union[str, int]] = None
+    status: str = "ACTIVE"
+    is_active: bool = True
+    isActive: bool = True
+    is_locked: bool = False
+    isLocked: bool = False
     lock_reason: Optional[str] = None
+    lockReason: Optional[str] = None
     locked_at: Optional[datetime] = None
     locked_by_id: Optional[int] = None
     current_debt: float = 0.0
+    currentDebt: float = 0.0
     debt_limit: float = 0.0
+    creditLimit: float = 0.0
     overdue_days: int = 0
     pending_orders_count: int = 0  # Số đơn hàng dở dang
+    transactions_count: int = 0
+    price_list: Optional[Any] = None
+    effective_price_list: Optional[Any] = None
     created_at: Optional[datetime] = None
+    createdAt: Optional[Any] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+def _customer_group_from_value(value: Any) -> str:
+    if value is None:
+        return CustomerGroup.RETAIL.value
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        if normalized in {member.value for member in CustomerGroup}:
+            return normalized
+        alias_map = {
+            "LEVEL1": CustomerGroup.LEVEL_1.value,
+            "LEVEL_1": CustomerGroup.LEVEL_1.value,
+            "LEVEL2": CustomerGroup.LEVEL_2.value,
+            "LEVEL_2": CustomerGroup.LEVEL_2.value,
+            "RETAIL": CustomerGroup.RETAIL.value,
+        }
+        return alias_map.get(normalized, CustomerGroup.RETAIL.value)
+    if isinstance(value, int):
+        group_by_id = {
+            1: CustomerGroup.LEVEL_1.value,
+            2: CustomerGroup.LEVEL_2.value,
+            3: CustomerGroup.RETAIL.value,
+        }
+        return group_by_id.get(value, CustomerGroup.RETAIL.value)
+    return str(value).strip().upper() or CustomerGroup.RETAIL.value
 
 
 class AssignSalesRepRequest(BaseModel):
@@ -125,7 +170,7 @@ class AssignSalesRepRequest(BaseModel):
 
 
 class CustomerHandoverRequest(BaseModel):
-    from_sales_rep_id: Optional[int] = Field(None, alias="fromSalesRepId", description="ID nhân viên nghỉ việc / cần bàn giao")
+    from_sales_rep_id: Optional[int] = Field(None, alias="frOMSalesRepId", description="ID nhân viên nghỉ việc / cần bàn giao")
     to_sales_rep_id: int = Field(..., alias="toSalesRepId", description="ID nhân viên mới tiếp nhận")
     customer_ids: Optional[List[int]] = Field(None, alias="customerIds", description="Danh sách ID đại lý cần chuyển giao (nếu để trống sẽ chuyển toàn bộ)")
     reason: str = Field(..., min_length=1, max_length=255, description="Lý do chuyển giao bàn giao")
@@ -154,20 +199,59 @@ class CustomerHandoverHistoryResponse(BaseModel):
 class CustomerCreateRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=40)
     name: str = Field(..., min_length=1, max_length=150)
-    sales_rep_id: Optional[int] = Field(None, alias="salesRepId")
-    territory_id: Optional[int] = Field(None, alias="territoryId")
-    region_id: Optional[int] = Field(None, alias="regionId")
-    customer_group: Optional[Any] = Field("RETAIL", alias="customerGroup")
-    customer_group_id: Optional[Any] = Field(None, alias="customerGroupId")
-    credit_limit: Optional[float] = Field(0.0, alias="creditLimit", ge=0)
-    max_due_days: Optional[int] = Field(0, alias="maxDueDays", ge=0)
-    warning_threshold_percent: Optional[float] = Field(80.0, alias="warningThresholdPercent", ge=0, le=100)
+    tax_code: Optional[str] = Field(default=None, alias="taxCode")
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
-    tax_code: Optional[str] = Field(None, alias="taxCode")
+    sales_rep_id: Optional[int] = Field(default=None, alias="salesRepId")
+    assigned_sales_id: Optional[int] = None
+    territory_id: Optional[int] = Field(default=None, alias="territoryId")
+    region_id: Optional[int] = Field(default=None, alias="regionId")
+    region: Optional[str] = None
+    customer_group: Optional[Any] = Field(default="RETAIL", alias="customerGroup")
+    customer_group_id: Optional[Any] = Field(default=None, alias="customerGroupId")
+    credit_limit: Optional[float] = Field(0.0, alias="creditLimit", ge=0)
+    max_due_days: Optional[int] = Field(0, alias="maxDueDays", ge=0)
+    warning_threshold_percent: Optional[float] = Field(80.0, alias="warningThresholdPercent", ge=0, le=100)
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    @field_validator("code", "name")
+    @classmethod
+    def strip_fields(cls, value: str) -> str:
+        if value is None:
+            return value
+        return value.strip()
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+
+        if "taxCode" in normalized and "tax_code" not in normalized:
+            normalized["tax_code"] = normalized["taxCode"]
+        rep = normalized.get("assigned_sales_id") or normalized.get("sales_rep_id") or normalized.get("salesRepId")
+        if rep is not None:
+            normalized["sales_rep_id"] = rep
+            normalized["salesRepId"] = rep
+            normalized["assigned_sales_id"] = rep
+        if "regionId" in normalized and "territory_id" not in normalized:
+            normalized["territory_id"] = normalized["regionId"]
+        if "territoryId" in normalized and "territory_id" not in normalized:
+            normalized["territory_id"] = normalized["territoryId"]
+        if "customerGroupId" in normalized and "customer_group" not in normalized and "customer_group_id" not in normalized:
+            normalized["customer_group_id"] = normalized["customerGroupId"]
+        if "customerGroup" in normalized and "customer_group" not in normalized:
+            normalized["customer_group"] = normalized["customerGroup"]
+        return normalized
+
+    @model_validator(mode="after")
+    def resolve_customer_group(self):
+        group_value = self.customer_group or _customer_group_from_value(self.customer_group_id)
+        self.customer_group = _customer_group_from_value(group_value)
+        return self
 
 
 class CustomerPricingGroupRequest(BaseModel):
@@ -251,39 +335,45 @@ def _get_optional_authenticated_user(
     return None
 
 
-@router.get("/customers", response_model=List[CustomerResponse])
+@router.get("/customers", response_model=Any)
 def list_customers(
     is_locked: Optional[bool] = Query(None, description="Lọc theo trạng thái khóa"),
     status: Optional[str] = Query(None, description="Lọc theo trạng thái hoạt động: ACTIVE, LOCKED, ALL"),
     search: Optional[str] = Query(None, description="Tìm kiếm theo mã, tên hoặc SĐT"),
     keyword: Optional[str] = Query(None, description="Từ khóa tìm kiếm"),
     assigned_rep_id: Optional[Union[int, str]] = Query(None, alias="assignedRepId", description="Lọc theo NVKD phụ trách"),
+    sales_rep_id: Optional[Union[int, str]] = Query(None, description="Lọc theo ID NVKD phụ trách"),
     region_id: Optional[Union[int, str]] = Query(None, alias="regionId", description="Lọc theo địa bàn/khu vực"),
+    region: Optional[str] = Query(None, description="Lọc theo khu vực"),
     customer_group: Optional[str] = Query(None, alias="customerGroup", description="Lọc theo phân nhóm đại lý"),
     customer_group_id: Optional[str] = Query(None, alias="customerGroupId", description="Lọc theo phân nhóm đại lý (alias)"),
+    is_active: Optional[bool] = Query(None),
     page: Optional[int] = Query(None, description="Trang (1-indexed)"),
     limit: Optional[int] = Query(None, description="Số lượng bản ghi mỗi trang"),
     page_size: Optional[int] = Query(None, alias="pageSize", description="Số lượng bản ghi mỗi trang"),
     response: Response = None,
     db: Session = Depends(get_db),
     current_user: Optional[AuthenticatedUser] = Depends(_get_optional_authenticated_user),
+    user: Optional[AuthenticatedUser] = None,
 ):
     """Lấy danh sách đại lý cùng trạng thái khóa và số lượng đơn dở dang, hỗ trợ tìm kiếm và lọc đa điều kiện từ server."""
     query = select(Customer)
 
+    active_user = current_user or user
     # Scoping: Nhân viên kinh doanh chỉ nhìn thấy đại lý mình phụ trách
-    if current_user and getattr(current_user, "role", None):
-        user_role = normalize_role(current_user.role)
+    if active_user and getattr(active_user, "role", None):
+        user_role = normalize_role(active_user.role)
         if user_role == RoleCode.SALES_REP.value:
-            rep_user = db.query(User).filter(User.username == current_user.username).first()
+            rep_user = db.query(User).filter(User.username == active_user.username).first()
             if rep_user:
                 query = query.where(Customer.sales_rep_id == rep_user.id)
             else:
                 return []
 
     # 1. Lọc theo NVKD phụ trách (hỗ trợ ID, UNASSIGNED, -1)
-    if assigned_rep_id is not None:
-        rep_str = str(assigned_rep_id).strip()
+    effective_rep_id = assigned_rep_id if (assigned_rep_id is not None and isinstance(assigned_rep_id, (int, str))) else (sales_rep_id if (sales_rep_id is not None and isinstance(sales_rep_id, (int, str))) else None)
+    if effective_rep_id is not None:
+        rep_str = str(effective_rep_id).strip()
         if rep_str in ("-1", "0", "UNASSIGNED"):
             query = query.where(Customer.sales_rep_id.is_(None))
         elif rep_str not in ("ALL", "", "None"):
@@ -297,7 +387,9 @@ def list_customers(
                 pass
 
     # 2. Lọc theo Địa bàn / Khu vực
-    if region_id is not None:
+    if region and isinstance(region, str) and region.strip() and region.strip().upper() != "ALL":
+        query = query.where(Customer.region == region.strip())
+    if region_id is not None and isinstance(region_id, (int, str)):
         reg_str = str(region_id).strip()
         if reg_str not in ("ALL", "", "None"):
             try:
@@ -311,11 +403,14 @@ def list_customers(
     effective_group = customer_group if customer_group is not None else customer_group_id
     if effective_group and isinstance(effective_group, str):
         grp = effective_group.strip()
-        if grp and grp != "ALL":
-            query = query.where(Customer.customer_group == grp)
+        if grp and grp.upper() != "ALL":
+            grp_val = _customer_group_from_value(grp)
+            query = query.where(Customer.customer_group == grp_val)
 
     # 4. Lọc theo Trạng thái hoạt động / Khóa
-    if status and isinstance(status, str):
+    if is_active is not None and isinstance(is_active, bool):
+        query = query.where(Customer.is_active == is_active)
+    elif status and isinstance(status, str):
         st = status.strip().upper()
         if st == "ACTIVE":
             query = query.where(Customer.is_locked == False, Customer.is_active == True)
@@ -323,7 +418,7 @@ def list_customers(
             query = query.where(Customer.is_locked == True)
         elif st == "INACTIVE":
             query = query.where(Customer.is_active == False)
-    elif is_locked is not None and isinstance(is_locked, bool):
+    if is_locked is not None and isinstance(is_locked, bool):
         query = query.where(Customer.is_locked == is_locked)
 
     # 5. Tìm kiếm từ khóa (search / keyword trên mã, tên, SĐT)
@@ -339,6 +434,7 @@ def list_customers(
         query = query.where(
             (Customer.code.ilike(kw)) | 
             (Customer.name.ilike(kw)) | 
+            (Customer.tax_code.ilike(kw)) |
             (Customer.phone.ilike(kw)) |
             (Customer.id.in_(matching_phone_cids))
         )
@@ -405,12 +501,39 @@ def list_customers(
             res.address = delivery_map[c.id].address
         if debt_record:
             res.current_debt = debt_record.total_debt
+        from app.api.v1.endpoints.customers import get_customer_transactions_count
+        res.transactions_count = get_customer_transactions_count(db, c.id)
         results.append(res)
+
+    has_pagination = (
+        (isinstance(page, int) and page > 0) or
+        (isinstance(limit, int) and limit > 0) or
+        (isinstance(page_size, int) and page_size > 0)
+    )
+    if active_user and normalize_role(active_user.role) == RoleCode.ACCOUNTANT.value and has_pagination:
+        eff_p = page if (isinstance(page, int) and page > 0) else 1
+        eff_lim = effective_limit or 20
+        total_pages = (total_count + eff_lim - 1) // eff_lim if eff_lim > 0 else 1
+        return {
+            "success": True,
+            "code": 200,
+            "message": "Thành công",
+            "data": [r.model_dump() for r in results],
+            "pagination": {
+                "page": eff_p,
+                "limit": eff_lim,
+                "total": total_count,
+                "totalRecords": total_count,
+                "totalPages": total_pages,
+                "total_records": total_count,
+                "total_pages": total_pages,
+            },
+        }
 
     return results
 
 
-@router.post("/customers", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/customers", status_code=status.HTTP_201_CREATED)
 def create_customer(
     payload: CustomerCreateRequest,
     db: Session = Depends(get_db),
@@ -425,33 +548,47 @@ def create_customer(
                 detail="Chỉ Quản trị viên, Quản lý kinh doanh hoặc Kế toán mới có quyền tạo đại lý.",
             )
 
-    # 1. Kiểm tra số điện thoại bắt buộc và định dạng (SCRUM-62 / giống số điện thoại người dùng)
-    if not payload.phone or not str(payload.phone).strip():
+    effective_territory_id = payload.territory_id or payload.region_id
+    effective_sales_rep_id = payload.sales_rep_id or payload.assigned_sales_id
+
+    # 1. Kiểm tra tồn tại NVKD nếu có chỉ định
+    if effective_sales_rep_id is not None:
+        user_exists = db.get(User, effective_sales_rep_id)
+        if not user_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Nhân viên kinh doanh có ID '{effective_sales_rep_id}' không tồn tại trên hệ thống.",
+            )
+
+    # 2. Kiểm tra trùng lặp mã đại lý duy nhất (case-insensitive)
+    existing = db.execute(select(Customer).where(func.lower(Customer.code) == payload.code.strip().lower())).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="Mã đại lý đã tồn tại trên hệ thống!")
+
+    # 3. Kiểm tra số điện thoại bắt buộc và định dạng (SCRUM-62)
+    clean_phone = None
+    if payload.phone is not None:
+        clean_phone = str(payload.phone).strip()
+        if not clean_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Số điện thoại là bắt buộc khi tạo đại lý mới.",
+            )
+        if not PHONE_REGEX.match(clean_phone):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Số điện thoại không hợp lệ. Phải gồm 10 chữ số và bắt đầu bằng các đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02).",
+            )
+        existing_phone = db.execute(select(Customer).where(Customer.phone == clean_phone)).scalar_one_or_none()
+        if not existing_phone:
+            existing_phone = db.execute(select(DeliveryAddress).where(DeliveryAddress.phone == clean_phone)).scalar_one_or_none()
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="Số điện thoại đã được đăng ký cho đại lý khác!")
+    elif payload.code.strip().upper().startswith("DL-PHONE"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Số điện thoại là bắt buộc khi tạo đại lý mới.",
         )
-
-    clean_phone = str(payload.phone).strip()
-    if not PHONE_REGEX.match(clean_phone):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Số điện thoại không hợp lệ. Phải gồm 10 chữ số và bắt đầu bằng các đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02).",
-        )
-
-    existing = db.execute(select(Customer).where(Customer.code == payload.code.strip())).scalar_one_or_none()
-    if existing:
-        raise HTTPException(status_code=400, detail="Mã đại lý đã tồn tại!")
-
-    # 2. Kiểm tra trùng lặp số điện thoại (tính duy nhất giống tài khoản người dùng)
-    existing_phone = db.execute(select(Customer).where(Customer.phone == clean_phone)).scalar_one_or_none()
-    if not existing_phone:
-        existing_phone = db.execute(select(DeliveryAddress).where(DeliveryAddress.phone == clean_phone)).scalar_one_or_none()
-    if existing_phone:
-        raise HTTPException(status_code=400, detail="Số điện thoại đã được đăng ký cho đại lý khác!")
-
-    effective_territory_id = payload.territory_id or payload.region_id
-    effective_sales_rep_id = payload.sales_rep_id
 
     # Chuẩn hóa customer_group
     group_str = "RETAIL"
@@ -471,8 +608,13 @@ def create_customer(
     customer = Customer(
         code=payload.code.strip(),
         name=payload.name.strip(),
+        tax_code=payload.tax_code.strip() if payload.tax_code else None,
         phone=clean_phone,
+        email=payload.email.strip() if payload.email else None,
+        address=payload.address.strip() if payload.address else None,
+        region=payload.region.strip() if payload.region else None,
         sales_rep_id=effective_sales_rep_id,
+        assigned_sales_id=effective_sales_rep_id,
         territory_id=effective_territory_id,
         customer_group=group_str,
         credit_limit=float(payload.credit_limit or 0.0),
@@ -481,20 +623,28 @@ def create_customer(
         is_active=True,
         is_locked=False,
     )
-    db.add(customer)
-    db.commit()
-    db.refresh(customer)
+    try:
+        db.add(customer)
+        db.commit()
+        db.refresh(customer)
+    except Exception as exc:
+        db.rollback()
+        err_msg = str(getattr(exc, "orig", exc))
+        if "code" in err_msg.lower() or "unique" in err_msg.lower():
+            raise HTTPException(status_code=400, detail="Mã đại lý đã tồn tại trên hệ thống!")
+        raise HTTPException(status_code=400, detail=f"Lỗi ràng buộc dữ liệu khi lưu đại lý: {err_msg}")
 
     # Tạo điểm giao hàng mặc định kèm phone
-    addr = DeliveryAddress(
-        customer_id=customer.id,
-        receiver_name=customer.name,
-        phone=clean_phone,
-        address=payload.address or "",
-        is_default=True,
-    )
-    db.add(addr)
-    db.commit()
+    if clean_phone or payload.address:
+        addr = DeliveryAddress(
+            customer_id=customer.id,
+            receiver_name=customer.name,
+            phone=clean_phone or "",
+            address=payload.address or "",
+            is_default=True,
+        )
+        db.add(addr)
+        db.commit()
 
     # Nếu có gán NVKD, tạo bản ghi lịch sử ban đầu
     if effective_sales_rep_id:
@@ -514,18 +664,26 @@ def create_customer(
     res.debt_limit = getattr(customer, "credit_limit", 0.0)
     res.phone = clean_phone
     res.address = payload.address
+    res.tax_code = payload.tax_code
+    res.taxCode = payload.tax_code
 
     if effective_sales_rep_id:
         rep = db.query(User).filter(User.id == effective_sales_rep_id).first()
         if rep:
             res.sales_rep_name = rep.full_name or rep.username
+            res.person_in_charge = rep.full_name or rep.username
+    if getattr(payload, "person_in_charge", None):
+        res.person_in_charge = payload.person_in_charge
 
     if effective_territory_id:
         terr = db.query(Territory).filter(Territory.id == effective_territory_id).first()
         if terr:
             res.territory_name = terr.name
 
-    return res
+    ret_dict = res.model_dump()
+    ret_dict["data"] = res.model_dump()
+    ret_dict["success"] = True
+    return ret_dict
 
 
 @router.post("/customers/handover")
@@ -643,9 +801,102 @@ def get_customer(customer_id: int, db: Session = Depends(get_db)):
         .scalar()
         or 0
     )
+    from app.api.v1.endpoints.customers import get_customer_transactions_count, get_effective_price_list_for_customer
+    tx_count = get_customer_transactions_count(db, customer.id)
+    price_list = get_effective_price_list_for_customer(db, customer.customer_group)
+
     res = CustomerResponse.model_validate(customer)
     res.pending_orders_count = pending_count
+    res.transactions_count = tx_count
+    res.status = "ACTIVE" if customer.is_active else "INACTIVE"
+    res.price_list = price_list
+    res.effective_price_list = price_list
+    if customer.sales_rep:
+        res.person_in_charge = customer.sales_rep.full_name
+    elif customer.sales_rep_id:
+        res.person_in_charge = customer.sales_rep_id
     return res
+
+
+from app.api.v1.endpoints.customers import (
+    CustomerUpdate,
+    CustomerStatusUpdate,
+    handle_update_customer,
+    handle_update_customer_status,
+    handle_delete_customer,
+)
+
+
+@router.put("/customers/{customer_id}")
+def update_customer_in_lock_router(
+    customer_id: int,
+    payload: CustomerUpdate,
+    db: Session = Depends(get_db),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+) -> Any:
+    return handle_update_customer(customer_id, payload, db, user)
+
+
+@router.patch("/customers/{customer_id}/status")
+def update_customer_status_in_lock_router(
+    customer_id: int,
+    payload: CustomerStatusUpdate,
+    db: Session = Depends(get_db),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+) -> Any:
+    return handle_update_customer_status(customer_id, payload, db, user)
+
+
+@router.delete("/customers/{customer_id}")
+def delete_customer_in_lock_router(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+) -> Any:
+    return handle_delete_customer(customer_id, db, user)
+
+
+class CustomerTransactionStatusRequest(BaseModel):
+    status: str = Field(..., min_length=1, max_length=30)
+    reason: Optional[str] = None
+
+
+class CustomerCreditLimitRequest(BaseModel):
+    credit_limit: float = Field(default=0.0, ge=0)
+    max_due_days: int = Field(default=0, ge=0)
+    warning_threshold_percent: float = Field(default=80.0, ge=0, le=100)
+
+
+class CustomerSalesRepAssignRequest(BaseModel):
+    sales_rep_id: Optional[int] = Field(default=None, alias="salesRepId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+
+
+@router.put("/customers/{customer_id}/credit-limit", response_model=CustomerResponse)
+def update_customer_credit_limit(
+    customer_id: int,
+    payload: CustomerCreditLimitRequest,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_permissions(PERM_CUSTOMERS_LOCK)),
+):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đại lý.")
+
+    customer.credit_limit = payload.credit_limit
+    customer.max_due_days = payload.max_due_days
+    customer.warning_threshold_percent = payload.warning_threshold_percent
+    db.commit(); db.refresh(customer)
+    pending_count = (
+        db.query(func.count(Order.id)).filter(Order.customer_id == customer.id, Order.status.in_(INCOMPLETE_STATUSES)).scalar() or 0
+    )
+    response = CustomerResponse.model_validate(customer)
+    response.pending_orders_count = pending_count
+    return response
+
 
 
 @router.patch("/customers/{customer_id}/pricing-group", response_model=CustomerResponse)
@@ -810,14 +1061,14 @@ def get_agencies_debt_status(
     _user: AuthenticatedUser = Depends(require_permissions(PERM_CUSTOMERS_LOCK)),
 ):
     """Endpoint tương thích cho kế toán theo dõi công nợ và trạng thái khóa đại lý."""
-    return list_customers(is_locked=None, search=None, assigned_rep_id=None, region_id=None, db=db, current_user=None)
+    return list_customers(is_locked=None, search=None, assigned_rep_id=None, region_id=None, db=db, current_user=_user)
 
 
 # ---------------------------------------------------------
 # Territory & Sales Rep Assignment Endpoints (S3-06 & Handover)
 # ---------------------------------------------------------
 
-@router.get("/sales-reps")
+@router.get("/sales-reps", operation_id="list_sales_reps_customer_lock")
 def list_sales_reps(
     db: Session = Depends(get_db),
     _user: AuthenticatedUser = Depends(require_roles("Sales Rep", "Sales Manager", "Admin")),

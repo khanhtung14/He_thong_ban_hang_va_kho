@@ -24,7 +24,7 @@ except ModuleNotFoundError:  # pragma: no cover
     from app.models.models import RoleCode
 
 # Secret key & algorithm for JWT tokens
-JWT_SECRET = "oms-rbac-jwt-secret-key-2026-production"
+JWT_SECRET = "OMS-rbac-jwt-secret-key-2026-production"
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -111,6 +111,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     },
     RoleCode.SALES_MANAGER.value: {
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_MANAGE,
         PERM_PRODUCTS_VIEW_FINANCIALS,  # Cho phÃ©p xem giÃ¡ vá»‘n & biÃªn lá»£i nhuáº­n
         PERM_PRODUCTS_IMPORT,
         PERM_INVENTORY_VIEW,
@@ -152,6 +153,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     RoleCode.ADMIN.value: {
         PERM_SYSTEM_ADMIN,
         PERM_PRODUCTS_VIEW,
+        PERM_PRODUCTS_MANAGE,
         PERM_PRODUCTS_UNIT_MANAGE,
         PERM_PRODUCTS_IMPORT,
         PERM_INVENTORY_VIEW,
@@ -174,6 +176,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
 
 
 class AuthenticatedUser(BaseModel):
+    id: Optional[int] = None
     username: str
     role: str
     full_name: Optional[str] = None
@@ -284,6 +287,7 @@ def get_current_user(
                     detail="Vai trÃ² trong token khÃ´ng há»£p lá»‡ trÃªn há»‡ thá»‘ng.",
                 )
             return AuthenticatedUser(
+                id=payload.get("user_id") or payload.get("id"),
                 username=username,
                 role=normalized,
                 full_name=payload.get("full_name"),
@@ -303,8 +307,8 @@ def get_current_user(
                     s = (
                         db.query(UserSession)
                         .filter(
-                            UserSession.refresh_token_hash == token_hash,
-                            UserSession.revoked_at.is_(None),
+                             UserSession.refresh_token_hash == token_hash,
+                             UserSession.revoked_at.is_(None),
                         )
                         .first()
                     )
@@ -312,6 +316,7 @@ def get_current_user(
                         db_user = s.user
                         role_code = db_user.roles[0].code if db_user.roles else "SALES_MANAGER"
                         return AuthenticatedUser(
+                            id=db_user.id,
                             username=db_user.username,
                             role=normalize_role(role_code) or "SALES_MANAGER",
                             full_name=db_user.full_name,
@@ -325,9 +330,21 @@ def get_current_user(
     # Default-Deny: Missing authentication credentials
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="YÃªu cáº§u xÃ¡c thá»±c tÃ i khoáº£n (Thiáº¿u thÃ´ng tin Ä‘Äƒng nháº­p hoáº·c Authorization header).",
+        detail="Yêu cầu xác thực tài khoản (Thiếu thông tin đăng nhập hoặc Authorization header).",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+def get_optional_current_user(
+    auth: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+) -> Optional[AuthenticatedUser]:
+    """Dependency that extracts and validates user identity if Bearer header is present, returning None otherwise."""
+    if not auth or not auth.credentials:
+        return None
+    try:
+        return get_current_user(auth)
+    except HTTPException:
+        return None
 
 
 def require_roles(*allowed_roles: Union[str, RoleCode]):

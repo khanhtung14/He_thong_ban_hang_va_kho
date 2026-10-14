@@ -373,11 +373,90 @@
 ```
 - **Response Data:** Cập nhật hạn mức và số ngày nợ tối đa.
 
-#### `PATCH /customers/{id}/assign-sales-rep`
+#### `POST /customers/{id}/assign-sales` (hoặc `POST /sales-assignments`, `PATCH /customers/{id}/assign-sales-rep`)
 - **Story:** S3-06
-- **Phân quyền:** Sales Manager
-- **Request Body:** `{"salesRepId": 5}`
-- **Response Data:** Gán NVKD phụ trách đại lý thành công.
+- **Phân quyền:** Sales Manager, Admin
+- **Request Body:**
+```json
+{
+  "sales_user_id": 5,
+  "region": "Miền Bắc"
+}
+```
+- **Response Data:** Gán NVKD phụ trách đại lý thành công kèm thông tin đại lý đã cập nhật.
+
+#### `POST /sales/handover/batch`
+- **Story:** S3-11 (Bulk Handover)
+- **Phân quyền:** Sales Manager, Admin
+- **Request Body:**
+```json
+{
+  "from_user_id": 2,
+  "to_user_id": 5,
+  "customer_ids": [101, 102],
+  "reason": "Nhân viên nghỉ việc",
+  "notes": "Bàn giao danh sách đại lý phụ trách"
+}
+```
+- **Response Data:**
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "Đã chuyển giao thành công 2 đại lý từ Trần Văn B sang Nguyễn Văn C.",
+  "data": {
+    "handover_id": 1,
+    "code": "HO-202610-001",
+    "from_user_id": 2,
+    "from_user_name": "Trần Văn B",
+    "to_user_id": 5,
+    "to_user_name": "Nguyễn Văn C",
+    "customer_count": 2,
+    "customer_ids": [101, 102],
+    "reason": "Nhân viên nghỉ việc",
+    "notes": "Bàn giao danh sách đại lý phụ trách",
+    "created_at": "2026-10-11T23:30:00Z"
+  }
+}
+```
+
+#### `GET /sales/handover/history`
+- **Story:** S3-12 (Handover History)
+- **Phân quyền:** Sales Manager, Admin
+- **Query Params:** `page`, `limit`, `from_user_id`, `to_user_id`
+- **Response Data:**
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "Lấy lịch sử bàn giao thành công.",
+  "data": [
+    {
+      "id": 1,
+      "code": "HO-202610-001",
+      "handover_date": "2026-10-11T23:30:00Z",
+      "created_at": "2026-10-11T23:30:00Z",
+      "from_user_id": 2,
+      "from_user_name": "Trần Văn B",
+      "to_user_id": 5,
+      "to_user_name": "Nguyễn Văn C",
+      "transferred_by_id": 1,
+      "transferred_by_name": "Quản lý kinh doanh",
+      "customer_count": 2,
+      "customer_ids": [101, 102],
+      "reason": "Nhân viên nghỉ việc",
+      "notes": "Bàn giao danh sách đại lý phụ trách"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "totalRecords": 1,
+    "totalPages": 1
+  }
+}
+```
+
 
 #### `PATCH /customers/{id}/transaction-status`
 - **Story:** S3-07

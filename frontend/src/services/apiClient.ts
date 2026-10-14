@@ -183,6 +183,135 @@ export async function getProducts(): Promise<Product[]> {
   return Array.isArray(data) ? data : data.data || [];
 }
 
+// ==========================================
+// SCRUM-79: QUẢN LÝ NHÀ CUNG CẤP (SUPPLIERS)
+// ==========================================
+import type {
+  Supplier,
+  SupplierPayload,
+  SupplierListParams,
+  SupplierListResponse,
+} from "../types/supplier";
+
+export type { Supplier, SupplierPayload, SupplierListParams, SupplierListResponse };
+
+export async function fetchSuppliers(
+  params?: SupplierListParams,
+): Promise<SupplierListResponse> {
+  const headers = getAuthHeaders();
+  const searchParams = new URLSearchParams();
+
+  if (params?.search) searchParams.append("search", params.search);
+  if (params?.is_active !== undefined)
+    searchParams.append("is_active", String(params.is_active));
+  if (params?.page) searchParams.append("page", String(params.page));
+  if (params?.limit) searchParams.append("limit", String(params.limit));
+
+  const url = `/api/v1/suppliers${searchParams.toString() ? `?${searchParams.toString()}` : ""
+    }`;
+  const res = await fetch(url, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách nhà cung cấp.");
+  }
+
+  return res.json();
+}
+
+export async function fetchSupplierDetail(id: number): Promise<Supplier> {
+  const headers = getAuthHeaders();
+  const res = await fetch(`/api/v1/suppliers/${id}`, { headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Không tìm thấy nhà cung cấp #${id}.`);
+  }
+  const result = await res.json();
+  return result.data || result;
+}
+
+export async function createSupplier(payload: SupplierPayload): Promise<Supplier> {
+  const headers = getAuthHeaders();
+  const res = await fetch("/api/v1/suppliers", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tạo mới nhà cung cấp.");
+  }
+
+  const result = await res.json();
+  return result.data || result;
+}
+
+export async function updateSupplier(
+  id: number,
+  payload: Partial<SupplierPayload>,
+): Promise<Supplier> {
+  const headers = getAuthHeaders();
+  const res = await fetch(`/api/v1/suppliers/${id}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Không thể cập nhật nhà cung cấp #${id}.`);
+  }
+
+  const result = await res.json();
+  return result.data || result;
+}
+
+export async function updateSupplierStatus(
+  id: number,
+  isActive: boolean,
+): Promise<Supplier> {
+  const headers = getAuthHeaders();
+  const res = await fetch(`/api/v1/suppliers/${id}/status`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ is_active: isActive }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.detail || `Không thể cập nhật trạng thái nhà cung cấp #${id}.`,
+    );
+  }
+
+  const result = await res.json();
+  return result.data || result;
+}
+
+export async function deleteSupplier(
+  id: number,
+): Promise<{ success: boolean; message: string }> {
+  const headers = getAuthHeaders();
+  const res = await fetch(`/api/v1/suppliers/${id}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const errorMsg =
+      err.detail || "Không thể xóa nhà cung cấp do ràng buộc hệ thống.";
+    const error = new Error(errorMsg);
+    // Gắn thêm HTTP status code để frontend nhận diện mã lỗi 400
+    (error as any).status = res.status;
+    (error as any).hasReceiptsConstraint = res.status === 400;
+    throw error;
+  }
+
+  return res.json();
+}
+
 export interface CustomerItem {
   id: number;
   code: string;
@@ -332,7 +461,7 @@ export async function assignSalesRep(
 }
 
 export async function handoverCustomers(payload: {
-  fromSalesRepId?: number;
+  frOMSalesRepId?: number;
   toSalesRepId: number;
   customerIds?: number[];
   reason: string;
@@ -378,5 +507,3 @@ export async function createCustomer(payload: CreateCustomerPayload): Promise<Cu
   }
   return res.json();
 }
-
-

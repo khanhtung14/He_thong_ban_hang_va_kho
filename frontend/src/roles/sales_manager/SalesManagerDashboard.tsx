@@ -6,7 +6,6 @@ import {
   FileExcelOutlined,
   PlusOutlined,
   SmileOutlined,
-  DashboardOutlined,
 } from "@ant-design/icons";
 
 // Các components Ant Design
@@ -17,10 +16,14 @@ import ApprovalList, { type ApprovalItem } from "./ApprovalList";
 import TerritoryProgress from "./TerritoryProgress";
 import CreatePriceListModal from "./CreatePriceListModal";
 import ExportReportModal from "./ExportReportModal";
-import ProductExcelImport from "./ProductExcelImport";
 import CategoryManagement from "./CategoryManagement";
+import SalesAssignmentManager from "./SalesAssignmentManager";
+import SalesReportPage from "./SalesReportPage";
+import ProductManagement from "./ProductManagement";
+import ProductImportPage from "./ProductImportPage";
 import ProductCatalogManagement from "./ProductCatalogManagement";
 import CustomerTerritoryManagement from "./CustomerTerritoryManagement";
+import DiscountPolicyManagement from "./DiscountPolicyManagement";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -47,12 +50,29 @@ export const SalesManagerDashboard: React.FC = () => {
   // State điều hướng màn hình hiển thị
   const [currentPath, setCurrentPath] = useState<string>(() => {
     if (typeof window !== "undefined") {
+      if (window.location.pathname === "/sales/assignments") return "/sales/assignments";
+      if (
+        window.location.pathname === "/manager/products/import-excel" ||
+        window.location.pathname === "/manager/products/import"
+      ) {
+        return "/manager/products/import-excel";
+      }
+      if (window.location.pathname === "/manager/products") return "/manager/products";
       if (window.location.pathname === "/manager/categories") return "/manager/categories";
-      if (window.location.pathname === "/manager/products/import") return "/manager/products/import";
+      if (window.location.pathname === "/manager/discounts") return "/manager/discounts";
+      if (window.location.pathname === "/manager/reports") return "/manager/reports";
       if (window.location.pathname === "/manager/customers") return "/manager/customers";
     }
     return "/manager/dashboard";
   });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -119,13 +139,20 @@ export const SalesManagerDashboard: React.FC = () => {
 
       // 4. Menu điều hướng
       if (navItems.status === "fulfilled" && navItems.value.length > 0) {
-        // Lọc bỏ route admin và loại bỏ mục "Quản lý nhóm hàng" (nếu có từ backend)
+        // Lọc bỏ route admin, loại bỏ "Quản lý nhóm hàng" và "Bảng giá"
         const backendNavItems = navItems.value
           .filter(
             (m: any) =>
               !m.path.startsWith("/admin/") &&
               m.title !== "Quản lý nhóm hàng" &&
-              m.id !== "category-management"
+              m.id !== "category-management" &&
+              m.id !== "pricing" &&
+              m.id !== "manager-pricing" &&
+              m.path !== "/manager/pricing" &&
+              m.title !== "Bảng giá" &&
+              m.path !== "/manager/products/import" &&
+              m.id !== "excel-import" &&
+              m.title !== "Nhập sản phẩm (Excel)"
           )
           .map((m: any) => ({
             id: m.id,
@@ -137,6 +164,12 @@ export const SalesManagerDashboard: React.FC = () => {
         const hasCategoryMenu = backendNavItems.some(
           (m: any) => m.path === "/manager/categories" || m.id === "manager-categories"
         );
+        const hasAssignmentMenu = backendNavItems.some(
+          (m: any) => m.path === "/sales/assignments" || m.id === "sales-assignments"
+        );
+        const hasProductsMenu = backendNavItems.some(
+          (m: any) => m.path === "/manager/products" || m.id === "manager-products"
+        );
 
         const rawMenuItems = [
           {
@@ -146,6 +179,26 @@ export const SalesManagerDashboard: React.FC = () => {
             icon: "home",
           },
           ...backendNavItems,
+          ...(hasAssignmentMenu
+            ? []
+            : [
+              {
+                id: "sales-assignments",
+                title: "Phân công & Bàn giao",
+                path: "/sales/assignments",
+                icon: "user-switch",
+              },
+            ]),
+          ...(hasProductsMenu
+            ? []
+            : [
+              {
+                id: "manager-products",
+                title: "Sản phẩm",
+                path: "/manager/products",
+                icon: "boxes-stacked",
+              },
+            ]),
           ...(hasCategoryMenu
             ? []
             : [
@@ -162,29 +215,42 @@ export const SalesManagerDashboard: React.FC = () => {
             path: "/manager/customers",
             icon: "customers",
           },
-          {
-            id: "manager-products",
-            title: "Danh mục sản phẩm",
-            path: "/manager/products",
-            icon: "boxes-stacked",
-          },
-          {
-            id: "excel-import",
-            title: "Nhập sản phẩm (Excel)",
-            path: "/manager/products/import",
-            icon: "excel",
-          },
         ];
 
-        // Đảm bảo không trùng lặp mục menu theo path và không có "Quản lý nhóm hàng"
+        // Đảm bảo không trùng lặp mục menu theo path, không có "Quản lý nhóm hàng" và "Nhập sản phẩm (Excel)"
         const uniqueMenuItems = rawMenuItems
-          .filter((item) => item.title !== "Quản lý nhóm hàng")
+          .filter(
+            (item) =>
+              item.title !== "Quản lý nhóm hàng" &&
+              item.path !== "/manager/products/import" &&
+              item.id !== "excel-import" &&
+              item.title !== "Nhập sản phẩm (Excel)"
+          )
           .filter(
             (item, index, self) =>
               index === self.findIndex((t) => t.path === item.path)
           );
 
-        setMenuItems(uniqueMenuItems);
+        // Đảm bảo mục Báo cáo doanh số luôn ở cuối cùng của menu
+        const nonReportItems = uniqueMenuItems.filter(
+          (item) =>
+            item.path !== "/manager/reports" &&
+            item.id !== "reports" &&
+            item.id !== "manager-sales-reports"
+        );
+        const reportItem = uniqueMenuItems.find(
+          (item) =>
+            item.path === "/manager/reports" ||
+            item.id === "reports" ||
+            item.id === "manager-sales-reports"
+        ) || {
+          id: "reports",
+          title: "Báo cáo doanh số & KPI",
+          path: "/manager/reports",
+          icon: "chart",
+        };
+
+        setMenuItems([...nonReportItems, reportItem]);
       }
     } catch (err: any) {
       setError(err.message || "Đã xảy ra lỗi khi kết nối với máy chủ.");
@@ -293,25 +359,40 @@ export const SalesManagerDashboard: React.FC = () => {
         onNavigate={(path) => {
           if (path === "/manager/dashboard" || path === "/") {
             setCurrentPath("/manager/dashboard");
+            window.history.pushState({}, "", "/manager/dashboard");
             window.scrollTo({ top: 0, behavior: "smooth" });
-          } else if (path === "/manager/products/import") {
-            setCurrentPath("/manager/products/import");
+          } else if (path === "/sales/assignments") {
+            setCurrentPath("/sales/assignments");
+            window.history.pushState({}, "", "/sales/assignments");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (path === "/manager/products/import-excel" || path === "/manager/products/import") {
+            setCurrentPath("/manager/products/import-excel");
+            window.history.pushState({}, "", "/manager/products/import-excel");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (path === "/manager/products") {
+            setCurrentPath("/manager/products");
+            window.history.pushState({}, "", "/manager/products");
             window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/categories") {
             setCurrentPath("/manager/categories");
+            window.history.pushState({}, "", "/manager/categories");
             window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/orders/approval") {
             setCurrentPath("/manager/dashboard");
+            window.history.pushState({}, "", "/manager/dashboard");
             setTimeout(() => {
               const el = document.getElementById("approvals-section");
               if (el) el.scrollIntoView({ behavior: "smooth" });
             }, 100);
-          } else if (path === "/manager/pricing") {
-            setIsCreateModalOpen(true);
+            // } else if (path === "/manager/pricing") {
+            //   setIsCreateModalOpen(true);
           } else if (path === "/manager/reports") {
-            setIsExportModalOpen(true);
+            setCurrentPath("/manager/reports");
+            window.history.pushState({}, "", "/manager/reports");
+            window.scrollTo({ top: 0, behavior: "smooth" });
           } else {
             setCurrentPath(path);
+            window.history.pushState({}, "", path);
           }
         }}
       />
@@ -338,46 +419,53 @@ export const SalesManagerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* TAB 1: MÀN HÌNH NHẬP EXCEL SẢN PHẨM HÀNG LOẠT */}
-          {currentPath === "/manager/products/import" ? (
+          {/* TAB 0: MÀN HÌNH PHÂN CÔNG & BÀN GIAO ĐẠI LÝ */}
+          {currentPath === "/sales/assignments" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <Title level={3} style={{ margin: 0 }}>
-                    Nhập danh mục sản phẩm từ Excel
-                  </Title>
-                  <Text type="secondary">
-                    Đưa hàng loạt sản phẩm mới hoặc cập nhật giá/tồn kho từ file
-                    bảng tính
-                  </Text>
-                </div>
-                <Button
-                  icon={<DashboardOutlined />}
-                  onClick={() => setCurrentPath("/manager/dashboard")}
-                >
-                  Quay lại Dashboard
-                </Button>
-              </div>
-
-              <ProductExcelImport />
+              <SalesAssignmentManager />
             </div>
+          ) : currentPath === "/manager/products/import-excel" || currentPath === "/manager/products/import" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <ProductImportPage
+                onBack={() => {
+                  setCurrentPath("/manager/products");
+                  window.history.pushState({}, "", "/manager/products");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            </div>
+          ) : currentPath === "/manager/products" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <ProductManagement
+                onNavigate={(path) => {
+                  setCurrentPath(path);
+                  window.history.pushState({}, "", path);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            </div>
+          ) : currentPath === "/manager/reports" ? (
+            <SalesReportPage
+              reportData={report}
+              loading={loading}
+              onRefresh={loadDashboardData}
+              onBack={() => {
+                setCurrentPath("/manager/dashboard");
+                window.history.pushState({}, "", "/manager/dashboard");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            />
           ) : currentPath === "/manager/categories" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <CategoryManagement />
             </div>
-          ) : currentPath === "/manager/products" ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <ProductCatalogManagement />
-            </div>
           ) : currentPath === "/manager/customers" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <CustomerTerritoryManagement />
+            </div>
+          ) : currentPath === "/manager/discounts" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <DiscountPolicyManagement />
             </div>
           ) : (
             /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */
@@ -425,17 +513,14 @@ export const SalesManagerDashboard: React.FC = () => {
                 <Space size="middle">
                   <Button
                     icon={<FileExcelOutlined />}
-                    onClick={() => setCurrentPath("/manager/products/import")}
+                    onClick={() => {
+                      setCurrentPath("/manager/reports");
+                      window.history.pushState({}, "", "/manager/reports");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
                     style={{ borderRadius: 8, height: 38 }}
                   >
-                    Nhập hàng loạt (Excel)
-                  </Button>
-                  <Button
-                    icon={<FileExcelOutlined />}
-                    onClick={() => setIsExportModalOpen(true)}
-                    style={{ borderRadius: 8, height: 38 }}
-                  >
-                    Xuất báo cáo
+                    Báo cáo doanh số
                   </Button>
                   <Button
                     type="primary"
