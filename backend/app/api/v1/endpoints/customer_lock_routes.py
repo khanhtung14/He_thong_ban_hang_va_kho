@@ -28,6 +28,7 @@ try:
         Customer,
         CustomerDebt,
         CustomerHandoverHistory,
+        CreditLimitLog,
         DeliveryAddress,
         Order,
         OrderItem,
@@ -55,6 +56,7 @@ except ImportError:  # pragma: no cover
         Customer,
         CustomerDebt,
         CustomerHandoverHistory,
+        CreditLimitLog,
         DeliveryAddress,
         Order,
         OrderItem,
@@ -860,9 +862,38 @@ class CustomerTransactionStatusRequest(BaseModel):
 
 
 class CustomerCreditLimitRequest(BaseModel):
-    credit_limit: float = Field(default=0.0, ge=0)
-    max_due_days: int = Field(default=0, ge=0)
-    warning_threshold_percent: float = Field(default=80.0, ge=0, le=100)
+    new_credit_limit: float = Field(ge=0, alias="newCreditLimit")
+    new_max_debt_days: int = Field(default=30, ge=0, alias="newMaxDebtDays")
+    reason: str = Field(..., min_length=1)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Fallback aliases for new_credit_limit
+            if "new_credit_limit" not in data and "newCreditLimit" not in data:
+                if "credit_limit" in data:
+                    data["new_credit_limit"] = data["credit_limit"]
+                elif "creditLimit" in data:
+                    data["new_credit_limit"] = data["creditLimit"]
+            # Fallback aliases for new_max_debt_days
+            if "new_max_debt_days" not in data and "newMaxDebtDays" not in data:
+                if "max_debt_days" in data:
+                    data["new_max_debt_days"] = data["max_debt_days"]
+                elif "max_due_days" in data:
+                    data["new_max_debt_days"] = data["max_due_days"]
+                elif "maxDebtDays" in data:
+                    data["new_max_debt_days"] = data["maxDebtDays"]
+                elif "maxDueDays" in data:
+                    data["new_max_debt_days"] = data["maxDueDays"]
+            # Fallback reason if empty in legacy calls
+            if "reason" not in data or not str(data.get("reason", "")).strip():
+                data["reason"] = "Điều chỉnh hạn mức công nợ"
+            else:
+                data["reason"] = str(data["reason"]).strip()
+        return data
 
 
 class CustomerSalesRepAssignRequest(BaseModel):
@@ -873,27 +904,129 @@ class CustomerSalesRepAssignRequest(BaseModel):
 
 
 
-@router.put("/customers/{customer_id}/credit-limit", response_model=CustomerResponse)
+@router.put("/customers/{customer_id}/credit-limit")
 def update_customer_credit_limit(
     customer_id: int,
     payload: CustomerCreditLimitRequest,
     db: Session = Depends(get_db),
-    _user: AuthenticatedUser = Depends(require_permissions(PERM_CUSTOMERS_LOCK)),
+    _user: AuthenticatedUser = Depends(get_current_user),
+):
+    # Phân quyền (RBAC/Role Check): Chỉ cho phép các user có role accountant hoặc sales_manager (hoặc admin)
+    user_role = normalize_role(_user.role) if _user else None
+    if user_role not in (RoleCode.ACCOUNTANT.value, RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ Kế toán (Accountant) hoặc Quản lý kinh doanh (Sales Manager) mới có quyền điều chỉnh hạn mức công nợ.",
+        )
+
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đại lý.")
+
+    # Đọc hạn mức cũ
+    old_credit_limit = float(customer.credit_limit or 0.0)
+    old_max_debt_days = int(getattr(customer, "max_debt_days", None) or customer.max_due_days or 0)
+
+    # Cập nhật hạn mức mới vào bảng customers
+    customer.credit_limit = float(payload.new_credit_limit)
+    customer.max_due_days = int(payload.new_max_debt_days)
+    customer.max_debt_days = int(payload.new_max_debt_days)
+
+    # Ghi nhận thông tin người thực hiện
+    author_id = _user.id if _user else None
+    author_name = _user.full_name or _user.username if _user else "Kế toán"
+
+    # Tạo một bản ghi log vào credit_limit_logs trong cùng transaction commit
+    log_entry = CreditLimitLog(
+        customer_id=customer.id,
+        old_credit_limit=old_credit_limit,
+        new_credit_limit=float(payload.new_credit_limit),
+        old_max_debt_days=old_max_debt_days,
+        new_max_debt_days=int(payload.new_max_debt_days),
+        reason=payload.reason.strip(),
+        changed_by_user_id=author_id,
+        changed_by_name=author_name,
+    )
+    db.add(log_entry)
+    db.commit()
+    db.refresh(customer)
+    db.refresh(log_entry)
+
+    pending_count = (
+        db.query(func.count(Order.id))
+        .filter(Order.customer_id == customer.id, Order.status.in_(INCOMPLETE_STATUSES))
+        .scalar()
+        or 0
+    )
+
+    response = CustomerResponse.model_validate(customer)
+    response.pending_orders_count = pending_count
+    customer_dict = response.model_dump()
+
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Cập nhật hạn mức công nợ cho đại lý '{customer.name}' thành công.",
+        "data": {
+            **customer_dict,
+            "credit_limit": customer.credit_limit,
+            "max_due_days": customer.max_due_days,
+            "max_debt_days": customer.max_debt_days,
+            "log": {
+                "id": log_entry.id,
+                "old_credit_limit": log_entry.old_credit_limit,
+                "new_credit_limit": log_entry.new_credit_limit,
+                "old_max_debt_days": log_entry.old_max_debt_days,
+                "new_max_debt_days": log_entry.new_max_debt_days,
+                "reason": log_entry.reason,
+                "changed_by_user_id": log_entry.changed_by_user_id,
+                "changed_by_name": log_entry.changed_by_name,
+                "created_at": log_entry.created_at.isoformat() if log_entry.created_at else None,
+            },
+        },
+    }
+
+
+@router.get("/customers/{customer_id}/credit-limit-logs")
+def get_customer_credit_limit_logs(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(get_optional_current_user),
 ):
     customer = db.get(Customer, customer_id)
     if customer is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy đại lý.")
 
-    customer.credit_limit = payload.credit_limit
-    customer.max_due_days = payload.max_due_days
-    customer.warning_threshold_percent = payload.warning_threshold_percent
-    db.commit(); db.refresh(customer)
-    pending_count = (
-        db.query(func.count(Order.id)).filter(Order.customer_id == customer.id, Order.status.in_(INCOMPLETE_STATUSES)).scalar() or 0
+    logs = (
+        db.query(CreditLimitLog)
+        .filter(CreditLimitLog.customer_id == customer_id)
+        .order_by(CreditLimitLog.created_at.desc(), CreditLimitLog.id.desc())
+        .all()
     )
-    response = CustomerResponse.model_validate(customer)
-    response.pending_orders_count = pending_count
-    return response
+
+    data = [
+        {
+            "id": l.id,
+            "customer_id": l.customer_id,
+            "old_credit_limit": l.old_credit_limit,
+            "new_credit_limit": l.new_credit_limit,
+            "old_max_debt_days": l.old_max_debt_days,
+            "new_max_debt_days": l.new_max_debt_days,
+            "reason": l.reason,
+            "changed_by_user_id": l.changed_by_user_id,
+            "changed_by_name": l.changed_by_name or "Hệ thống",
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+        }
+        for l in logs
+    ]
+
+    return {
+        "success": True,
+        "code": 200,
+        "message": "Lấy lịch sử điều chỉnh hạn mức thành công.",
+        "data": data,
+        "total": len(data),
+    }
 
 
 

@@ -72,6 +72,7 @@ def migrate_pricing_schema():
         Supplier,
         DiscountPolicy,
         DiscountTier,
+        CreditLimitLog,
     )
 
     Base.metadata.create_all(
@@ -85,6 +86,7 @@ def migrate_pricing_schema():
             Supplier.__table__,
             DiscountPolicy.__table__,
             DiscountTier.__table__,
+            CreditLimitLog.__table__,
         ],
         checkfirst=True,
     )
@@ -105,6 +107,11 @@ def migrate_pricing_schema():
             "locked_at": "DATETIME NULL",
             "locked_by_id": "INTEGER NULL",
             "phone": "VARCHAR(20) NULL",
+            "credit_limit": "FLOAT NOT NULL DEFAULT 0.0",
+            "max_due_days": "INTEGER NOT NULL DEFAULT 30",
+            "max_debt_days": "INTEGER NOT NULL DEFAULT 30",
+            "warning_threshold_percent": "FLOAT NOT NULL DEFAULT 80.0",
+            "warning_threshold": "FLOAT NOT NULL DEFAULT 80.0",
         },
         "suppliers": {
             "contact_person": "VARCHAR(100) NULL",

@@ -14,6 +14,7 @@ import {
   Tabs,
   Alert,
   Popconfirm,
+  Tooltip,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -26,8 +27,10 @@ import {
   ShopOutlined,
   UserOutlined,
   PlusOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import CreateCustomerModal from "../admin/CreateCustomerModal";
+import CreditLimitModal from "../../components/CreditLimitModal";
 import {
   fetchCustomersWithTotal,
   fetchSalesReps,
@@ -60,6 +63,15 @@ export const CustomerTerritoryManagement: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [totalRecords, setTotalRecords] = useState(0);
+
+  // State Modal Điều chỉnh hạn mức tín dụng & ngày nợ
+  const [creditLimitModal, setCreditLimitModal] = useState<{
+    visible: boolean;
+    customer: CustomerItem | null;
+  }>({
+    visible: false,
+    customer: null,
+  });
 
   // State Modal Phân công 1 đại lý
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -348,19 +360,30 @@ export const CustomerTerritoryManagement: React.FC = () => {
       title: "THAO TÁC",
       key: "actions",
       render: (_, r) => (
-        <Button
-          size="small"
-          type="primary"
-          ghost
-          icon={<UserSwitchOutlined />}
-          onClick={() => {
-            setSelectedCustomer(r);
-            setSelectedRepId(r.sales_rep_id || null);
-            setAssignModalOpen(true);
-          }}
-        >
-          {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
-        </Button>
+        <Space size="small">
+          <Button
+            size="small"
+            type="primary"
+            ghost
+            icon={<UserSwitchOutlined />}
+            onClick={() => {
+              setSelectedCustomer(r);
+              setSelectedRepId(r.sales_rep_id || null);
+              setAssignModalOpen(true);
+            }}
+          >
+            {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
+          </Button>
+          <Tooltip title="Điều chỉnh hạn mức tín dụng & ngày nợ">
+            <Button
+              size="small"
+              icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
+              onClick={() => setCreditLimitModal({ visible: true, customer: r })}
+            >
+              Hạn mức
+            </Button>
+          </Tooltip>
+        </Space>
       ),
     },
   ];
@@ -765,6 +788,14 @@ export const CustomerTerritoryManagement: React.FC = () => {
         isOpen={isCreateCustomerModalOpen}
         onClose={() => setIsCreateCustomerModalOpen(false)}
         onSuccess={() => loadData()}
+      />
+
+      {/* Modal Điều chỉnh hạn mức tín dụng & ngày nợ */}
+      <CreditLimitModal
+        visible={creditLimitModal.visible}
+        customer={creditLimitModal.customer}
+        onClose={() => setCreditLimitModal({ visible: false, customer: null })}
+        onSuccess={() => fetchCustomersList(currentPage)}
       />
     </div>
   );

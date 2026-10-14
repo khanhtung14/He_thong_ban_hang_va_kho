@@ -35,7 +35,9 @@ import {
   UserOutlined,
   DollarCircleOutlined,
   EyeOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
+import CreditLimitModal from "../../components/CreditLimitModal";
 
 import {
   getAgencies,
@@ -153,6 +155,15 @@ export const AgencyManagement: React.FC = () => {
     visible: false,
     agency: null,
     errorMessage: "",
+  });
+
+  // Modal Điều chỉnh hạn mức tín dụng & ngày nợ
+  const [creditLimitModal, setCreditLimitModal] = useState<{
+    visible: boolean;
+    agency: Agency | null;
+  }>({
+    visible: false,
+    agency: null,
   });
 
   // Tải danh sách đại lý
@@ -634,6 +645,14 @@ export const AgencyManagement: React.FC = () => {
                 type="text"
                 icon={<EditOutlined style={{ color: "#2563eb" }} />}
                 onClick={() => handleOpenEditModal(record)}
+              />
+            </Tooltip>
+
+            <Tooltip title="Điều chỉnh hạn mức tín dụng & ngày nợ">
+              <Button
+                type="text"
+                icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
+                onClick={() => setCreditLimitModal({ visible: true, agency: record })}
               />
             </Tooltip>
 
@@ -1362,6 +1381,13 @@ export const AgencyManagement: React.FC = () => {
           </ul>
         </div>
       </Modal>
+
+      <CreditLimitModal
+        visible={creditLimitModal.visible}
+        customer={creditLimitModal.agency as any}
+        onClose={() => setCreditLimitModal({ visible: false, agency: null })}
+        onSuccess={() => loadAgencies(pagination.current)}
+      />
     </div>
   );
 };

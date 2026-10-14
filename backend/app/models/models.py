@@ -437,14 +437,33 @@ class Customer(Base):
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     locked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
-    # NEW FIELDS: Credit limit
+    # Credit limit & payment terms
     credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    max_due_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_due_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    max_debt_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     warning_threshold_percent: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
+    warning_threshold: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     orders: Mapped[list["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
+
+
+class CreditLimitLog(Base):
+    __tablename__ = "credit_limit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    old_credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    new_credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    old_max_debt_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    new_max_debt_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    changed_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changed_by_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    customer: Mapped["Customer"] = relationship(backref="credit_limit_logs")
 
 
 class HandoverHistory(Base):
