@@ -2058,10 +2058,10 @@ export interface components {
         /** CustomerHandoverRequest */
         CustomerHandoverRequest: {
             /**
-             * Fromsalesrepid
+             * FrOMSalesrepid
              * @description ID nhân viên nghỉ việc / cần bàn giao
              */
-            fromSalesRepId?: number | null;
+            frOMSalesRepId?: number | null;
             /**
              * Tosalesrepid
              * @description ID nhân viên mới tiếp nhận

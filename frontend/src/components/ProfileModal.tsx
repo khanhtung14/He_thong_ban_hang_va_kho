@@ -95,7 +95,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setProfile(updated);
       message.success("Cập nhật hồ sơ thành công!");
       setIsEditing(false);
-      window.dispatchEvent(new Event("oms:profile-avatar-updated"));
+      window.dispatchEvent(new Event("OMS:profile-avatar-updated"));
       if (onProfileUpdated) onProfileUpdated(updated);
     } catch (error: any) {
       const msg = error.message || "Không thể kết nối đến máy chủ.";

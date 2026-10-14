@@ -61,14 +61,14 @@ def scrum85_env():
     with TestingSessionLocal() as db:
         acc_user = User(
             username="accountant_user",
-            email="accountant@oms.com",
+            email="accountant@OMS.com",
             full_name="Kế Toán Viên",
             password_hash="fakehash",
             is_active=True,
         )
         sales_user = User(
             username="sales_user",
-            email="sales@oms.com",
+            email="sales@OMS.com",
             full_name="Nhân Viên Kinh Doanh",
             password_hash="fakehash",
             is_active=True,

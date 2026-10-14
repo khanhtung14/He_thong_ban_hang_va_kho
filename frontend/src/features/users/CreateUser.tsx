@@ -150,9 +150,9 @@ export default function CreateUser() {
   return (
     <main className="create-user-page">
       <header className="create-user-topbar">
-        <a className="create-user-brand" href="/admin/users" aria-label="WMS quản trị tài khoản">
+        <a className="create-user-brand" href="/admin/users" aria-label="OMS quản trị tài khoản">
           <span className="create-user-brand-mark" aria-hidden="true">⌂</span>
-          <span>WMS <span className="create-user-brand-muted">Hệ thống quản lý kho & bán hàng</span></span>
+          <span>OMS <span className="create-user-brand-muted">Hệ thống quản lý kho & bán hàng</span></span>
         </a>
         <span className="create-user-admin-label"><span aria-hidden="true">●</span> Tạo tài khoản</span>
       </header>

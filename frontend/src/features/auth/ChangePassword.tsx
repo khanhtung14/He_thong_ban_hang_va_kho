@@ -83,7 +83,7 @@ export default function ChangePassword() {
           zIndex: 2,
         }}
       >
-        {/* Brand Logo chuẩn hệ thống WMS & OMS */}
+        {/* Brand Logo chuẩn hệ thống OMS & OMS */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
           <div
             style={{
@@ -117,7 +117,7 @@ export default function ChangePassword() {
                 lineHeight: 1.2,
               }}
             >
-              WMS &amp; OMS
+              OMS
             </div>
             <div
               style={{

@@ -16,8 +16,16 @@ from fastapi.testclient import TestClient
 from src.backend import change_password, database, login
 
 database.init_db()
+for _smtp_key in ("SMTP_HOST", "SMTP_USER", "SMTP_USERNAME", "SMTP_PASSWORD"):
+    os.environ.pop(_smtp_key, None)
 
 from src.backend.main import app
+
+
+@pytest.fixture(autouse=True)
+def disable_external_smtp(monkeypatch):
+    for key in ("SMTP_HOST", "SMTP_USER", "SMTP_USERNAME", "SMTP_PASSWORD"):
+        monkeypatch.delenv(key, raising=False)
 
 
 @pytest.fixture

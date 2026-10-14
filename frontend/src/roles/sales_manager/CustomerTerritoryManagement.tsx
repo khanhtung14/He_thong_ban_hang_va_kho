@@ -94,8 +94,8 @@ export const CustomerTerritoryManagement: React.FC = () => {
           currentRep === "UNASSIGNED"
             ? -1
             : currentRep !== "ALL"
-            ? Number(currentRep)
-            : undefined;
+              ? Number(currentRep)
+              : undefined;
 
         const regionParam =
           currentRegion !== "ALL" && currentRegion !== undefined
@@ -223,7 +223,7 @@ export const CustomerTerritoryManagement: React.FC = () => {
     setHandoverLoading(true);
     try {
       const res = await handoverCustomers({
-        fromSalesRepId: fromRepId,
+        frOMSalesRepId: fromRepId,
         toSalesRepId: toRepId,
         reason: handoverReason.trim(),
       });

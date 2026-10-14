@@ -200,7 +200,7 @@ def test_bulk_handover_success(client, test_setup_users):
         "/api/v1/customers/handover",
         headers=mgr_headers,
         json={
-            "fromSalesRepId": setup["rep1_id"],
+            "frOMSalesRepId": setup["rep1_id"],
             "toSalesRepId": setup["rep2_id"],
             "reason": "Nhân viên rep_alpha nghỉ việc, chuyển giao toàn bộ tuyến bán hàng cho rep_beta",
         },
@@ -270,7 +270,7 @@ def test_unauthorized_access_denied(client, test_setup_users):
         "/api/v1/customers/handover",
         headers=rep_headers,
         json={
-            "fromSalesRepId": setup["rep1_id"],
+            "frOMSalesRepId": setup["rep1_id"],
             "toSalesRepId": setup["rep2_id"],
             "reason": "Tự ý chuyển",
         },
