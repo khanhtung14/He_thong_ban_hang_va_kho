@@ -1068,7 +1068,7 @@ def get_agencies_debt_status(
 # Territory & Sales Rep Assignment Endpoints (S3-06 & Handover)
 # ---------------------------------------------------------
 
-@router.get("/sales-reps")
+@router.get("/sales-reps", operation_id="list_sales_reps_customer_lock")
 def list_sales_reps(
     db: Session = Depends(get_db),
     _user: AuthenticatedUser = Depends(require_roles("Sales Rep", "Sales Manager", "Admin")),

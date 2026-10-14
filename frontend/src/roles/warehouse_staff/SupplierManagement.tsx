@@ -288,10 +288,10 @@ export const SupplierManagement: React.FC = () => {
   // Cấu hình các cột cho bảng danh sách
   const columns: ColumnsType<Supplier> = [
     {
-      title: "Mã NCC",
+      title: <span style={{ whiteSpace: "nowrap" }}>Mã NCC</span>,
       dataIndex: "code",
       key: "code",
-      width: 130,
+      width: 125,
       render: (code: string) => (
         <Tag
           color="blue"
@@ -300,6 +300,7 @@ export const SupplierManagement: React.FC = () => {
             fontSize: 13,
             padding: "2px 8px",
             letterSpacing: "0.5px",
+            whiteSpace: "nowrap",
           }}
         >
           {code}
@@ -307,7 +308,7 @@ export const SupplierManagement: React.FC = () => {
       ),
     },
     {
-      title: "Tên nhà cung cấp",
+      title: <span style={{ whiteSpace: "nowrap" }}>Tên nhà cung cấp</span>,
       dataIndex: "name",
       key: "name",
       render: (name: string, record: Supplier) => (
@@ -324,30 +325,30 @@ export const SupplierManagement: React.FC = () => {
       ),
     },
     {
-      title: "Mã số thuế",
+      title: <span style={{ whiteSpace: "nowrap" }}>Mã số thuế</span>,
       key: "tax_code",
-      width: 140,
+      width: 115,
       render: (_: any, record: Supplier) => {
         const tax = record.tax_code ?? record.taxCode;
         return tax ? (
-          <Text code style={{ fontSize: 12, color: "#0f766e" }}>
+          <Text code style={{ fontSize: 12, color: "#0f766e", whiteSpace: "nowrap" }}>
             {tax}
           </Text>
         ) : (
-          <Text type="secondary" italic style={{ fontSize: 12 }}>
+          <Text type="secondary" italic style={{ fontSize: 12, whiteSpace: "nowrap" }}>
             —
           </Text>
         );
       },
     },
     {
-      title: "Người liên hệ & SĐT",
+      title: <span style={{ whiteSpace: "nowrap" }}>Người liên hệ & SĐT</span>,
       key: "contact",
-      width: 190,
+      width: 160,
       render: (_: any, record: Supplier) => {
         const contact = record.contact_person ?? record.contactPerson;
         return (
-          <div>
+          <div style={{ whiteSpace: "nowrap" }}>
             <div style={{ fontWeight: 500, color: "#334155" }}>
               {contact || (
                 <Text type="secondary" italic>
@@ -366,26 +367,26 @@ export const SupplierManagement: React.FC = () => {
       },
     },
     {
-      title: "Điều khoản thanh toán",
+      title: <span style={{ whiteSpace: "nowrap" }}>Điều khoản thanh toán</span>,
       key: "payment_terms",
-      width: 160,
+      width: 165,
       render: (_: any, record: Supplier) => {
         const terms = record.payment_terms ?? record.paymentTerms;
         return terms ? (
-          <Tag color="cyan" style={{ borderRadius: 4, fontWeight: 500 }}>
+          <Tag color="cyan" style={{ borderRadius: 4, fontWeight: 500, whiteSpace: "nowrap" }}>
             {terms}
           </Tag>
         ) : (
-          <Text type="secondary" italic style={{ fontSize: 12 }}>
+          <Text type="secondary" italic style={{ fontSize: 12, whiteSpace: "nowrap" }}>
             —
           </Text>
         );
       },
     },
     {
-      title: "Số phiếu nhập",
+      title: <span style={{ whiteSpace: "nowrap" }}>Số phiếu nhập</span>,
       key: "receipts_count",
-      width: 130,
+      width: 115,
       align: "center",
       render: (_: any, record: Supplier) => {
         const count = record.receipts_count ?? record.receiptsCount ?? 0;
@@ -397,22 +398,23 @@ export const SupplierManagement: React.FC = () => {
               style={{
                 fontWeight: 600,
                 padding: "2px 8px",
+                whiteSpace: "nowrap",
               }}
             >
               {count} phiếu
             </Tag>
           </Tooltip>
         ) : (
-          <Tag color="default" style={{ color: "#94a3b8" }}>
+          <Tag color="default" style={{ color: "#94a3b8", whiteSpace: "nowrap" }}>
             0 phiếu
           </Tag>
         );
       },
     },
     {
-      title: "Trạng thái",
+      title: <span style={{ whiteSpace: "nowrap" }}>Trạng thái</span>,
       key: "is_active",
-      width: 140,
+      width: 135,
       align: "center",
       render: (_: any, record: Supplier) => {
         const active = record.is_active ?? record.isActive;
@@ -420,7 +422,7 @@ export const SupplierManagement: React.FC = () => {
           <Tag
             color="success"
             icon={<CheckCircleOutlined />}
-            style={{ fontWeight: 500 }}
+            style={{ fontWeight: 500, whiteSpace: "nowrap" }}
           >
             Hoạt động
           </Tag>
@@ -428,7 +430,7 @@ export const SupplierManagement: React.FC = () => {
           <Tag
             color="default"
             icon={<StopOutlined />}
-            style={{ fontWeight: 500, color: "#64748b" }}
+            style={{ fontWeight: 500, color: "#64748b", whiteSpace: "nowrap" }}
           >
             Ngừng giao dịch
           </Tag>
@@ -436,16 +438,16 @@ export const SupplierManagement: React.FC = () => {
       },
     },
     {
-      title: "Thao tác",
+      title: <span style={{ whiteSpace: "nowrap" }}>Thao tác</span>,
       key: "actions",
-      width: 170,
+      width: 100,
       align: "center",
       render: (_: any, record: Supplier) => {
         const active = record.is_active ?? record.isActive;
         const count = record.receipts_count ?? record.receiptsCount ?? 0;
 
         return (
-          <Space size="small">
+          <Space size={4} style={{ whiteSpace: "nowrap" }}>
             <Tooltip title="Chỉnh sửa thông tin">
               <Button
                 type="text"
