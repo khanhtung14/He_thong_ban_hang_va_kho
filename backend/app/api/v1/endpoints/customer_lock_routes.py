@@ -862,8 +862,8 @@ class CustomerTransactionStatusRequest(BaseModel):
 
 
 class CustomerCreditLimitRequest(BaseModel):
-    new_credit_limit: float = Field(ge=0, alias="newCreditLimit")
-    new_max_debt_days: int = Field(default=30, ge=0, alias="newMaxDebtDays")
+    new_credit_limit: float = Field(..., ge=0, description="Hạn mức tiền mới phải >= 0", alias="newCreditLimit")
+    new_max_debt_days: int = Field(default=30, ge=0, description="Số ngày nợ tối đa mới phải >= 0", alias="newMaxDebtDays")
     reason: str = Field(..., min_length=1)
 
     model_config = ConfigDict(populate_by_name=True)
@@ -902,6 +902,13 @@ class CustomerSalesRepAssignRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+def _format_utc_datetime_iso(dt: Optional[datetime]) -> Optional[str]:
+    """Format datetime ensuring explicit UTC timezone offset for correct client-side GMT+7 parsing."""
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 
 @router.put("/customers/{customer_id}/credit-limit")
@@ -919,6 +926,18 @@ def update_customer_credit_limit(
             detail="Chỉ Kế toán (Accountant) hoặc Quản lý kinh doanh (Sales Manager) mới có quyền điều chỉnh hạn mức công nợ.",
         )
 
+    # Ràng buộc số không được âm (Non-negative check)
+    if payload.new_credit_limit < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Hạn mức tiền mới không được là số âm (phải >= 0).",
+        )
+    if payload.new_max_debt_days < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Số ngày nợ tối đa mới không được là số âm (phải >= 0).",
+        )
+
     customer = db.get(Customer, customer_id)
     if customer is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy đại lý.")
@@ -927,10 +946,19 @@ def update_customer_credit_limit(
     old_credit_limit = float(customer.credit_limit or 0.0)
     old_max_debt_days = int(getattr(customer, "max_debt_days", None) or customer.max_due_days or 0)
 
+    # Ràng buộc: Hạn mức mới không được phép giống hệt hạn mức cũ (tránh ghi trùng audit log)
+    new_credit_limit = float(payload.new_credit_limit)
+    new_max_debt_days = int(payload.new_max_debt_days)
+    if new_credit_limit == old_credit_limit and new_max_debt_days == old_max_debt_days:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Hạn mức tiền hoặc số ngày nợ mới phải khác với giá trị hiện tại.",
+        )
+
     # Cập nhật hạn mức mới vào bảng customers
-    customer.credit_limit = float(payload.new_credit_limit)
-    customer.max_due_days = int(payload.new_max_debt_days)
-    customer.max_debt_days = int(payload.new_max_debt_days)
+    customer.credit_limit = new_credit_limit
+    customer.max_due_days = new_max_debt_days
+    customer.max_debt_days = new_max_debt_days
 
     # Ghi nhận thông tin người thực hiện
     author_id = _user.id if _user else None
@@ -946,6 +974,7 @@ def update_customer_credit_limit(
         reason=payload.reason.strip(),
         changed_by_user_id=author_id,
         changed_by_name=author_name,
+        created_at=datetime.now(timezone.utc),
     )
     db.add(log_entry)
     db.commit()
@@ -981,7 +1010,7 @@ def update_customer_credit_limit(
                 "reason": log_entry.reason,
                 "changed_by_user_id": log_entry.changed_by_user_id,
                 "changed_by_name": log_entry.changed_by_name,
-                "created_at": log_entry.created_at.isoformat() if log_entry.created_at else None,
+                "created_at": _format_utc_datetime_iso(log_entry.created_at),
             },
         },
     }
@@ -1015,7 +1044,7 @@ def get_customer_credit_limit_logs(
             "reason": l.reason,
             "changed_by_user_id": l.changed_by_user_id,
             "changed_by_name": l.changed_by_name or "Hệ thống",
-            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "created_at": _format_utc_datetime_iso(l.created_at),
         }
         for l in logs
     ]

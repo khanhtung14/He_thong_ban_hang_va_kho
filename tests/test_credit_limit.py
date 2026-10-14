@@ -142,3 +142,45 @@ def test_credit_limit_logs_history():
     assert logs_data["data"][0]["new_credit_limit"] == 90000000.0
     assert logs_data["data"][1]["reason"] == "Lần 1"
     assert logs_data["data"][1]["new_credit_limit"] == 70000000.0
+    # Check that created_at has timezone information
+    assert logs_data["data"][0]["created_at"] is not None
+    assert "+" in logs_data["data"][0]["created_at"] or "Z" in logs_data["data"][0]["created_at"]
+
+
+def test_update_credit_limit_negative_value_rejected():
+    token = create_access_token(
+        data={"sub": "1", "username": "accountant_user", "role": "Accountant", "fullName": "Nguyễn Kế Toán"}
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Negative credit limit
+    res1 = client.put(
+        "/api/v1/customers/1/credit-limit",
+        json={"new_credit_limit": -50000.0, "new_max_debt_days": 30, "reason": "Hạn mức âm"},
+        headers=headers,
+    )
+    assert res1.status_code == 422
+
+    # Negative max debt days
+    res2 = client.put(
+        "/api/v1/customers/1/credit-limit",
+        json={"new_credit_limit": 50000000.0, "new_max_debt_days": -5, "reason": "Ngày nợ âm"},
+        headers=headers,
+    )
+    assert res2.status_code == 422
+
+
+def test_update_credit_limit_identical_values_rejected():
+    token = create_access_token(
+        data={"sub": "1", "username": "accountant_user", "role": "Accountant", "fullName": "Nguyễn Kế Toán"}
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Customer 1 starts with credit_limit=50,000,000 and max_due_days=30
+    res = client.put(
+        "/api/v1/customers/1/credit-limit",
+        json={"new_credit_limit": 50000000.0, "new_max_debt_days": 30, "reason": "Không thay đổi gì"},
+        headers=headers,
+    )
+    assert res.status_code == 400
+    assert "Hạn mức tiền hoặc số ngày nợ mới phải khác với giá trị hiện tại." in res.json()["detail"]

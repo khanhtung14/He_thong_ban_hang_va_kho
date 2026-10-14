@@ -14,7 +14,6 @@ import {
   Divider,
   message,
   Empty,
-  Tooltip,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -26,8 +25,9 @@ import {
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import { authenticatedFetch } from "../services/sessionService";
+import dayjs from "dayjs";
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 const { TextArea } = Input;
 
 export interface CreditLimitCustomer {
@@ -61,6 +61,16 @@ export interface CreditLimitModalProps {
   onClose: () => void;
   onSuccess?: (updatedData: any) => void;
 }
+
+// Hàm format thời gian chuẩn theo múi giờ Việt Nam (GMT+7)
+const formatVietnamDateTime = (dateStr?: string | null): string => {
+  if (!dateStr) return "—";
+  let normalized = dateStr;
+  if (!normalized.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(normalized)) {
+    normalized += "Z";
+  }
+  return dayjs(normalized).format("HH:mm:ss DD/MM/YYYY");
+};
 
 export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
   visible,
@@ -120,11 +130,22 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
     if (!customer) return;
     try {
       const values = await form.validateFields();
+      const newCreditLimit = Number(values.new_credit_limit) || 0;
+      const newMaxDebtDays = Number(values.new_max_debt_days) || 0;
+
+      // Ràng buộc: Hạn mức mới không được phép giống hệt hạn mức cũ
+      if (newCreditLimit === currentCreditLimit && newMaxDebtDays === currentMaxDebtDays) {
+        message.warning(
+          "Hạn mức tiền hoặc số ngày nợ mới phải khác với giá trị hiện tại!",
+        );
+        return;
+      }
+
       setSubmitting(true);
 
       const payload = {
-        new_credit_limit: Number(values.new_credit_limit) || 0,
-        new_max_debt_days: Number(values.new_max_debt_days) || 0,
+        new_credit_limit: newCreditLimit,
+        new_max_debt_days: newMaxDebtDays,
         reason: values.reason.trim(),
       };
 
@@ -154,7 +175,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       }
       onClose();
     } catch (err: any) {
-      if (err.errorFields) return; // Antd validation error
+      if (err.errorFields) return;
       message.error(err.message || "Đã xảy ra lỗi khi lưu hạn mức.");
     } finally {
       setSubmitting(false);
@@ -167,10 +188,10 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       title: "Thời gian",
       dataIndex: "created_at",
       key: "created_at",
-      width: 140,
+      width: 160,
       render: (val: string) => (
-        <Text style={{ fontSize: 12 }}>
-          {val ? new Date(val).toLocaleString("vi-VN") : "—"}
+        <Text style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+          {formatVietnamDateTime(val)}
         </Text>
       ),
     },
@@ -180,9 +201,9 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       key: "changed_by_name",
       width: 150,
       render: (name: string) => (
-        <Space size={4}>
+        <Space size={4} style={{ whiteSpace: "nowrap" }}>
           <UserOutlined style={{ color: "#64748b", fontSize: 12 }} />
-          <Text strong style={{ fontSize: 13, color: "#334155" }}>
+          <Text strong style={{ fontSize: 12, color: "#334155" }}>
             {name || "Hệ thống"}
           </Text>
         </Space>
@@ -191,15 +212,21 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
     {
       title: "Hạn mức tiền (VND)",
       key: "credit_limit_change",
-      width: 220,
+      width: 240,
       render: (_, record) => (
-        <Space size={6} align="center">
-          <Text type="secondary" style={{ fontSize: 12, textDecoration: "line-through" }}>
-            {record.old_credit_limit.toLocaleString("vi-VN")} ₫
+        <Space size={6} align="center" style={{ whiteSpace: "nowrap" }}>
+          <Text
+            type="secondary"
+            style={{ fontSize: 12, textDecoration: "line-through", whiteSpace: "nowrap" }}
+          >
+            {Number(record.old_credit_limit || 0).toLocaleString("vi-VN")} ₫
           </Text>
           <ArrowRightOutlined style={{ fontSize: 10, color: "#94a3b8" }} />
-          <Text strong style={{ color: "#059669", fontSize: 13 }}>
-            {record.new_credit_limit.toLocaleString("vi-VN")} ₫
+          <Text
+            strong
+            style={{ color: "#059669", fontSize: 12, whiteSpace: "nowrap" }}
+          >
+            {Number(record.new_credit_limit || 0).toLocaleString("vi-VN")} ₫
           </Text>
         </Space>
       ),
@@ -209,12 +236,12 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       key: "debt_days_change",
       width: 140,
       render: (_, record) => (
-        <Space size={4} align="center">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {record.old_max_debt_days}d
+        <Space size={4} align="center" style={{ whiteSpace: "nowrap" }}>
+          <Text type="secondary" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+            {record.old_max_debt_days} ngày
           </Text>
           <ArrowRightOutlined style={{ fontSize: 10, color: "#94a3b8" }} />
-          <Tag color="blue" style={{ borderRadius: 4, fontWeight: 600 }}>
+          <Tag color="blue" style={{ borderRadius: 4, fontWeight: 600, fontSize: 11, marginRight: 0 }}>
             {record.new_max_debt_days} ngày
           </Tag>
         </Space>
@@ -224,11 +251,19 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       title: "Lý do thay đổi",
       dataIndex: "reason",
       key: "reason",
-      ellipsis: { showTitle: false },
+      width: 250,
       render: (reason: string) => (
-        <Tooltip placement="topLeft" title={reason}>
-          <Text style={{ fontSize: 13, color: "#475569" }}>{reason}</Text>
-        </Tooltip>
+        <div
+          style={{
+            wordBreak: "break-word",
+            whiteSpace: "normal",
+            fontSize: 12,
+            color: "#334155",
+            lineHeight: 1.5,
+          }}
+        >
+          {reason || "—"}
+        </div>
       ),
     },
   ];
@@ -256,12 +291,13 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
         </Space>
       }
       open={visible}
+      centered
       onOk={handleFormSubmit}
       onCancel={onClose}
       confirmLoading={submitting}
       okText="Lưu thay đổi"
       cancelText="Đóng"
-      width={780}
+      width={850}
       destroyOnClose
     >
       {/* Thẻ hiển thị hạn mức hiện tại */}
@@ -313,7 +349,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                 {
                   type: "number",
                   min: 0,
-                  message: "Hạn mức phải lớn hơn hoặc bằng 0!",
+                  message: "Hạn mức không được là số âm!",
                 },
               ]}
             >
@@ -321,11 +357,18 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                 min={0}
                 style={{ width: "100%" }}
                 formatter={(value) =>
-                  `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                  value !== undefined && value !== null
+                    ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                    : ""
                 }
                 parser={
-                  ((value: string | undefined) =>
-                    value ? Number(value.replace(/\$\s?|(,*)/g, "")) : 0) as any
+                  ((displayValue: string | undefined) => {
+                    if (displayValue === undefined || displayValue === null || displayValue === "") {
+                      return "";
+                    }
+                    const cleaned = displayValue.replace(/[₫\s,]/g, "");
+                    return cleaned === "-" ? cleaned : (Number(cleaned) as any);
+                  }) as any
                 }
                 addonAfter="₫"
                 placeholder="Ví dụ: 100,000,000"
@@ -346,14 +389,12 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                 {
                   type: "number",
                   min: 0,
-                  max: 365,
-                  message: "Số ngày nợ từ 0 đến 365 ngày!",
+                  message: "Số ngày nợ không được là số âm!",
                 },
               ]}
             >
               <InputNumber
                 min={0}
-                max={365}
                 style={{ width: "100%" }}
                 addonAfter="ngày"
                 placeholder="Ví dụ: 30"
@@ -418,6 +459,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           rowKey="id"
           size="small"
           loading={loadingLogs}
+          scroll={{ x: 900 }}
           pagination={
             logs.length > 5 ? { pageSize: 5, size: "small" } : false
           }
