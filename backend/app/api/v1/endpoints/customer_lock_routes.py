@@ -387,7 +387,7 @@ def list_customers(
                 pass
 
     # 2. Lọc theo Địa bàn / Khu vực
-    if region and isinstance(region, str) and region.strip():
+    if region and isinstance(region, str) and region.strip() and region.strip().upper() != "ALL":
         query = query.where(Customer.region == region.strip())
     if region_id is not None and isinstance(region_id, (int, str)):
         reg_str = str(region_id).strip()
@@ -403,8 +403,9 @@ def list_customers(
     effective_group = customer_group if customer_group is not None else customer_group_id
     if effective_group and isinstance(effective_group, str):
         grp = effective_group.strip()
-        if grp and grp != "ALL":
-            query = query.where(Customer.customer_group == grp)
+        if grp and grp.upper() != "ALL":
+            grp_val = _customer_group_from_value(grp)
+            query = query.where(Customer.customer_group == grp_val)
 
     # 4. Lọc theo Trạng thái hoạt động / Khóa
     if is_active is not None and isinstance(is_active, bool):

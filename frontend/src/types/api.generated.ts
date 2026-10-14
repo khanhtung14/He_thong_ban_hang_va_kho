@@ -5344,6 +5344,8 @@ export interface operations {
                 regionId?: number | string | null;
                 /** @description Lọc theo phân nhóm đại lý */
                 customerGroup?: string | null;
+                /** @description Lọc theo phân nhóm đại lý (alias) */
+                customerGroupId?: string | null;
                 /** @description Trang (1-indexed) */
                 page?: number | null;
                 /** @description Số lượng bản ghi mỗi trang */

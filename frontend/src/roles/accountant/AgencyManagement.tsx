@@ -21,7 +21,6 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
-  PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   TeamOutlined,
@@ -35,12 +34,13 @@ import {
   UserOutlined,
   DollarCircleOutlined,
   EyeOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 
+import { authenticatedFetch } from "../../services/sessionService";
 import {
   getAgencies,
   getAgencyDetail,
-  createAgency,
   updateAgency,
   updateAgencyStatus,
   deleteAgency,
@@ -48,7 +48,6 @@ import {
 } from "../../services/agencyService";
 import type {
   Agency,
-  AgencyCreatePayload,
   AgencyUpdatePayload,
   SalesRepUser,
 } from "../../types/agency";
@@ -78,15 +77,24 @@ const REGION_OPTIONS = [
 export const AgencyManagement: React.FC = () => {
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [total, setTotal] = useState<number>(0);
+
+  // Bộ lọc tìm kiếm & truy vấn
   const [searchKeyword, setSearchKeyword] = useState<string>("");
-  const [groupFilter, setGroupFilter] = useState<string | undefined>(undefined);
-  const [regionFilter, setRegionFilter] = useState<string | undefined>(undefined);
-  const [statusFilter, setStatusFilter] = useState<boolean | undefined>(undefined);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0,
-  });
+  const [groupFilter, setGroupFilter] = useState<string>("ALL");
+  const [regionFilter, setRegionFilter] = useState<string>("ALL");
+  const [repFilter, setRepFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
+  // Thống kê tổng quan từ DB
+  const [overviewStats, setOverviewStats] = useState<{
+    total: number;
+    active: number;
+    inactive: number;
+    locked: number;
+  }>({ total: 0, active: 0, inactive: 0, locked: 0 });
 
   // Danh sách nhân viên kinh doanh
   const [salesReps, setSalesReps] = useState<SalesRepUser[]>([]);
@@ -102,6 +110,24 @@ export const AgencyManagement: React.FC = () => {
       console.error("Không thể tải danh sách nhân viên kinh doanh:", err);
     } finally {
       setLoadingSalesReps(false);
+    }
+  }, []);
+
+  // Tải thống kê tổng quan (toàn bộ đại lý trong hệ thống)
+  const loadOverviewStats = useCallback(async () => {
+    try {
+      const res = await authenticatedFetch("/api/v1/customers");
+      if (res.ok) {
+        const data = await res.json();
+        const list: any[] = Array.isArray(data) ? data : data.data || [];
+        const tot = list.length;
+        const act = list.filter((a) => (a.is_active ?? a.isActive) && !a.is_locked).length;
+        const inact = list.filter((a) => !(a.is_active ?? a.isActive)).length;
+        const lck = list.filter((a) => a.is_locked).length;
+        setOverviewStats({ total: tot, active: act, inactive: inact, locked: lck });
+      }
+    } catch {
+      // Fallback giữ nguyên
     }
   }, []);
 
@@ -155,31 +181,41 @@ export const AgencyManagement: React.FC = () => {
     errorMessage: "",
   });
 
-  // Tải danh sách đại lý
-  const loadAgencies = useCallback(
-    async (page = pagination.current, limit = pagination.pageSize) => {
+  // Tải danh sách đại lý có hỗ trợ bộ lọc và phân trang từ server backend
+  const fetchAgencies = useCallback(
+    async (
+      targetPage = page,
+      targetPageSize = pageSize,
+      currentSearch = searchKeyword,
+      currentGroup = groupFilter,
+      currentRegion = regionFilter,
+      currentRep = repFilter,
+      currentStatus = statusFilter,
+    ) => {
       setLoading(true);
       try {
         const res = await getAgencies({
-          search: searchKeyword.trim() || undefined,
-          customer_group: groupFilter || undefined,
-          region: regionFilter || undefined,
-          is_active: statusFilter,
-          page,
-          limit,
+          keyword: currentSearch.trim() || undefined,
+          search: currentSearch.trim() || undefined,
+          customer_group: currentGroup !== "ALL" ? currentGroup : undefined,
+          region: currentRegion !== "ALL" ? currentRegion : undefined,
+          assignedRepId: currentRep !== "ALL" ? currentRep : undefined,
+          sales_rep_id: currentRep !== "ALL" ? currentRep : undefined,
+          status: currentStatus !== "ALL" ? currentStatus : undefined,
+          page: targetPage,
+          limit: targetPageSize,
         });
 
         if (res && res.data) {
           setAgencies(res.data);
-          const total =
+          const totalRecords =
             res.pagination?.totalRecords ??
             res.pagination?.total_records ??
+            res.pagination?.total ??
             res.data.length;
-          setPagination({
-            current: page,
-            pageSize: limit,
-            total,
-          });
+          setTotal(totalRecords);
+          setPage(targetPage);
+          setPageSize(targetPageSize);
         }
       } catch (err: any) {
         message.error(err.message || "Không thể tải danh sách hồ sơ đại lý.");
@@ -187,25 +223,26 @@ export const AgencyManagement: React.FC = () => {
         setLoading(false);
       }
     },
-    [searchKeyword, groupFilter, regionFilter, statusFilter, pagination.pageSize],
+    [page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter],
   );
 
   useEffect(() => {
-    loadAgencies(1);
+    fetchAgencies(1, pageSize, "", "ALL", "ALL", "ALL", "ALL");
     loadSalesReps();
-  }, [loadAgencies, loadSalesReps]);
+    loadOverviewStats();
+  }, []);
 
-  // Mở modal thêm mới đại lý
-  const handleOpenAddModal = () => {
-    setEditingAgency(null);
-    form.resetFields();
-    form.setFieldsValue({
-      customer_group: "DEALER_LEVEL_1",
-      region: "Miền Bắc",
-      person_in_charge: undefined,
-      is_active: true,
-    });
-    setIsModalOpen(true);
+  const handleSearch = () => {
+    fetchAgencies(1, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+  };
+
+  const handleResetFilter = () => {
+    setSearchKeyword("");
+    setGroupFilter("ALL");
+    setRegionFilter("ALL");
+    setRepFilter("ALL");
+    setStatusFilter("ALL");
+    fetchAgencies(1, pageSize, "", "ALL", "ALL", "ALL", "ALL");
   };
 
   // Mở modal chỉnh sửa đại lý
@@ -305,48 +342,34 @@ export const AgencyManagement: React.FC = () => {
       const emailClean = cleanStr(values.email);
       const addressClean = cleanStr(values.address);
 
-      if (editingAgency) {
-        const payload: AgencyUpdatePayload = {
-          name: nameClean,
-          tax_code: taxCodeClean,
-          customer_group: customerGroupClean,
-          region: regionClean,
-          sales_rep_id: salesRepId,
-          salesRepId: salesRepId,
-          assigned_sales_id: salesRepId,
-          person_in_charge: salesRepId,
-          phone: phoneClean,
-          email: emailClean,
-          address: addressClean,
-          is_active: values.is_active ?? true,
-        };
-
-        await updateAgency(editingAgency.id, payload);
-        message.success(`Cập nhật hồ sơ đại lý "${payload.name}" thành công!`);
-      } else {
-        const payload: AgencyCreatePayload = {
-          code: codeClean,
-          name: nameClean,
-          tax_code: taxCodeClean,
-          customer_group: customerGroupClean,
-          region: regionClean,
-          sales_rep_id: salesRepId,
-          salesRepId: salesRepId,
-          assigned_sales_id: salesRepId,
-          person_in_charge: salesRepId,
-          phone: phoneClean,
-          email: emailClean,
-          address: addressClean,
-          is_active: values.is_active ?? true,
-        };
-
-        await createAgency(payload);
-        message.success(`Khai báo mới đại lý "${payload.name}" thành công!`);
+      if (!editingAgency) {
+        setIsModalOpen(false);
+        return;
       }
 
+      const payload: AgencyUpdatePayload = {
+        name: nameClean,
+        tax_code: taxCodeClean,
+        customer_group: customerGroupClean,
+        region: regionClean,
+        sales_rep_id: salesRepId,
+        salesRepId: salesRepId,
+        assigned_sales_id: salesRepId,
+        person_in_charge: salesRepId,
+        phone: phoneClean,
+        email: emailClean,
+        address: addressClean,
+        is_active: values.is_active ?? true,
+      };
+
+      await updateAgency(editingAgency.id, payload);
+      message.success(`Cập nhật hồ sơ đại lý "${payload.name}" thành công!`);
+
       setIsModalOpen(false);
+      setEditingAgency(null);
       form.resetFields();
-      loadAgencies(pagination.current);
+      fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+      loadOverviewStats();
     } catch (err: any) {
       if (err.errorFields) return;
       message.error(err.message || "Đã xảy ra lỗi khi lưu hồ sơ đại lý.");
@@ -368,7 +391,8 @@ export const AgencyManagement: React.FC = () => {
           nextStatus ? "Hoạt động" : "Ngừng giao dịch"
         }".`,
       );
-      loadAgencies(pagination.current);
+      fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+      loadOverviewStats();
     } catch (err: any) {
       message.error(err.message || "Không thể cập nhật trạng thái.");
     } finally {
@@ -392,7 +416,8 @@ export const AgencyManagement: React.FC = () => {
       setLoading(true);
       const res = await deleteAgency(agency.id);
       message.success(res.message || `Xóa đại lý "${agency.name}" thành công!`);
-      loadAgencies(pagination.current);
+      fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+      loadOverviewStats();
     } catch (err: any) {
       if (err.status === 400 || err.hasTransactionsConstraint) {
         setConstraintModal({
@@ -418,7 +443,8 @@ export const AgencyManagement: React.FC = () => {
         `Đã chuyển đại lý "${constraintModal.agency.name}" sang "Ngừng giao dịch". Dữ liệu chứng từ và công nợ được bảo toàn.`,
       );
       setConstraintModal({ visible: false, agency: null, errorMessage: "" });
-      loadAgencies(pagination.current);
+      fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+      loadOverviewStats();
     } catch (err: any) {
       message.error(err.message || "Không thể cập nhật trạng thái.");
     } finally {
@@ -428,12 +454,13 @@ export const AgencyManagement: React.FC = () => {
 
   // Thống kê nhanh danh mục đại lý
   const stats = useMemo(() => {
-    const total = pagination.total;
-    const active = agencies.filter((a) => a.is_active ?? a.isActive).length;
-    const inactive = agencies.filter((a) => !(a.is_active ?? a.isActive)).length;
-    const withTx = agencies.filter((a) => (a.transactions_count ?? 0) > 0).length;
-    return { total, active, inactive, withTx };
-  }, [pagination.total, agencies]);
+    return {
+      total: overviewStats.total || total,
+      active: overviewStats.active,
+      inactive: overviewStats.inactive,
+      locked: overviewStats.locked,
+    };
+  }, [overviewStats, total]);
 
   // Cấu hình các cột bảng danh sách đại lý
   const columns: ColumnsType<Agency> = [
@@ -590,6 +617,19 @@ export const AgencyManagement: React.FC = () => {
       width: 140,
       align: "center",
       render: (_: any, record: Agency) => {
+        if (record.is_locked) {
+          return (
+            <Tooltip title={record.lock_reason ? `Lý do: ${record.lock_reason}` : "Đại lý bị khóa do nợ quá hạn"}>
+              <Tag
+                color="error"
+                icon={<LockOutlined />}
+                style={{ fontWeight: 500 }}
+              >
+                Bị khóa nợ
+              </Tag>
+            </Tooltip>
+          );
+        }
         const active = record.is_active ?? record.isActive ?? true;
         return active ? (
           <Tag
@@ -742,22 +782,13 @@ export const AgencyManagement: React.FC = () => {
         <Space size="middle">
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => loadAgencies(pagination.current)}
+            onClick={() => {
+              fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+              loadOverviewStats();
+            }}
             loading={loading}
           >
             Làm mới
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            style={{
-              backgroundColor: "#2563eb",
-              borderRadius: 6,
-              fontWeight: 500,
-            }}
-            onClick={handleOpenAddModal}
-          >
-            Thêm đại lý
           </Button>
         </Space>
       </div>
@@ -859,21 +890,21 @@ export const AgencyManagement: React.FC = () => {
                   width: 44,
                   height: 44,
                   borderRadius: 10,
-                  backgroundColor: "#fef3c7",
+                  backgroundColor: "#ffedd5",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#d97706",
+                  color: "#ea580c",
                 }}
               >
-                <FileTextOutlined style={{ fontSize: 20 }} />
+                <LockOutlined style={{ fontSize: 20 }} />
               </div>
               <div>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Đã phát sinh giao dịch
+                  Đang bị khóa nợ
                 </Text>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#d97706" }}>
-                  {stats.withTx}
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#ea580c" }}>
+                  {stats.locked}
                 </div>
               </div>
             </div>
@@ -881,7 +912,7 @@ export const AgencyManagement: React.FC = () => {
         </Col>
       </Row>
 
-      {/* 3. Khối tìm kiếm & Bộ lọc */}
+      {/* 3. Khối tìm kiếm & Bộ lọc (Truy vấn trực tiếp từ Backend đồng bộ chuẩn AdminUsers & ProductManagement) */}
       <Card
         bordered={false}
         style={{
@@ -890,64 +921,105 @@ export const AgencyManagement: React.FC = () => {
         }}
         bodyStyle={{ padding: 16 }}
       >
-        <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} md={8}>
+        <Row gutter={[12, 12]} align="middle">
+          <Col xs={24} lg={7}>
             <Input
-              placeholder="Tìm theo Mã đại lý, Tên đại lý, Mã số thuế..."
+              placeholder="Tìm theo Mã đại lý, Tên, MST, SĐT..."
               prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
-              onPressEnter={() => loadAgencies(1)}
+              onPressEnter={handleSearch}
               allowClear
             />
           </Col>
-          <Col xs={24} sm={8} md={5}>
+          <Col xs={24} sm={12} md={6} lg={4}>
             <Select
               style={{ width: "100%" }}
               placeholder="Nhóm khách hàng"
               value={groupFilter}
-              onChange={(val) => setGroupFilter(val)}
-              allowClear
-            >
-              {CUSTOMER_GROUP_OPTIONS.map((opt) => (
-                <Option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </Option>
-              ))}
-            </Select>
+              onChange={(val) => {
+                setGroupFilter(val);
+                fetchAgencies(1, pageSize, searchKeyword, val, regionFilter, repFilter, statusFilter);
+              }}
+              options={[
+                { value: "ALL", label: "Tất cả nhóm khách hàng" },
+                ...CUSTOMER_GROUP_OPTIONS,
+              ]}
+            />
           </Col>
-          <Col xs={24} sm={8} md={5}>
+          <Col xs={24} sm={12} md={6} lg={3}>
             <Select
               style={{ width: "100%" }}
               placeholder="Khu vực"
               value={regionFilter}
-              onChange={(val) => setRegionFilter(val)}
-              allowClear
-            >
-              {REGION_OPTIONS.map((reg) => (
-                <Option key={reg} value={reg}>
-                  {reg}
-                </Option>
-              ))}
-            </Select>
+              onChange={(val) => {
+                setRegionFilter(val);
+                fetchAgencies(1, pageSize, searchKeyword, groupFilter, val, repFilter, statusFilter);
+              }}
+              options={[
+                { value: "ALL", label: "Tất cả khu vực" },
+                ...REGION_OPTIONS.map((reg) => ({ value: reg, label: reg })),
+              ]}
+            />
           </Col>
-          <Col xs={24} sm={8} md={6}>
+          <Col xs={24} sm={12} md={6} lg={4}>
             <Select
               style={{ width: "100%" }}
-              placeholder="Trạng thái giao dịch"
+              placeholder="NVKD phụ trách"
+              value={repFilter}
+              onChange={(val) => {
+                setRepFilter(val);
+                fetchAgencies(1, pageSize, searchKeyword, groupFilter, regionFilter, val, statusFilter);
+              }}
+              loading={loadingSalesReps}
+              options={[
+                { value: "ALL", label: "Tất cả NVKD phụ trách" },
+                { value: "-1", label: "Chưa phân công NVKD" },
+                ...salesReps.map((r) => ({
+                  value: String(r.id),
+                  label: `${r.full_name || r.username}`,
+                })),
+              ]}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6} lg={3}>
+            <Select
+              style={{ width: "100%" }}
+              placeholder="Trạng thái"
               value={statusFilter}
-              onChange={(val) => setStatusFilter(val)}
-              allowClear
+              onChange={(val) => {
+                setStatusFilter(val);
+                fetchAgencies(1, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, val);
+              }}
+              options={[
+                { value: "ALL", label: "Tất cả trạng thái" },
+                { value: "ACTIVE", label: "Đang hoạt động" },
+                { value: "INACTIVE", label: "Ngừng giao dịch" },
+                { value: "LOCKED", label: "Bị khóa công nợ" },
+              ]}
+            />
+          </Col>
+          <Col xs={24} lg={3} style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              onClick={handleSearch}
+              style={{ backgroundColor: "#2563eb", borderRadius: 6 }}
             >
-              <Option value={undefined as any}>Tất cả trạng thái</Option>
-              <Option value={true}>Đang hoạt động</Option>
-              <Option value={false}>Ngừng giao dịch</Option>
-            </Select>
+              Tìm kiếm
+            </Button>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={handleResetFilter}
+              style={{ borderRadius: 6 }}
+            >
+              Đặt lại
+            </Button>
           </Col>
         </Row>
       </Card>
 
-      {/* 4. Bảng danh sách đại lý */}
+      {/* 4. Bảng danh sách đại lý (Phân trang và truy vấn trực tiếp từ server) */}
       <Card
         bordered={false}
         style={{
@@ -963,14 +1035,15 @@ export const AgencyManagement: React.FC = () => {
           rowKey="id"
           loading={loading}
           pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: pagination.total,
+            current: page,
+            pageSize: pageSize,
+            total: total,
             showSizeChanger: true,
             pageSizeOptions: ["10", "20", "50"],
-            showTotal: (total, range) =>
-              `Hiển thị ${range[0]}-${range[1]} / ${total} đại lý`,
-            onChange: (page, pageSize) => loadAgencies(page, pageSize),
+            showTotal: (totalCount, range) =>
+              `Hiển thị ${range[0]}-${range[1]} / ${totalCount} đại lý`,
+            onChange: (p, ps) =>
+              fetchAgencies(p, ps, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter),
           }}
           scroll={{ x: 1000 }}
         />
@@ -984,14 +1057,17 @@ export const AgencyManagement: React.FC = () => {
           <div style={{ fontSize: 16, fontWeight: 600 }}>
             {editingAgency
               ? `Chỉnh sửa hồ sơ đại lý: ${editingAgency.code}`
-              : "Khai báo thêm mới hồ sơ đại lý"}
+              : "Chỉnh sửa hồ sơ đại lý"}
           </div>
         }
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => {
+          setIsModalOpen(false);
+          setEditingAgency(null);
+        }}
         onOk={handleSubmitForm}
         confirmLoading={modalLoading}
-        okText={editingAgency ? "Lưu thay đổi" : "Tạo đại lý"}
+        okText="Lưu thay đổi"
         cancelText="Hủy bỏ"
         width={680}
         destroyOnClose
