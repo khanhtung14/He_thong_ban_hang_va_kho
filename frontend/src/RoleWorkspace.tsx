@@ -28,6 +28,8 @@ const roleByPath: Record<string, RoleKey> = {
   "/manager/reports": "salesManager",
   "/manager/categories": "salesManager",
   "/manager/products": "salesManager",
+  "/manager/customers": "salesManager",
+  "/manager/products/import": "salesManager",
   "/warehouse/picking": "warehouse",
   "/warehouse/receiving": "warehouse",
   "/warehouse/inventory": "warehouse",
@@ -36,6 +38,8 @@ const roleByPath: Record<string, RoleKey> = {
   "/accounting/debt-book": "accountant",
   "/accounting/invoices": "accountant",
   "/admin/users": "admin",
+  "/admin/customers": "admin",
+  "/admin/users/import": "admin",
   "/admin/territory-handover": "admin",
   "/admin/audit-logs": "admin",
 };
@@ -51,6 +55,8 @@ const allowedRolesByPath: Record<string, RoleKey[]> = {
   "/manager/reports": ["salesManager", "admin"],
   "/manager/categories": ["salesManager", "admin"],
   "/manager/products": ["salesManager", "admin"],
+  "/manager/customers": ["salesManager", "admin"],
+  "/manager/products/import": ["salesManager", "admin"],
   "/warehouse/picking": ["warehouse", "warehouseManager", "admin"],
   "/warehouse/receiving": ["warehouse", "warehouseManager", "admin"],
   "/warehouse/inventory": [
@@ -64,6 +70,8 @@ const allowedRolesByPath: Record<string, RoleKey[]> = {
   "/accounting/debt-book": ["accountant", "admin"],
   "/accounting/invoices": ["accountant", "admin"],
   "/admin/users": ["admin"],
+  "/admin/customers": ["admin"],
+  "/admin/users/import": ["admin"],
   "/admin/territory-handover": ["admin"],
   "/admin/audit-logs": ["admin"],
 };

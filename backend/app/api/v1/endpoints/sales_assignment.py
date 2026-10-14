@@ -24,6 +24,7 @@ try:
     from app.models.models import (
         AccountAuditLog,
         Customer,
+        CustomerHandoverHistory,
         HandoverHistory,
         RoleCode,
         Territory,
@@ -39,6 +40,7 @@ except ImportError:  # pragma: no cover
     from app.models.models import (
         AccountAuditLog,
         Customer,
+        CustomerHandoverHistory,
         HandoverHistory,
         RoleCode,
         Territory,
@@ -150,6 +152,13 @@ def _perform_assignment(
         actor_user_id=actor_id,
         action="ASSIGN_SALES_REP",
         reason=f"Gán đại lý '{customer.name}' ({customer.code}) từ NVKD ID {old_sales_rep_id} sang NVKD '{sales_user.username}' (khu vực: {customer.region})",
+    ))
+    db.add(CustomerHandoverHistory(
+        customer_id=customer.id,
+        from_sales_rep_id=old_sales_rep_id,
+        to_sales_rep_id=sales_user.id,
+        transferred_by_id=actor_id,
+        reason=f"Phân công nhân viên phụ trách trực tiếp",
     ))
     db.commit()
     db.refresh(customer)
@@ -285,6 +294,7 @@ def assign_sales_rep_spec_compat(
         "code": 200,
         "message": "Gán NVKD phụ trách đại lý thành công.",
         "data": assigned_data,
+        **assigned_data,
     }
 
 

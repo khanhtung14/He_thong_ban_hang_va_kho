@@ -123,3 +123,70 @@ button {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
+
+/* =========================================================
+   Ant Design Message & Notification - Position Bottom Right
+   ========================================================= */
+.ant-message,
+.ant-message-holder,
+.ant-message-wrapper,
+.ant-message.ant-message-top,
+.ant-message.ant-message-bottom {
+  position: fixed !important;
+  top: auto !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  left: auto !important;
+  margin: 0 !important;
+  width: auto !important;
+  max-width: calc(100vw - 48px) !important;
+  transform: none !important;
+  pointer-events: none !important;
+  z-index: 2147483647 !important; /* Luôn hiển thị trên cùng mọi modal, drawer, backdrop */
+  display: flex !important;
+  flex-direction: column-reverse !important;
+  align-items: flex-end !important;
+}
+
+.ant-message .ant-message-list,
+.ant-message .ant-message-list-content {
+  display: flex !important;
+  flex-direction: column-reverse !important;
+  align-items: flex-end !important;
+  width: auto !important;
+  pointer-events: none !important;
+}
+
+.ant-message .ant-message-notice {
+  text-align: right !important;
+  left: auto !important;
+  right: 0 !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  margin-top: 8px !important;
+  transform: none !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2147483647 !important;
+}
+
+.ant-message .ant-message-notice-content {
+  display: inline-flex !important;
+  align-items: center !important;
+  text-align: left !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  position: relative !important;
+  z-index: 2147483647 !important;
+}
+
+.ant-notification,
+.ant-notification-bottomRight {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  z-index: 2147483647 !important; /* Luôn trên cùng */
+}
+

@@ -21,6 +21,7 @@ const roleWorkspacePaths = [
   "/manager/reports",
   "/manager/categories",
   "/manager/products",
+  "/manager/products/import",
   "/warehouse/picking",
   "/warehouse/receiving",
   "/warehouse/inventory",
@@ -29,6 +30,7 @@ const roleWorkspacePaths = [
   "/accounting/debt-book",
   "/accounting/invoices",
   "/admin/users",
+  "/admin/users/import",
 ];
 
 export default function App() {

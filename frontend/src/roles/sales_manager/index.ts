@@ -6,3 +6,7 @@ export { default as ExportReportModal } from "./ExportReportModal";
 export { default as CategoryManagement, CategoryManagement as CategoryManagementComponent } from "./CategoryManagement";
 export { default as SalesAssignmentManager, SalesAssignmentManager as SalesAssignmentManagerComponent } from "./SalesAssignmentManager";
 export { default as SalesReportPage, SalesReportPage as SalesReportPageComponent } from "./SalesReportPage";
+export { default as CustomerTerritoryManagement } from "./CustomerTerritoryManagement";
+export { default as ProductPriceHistoryModal } from "./ProductPriceHistoryModal";
+export { default as ProductCatalogManagement } from "./ProductCatalogManagement";
+

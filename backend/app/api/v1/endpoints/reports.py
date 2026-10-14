@@ -1,8 +1,9 @@
 """Financial and managerial reports router with RBAC access control."""
+from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, datetime
-from typing import Any
+from typing import Any, List
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -33,7 +34,7 @@ class SalesMarginReportResponse(BaseModel):
     total_cogs: float
     gross_profit: float
     margin: str
-    details: list[ProductMarginDetail]
+    details: List[ProductMarginDetail]
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 

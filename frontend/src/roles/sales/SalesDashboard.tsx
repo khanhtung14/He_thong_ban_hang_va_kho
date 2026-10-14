@@ -9,9 +9,12 @@ import ProfileModal from "../../components/ProfileModal";
 import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
 import { SalesHeader } from "../../components/Header/SalesHeader";
 
+// Customer List Module (S3-08)
+import { SalesCustomerList } from "./SalesCustomerList";
+
 // Auth & API
 import { logout } from "../../services/sessionService";
-import { fetchProfile, type UserProfile } from "../../services/apiClient";
+import { fetchProfile, type UserProfile, type CustomerItem } from "../../services/apiClient";
 
 const { Content } = Layout;
 
@@ -25,15 +28,13 @@ export const SalesDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("dashboard");
-  const [, setLoading] = useState(false);
+  const [selectedKey, setSelectedKey] = useState("customers");
 
   // Trạng thái modal
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isChangePassModalOpen, setIsChangePassModalOpen] = useState(false);
 
   const loadProfileData = useCallback(async () => {
-    setLoading(true);
     try {
       const data = await fetchProfile();
       if (data) {
@@ -42,8 +43,6 @@ export const SalesDashboard: React.FC = () => {
       }
     } catch (err) {
       console.error("Lỗi tải thông tin Sales:", err);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -60,9 +59,15 @@ export const SalesDashboard: React.FC = () => {
     };
   }, [loadProfileData]);
 
+  const handleSelectCustomerForOrder = (customer: CustomerItem) => {
+    // Lưu tạm khách hàng để lên đơn
+    localStorage.setItem("selectedOrderCustomer", JSON.stringify(customer));
+    setSelectedKey("orders");
+  };
+
   return (
     <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
-      {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
+      {/* 1. Lớp hình nền mờ */}
       <div
         style={{
           position: "fixed",
@@ -79,19 +84,19 @@ export const SalesDashboard: React.FC = () => {
         style={{
           position: "fixed",
           inset: 0,
-          backgroundColor: "rgba(248, 250, 252, 0.5)",
+          backgroundColor: "rgba(248, 250, 252, 0.7)",
           zIndex: 0,
         }}
       />
 
-      {/* 1. Sidebar Sales */}
+      {/* 2. Sidebar Sales */}
       <SalesSidebar
         selectedKey={selectedKey}
         onSelect={setSelectedKey}
         onLogout={logout}
       />
 
-      {/* 2. Cột nội dung */}
+      {/* 3. Cột nội dung */}
       <Layout style={{ backgroundColor: "transparent", minWidth: 0, zIndex: 1 }}>
         <SalesHeader
           fullName={profile?.full_name || "Nhân viên kinh doanh"}
@@ -105,13 +110,17 @@ export const SalesDashboard: React.FC = () => {
 
         <Content
           style={{
-            padding: "24px 32px",
-            maxWidth: 1400,
+            padding: "20px 28px",
+            maxWidth: 1500,
             width: "100%",
             margin: "0 auto",
           }}
         >
-          {/* Nơi render bảng đơn hàng, danh sách đại lý của salesman */}
+          {/* Màn hình Khách hàng & Đại lý / Tổng quan */}
+          <SalesCustomerList
+            currentRepName={profile?.full_name}
+            onSelectCustomerForOrder={handleSelectCustomerForOrder}
+          />
         </Content>
       </Layout>
 

@@ -62,9 +62,28 @@ def init_db():
 
 def migrate_pricing_schema():
     """Create price-list tables and add pricing/approval fields to existing DBs."""
-    from app.models.models import Base, PriceList, PriceListItem, HandoverHistory, Supplier
+    from app.models.models import (
+        Base,
+        PriceList,
+        PriceListItem,
+        HandoverHistory,
+        CustomerHandoverHistory,
+        ProductPriceHistory,
+        Supplier,
+    )
 
-    Base.metadata.create_all(bind=engine, tables=[PriceList.__table__, PriceListItem.__table__, HandoverHistory.__table__, Supplier.__table__], checkfirst=True)
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[
+            PriceList.__table__,
+            PriceListItem.__table__,
+            HandoverHistory.__table__,
+            CustomerHandoverHistory.__table__,
+            ProductPriceHistory.__table__,
+            Supplier.__table__,
+        ],
+        checkfirst=True,
+    )
     inspector = inspect(engine)
     additions = {
         "customers": {
@@ -74,6 +93,7 @@ def migrate_pricing_schema():
             "lock_reason": "VARCHAR(255) NULL",
             "locked_at": "DATETIME NULL",
             "locked_by_id": "INTEGER NULL",
+            "phone": "VARCHAR(20) NULL",
         },
         "suppliers": {
             "contact_person": "VARCHAR(100) NULL",
@@ -105,3 +125,35 @@ def migrate_pricing_schema():
             with engine.begin() as connection:
                 for name, definition in missing:
                     connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}"))
+
+    # Backfill phone từ delivery_addresses nếu cột customers.phone đang rỗng
+    if inspector.has_table("customers") and inspector.has_table("delivery_addresses"):
+        try:
+            with engine.begin() as connection:
+                connection.execute(text("""
+                    UPDATE customers
+                    SET phone = (
+                        SELECT delivery_addresses.phone
+                        FROM delivery_addresses
+                        WHERE delivery_addresses.customer_id = customers.id
+                        LIMIT 1
+                    )
+                    WHERE customers.phone IS NULL OR customers.phone = ''
+                """))
+        except Exception:
+            pass
+
+    # Khởi tạo bản ghi giá ban đầu cho các sản phẩm chưa có lịch sử giá
+    inspector = inspect(engine)
+    if inspector.has_table("product_price_history") and inspector.has_table("products"):
+        try:
+            with engine.begin() as connection:
+                connection.execute(text("""
+                    INSERT INTO product_price_history (product_id, old_price, new_price, changed_by, effective_date, reason, note)
+                    SELECT id, NULL, base_price, 'Khởi tạo', CURRENT_TIMESTAMP, 'Giá khởi tạo ban đầu', 'Giá khởi tạo ban đầu'
+                    FROM products
+                    WHERE id NOT IN (SELECT DISTINCT product_id FROM product_price_history) AND base_price IS NOT NULL
+                """))
+        except Exception:
+            pass
+
