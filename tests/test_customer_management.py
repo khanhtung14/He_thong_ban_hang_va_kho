@@ -64,28 +64,28 @@ def agency_env():
     with TestingSessionLocal() as db:
         acc_user = User(
             username="accountant01",
-            email="acc@oms.com",
+            email="acc@OMS.com",
             full_name="Nguyễn Kế Toán",
             password_hash="fake",
             status=AccountStatus.ACTIVE,
         )
         sales_mgr = User(
             username="smgr01",
-            email="smgr@oms.com",
+            email="smgr@OMS.com",
             full_name="Trần Quản Lý",
             password_hash="fake",
             status=AccountStatus.ACTIVE,
         )
         sales_rep = User(
             username="srep01",
-            email="srep@oms.com",
+            email="srep@OMS.com",
             full_name="Lê Bán Hàng",
             password_hash="fake",
             status=AccountStatus.ACTIVE,
         )
         wh_user = User(
             username="wh01",
-            email="wh@oms.com",
+            email="wh@OMS.com",
             full_name="Phạm Thủ Kho",
             password_hash="fake",
             status=AccountStatus.ACTIVE,

@@ -1,5 +1,5 @@
 -- Create the MySQL database before starting the API.
-CREATE DATABASE IF NOT EXISTS oms
+CREATE DATABASE IF NOT EXISTS OMS
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_0900_ai_ci;
 

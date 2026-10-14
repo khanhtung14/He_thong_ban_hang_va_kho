@@ -74,7 +74,7 @@ export default function Navigation() {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [role]);
 
   // Nhóm menu_items theo category để đưa vào Menu Ant Design
@@ -140,7 +140,7 @@ export default function Navigation() {
                 fontSize: 11,
               }}
             >
-              WMS
+              OMS
             </div>
             <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
               Danh Mục Nghiệp Vụ
@@ -212,7 +212,7 @@ export default function Navigation() {
                 fontSize: 11,
               }}
             >
-              WMS
+              OMS
             </div>
             <span
               style={{

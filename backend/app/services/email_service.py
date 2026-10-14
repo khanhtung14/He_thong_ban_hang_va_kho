@@ -154,7 +154,7 @@ Bộ phận Quản trị hệ thống OMS
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
         smtp_user = os.getenv("SMTP_USERNAME") or os.getenv("SMTP_USER")
         smtp_password = os.getenv("SMTP_PASSWORD")
-        smtp_from = os.getenv("SMTP_FROM", smtp_user or "oms-noreply@company.com")
+        smtp_from = os.getenv("SMTP_FROM", smtp_user or "OMS-noreply@company.com")
         use_ssl = os.getenv("SMTP_USE_SSL", "false").strip().lower() in {"1", "true", "yes"}
 
         if smtp_host and smtp_user and smtp_password:

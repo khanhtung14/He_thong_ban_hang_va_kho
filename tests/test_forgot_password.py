@@ -140,7 +140,7 @@ class TestForgotPasswordCriteria:
     def test_configured_smtp_sends_email_without_exposing_link_in_response(self, monkeypatch):
         monkeypatch.setenv("SMTP_HOST", "smtp.example.test")
         monkeypatch.setenv("SMTP_FROM", "no-reply@example.test")
-        monkeypatch.setenv("PUBLIC_BASE_URL", "https://oms.example.test")
+        monkeypatch.setenv("PUBLIC_BASE_URL", "https://OMS.example.test")
 
         with patch("src.backend.forgot_password.smtplib.SMTP") as smtp_factory:
             smtp = smtp_factory.return_value.__enter__.return_value
@@ -152,7 +152,7 @@ class TestForgotPasswordCriteria:
         smtp.starttls.assert_called_once()
         mail = smtp.send_message.call_args.args[0]
         assert mail["To"] == DEMO_EMAIL
-        assert "https://oms.example.test/reset-password?token=" in mail.get_content()
+        assert "https://OMS.example.test/reset-password?token=" in mail.get_content()
         assert mock_outbox == []
 
     def test_production_without_smtp_does_not_publish_mock_reset_link(self, monkeypatch, db_session):

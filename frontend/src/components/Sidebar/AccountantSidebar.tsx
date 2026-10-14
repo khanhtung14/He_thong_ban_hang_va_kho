@@ -98,7 +98,7 @@ export const AccountantSidebar: React.FC<AccountantSidebarProps> = ({
               lineHeight: 1.1,
             }}
           >
-            WMS
+            OMS
           </div>
           <div
             style={{
