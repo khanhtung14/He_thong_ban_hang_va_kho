@@ -1633,8 +1633,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Orders */
-        get: operations["list_orders_api_v1_orders_get"];
+        /** List Orders Basic */
+        get: operations["list_orders_basic"];
         put?: never;
         /** Create Orders */
         post: operations["create_orders_api_v1_orders_post"];
@@ -7421,7 +7421,7 @@ export interface operations {
             };
         };
     };
-    list_orders_api_v1_orders_get: {
+    list_orders_basic: {
         parameters: {
             query?: never;
             header?: never;
