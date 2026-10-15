@@ -127,8 +127,16 @@ class CustomerResponse(BaseModel):
     locked_by_id: Optional[int] = None
     current_debt: float = 0.0
     currentDebt: float = 0.0
-    debt_limit: float = 0.0
+    credit_limit: float = 0.0
     creditLimit: float = 0.0
+    debt_limit: float = 0.0
+    max_debt_amount: float = 0.0
+    max_debt_days: int = 0
+    max_due_days: int = 0
+    maxDebtDays: int = 0
+    maxDueDays: int = 0
+    warning_threshold_percent: float = 80.0
+    warning_threshold: float = 80.0
     overdue_days: int = 0
     pending_orders_count: int = 0  # Số đơn hàng dở dang
     transactions_count: int = 0
@@ -514,7 +522,16 @@ def list_customers(
         debt_record = db.query(CustomerDebt).filter(CustomerDebt.customer_id == c.id).first()
         res = CustomerResponse.model_validate(c)
         res.pending_orders_count = pending_count
-        res.debt_limit = getattr(c, "credit_limit", 0.0)
+        res.credit_limit = float(getattr(c, "credit_limit", 0.0) or 0.0)
+        res.creditLimit = res.credit_limit
+        res.debt_limit = res.credit_limit
+        res.max_debt_amount = res.credit_limit
+        res.max_debt_days = int(getattr(c, "max_debt_days", None) or getattr(c, "max_due_days", None) or 0)
+        res.max_due_days = res.max_debt_days
+        res.maxDebtDays = res.max_debt_days
+        res.maxDueDays = res.max_debt_days
+        res.warning_threshold_percent = float(getattr(c, "warning_threshold_percent", 80.0) or 80.0)
+        res.warning_threshold = float(getattr(c, "warning_threshold", 80.0) or 80.0)
         res.sales_rep_name = rep_names.get(c.sales_rep_id)
         res.territory_name = territory_names.get(c.territory_id)
         res.phone = getattr(c, "phone", None) or (delivery_map[c.id].phone if c.id in delivery_map else None)
@@ -883,16 +900,48 @@ class CustomerTransactionStatusRequest(BaseModel):
 
 
 class CustomerCreditLimitRequest(BaseModel):
-    new_credit_limit: float = Field(ge=0, alias="newCreditLimit")
-    new_max_debt_days: int = Field(default=30, ge=0, alias="newMaxDebtDays")
+    new_credit_limit: float = Field(..., alias="newCreditLimit")
+    new_max_debt_days: int = Field(default=30, alias="newMaxDebtDays")
     reason: str = Field(..., min_length=1)
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("new_credit_limit")
+    @classmethod
+    def validate_new_credit_limit(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0")
+        return v
+
+    @field_validator("new_max_debt_days")
+    @classmethod
+    def validate_new_max_debt_days(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0")
+        return v
 
     @model_validator(mode="before")
     @classmethod
     def normalize_fields(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            # Check negative numbers directly
+            for key in ["new_credit_limit", "newCreditLimit", "credit_limit", "creditLimit"]:
+                if key in data and data[key] is not None:
+                    try:
+                        if float(data[key]) < 0:
+                            raise ValueError("Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0")
+                    except (TypeError, ValueError) as err:
+                        if "Hạn mức và số ngày nợ" in str(err):
+                            raise err
+            for key in ["new_max_debt_days", "newMaxDebtDays", "max_debt_days", "max_due_days", "maxDebtDays", "maxDueDays"]:
+                if key in data and data[key] is not None:
+                    try:
+                        if int(data[key]) < 0:
+                            raise ValueError("Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0")
+                    except (TypeError, ValueError) as err:
+                        if "Hạn mức và số ngày nợ" in str(err):
+                            raise err
+
             # Fallback aliases for new_credit_limit
             if "new_credit_limit" not in data and "newCreditLimit" not in data:
                 if "credit_limit" in data:
@@ -948,10 +997,19 @@ def update_customer_credit_limit(
     old_credit_limit = float(customer.credit_limit or 0.0)
     old_max_debt_days = int(getattr(customer, "max_debt_days", None) or customer.max_due_days or 0)
 
+    # Chặn lưu khi không có thay đổi dữ liệu (tránh rác audit log)
+    new_limit_val = float(payload.new_credit_limit)
+    new_days_val = int(payload.new_max_debt_days)
+    if new_limit_val == old_credit_limit and new_days_val == old_max_debt_days:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không có thay đổi nào so với hạn mức hiện tại.",
+        )
+
     # Cập nhật hạn mức mới vào bảng customers
-    customer.credit_limit = float(payload.new_credit_limit)
-    customer.max_due_days = int(payload.new_max_debt_days)
-    customer.max_debt_days = int(payload.new_max_debt_days)
+    customer.credit_limit = new_limit_val
+    customer.max_due_days = new_days_val
+    customer.max_debt_days = new_days_val
 
     # Ghi nhận thông tin người thực hiện
     author_id = _user.id if _user else None
@@ -961,9 +1019,9 @@ def update_customer_credit_limit(
     log_entry = CreditLimitLog(
         customer_id=customer.id,
         old_credit_limit=old_credit_limit,
-        new_credit_limit=float(payload.new_credit_limit),
+        new_credit_limit=new_limit_val,
         old_max_debt_days=old_max_debt_days,
-        new_max_debt_days=int(payload.new_max_debt_days),
+        new_max_debt_days=new_days_val,
         reason=payload.reason.strip(),
         changed_by_user_id=author_id,
         changed_by_name=author_name,
@@ -982,6 +1040,16 @@ def update_customer_credit_limit(
 
     response = CustomerResponse.model_validate(customer)
     response.pending_orders_count = pending_count
+    response.credit_limit = customer.credit_limit
+    response.creditLimit = customer.credit_limit
+    response.debt_limit = customer.credit_limit
+    response.max_debt_amount = customer.credit_limit
+    response.max_debt_days = customer.max_debt_days
+    response.max_due_days = customer.max_due_days
+    response.maxDebtDays = customer.max_debt_days
+    response.maxDueDays = customer.max_due_days
+    response.warning_threshold_percent = getattr(customer, "warning_threshold_percent", 80.0)
+    response.warning_threshold = getattr(customer, "warning_threshold", 80.0)
     customer_dict = response.model_dump()
 
     return {
@@ -991,8 +1059,13 @@ def update_customer_credit_limit(
         "data": {
             **customer_dict,
             "credit_limit": customer.credit_limit,
+            "creditLimit": customer.credit_limit,
+            "debt_limit": customer.credit_limit,
+            "max_debt_amount": customer.credit_limit,
             "max_due_days": customer.max_due_days,
             "max_debt_days": customer.max_debt_days,
+            "maxDueDays": customer.max_due_days,
+            "maxDebtDays": customer.max_debt_days,
             "log": {
                 "id": log_entry.id,
                 "old_credit_limit": log_entry.old_credit_limit,
@@ -1002,7 +1075,11 @@ def update_customer_credit_limit(
                 "reason": log_entry.reason,
                 "changed_by_user_id": log_entry.changed_by_user_id,
                 "changed_by_name": log_entry.changed_by_name,
-                "created_at": log_entry.created_at.isoformat() if log_entry.created_at else None,
+                "created_at": (
+                    (log_entry.created_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z"))
+                    if log_entry.created_at and log_entry.created_at.tzinfo is None
+                    else (log_entry.created_at.isoformat() if log_entry.created_at else None)
+                ),
             },
         },
     }
@@ -1036,7 +1113,11 @@ def get_customer_credit_limit_logs(
             "reason": l.reason,
             "changed_by_user_id": l.changed_by_user_id,
             "changed_by_name": l.changed_by_name or "Hệ thống",
-            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "created_at": (
+                (l.created_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z"))
+                if l.created_at and l.created_at.tzinfo is None
+                else (l.created_at.isoformat() if l.created_at else None)
+            ),
         }
         for l in logs
     ]

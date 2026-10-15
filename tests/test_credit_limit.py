@@ -142,3 +142,46 @@ def test_credit_limit_logs_history():
     assert logs_data["data"][0]["new_credit_limit"] == 90000000.0
     assert logs_data["data"][1]["reason"] == "Lần 1"
     assert logs_data["data"][1]["new_credit_limit"] == 70000000.0
+
+
+def test_update_credit_limit_unchanged_rejected_with_400():
+    token = create_access_token(
+        data={"sub": "1", "username": "accountant_user", "role": "Accountant", "fullName": "Nguyễn Kế Toán"}
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    payload = {
+        "new_credit_limit": 50000000.0,
+        "new_max_debt_days": 30,
+        "reason": "Không có gì thay đổi",
+    }
+    response = client.put("/api/v1/customers/1/credit-limit", json=payload, headers=headers)
+    assert response.status_code == 400
+    assert "Không có thay đổi nào so với hạn mức hiện tại." in response.json()["detail"]
+
+
+def test_update_credit_limit_negative_value_rejected():
+    token = create_access_token(
+        data={"sub": "1", "username": "accountant_user", "role": "Accountant", "fullName": "Nguyễn Kế Toán"}
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Negative credit limit
+    payload1 = {
+        "new_credit_limit": -5000000.0,
+        "new_max_debt_days": 30,
+        "reason": "Test số âm",
+    }
+    response1 = client.put("/api/v1/customers/1/credit-limit", json=payload1, headers=headers)
+    assert response1.status_code in (400, 422)
+    assert "Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0" in response1.text
+
+    # Negative debt days
+    payload2 = {
+        "new_credit_limit": 60000000.0,
+        "new_max_debt_days": -10,
+        "reason": "Test ngày nợ âm",
+    }
+    response2 = client.put("/api/v1/customers/1/credit-limit", json=payload2, headers=headers)
+    assert response2.status_code in (400, 422)
+    assert "Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0" in response2.text

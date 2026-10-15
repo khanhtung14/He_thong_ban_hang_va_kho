@@ -362,9 +362,15 @@ class DiscountPolicy(Base):
     __tablename__ = "discount_policies"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    scope: Mapped[str] = mapped_column(String(30), default="SKU", nullable=False)
     target_type: Mapped[str] = mapped_column(String(20), default="SKU", nullable=False)  # 'SKU' | 'CATEGORY'
-    target_id: Mapped[str] = mapped_column(String(100), nullable=False)  # SKU or Category ID
+    target_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # SKU or Category ID
+    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     discount_type: Mapped[str] = mapped_column(String(20), default="PERCENTAGE", nullable=False)  # 'PERCENTAGE' | 'FIXED_AMOUNT'
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -373,15 +379,8 @@ class DiscountPolicy(Base):
         back_populates="policy",
         cascade="all, delete-orphan",
         order_by="DiscountTier.min_quantity",
+        foreign_keys="[DiscountTier.policy_id]",
     )
-
-    @property
-    def scope(self) -> str:
-        return self.target_type
-
-    @scope.setter
-    def scope(self, val: str) -> None:
-        self.target_type = val
 
 
 class DiscountTier(Base):
@@ -389,27 +388,17 @@ class DiscountTier(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     policy_id: Mapped[int] = mapped_column(ForeignKey("discount_policies.id", ondelete="CASCADE"), nullable=False)
+    discount_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_qty: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    discount_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     min_quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     max_quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     discount_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
-    policy: Mapped["DiscountPolicy"] = relationship(back_populates="tiers")
-
-    @property
-    def min_qty(self) -> int:
-        return self.min_quantity
-
-    @min_qty.setter
-    def min_qty(self, val: int) -> None:
-        self.min_quantity = val
-
-    @property
-    def discount_percent(self) -> float:
-        return self.discount_value
-
-    @discount_percent.setter
-    def discount_percent(self, val: float) -> None:
-        self.discount_value = val
+    policy: Mapped["DiscountPolicy"] = relationship(
+        back_populates="tiers",
+        foreign_keys="[DiscountTier.policy_id]",
+    )
 
 
 # --- EP-03: Đại lý & Hạn mức công nợ ---
