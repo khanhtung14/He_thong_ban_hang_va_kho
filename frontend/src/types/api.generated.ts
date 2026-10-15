@@ -1470,9 +1470,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        /** Update Customer Credit Limit */
-        put: operations["update_customer_credit_limit_api_v1_customers__customer_id__credit_limit_put"];
+        /**
+         * Get Customer Debt Limit Info
+         * @description Lấy thông tin hạn mức công nợ hiện tại của đại lý.
+         */
+        get: operations["get_customer_debt_limit_info_api_v1_customers__customer_id__credit_limit_get"];
+        /**
+         * Update Customer Credit Limit
+         * @description Cập nhật hạn mức công nợ và số ngày nợ cho Đại lý / Khách hàng (SCRUM-21).
+         */
+        put: operations["update_customer_credit_limit_v2"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2062,6 +2069,222 @@ export interface paths {
         get: operations["get_sales_draft_api_v1_sales_orders_drafts__order_id__get"];
         /** Update Sales Draft */
         put: operations["update_sales_draft_api_v1_sales_orders_drafts__order_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/debt-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Customer Debt Limit Info
+         * @description Lấy thông tin hạn mức công nợ hiện tại của đại lý.
+         */
+        get: operations["get_customer_debt_limit_info_api_v1_customers__customer_id__debt_limit_get"];
+        /**
+         * Update Customer Credit Limit
+         * @description Cập nhật hạn mức công nợ và số ngày nợ cho Đại lý / Khách hàng (SCRUM-21).
+         */
+        put: operations["update_customer_debt_limit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agencies/{agency_id}/debt-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agency Debt Limit Info Alias
+         * @description Alias cho /api/v1/customers/{customer_id}/credit-limit.
+         */
+        get: operations["get_agency_debt_limit_info_alias_api_v1_agencies__agency_id__debt_limit_get"];
+        /**
+         * Update Agency Credit Limit Alias
+         * @description Alias endpoint hỗ trợ URI /api/v1/agencies/{agency_id}/credit-limit.
+         */
+        put: operations["update_agency_credit_limit_alias_api_v1_agencies__agency_id__debt_limit_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agencies/{agency_id}/credit-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agency Debt Limit Info Alias
+         * @description Alias cho /api/v1/customers/{customer_id}/credit-limit.
+         */
+        get: operations["get_agency_debt_limit_info_alias_api_v1_agencies__agency_id__credit_limit_get"];
+        /**
+         * Update Agency Credit Limit Alias
+         * @description Alias endpoint hỗ trợ URI /api/v1/agencies/{agency_id}/credit-limit.
+         */
+        put: operations["update_agency_credit_limit_alias_api_v1_agencies__agency_id__credit_limit_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/debt-limit/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Customer Debt Limit History
+         * @description Lấy danh sách nhật ký thay đổi hạn mức công nợ (credit_limit_logs).
+         */
+        get: operations["get_customer_debt_limit_history_api_v1_customers__customer_id__debt_limit_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/credit-limit/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Customer Debt Limit History
+         * @description Lấy danh sách nhật ký thay đổi hạn mức công nợ (credit_limit_logs).
+         */
+        get: operations["get_customer_debt_limit_history_api_v1_customers__customer_id__credit_limit_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agencies/{agency_id}/debt-limit/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agency Debt Limit History Alias
+         * @description Alias cho /api/v1/customers/{customer_id}/credit-limit/history.
+         */
+        get: operations["get_agency_debt_limit_history_alias_api_v1_agencies__agency_id__debt_limit_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agencies/{agency_id}/credit-limit/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agency Debt Limit History Alias
+         * @description Alias cho /api/v1/customers/{customer_id}/credit-limit/history.
+         */
+        get: operations["get_agency_debt_limit_history_alias_api_v1_agencies__agency_id__credit_limit_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/customers/{agency_id}/credit-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Agency Credit Limit Direct
+         * @description Hỗ trợ trực tiếp URI /api/agencies/{agency_id}/credit-limit.
+         */
+        put: operations["update_agency_credit_limit_direct_api_customers__agency_id__credit_limit_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agencies/{agency_id}/credit-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agency Debt Limit Info Alias
+         * @description Alias cho /api/v1/customers/{customer_id}/credit-limit.
+         */
+        get: operations["get_agency_debt_limit_info_alias_api_agencies__agency_id__credit_limit_get"];
+        /**
+         * Update Agency Credit Limit Direct
+         * @description Hỗ trợ trực tiếp URI /api/agencies/{agency_id}/credit-limit.
+         */
+        put: operations["update_agency_credit_limit_direct_api_agencies__agency_id__credit_limit_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agencies/{agency_id}/credit-limit/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agency Debt Limit History Alias
+         * @description Alias cho /api/v1/customers/{customer_id}/credit-limit/history.
+         */
+        get: operations["get_agency_debt_limit_history_alias_api_agencies__agency_id__credit_limit_history_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2991,6 +3214,68 @@ export interface components {
             email?: string | null;
             /** Address */
             address?: string | null;
+        };
+        /** DebtLimitUpdateRequest */
+        DebtLimitUpdateRequest: {
+            /**
+             * Credit Limit
+             * @description Hạn mức tiền nợ tối đa (VND)
+             * @example 50000000
+             */
+            credit_limit?: number | null;
+            /**
+             * Creditlimit
+             * @description Alias camelCase theo API Specification
+             */
+            creditLimit?: number | null;
+            /**
+             * Max Debt Amount
+             * @description Alias tương thích ngược cho hạn mức tiền nợ (VND)
+             */
+            max_debt_amount?: number | null;
+            /**
+             * New Limit
+             * @description Alias tương thích cho credit_limit
+             */
+            new_limit?: number | null;
+            /**
+             * Max Debt Days
+             * @description Số ngày cho phép nợ tối đa
+             * @example 30
+             */
+            max_debt_days?: number | null;
+            /**
+             * Max Due Days
+             * @description Alias tương thích cho max_debt_days
+             */
+            max_due_days?: number | null;
+            /**
+             * Maxduedays
+             * @description Alias camelCase theo API Specification
+             */
+            maxDueDays?: number | null;
+            /**
+             * New Days
+             * @description Alias tương thích cho max_debt_days
+             */
+            new_days?: number | null;
+            /**
+             * Warning Threshold Percent
+             * @description Ngưỡng phần trăm cảnh báo chạm hạn mức
+             * @default 80
+             */
+            warning_threshold_percent: number | null;
+            /**
+             * Warningthresholdpercent
+             * @description Alias camelCase cho warning_threshold_percent
+             */
+            warningThresholdPercent?: number | null;
+            /**
+             * Reason
+             * @description Lý do thay đổi hạn mức (bắt buộc nhập)
+             * @example Nâng hạn mức sau thẩm định hồ sơ tín dụng đại lý
+             */
+            reason: string;
         };
         /** DeliveryPointView */
         DeliveryPointView: {
@@ -7175,7 +7460,38 @@ export interface operations {
             };
         };
     };
-    update_customer_credit_limit_api_v1_customers__customer_id__credit_limit_put: {
+    get_customer_debt_limit_info_api_v1_customers__customer_id__credit_limit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_customer_credit_limit_v2: {
         parameters: {
             query?: never;
             header?: never;
@@ -7186,7 +7502,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CustomerCreditLimitRequest"];
+                "application/json": components["schemas"]["DebtLimitUpdateRequest"];
             };
         };
         responses: {
@@ -7196,7 +7512,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CustomerResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -8497,6 +8813,470 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_debt_limit_info_api_v1_customers__customer_id__debt_limit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_customer_debt_limit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtLimitUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agency_debt_limit_info_alias_api_v1_agencies__agency_id__debt_limit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_agency_credit_limit_alias_api_v1_agencies__agency_id__debt_limit_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtLimitUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agency_debt_limit_info_alias_api_v1_agencies__agency_id__credit_limit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_agency_credit_limit_alias_api_v1_agencies__agency_id__credit_limit_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtLimitUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_debt_limit_history_api_v1_customers__customer_id__debt_limit_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_debt_limit_history_api_v1_customers__customer_id__credit_limit_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agency_debt_limit_history_alias_api_v1_agencies__agency_id__debt_limit_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agency_debt_limit_history_alias_api_v1_agencies__agency_id__credit_limit_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_agency_credit_limit_direct_api_customers__agency_id__credit_limit_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtLimitUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agency_debt_limit_info_alias_api_agencies__agency_id__credit_limit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_agency_credit_limit_direct_api_agencies__agency_id__credit_limit_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtLimitUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agency_debt_limit_history_alias_api_agencies__agency_id__credit_limit_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                agency_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
