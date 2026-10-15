@@ -117,7 +117,12 @@ export async function authenticatedFetch(
   const headers = new Headers(init.headers);
   const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
   const pathname = new URL(requestUrl, window.location.origin).pathname;
-  const usesAccessToken = ["/api/v1/products", "/api/v1/inventory", "/api/v1/reports"].some(
+  const usesAccessToken = [
+    "/api/v1/products",
+    "/api/v1/inventory",
+    "/api/v1/reports",
+    "/api/v1/suppliers",
+  ].some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
   const sessionToken =

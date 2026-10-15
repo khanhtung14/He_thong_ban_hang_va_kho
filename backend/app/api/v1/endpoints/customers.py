@@ -460,13 +460,13 @@ def handle_list_customers(
         )
 
     # Lọc khu vực
-    if isinstance(region, str) and region.strip():
+    if isinstance(region, str) and region.strip() and region.strip().upper() != "ALL":
         query = query.where(Customer.region == region.strip())
     if isinstance(region_id, int):
         query = query.where(Customer.territory_id == region_id)
 
     # Lọc nhóm khách hàng
-    if isinstance(customer_group, str) and customer_group.strip():
+    if isinstance(customer_group, str) and customer_group.strip() and customer_group.strip().upper() != "ALL":
         query = query.where(
             Customer.customer_group == _coerce_customer_group(customer_group)
         )
@@ -477,9 +477,11 @@ def handle_list_customers(
     elif isinstance(status_filter, str) and status_filter.strip():
         st = status_filter.strip().upper()
         if st in ["ACTIVE", "HOẠT ĐỘNG"]:
-            query = query.where(Customer.is_active.is_(True))
+            query = query.where(Customer.is_locked == False, Customer.is_active == True)
         elif st in ["INACTIVE", "NGỪNG GIAO DỊCH"]:
-            query = query.where(Customer.is_active.is_(False))
+            query = query.where(Customer.is_active == False)
+        elif st in ["LOCKED", "ĐÃ KHÓA", "BỊ KHÓA"]:
+            query = query.where(Customer.is_locked == True)
 
     # Lọc trạng thái khóa
     if isinstance(is_locked, bool):

@@ -225,38 +225,48 @@ export const UserExcelImportModal: React.FC<UserExcelImportModalProps> = ({
   // Cột bảng xem trước (Preview Table)
   const previewColumns: ColumnsType<PreviewRow> = [
     {
-      title: "Dòng",
+      title: <span style={{ whiteSpace: "nowrap" }}>Dòng</span>,
       dataIndex: "row_number",
       key: "row_number",
-      width: 65,
+      width: 55,
+      align: "center",
       render: (r: number) => <strong>#{r}</strong>,
     },
     {
-      title: "Tên đăng nhập",
+      title: <span style={{ whiteSpace: "nowrap" }}>Tên đăng nhập</span>,
       dataIndex: ["data", "username"],
       key: "username",
-      width: 130,
-      render: (u: string) => <code>{u || "(Trống)"}</code>,
+      width: 125,
+      render: (u: string) => (
+        <code style={{ whiteSpace: "nowrap" }}>{u || "(Trống)"}</code>
+      ),
     },
     {
-      title: "Họ và tên",
+      title: <span style={{ whiteSpace: "nowrap" }}>Họ và tên</span>,
       dataIndex: ["data", "full_name"],
       key: "full_name",
-      width: 150,
+      width: 140,
+      render: (name?: string) => (
+        <span style={{ whiteSpace: "nowrap" }}>{name || "—"}</span>
+      ),
     },
     {
-      title: "Email",
+      title: <span style={{ whiteSpace: "nowrap" }}>Email</span>,
       dataIndex: ["data", "email"],
       key: "email",
-      width: 170,
+      width: 160,
+      render: (email?: string) => (
+        <span style={{ whiteSpace: "nowrap" }}>{email || "—"}</span>
+      ),
     },
     {
-      title: "Vai trò",
+      title: <span style={{ whiteSpace: "nowrap" }}>Vai trò</span>,
       dataIndex: ["data", "role"],
       key: "role",
-      width: 140,
+      width: 115,
+      align: "center",
       render: (role: string) => {
-        if (!role) return <Tag color="default">(Trống)</Tag>;
+        if (!role) return <Tag color="default" style={{ whiteSpace: "nowrap" }}>(Trống)</Tag>;
         const roleMeta: Record<string, { label: string; color: string }> = {
           sales: { label: "NV Kinh doanh", color: "blue" },
           sales_manager: { label: "QL Kinh doanh", color: "geekblue" },
@@ -268,31 +278,32 @@ export const UserExcelImportModal: React.FC<UserExcelImportModalProps> = ({
         };
         const meta = roleMeta[role.toLowerCase()];
         if (meta) {
-          return <Tag color={meta.color}>{meta.label}</Tag>;
+          return <Tag color={meta.color} style={{ whiteSpace: "nowrap" }}>{meta.label}</Tag>;
         }
-        return <Tag color="error">{role}</Tag>;
+        return <Tag color="error" style={{ whiteSpace: "nowrap" }}>{role}</Tag>;
       },
     },
     {
-      title: "Số ĐT",
+      title: <span style={{ whiteSpace: "nowrap" }}>Số ĐT</span>,
       dataIndex: ["data", "phone"],
       key: "phone",
-      width: 120,
+      width: 105,
+      align: "center",
       render: (phone?: string) =>
-        phone ? <span>{phone}</span> : <Text type="secondary" italic>(Trống)</Text>,
+        phone ? <span style={{ whiteSpace: "nowrap" }}>{phone}</span> : <Text type="secondary" italic>(Trống)</Text>,
     },
     {
-      title: "Kho",
+      title: <span style={{ whiteSpace: "nowrap" }}>Kho</span>,
       dataIndex: ["data", "warehouse"],
       key: "warehouse",
-      width: 140,
+      width: 120,
       render: (wh: string, record: PreviewRow) => {
         const isWarehouseRole = ["warehouse_staff", "warehouse_manager"].includes(
           record.data?.role?.toLowerCase() || "",
         );
         if (!wh) {
           return isWarehouseRole ? (
-            <Text type="danger" italic style={{ fontWeight: 600 }}>
+            <Text type="danger" italic style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
               (Chưa gán kho)
             </Text>
           ) : (
@@ -301,43 +312,45 @@ export const UserExcelImportModal: React.FC<UserExcelImportModalProps> = ({
             </Text>
           );
         }
-        return <Tag color="cyan">{wh}</Tag>;
+        return <Tag color="cyan" style={{ whiteSpace: "nowrap" }}>{wh}</Tag>;
       },
     },
     {
-      title: "Địa bàn",
+      title: <span style={{ whiteSpace: "nowrap" }}>Địa bàn</span>,
       dataIndex: ["data", "region"],
       key: "region",
-      width: 120,
+      width: 105,
+      align: "center",
       render: (rg?: string) =>
-        rg ? <Tag color="purple">{rg}</Tag> : <Text type="secondary" italic>(Trống)</Text>,
+        rg ? <Tag color="purple" style={{ whiteSpace: "nowrap" }}>{rg}</Tag> : <Text type="secondary" italic>(Trống)</Text>,
     },
     {
-      title: "Trạng thái",
+      title: <span style={{ whiteSpace: "nowrap" }}>Trạng thái</span>,
       dataIndex: "valid",
       key: "valid",
-      width: 110,
+      width: 95,
+      align: "center",
       render: (valid: boolean) =>
         valid ? (
-          <Tag color="success" icon={<CheckCircleOutlined />}>
+          <Tag color="success" icon={<CheckCircleOutlined />} style={{ whiteSpace: "nowrap" }}>
             Hợp lệ
           </Tag>
         ) : (
-          <Tag color="error" icon={<CloseCircleOutlined />} style={{ fontWeight: 600 }}>
+          <Tag color="error" icon={<CloseCircleOutlined />} style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
             Lỗi
           </Tag>
         ),
     },
     {
-      title: "Ghi chú / Lỗi",
+      title: <span style={{ whiteSpace: "nowrap" }}>Ghi chú / Chi tiết lỗi</span>,
       dataIndex: "errors",
       key: "errors",
-      width: 250,
+      minWidth: 320,
       render: (errs: string[]) =>
         errs && errs.length > 0 ? (
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={2} style={{ width: "100%" }}>
             {errs.map((e, idx) => (
-              <Text type="danger" key={idx} style={{ fontSize: 12, fontWeight: 500 }}>
+              <Text type="danger" key={idx} style={{ fontSize: 12, fontWeight: 500, display: "block" }}>
                 • {e}
               </Text>
             ))}
@@ -408,7 +421,7 @@ export const UserExcelImportModal: React.FC<UserExcelImportModalProps> = ({
     <Modal
       open={open}
       onCancel={handleModalClose}
-      width={1120}
+      width={1240}
       style={{ top: 24 }}
       styles={{ body: { maxHeight: "80vh", overflowY: "auto", padding: "16px 24px" } }}
       title={
@@ -585,7 +598,7 @@ export const UserExcelImportModal: React.FC<UserExcelImportModalProps> = ({
             pagination={{ pageSize: 5 }}
             size="small"
             bordered
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1300 }}
             style={{ borderRadius: 8, overflow: "hidden" }}
           />
         </div>

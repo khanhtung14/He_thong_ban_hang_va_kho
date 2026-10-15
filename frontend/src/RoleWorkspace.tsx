@@ -75,7 +75,7 @@ const allowedRolesByPath: Record<string, RoleKey[]> = {
     "admin",
   ],
   "/warehouse/suppliers": ["warehouse", "warehouseManager", "admin"],
-  "/warehouse/dashboard": ["warehouseManager", "admin"],
+  "/warehouse/dashboard": ["warehouse", "warehouseManager", "admin"],
   "/accounting/debt-book": ["accountant", "admin"],
   "/accounting/invoices": ["accountant", "admin"],
   "/accounting/agencies": ["accountant", "admin"],
