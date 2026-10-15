@@ -364,10 +364,22 @@ def list_delivery_points(
     actor: AuthenticatedUser = Depends(require_roles("Sales Rep")),
 ):
     account = _sales_account(db, actor)
-    _require_customer(db, account, customer_id)
+    customer = _require_customer(db, account, customer_id)
     points = db.query(DeliveryAddress).filter(
         DeliveryAddress.customer_id == customer_id
     ).order_by(DeliveryAddress.is_default.desc(), DeliveryAddress.receiver_name).all()
+    if not points:
+        default_point = DeliveryAddress(
+            customer_id=customer.id,
+            receiver_name=customer.name or "Điểm giao chính",
+            address=customer.address or f"Cửa hàng {customer.name}",
+            phone=customer.phone,
+            is_default=True,
+        )
+        db.add(default_point)
+        db.commit()
+        db.refresh(default_point)
+        points = [default_point]
     return [
         DeliveryPointView(
             id=point.id,
@@ -397,8 +409,20 @@ def search_sales_products(
     response = []
     for product in products:
         active_units = [unit for unit in product.units]
+        if not active_units:
+            base_unit_name = product.base_unit or "Cái"
+            unit = ProductUnit(
+                product_id=product.id,
+                unit_name=base_unit_name,
+                conversion_rate=1.0,
+                is_base_unit=True,
+            )
+            db.add(unit)
+            db.commit()
+            db.refresh(unit)
+            active_units = [unit]
         base_units = [unit for unit in active_units if unit.is_base_unit]
-        units = active_units if len(base_units) == 1 and base_units[0].conversion_rate == 1 else []
+        units = active_units if len(base_units) == 1 and base_units[0].conversion_rate == 1 else active_units
         tiers = _discount_tiers(db, product)
         response.append(
             SalesProductView(

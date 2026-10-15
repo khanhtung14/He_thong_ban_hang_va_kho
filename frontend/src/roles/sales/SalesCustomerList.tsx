@@ -324,6 +324,19 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
               onClick={() => handleOpenDetail(r)}
             />
           </Tooltip>
+          <Tooltip title={r.is_locked ? "Đại lý bị khóa không thể lên đơn" : "Lên đơn ngay"}>
+            <Button
+              size="small"
+              type="primary"
+              disabled={r.is_locked}
+              style={{
+                backgroundColor: r.is_locked ? "#94a3b8" : "#2563eb",
+                borderColor: r.is_locked ? "#94a3b8" : "#2563eb",
+              }}
+              icon={<ShoppingCartOutlined />}
+              onClick={() => onSelectCustomerForOrder?.(r)}
+            />
+          </Tooltip>
           {r.phone && (
             <Tooltip title="Gọi điện ngay">
               <Button

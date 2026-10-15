@@ -114,7 +114,17 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
-export default function SalesOrderDraft() {
+export interface SalesOrderDraftProps {
+  preselectedCustomerId?: number | null;
+  onCustomerPreselected?: () => void;
+  onBackToCustomers?: () => void;
+}
+
+export default function SalesOrderDraft({
+  preselectedCustomerId,
+  onCustomerPreselected,
+  onBackToCustomers,
+}: SalesOrderDraftProps = {}) {
   const [customers, setCustomers] = useState<SalesCustomer[]>([]);
   const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
   const [products, setProducts] = useState<SalesProduct[]>([]);
@@ -155,6 +165,30 @@ export default function SalesOrderDraft() {
         if (active) {
           setCustomers(loadedCustomers);
           setDrafts(loadedDrafts);
+
+          // Kiểm tra xem có đại lý được chọn sẵn từ màn hình Khách hàng không
+          let targetCustId: number | null = preselectedCustomerId ?? null;
+          if (!targetCustId) {
+            try {
+              const saved = localStorage.getItem("selectedOrderCustomer");
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed?.id) targetCustId = Number(parsed.id);
+              }
+            } catch {
+              // ignore json parse error
+            }
+          }
+
+          if (targetCustId) {
+            const found = loadedCustomers.find((c) => c.id === targetCustId);
+            if (found) {
+              setCustomerId(found.id);
+              void loadDeliveryPoints(found.id, "");
+              localStorage.removeItem("selectedOrderCustomer");
+              onCustomerPreselected?.();
+            }
+          }
         }
       } catch (error) {
         if (active) setErrorMessage(error instanceof Error ? error.message : "Không tải được dữ liệu đơn hàng.");
@@ -167,6 +201,18 @@ export default function SalesOrderDraft() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (preselectedCustomerId && customers.length > 0) {
+      const found = customers.find((c) => c.id === preselectedCustomerId);
+      if (found && customerId !== found.id) {
+        setCustomerId(found.id);
+        void loadDeliveryPoints(found.id, "");
+        localStorage.removeItem("selectedOrderCustomer");
+        onCustomerPreselected?.();
+      }
+    }
+  }, [preselectedCustomerId, customers, customerId, onCustomerPreselected]);
 
   useEffect(() => {
     let active = true;
@@ -397,11 +443,22 @@ export default function SalesOrderDraft() {
       <header className="sales-order-heading">
         <div>
           <h2>Tạo đơn hàng</h2>
-          <p>Chọn đại lý, điểm giao và thêm các mặt hàng cần đặt.</p>
+          <p>Gõ đơn trực tiếp tại cửa hàng đại lý, chọn điểm giao và mặt hàng cần đặt.</p>
         </div>
-        <button className="workspace-button is-secondary" type="button" onClick={openNewDraft}>
-          Đơn mới
-        </button>
+        <div className="sales-order-heading-actions">
+          {onBackToCustomers && (
+            <button
+              className="workspace-button is-secondary"
+              type="button"
+              onClick={onBackToCustomers}
+            >
+              ← Danh sách đại lý
+            </button>
+          )}
+          <button className="workspace-button is-secondary" type="button" onClick={openNewDraft}>
+            Đơn mới
+          </button>
+        </div>
       </header>
 
       {errorMessage && <div className="workspace-alert is-error" role="alert">{errorMessage}</div>}
@@ -584,18 +641,36 @@ export default function SalesOrderDraft() {
                         </label>
                         <label>
                           Số lượng
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            max={1_000_000}
-                            step={1}
-                            value={line.quantity}
-                            onChange={(event) => updateLine(line.key, {
-                              quantity: Math.max(1, Math.min(1_000_000, Number(event.target.value) || 1)),
-                            })}
-                            required
-                          />
+                          <div className="sales-order-qty-wrapper">
+                            <button
+                              type="button"
+                              className="sales-order-qty-btn"
+                              onClick={() => updateLine(line.key, { quantity: Math.max(1, line.quantity - 1) })}
+                              aria-label="Giảm"
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              max={1_000_000}
+                              step={1}
+                              value={line.quantity}
+                              onChange={(event) => updateLine(line.key, {
+                                quantity: Math.max(1, Math.min(1_000_000, Number(event.target.value) || 1)),
+                              })}
+                              required
+                            />
+                            <button
+                              type="button"
+                              className="sales-order-qty-btn"
+                              onClick={() => updateLine(line.key, { quantity: Math.min(1_000_000, line.quantity + 1) })}
+                              aria-label="Tăng"
+                            >
+                              +
+                            </button>
+                          </div>
                         </label>
                         <div className="sales-order-line-price">
                           <small>Đơn giá · {unit?.unit_name ?? "đơn vị"}</small>

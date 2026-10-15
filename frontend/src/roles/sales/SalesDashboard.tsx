@@ -60,9 +60,12 @@ export const SalesDashboard: React.FC = () => {
     };
   }, [loadProfileData]);
 
+  const [preselectedCustomerId, setPreselectedCustomerId] = useState<number | null>(null);
+
   const handleSelectCustomerForOrder = (customer: CustomerItem) => {
     // Lưu tạm khách hàng để lên đơn
     localStorage.setItem("selectedOrderCustomer", JSON.stringify(customer));
+    setPreselectedCustomerId(customer.id);
     setSelectedKey("orders");
   };
 
@@ -120,7 +123,11 @@ export const SalesDashboard: React.FC = () => {
           }}
         >
           {selectedKey === "orders" ? (
-            <SalesOrderDraft />
+            <SalesOrderDraft
+              preselectedCustomerId={preselectedCustomerId}
+              onCustomerPreselected={() => setPreselectedCustomerId(null)}
+              onBackToCustomers={() => setSelectedKey("customers")}
+            />
           ) : (
             /* Màn hình Khách hàng & Đại lý / Tổng quan */
             <SalesCustomerList

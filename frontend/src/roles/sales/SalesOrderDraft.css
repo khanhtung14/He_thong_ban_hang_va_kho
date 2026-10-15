@@ -67,19 +67,27 @@
 .sales-order-empty span { color: #8994a6; }
 .sales-order-page .workspace-alert { margin-bottom: 12px; }
 
+.sales-order-heading-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sales-order-qty-wrapper { display: flex; align-items: center; gap: 4px; }
+.sales-order-qty-wrapper input { text-align: center; font-weight: 700; }
+.sales-order-qty-btn { min-width: 34px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #dfe4ed; border-radius: 6px; background: #f1f5f9; color: #334155; font-size: 16px; font-weight: 700; cursor: pointer; user-select: none; transition: background 0.15s ease; }
+.sales-order-qty-btn:hover { background: #e2e8f0; }
+.sales-order-qty-btn:active { background: #cbd5e1; }
+
 @media (max-width: 600px) {
   .sales-dashboard-content { padding: 12px !important; }
   .sales-order-page { width: 100%; }
-  .sales-order-heading { align-items: flex-start; }
+  .sales-order-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
   .sales-order-heading h2 { font-size: 19px; }
   .sales-order-drafts, .sales-order-section { padding: 12px; }
   .sales-order-fields { grid-template-columns: 1fr; }
   .sales-order-fields label:first-child { grid-column: auto; }
-  .sales-order-line-controls { grid-template-columns: minmax(0, 1fr) minmax(82px, .65fr); }
+  .sales-order-line-controls { grid-template-columns: minmax(0, 1fr) minmax(110px, 1fr); }
   .sales-order-line-price, .sales-order-line-total { padding: 3px 0; }
 }
 
 @media (max-width: 380px) {
+  .sales-dashboard-content { padding: 8px !important; }
   .sales-order-draft-option { grid-template-columns: minmax(0, 1fr) auto; gap: 7px; padding: 9px 8px; }
   .sales-order-draft-option > span:nth-child(2) { grid-column: 1; grid-row: 2; color: #53617a; text-align: left; }
   .sales-order-draft-option > span:last-child { grid-column: 2; grid-row: 1 / span 2; }
@@ -87,4 +95,7 @@
   .sales-order-product-result > span:nth-child(2) { max-width: 100px; text-align: right; overflow-wrap: anywhere; }
   .sales-order-add-icon { width: 27px; height: 27px; }
   .sales-order-actions .workspace-button { width: 100%; min-height: 44px; }
+  .sales-order-line-controls { grid-template-columns: 1fr; gap: 8px; }
+  .sales-order-heading-actions { width: 100%; }
+  .sales-order-heading-actions .workspace-button { flex: 1; }
 }
