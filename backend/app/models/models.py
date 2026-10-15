@@ -687,6 +687,45 @@ class WarehouseTransferItem(Base):
     quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
+# --- Phiếu chuyển kho nội bộ (Internal Transfers) ---
+class InternalTransfer(Base):
+    __tablename__ = "internal_transfers"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    transfer_code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    from_warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="RESTRICT"), nullable=False)
+    to_warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="PENDING", nullable=False)  # PENDING / COMPLETED / CANCELLED
+    created_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    confirmed_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    from_warehouse: Mapped["Warehouse"] = relationship("Warehouse", foreign_keys=[from_warehouse_id])
+    to_warehouse: Mapped["Warehouse"] = relationship("Warehouse", foreign_keys=[to_warehouse_id])
+    items: Mapped[List["InternalTransferItem"]] = relationship(
+        "InternalTransferItem", back_populates="transfer", cascade="all, delete-orphan"
+    )
+
+InternalTransfers = InternalTransfer
+
+
+class InternalTransferItem(Base):
+    __tablename__ = "internal_transfer_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    transfer_id: Mapped[int] = mapped_column(ForeignKey("internal_transfers.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
+    sent_quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    received_quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    discrepancy_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    transfer: Mapped["InternalTransfer"] = relationship("InternalTransfer", back_populates="items")
+    product: Mapped["Product"] = relationship("Product")
+
+InternalTransferItems = InternalTransferItem
+
+
 class WarehouseAudit(Base):
     __tablename__ = "warehouse_audits"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

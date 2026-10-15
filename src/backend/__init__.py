@@ -30,6 +30,7 @@ from . import (
     security,
     session,
     suppliers,
+    internal_transfers,
     user_routes,
     users_service,
 )
@@ -53,6 +54,7 @@ sys.modules["src.backend.user_routes"] = user_routes
 sys.modules["src.backend.email_service"] = email_service
 sys.modules["src.backend.users_service"] = users_service
 sys.modules["src.backend.suppliers"] = suppliers
+sys.modules["src.backend.internal_transfers"] = internal_transfers
 sys.modules["src.backend.inventory"] = inventory
 sys.modules["src.backend.reports"] = reports
 sys.modules["src.backend.main"] = main_module

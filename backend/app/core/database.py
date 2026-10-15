@@ -72,6 +72,8 @@ def migrate_pricing_schema():
         Supplier,
         DiscountPolicy,
         DiscountTier,
+        InternalTransfer,
+        InternalTransferItem,
     )
 
     Base.metadata.create_all(
@@ -85,6 +87,8 @@ def migrate_pricing_schema():
             Supplier.__table__,
             DiscountPolicy.__table__,
             DiscountTier.__table__,
+            InternalTransfer.__table__,
+            InternalTransferItem.__table__,
         ],
         checkfirst=True,
     )

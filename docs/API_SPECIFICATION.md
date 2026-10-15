@@ -660,6 +660,53 @@
 ```
 - **Response Data:** Phiếu nhập kho đã ghi sổ, tăng `physicalQty` và cập nhật giá vốn.
 
+#### `POST /api/internal-transfers`
+- **Story:** S5-07 (Chuyển kho nội bộ)
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Request Body:**
+```json
+{
+  "from_warehouse_id": 1,
+  "to_warehouse_id": 2,
+  "transfer_code": "TRF-20261015-001",
+  "items": [
+    {
+      "product_id": 101,
+      "sent_quantity": 100
+    }
+  ]
+}
+```
+- **Response Data:** Phiếu chuyển kho nội bộ ở trạng thái `PENDING`, tồn kho kho xuất đã được trừ tạm thời (đưa vào luân chuyển).
+
+#### `PUT /api/internal-transfers/{id}/confirm`
+- **Story:** S5-07 (Xác nhận nhận hàng chuyển kho)
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Request Body:**
+```json
+{
+  "confirmed_by": "Nguyễn Văn Nhận",
+  "items": [
+    {
+      "product_id": 101,
+      "received_quantity": 98,
+      "discrepancy_reason": "Vỡ 2 lon trong quá trình bốc dỡ"
+    }
+  ]
+}
+```
+- **Quy tắc nghiệp vụ:** BẮT BUỘC phải có `discrepancy_reason` nếu `sent_quantity != received_quantity` (nếu trống trả về 400). Khi xác nhận thành công, tồn kho kho đến được cộng chính thức và chuyển trạng thái thành `COMPLETED`.
+
+#### `GET /api/internal-transfers`
+- **Story:** S5-07
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Query Params:** `warehouse_id`, `status` (PENDING/COMPLETED/CANCELLED), `search`, `limit`, `offset`
+- **Response Data:** Danh sách phiếu chuyển kho nội bộ.
+
+#### `GET /api/internal-transfers/{id}`
+- **Story:** S5-07
+- **Response Data:** Chi tiết phiếu chuyển kho và danh sách sản phẩm.
+
 #### `POST /warehouse/transfers`
 - **Story:** S5-07
 - **Phân quyền:** Warehouse, WH Manager

@@ -7,6 +7,7 @@ import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSi
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
 import SupplierManagement from "./SupplierManagement";
+import InternalTransferManager from "./InternalTransferManager";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -26,6 +27,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
   const [selectedKey, setSelectedKey] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const p = window.location.pathname;
+      if (p === "/warehouse/transfers") return "transfers";
       if (p === "/warehouse/suppliers") return "suppliers";
       if (p === "/warehouse/inventory") return "unit-conversion";
       if (p === "/warehouse/receiving") return "inbound";
@@ -69,7 +71,8 @@ export const WarehouseStaffDashboard: React.FC = () => {
   useEffect(() => {
     const handlePopState = () => {
       const p = window.location.pathname;
-      if (p === "/warehouse/suppliers") setSelectedKey("suppliers");
+      if (p === "/warehouse/transfers") setSelectedKey("transfers");
+      else if (p === "/warehouse/suppliers") setSelectedKey("suppliers");
       else if (p === "/warehouse/inventory") setSelectedKey("unit-conversion");
       else if (p === "/warehouse/receiving") setSelectedKey("inbound");
       else if (p === "/warehouse/picking") setSelectedKey("outbound");
@@ -106,7 +109,9 @@ export const WarehouseStaffDashboard: React.FC = () => {
         selectedKey={selectedKey}
         onSelect={(key) => {
           setSelectedKey(key);
-          if (key === "suppliers") {
+          if (key === "transfers") {
+            window.history.pushState({}, "", "/warehouse/transfers");
+          } else if (key === "suppliers") {
             window.history.pushState({}, "", "/warehouse/suppliers");
           } else if (key === "unit-conversion") {
             window.history.pushState({}, "", "/warehouse/inventory");
@@ -140,6 +145,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
+          {selectedKey === "transfers" && <InternalTransferManager />}
           {selectedKey === "suppliers" && <SupplierManagement />}
           {selectedKey === "unit-conversion" && <UnitConversionManager />}
 

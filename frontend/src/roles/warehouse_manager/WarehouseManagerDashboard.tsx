@@ -5,6 +5,7 @@ import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import { WarehouseManagerSidebar } from "../../components/Sidebar/WarehouseManagerSidebar";
 import { WarehouseManagerHeader } from "../../components/Header/WarehouseManagerHeader";
+import InternalTransferManager from "../warehouse_staff/InternalTransferManager";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -21,7 +22,13 @@ export const WarehouseManagerDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [selectedKey, setSelectedKey] = useState(() => {
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname;
+      if (p === "/warehouse/transfers") return "transfers";
+    }
+    return "dashboard";
+  });
   const [, setLoading] = useState(false);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -55,6 +62,16 @@ export const WarehouseManagerDashboard: React.FC = () => {
     };
   }, [loadProfileData]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname;
+      if (p === "/warehouse/transfers") setSelectedKey("transfers");
+      else setSelectedKey("dashboard");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   return (
     <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
       {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
@@ -81,7 +98,14 @@ export const WarehouseManagerDashboard: React.FC = () => {
 
       <WarehouseManagerSidebar
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
+        onSelect={(key) => {
+          setSelectedKey(key);
+          if (key === "transfers") {
+            window.history.pushState({}, "", "/warehouse/transfers");
+          } else {
+            window.history.pushState({}, "", "/warehouse/dashboard");
+          }
+        }}
         onLogout={logout}
       />
 
@@ -104,7 +128,13 @@ export const WarehouseManagerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung quản lý duyệt kho */}
+          {selectedKey === "transfers" ? (
+            <InternalTransferManager />
+          ) : (
+            <div style={{ color: "#64748b" }}>
+              {/* Nội dung quản lý duyệt kho */}
+            </div>
+          )}
         </Content>
       </Layout>
 
