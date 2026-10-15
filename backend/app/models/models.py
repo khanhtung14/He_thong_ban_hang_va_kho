@@ -23,7 +23,7 @@ from sqlalchemy import (
     Float,
     event,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, synonym
 
 
 class Base(DeclarativeBase):
@@ -436,15 +436,28 @@ class Customer(Base):
     lock_reason: Mapped[Optional[str]] = mapped_column(String(255))
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     locked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-
-    # NEW FIELDS: Credit limit
+    # NEW FIELDS: Credit limit & Debt control (SCRUM-21)
     credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    max_debt_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     max_due_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    current_debt: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     warning_threshold_percent: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
+
+    max_debt_amount = synonym("credit_limit")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
+    debt_limit_histories: Mapped[List["CreditLimitLog"]] = relationship(
+        "CreditLimitLog",
+        back_populates="customer",
+        cascade="all, delete-orphan",
+        order_by="desc(CreditLimitLog.id)",
+    )
+    credit_limit_logs: Mapped[List["CreditLimitLog"]] = relationship(
+        "CreditLimitLog",
+        overlaps="debt_limit_histories,customer",
+    )
 
 
 class HandoverHistory(Base):
@@ -469,6 +482,54 @@ class HandoverHistory(Base):
     from_user: Mapped[Optional["User"]] = relationship(foreign_keys=[from_user_id])
     to_user: Mapped[Optional["User"]] = relationship(foreign_keys=[to_user_id])
     transferred_by: Mapped[Optional["User"]] = relationship(foreign_keys=[transferred_by_id])
+
+
+class CreditLimitLog(Base):
+    """Lịch sử thay đổi hạn mức công nợ (SCRUM-21 credit_limit_logs)."""
+    __tablename__ = "credit_limit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    agency_id: Mapped[int] = mapped_column(
+        ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    old_credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    new_credit_limit: Mapped[float] = mapped_column(Float, nullable=False)
+    old_max_debt_days: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
+    new_max_debt_days: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False
+    )
+
+    customer: Mapped[Optional["Customer"]] = relationship(
+        "Customer", back_populates="debt_limit_histories", foreign_keys=[agency_id]
+    )
+
+    # Synonyms for test_debt_limit and backward compatibility
+    old_limit = synonym("old_credit_limit")
+    new_limit = synonym("new_credit_limit")
+    old_debt_days = synonym("old_max_debt_days")
+    new_debt_days = synonym("new_max_debt_days")
+    changed_by = synonym("created_by")
+
+    def __init__(self, **kwargs):
+        if "old_limit" in kwargs and "old_credit_limit" not in kwargs:
+            kwargs["old_credit_limit"] = kwargs.pop("old_limit")
+        if "new_limit" in kwargs and "new_credit_limit" not in kwargs:
+            kwargs["new_credit_limit"] = kwargs.pop("new_limit")
+        if "old_debt_days" in kwargs and "old_max_debt_days" not in kwargs:
+            kwargs["old_max_debt_days"] = kwargs.pop("old_debt_days")
+        if "new_debt_days" in kwargs and "new_max_debt_days" not in kwargs:
+            kwargs["new_max_debt_days"] = kwargs.pop("new_debt_days")
+        if "changed_by" in kwargs and "created_by" not in kwargs:
+            kwargs["created_by"] = kwargs.pop("changed_by")
+        super().__init__(**kwargs)
+
+
+# Aliases cho các nghiệp vụ tương thích
+DebtLimitHistory = CreditLimitLog
+Agency = Customer
 
 
 class DeliveryAddress(Base):

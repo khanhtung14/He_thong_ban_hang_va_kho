@@ -14,6 +14,7 @@ import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
 import AgencyLockManager from "./AgencyLockManager";
 import { AgencyManagement } from "./AgencyManagement";
+import CreditLimitManager from "../../features/credit_limit/CreditLimitManager";
 
 const { Content } = Layout;
 
@@ -174,8 +175,8 @@ export const AccountantDashboard: React.FC = () => {
           {/* 1. Màn hình Khóa / Mở giao dịch đại lý */}
           {selectedKey === "agency-locks" && <AgencyLockManager />}
 
-          {/* 2. Màn hình Công nợ đại lý (hoặc mặc định cho xem luôn chức năng này) */}
-          {selectedKey === "debt" && <AgencyLockManager />}
+          {/* 2. Màn hình Quản lý Hạn mức Công nợ đại lý (SCRUM-21) */}
+          {selectedKey === "debt" && <CreditLimitManager />}
 
           {/* Các tab khác tạm thời hiển thị placeholder để không bị trắng màn hình */}
           {selectedKey === "dashboard" && (
