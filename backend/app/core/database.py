@@ -105,6 +105,7 @@ def migrate_pricing_schema():
             "locked_at": "DATETIME NULL",
             "locked_by_id": "INTEGER NULL",
             "phone": "VARCHAR(20) NULL",
+            "warehouse_id": "INTEGER NULL",
         },
         "suppliers": {
             "contact_person": "VARCHAR(100) NULL",
@@ -113,12 +114,16 @@ def migrate_pricing_schema():
             "created_at": "DATETIME NULL",
             "updated_at": "DATETIME NULL",
         },
-        "orders": {"approval_reason": "TEXT NULL"},
+        "orders": {
+            "approval_reason": "TEXT NULL",
+            "warehouse_id": "INTEGER NULL",
+        },
         "order_items": {
             "floor_price": "INTEGER NULL",
             "price_list_id": "INTEGER NULL",
             "sku": "VARCHAR(50) NULL",
             "product_name": "VARCHAR(255) NULL",
+            "available_qty": "FLOAT NULL",
         },
         "product_units": {
             "is_base_unit": "BOOLEAN NOT NULL DEFAULT 0",
