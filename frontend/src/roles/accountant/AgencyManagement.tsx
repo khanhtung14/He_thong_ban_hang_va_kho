@@ -36,8 +36,10 @@ import {
   DollarCircleOutlined,
   EyeOutlined,
   SafetyCertificateOutlined,
+  EnvironmentOutlined,
 } from "@ant-design/icons";
 import CreditLimitModal from "../../components/CreditLimitModal";
+import DeliveryAddressModal from "../../components/DeliveryAddressModal";
 
 import {
   getAgencies,
@@ -159,6 +161,15 @@ export const AgencyManagement: React.FC = () => {
 
   // Modal Điều chỉnh hạn mức tín dụng & ngày nợ
   const [creditLimitModal, setCreditLimitModal] = useState<{
+    visible: boolean;
+    agency: Agency | null;
+  }>({
+    visible: false,
+    agency: null,
+  });
+
+  // Modal Quản lý điểm giao hàng (SCRUM-20)
+  const [deliveryAddressModal, setDeliveryAddressModal] = useState<{
     visible: boolean;
     agency: Agency | null;
   }>({
@@ -653,6 +664,14 @@ export const AgencyManagement: React.FC = () => {
                 type="text"
                 icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
                 onClick={() => setCreditLimitModal({ visible: true, agency: record })}
+              />
+            </Tooltip>
+
+            <Tooltip title="Quản lý điểm giao hàng">
+              <Button
+                type="text"
+                icon={<EnvironmentOutlined style={{ color: "#0284c7" }} />}
+                onClick={() => setDeliveryAddressModal({ visible: true, agency: record })}
               />
             </Tooltip>
 
@@ -1386,6 +1405,13 @@ export const AgencyManagement: React.FC = () => {
         visible={creditLimitModal.visible}
         customer={creditLimitModal.agency as any}
         onClose={() => setCreditLimitModal({ visible: false, agency: null })}
+        onSuccess={() => loadAgencies(pagination.current)}
+      />
+
+      <DeliveryAddressModal
+        visible={deliveryAddressModal.visible}
+        customer={deliveryAddressModal.agency as any}
+        onClose={() => setDeliveryAddressModal({ visible: false, agency: null })}
         onSuccess={() => loadAgencies(pagination.current)}
       />
     </div>

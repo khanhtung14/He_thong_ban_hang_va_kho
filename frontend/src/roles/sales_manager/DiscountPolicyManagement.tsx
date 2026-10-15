@@ -224,9 +224,9 @@ export const DiscountPolicyManagement: React.FC = () => {
           const rawMax = t.max_quantity;
           const maxQty =
             rawMax !== undefined &&
-            rawMax !== null &&
-            String(rawMax).trim() !== "" &&
-            !isNaN(Number(rawMax))
+              rawMax !== null &&
+              String(rawMax).trim() !== "" &&
+              !isNaN(Number(rawMax))
               ? Number(rawMax)
               : null;
 
@@ -643,14 +643,14 @@ export const DiscountPolicyManagement: React.FC = () => {
         width={720}
         destroyOnClose
       >
-        <Alert
+        {/* <Alert
           type="info"
           showIcon
           icon={<InfoCircleOutlined />}
           message="Quy tắc tính giá tự động"
           description="Nhiều chính sách cùng áp dụng thì lấy chính sách có lợi nhất cho khách hàng."
           style={{ marginBottom: 20 }}
-        />
+        /> */}
 
         <Form form={form} layout="vertical" requiredMark="optional">
           <Form.Item

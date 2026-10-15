@@ -32,10 +32,14 @@ import {
   fetchSalesMarginReport,
   fetchPriceLists,
   publishPriceList,
+  fetchOrdersPendingApproval,
+  approveOrder,
+  rejectOrder,
   fetchNavigationMenu,
   type UserProfile,
   type SalesMarginReport,
   type PriceListItem,
+  type OrderResponseItem,
 } from "../../services/apiClient";
 
 const { Content } = Layout;
@@ -63,6 +67,7 @@ export const SalesManagerDashboard: React.FC = () => {
       if (window.location.pathname === "/manager/discounts") return "/manager/discounts";
       if (window.location.pathname === "/manager/reports") return "/manager/reports";
 
+      if (window.location.pathname === "/manager/orders/approval") return "/manager/orders/approval";
       if (window.location.pathname === "/manager/customers") return "/manager/customers";
     }
     return "/manager/dashboard";
@@ -90,11 +95,12 @@ export const SalesManagerDashboard: React.FC = () => {
     setError("");
 
     try {
-      const [profileData, reportData, priceListsData, navItems] =
+      const [profileData, reportData, priceListsData, pendingOrdersData, navItems] =
         await Promise.allSettled([
           fetchProfile(),
           fetchSalesMarginReport(),
           fetchPriceLists(),
+          fetchOrdersPendingApproval(),
           fetchNavigationMenu("SALES_MANAGER"),
         ]);
 
@@ -113,7 +119,33 @@ export const SalesManagerDashboard: React.FC = () => {
         console.error("Report load error:", reportData.reason);
       }
 
-      // 3. Danh sách bảng giá & Lọc đơn nháp cần duyệt
+      // 3. Danh sách đơn hàng & bảng giá chờ duyệt
+      const allApprovals: ApprovalItem[] = [];
+
+      // 3a. Đơn hàng chờ duyệt (PENDING / PENDING_APPROVAL)
+      if (pendingOrdersData.status === "fulfilled" && Array.isArray(pendingOrdersData.value)) {
+        const orderApprovals: ApprovalItem[] = pendingOrdersData.value.map((ord: OrderResponseItem) => {
+          const isBelowFloor = ord.approval_reason && ord.approval_reason.toLowerCase().includes("dưới giá sàn");
+          return {
+            id: `ord-${ord.id}`,
+            type: (isBelowFloor ? "below_floor" : "order") as ApprovalItem["type"],
+            typeLabel: isBelowFloor ? "Dưới giá sàn" : "Đơn hàng",
+            title: `Đơn hàng ${ord.order_code} - ${ord.customer_name || `Đại lý #${ord.customer_id}`}`,
+            reason: ord.approval_reason || "Đơn hàng mới chờ Quản lý phê duyệt",
+            amount: `${(ord.total_amount || 0).toLocaleString("vi-VN")} ₫`,
+            code: ord.order_code,
+            assigneeLabel: "Khách hàng",
+            assigneeName: ord.customer_name || `Đại lý #${ord.customer_id}`,
+            approveActionLabel: "Phê duyệt đơn",
+            orderId: ord.id,
+          };
+        });
+        allApprovals.push(...orderApprovals);
+      } else if (pendingOrdersData.status === "rejected") {
+        console.error("Pending orders load error:", pendingOrdersData.reason);
+      }
+
+      // 3b. Bảng giá nháp chờ phát hành
       if (priceListsData.status === "fulfilled") {
         const lists = priceListsData.value;
         setPriceLists(lists);
@@ -134,10 +166,12 @@ export const SalesManagerDashboard: React.FC = () => {
             priceListId: draft.id,
           }));
 
-        setApprovals(draftItems);
+        allApprovals.push(...draftItems);
       } else {
         console.error("Price lists load error:", priceListsData.reason);
       }
+
+      setApprovals(allApprovals);
 
       // 4. Menu điều hướng
       if (navItems.status === "fulfilled" && navItems.value.length > 0) {
@@ -277,7 +311,7 @@ export const SalesManagerDashboard: React.FC = () => {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  // Phê duyệt bảng giá
+  // Phê duyệt yêu cầu (Bảng giá hoặc Đơn hàng)
   const handleApprove = async (item: ApprovalItem) => {
     if (item.type === "price_list" && item.priceListId) {
       try {
@@ -293,12 +327,34 @@ export const SalesManagerDashboard: React.FC = () => {
       return;
     }
 
+    if (item.orderId) {
+      try {
+        await approveOrder(item.orderId);
+        message.success(`Đã phê duyệt thành công đơn hàng ${item.code}!`);
+        setApprovals((prev) => prev.filter((a) => a.id !== item.id));
+      } catch (err: any) {
+        message.error(err.message || "Lỗi khi phê duyệt đơn hàng");
+      }
+      return;
+    }
+
     message.success(`Đã xử lý: ${item.title}`);
     setApprovals((prev) => prev.filter((a) => a.id !== item.id));
   };
 
   // Từ chối yêu cầu
-  const handleReject = (item: ApprovalItem) => {
+  const handleReject = async (item: ApprovalItem) => {
+    if (item.orderId) {
+      try {
+        await rejectOrder(item.orderId);
+        message.info(`Đã từ chối đơn hàng ${item.code}`);
+        setApprovals((prev) => prev.filter((a) => a.id !== item.id));
+      } catch (err: any) {
+        message.error(err.message || "Lỗi khi từ chối đơn hàng");
+      }
+      return;
+    }
+
     message.info(`Đã từ chối: ${item.title}`);
     setApprovals((prev) => prev.filter((a) => a.id !== item.id));
   };
@@ -392,12 +448,9 @@ export const SalesManagerDashboard: React.FC = () => {
             window.history.pushState({}, "", "/manager/categories");
             window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/orders/approval") {
-            setCurrentPath("/manager/dashboard");
-            window.history.pushState({}, "", "/manager/dashboard");
-            setTimeout(() => {
-              const el = document.getElementById("approvals-section");
-              if (el) el.scrollIntoView({ behavior: "smooth" });
-            }, 100);
+            setCurrentPath("/manager/orders/approval");
+            window.history.pushState({}, "", "/manager/orders/approval");
+            window.scrollTo({ top: 0, behavior: "smooth" });
             // } else if (path === "/manager/pricing") {
             //   setIsCreateModalOpen(true);
           } else if (path === "/manager/reports") {
@@ -481,6 +534,33 @@ export const SalesManagerDashboard: React.FC = () => {
           ) : currentPath === "/manager/discounts" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <DiscountPolicyManagement />
+            </div>
+          ) : currentPath === "/manager/orders/approval" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <Title level={3} style={{ margin: 0 }}>
+                    Phê duyệt đơn hàng & Bảng giá
+                  </Title>
+                  <Text type="secondary">
+                    Danh sách các đơn hàng và bảng giá đang chờ Quản lý kinh doanh phê duyệt ({approvals.length} yêu cầu cần xử lý).
+                  </Text>
+                </div>
+                <Button onClick={loadDashboardData} loading={loading}>
+                  Làm mới
+                </Button>
+              </div>
+              <ApprovalList
+                items={approvals}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onViewAll={() =>
+                  message.info(
+                    `Tổng cộng ${approvals.length} yêu cầu đang chờ bạn xử lý`,
+                  )
+                }
+                loading={loading}
+              />
             </div>
           ) : (
             /* TAB 2: MÀN HÌNH DASHBOARD TỔNG QUAN CHÍNH */
@@ -613,7 +693,9 @@ export const SalesManagerDashboard: React.FC = () => {
                   badgeTone={approvals.length > 0 ? "rose" : "green"}
                   subText={
                     approvals.length > 0
-                      ? "Bảng giá nháp chờ phát hành"
+                      ? `${approvals.filter((a) => a.orderId).length} đơn hàng, ${
+                          approvals.filter((a) => a.priceListId).length
+                        } bảng giá`
                       : "Không có yêu cầu chờ duyệt"
                   }
                   iconType="alert"
