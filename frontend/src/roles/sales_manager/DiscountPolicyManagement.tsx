@@ -326,8 +326,8 @@ export const DiscountPolicyManagement: React.FC = () => {
     return policies.filter((p) => {
       const matchSearch =
         !searchTerm ||
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.target_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.target_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (p.target_name && p.target_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchType =
@@ -363,9 +363,10 @@ export const DiscountPolicyManagement: React.FC = () => {
       width: 260,
       render: (_, record: DiscountPolicyItem) => {
         const isSku = record.target_type === "SKU";
+        const targetIdStr = record.target_id || "";
         const catObj = !isSku
           ? categories.find(
-            (c) => String(c.id) === String(record.target_id) || c.code === record.target_id
+            (c) => String(c.id) === String(targetIdStr) || c.code === targetIdStr
           )
           : null;
         const resolvedName =
@@ -384,9 +385,11 @@ export const DiscountPolicyManagement: React.FC = () => {
               >
                 {isSku ? "Sản phẩm (SKU)" : "Nhóm hàng (Category)"}
               </Tag>
-              <Tag style={{ borderRadius: 4, fontFamily: "monospace" }}>
-                {record.target_id}
-              </Tag>
+              {targetIdStr ? (
+                <Tag style={{ borderRadius: 4, fontFamily: "monospace" }}>
+                  {targetIdStr}
+                </Tag>
+              ) : null}
             </div>
             {resolvedName && (
               <Text style={{ fontSize: 13, color: "#475569" }}>
@@ -420,19 +423,21 @@ export const DiscountPolicyManagement: React.FC = () => {
       key: "tiers",
       render: (_, record: DiscountPolicyItem) => {
         const isPercent = record.discount_type === "PERCENTAGE";
-        if (!record.tiers || record.tiers.length === 0) {
+        const tiers = record.tiers || [];
+        if (!tiers || tiers.length === 0) {
           return <Text type="secondary">Chưa thiết lập bậc</Text>;
         }
         return (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {record.tiers.map((tier, idx) => {
+            {tiers.map((tier, idx) => {
               const qtyLabel =
                 tier.max_quantity !== null && tier.max_quantity !== undefined
                   ? `${tier.min_quantity} - ${tier.max_quantity}`
                   : `≥ ${tier.min_quantity}`;
+              const val = tier.discount_value ?? (tier as any).discount_percent ?? 0;
               const valLabel = isPercent
-                ? `${tier.discount_value}%`
-                : `${tier.discount_value.toLocaleString("vi-VN")} ₫`;
+                ? `${val}%`
+                : `${Number(val).toLocaleString("vi-VN")} ₫`;
               return (
                 <Tag
                   key={idx}

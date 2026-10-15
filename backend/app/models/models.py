@@ -23,7 +23,7 @@ from sqlalchemy import (
     Float,
     event,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, synonym
 
 
 class Base(DeclarativeBase):
@@ -362,9 +362,15 @@ class DiscountPolicy(Base):
     __tablename__ = "discount_policies"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    scope: Mapped[str] = mapped_column(String(30), default="SKU", nullable=False)
     target_type: Mapped[str] = mapped_column(String(20), default="SKU", nullable=False)  # 'SKU' | 'CATEGORY'
-    target_id: Mapped[str] = mapped_column(String(100), nullable=False)  # SKU or Category ID
+    target_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # SKU or Category ID
+    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     discount_type: Mapped[str] = mapped_column(String(20), default="PERCENTAGE", nullable=False)  # 'PERCENTAGE' | 'FIXED_AMOUNT'
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -373,15 +379,8 @@ class DiscountPolicy(Base):
         back_populates="policy",
         cascade="all, delete-orphan",
         order_by="DiscountTier.min_quantity",
+        foreign_keys="[DiscountTier.policy_id]",
     )
-
-    @property
-    def scope(self) -> str:
-        return self.target_type
-
-    @scope.setter
-    def scope(self, val: str) -> None:
-        self.target_type = val
 
 
 class DiscountTier(Base):
@@ -389,27 +388,17 @@ class DiscountTier(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     policy_id: Mapped[int] = mapped_column(ForeignKey("discount_policies.id", ondelete="CASCADE"), nullable=False)
+    discount_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_qty: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    discount_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     min_quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     max_quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     discount_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
-    policy: Mapped["DiscountPolicy"] = relationship(back_populates="tiers")
-
-    @property
-    def min_qty(self) -> int:
-        return self.min_quantity
-
-    @min_qty.setter
-    def min_qty(self, val: int) -> None:
-        self.min_quantity = val
-
-    @property
-    def discount_percent(self) -> float:
-        return self.discount_value
-
-    @discount_percent.setter
-    def discount_percent(self, val: float) -> None:
-        self.discount_value = val
+    policy: Mapped["DiscountPolicy"] = relationship(
+        back_populates="tiers",
+        foreign_keys="[DiscountTier.policy_id]",
+    )
 
 
 # --- EP-03: Đại lý & Hạn mức công nợ ---
@@ -436,21 +425,34 @@ class Customer(Base):
     lock_reason: Mapped[Optional[str]] = mapped_column(String(255))
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     locked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-
-    # Credit limit & payment terms
+    # Credit limit & Debt control (SCRUM-21 & SCRUM-20)
     credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     max_due_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     max_debt_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    current_debt: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     warning_threshold_percent: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
     warning_threshold: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
+
+    max_debt_amount = synonym("credit_limit")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     delivery_addresses: Mapped[List["DeliveryAddress"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
+    credit_limit_logs: Mapped[List["CreditLimitLog"]] = relationship(
+        "CreditLimitLog",
+        back_populates="customer",
+        cascade="all, delete-orphan",
+        order_by="desc(CreditLimitLog.id)",
+    )
+    debt_limit_histories: Mapped[List["CreditLimitLog"]] = relationship(
+        "CreditLimitLog",
+        overlaps="credit_limit_logs,customer",
+    )
 
 
 class CreditLimitLog(Base):
+    """Lịch sử thay đổi hạn mức công nợ (SCRUM-21 credit_limit_logs)."""
     __tablename__ = "credit_limit_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -462,9 +464,42 @@ class CreditLimitLog(Base):
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     changed_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     changed_by_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), index=True)
 
-    customer: Mapped["Customer"] = relationship(backref="credit_limit_logs")
+    customer: Mapped["Customer"] = relationship(
+        "Customer", back_populates="credit_limit_logs", foreign_keys=[customer_id]
+    )
+
+    # Synonyms for test_debt_limit and backward compatibility
+    agency_id = synonym("customer_id")
+    old_limit = synonym("old_credit_limit")
+    new_limit = synonym("new_credit_limit")
+    old_debt_days = synonym("old_max_debt_days")
+    new_debt_days = synonym("new_max_debt_days")
+    created_by = synonym("changed_by_name")
+    changed_by = synonym("changed_by_name")
+
+    def __init__(self, **kwargs):
+        if "agency_id" in kwargs and "customer_id" not in kwargs:
+            kwargs["customer_id"] = kwargs.pop("agency_id")
+        if "old_limit" in kwargs and "old_credit_limit" not in kwargs:
+            kwargs["old_credit_limit"] = kwargs.pop("old_limit")
+        if "new_limit" in kwargs and "new_credit_limit" not in kwargs:
+            kwargs["new_credit_limit"] = kwargs.pop("new_limit")
+        if "old_debt_days" in kwargs and "old_max_debt_days" not in kwargs:
+            kwargs["old_max_debt_days"] = kwargs.pop("old_debt_days")
+        if "new_debt_days" in kwargs and "new_max_debt_days" not in kwargs:
+            kwargs["new_max_debt_days"] = kwargs.pop("new_debt_days")
+        if "changed_by" in kwargs and "changed_by_name" not in kwargs:
+            kwargs["changed_by_name"] = kwargs.pop("changed_by")
+        if "created_by" in kwargs and "changed_by_name" not in kwargs:
+            kwargs["changed_by_name"] = kwargs.pop("created_by")
+        super().__init__(**kwargs)
+
+
+# Aliases cho các nghiệp vụ tương thích
+DebtLimitHistory = CreditLimitLog
+Agency = Customer
 
 
 class HandoverHistory(Base):
@@ -859,7 +894,3 @@ class SalesTarget(Base):
     month: Mapped[int] = mapped_column(Integer, nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     target_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-
-
-
-

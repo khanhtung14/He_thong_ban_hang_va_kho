@@ -31,6 +31,7 @@ from app.api.v1.endpoints.users import compat_router as users_compat_router, rou
 from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_router
 from app.api.v1.endpoints.delivery_addresses import router as delivery_addresses_router
 from app.api.v1.endpoints.import_users import router as import_users_router
+from app.api.v1.endpoints.debt_limit import router as debt_limit_router, compat_router as debt_limit_compat_router
 from app.api.v1.endpoints.suppliers import compat_router as suppliers_compat_router, router as suppliers_router
 from app.api.v1.endpoints.discount_policy_routes import router as discounts_router, compat_router as discounts_compat_router
 
@@ -209,6 +210,8 @@ app.include_router(users_compat_router)
 app.include_router(user_router)
 app.include_router(profile_router)
 app.include_router(customer_lock_router)
+app.include_router(debt_limit_router)
+app.include_router(debt_limit_compat_router)
 app.include_router(delivery_addresses_router)
 app.include_router(suppliers_router)
 app.include_router(suppliers_compat_router)
