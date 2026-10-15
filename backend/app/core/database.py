@@ -113,12 +113,16 @@ def migrate_pricing_schema():
             "created_at": "DATETIME NULL",
             "updated_at": "DATETIME NULL",
         },
-        "orders": {"approval_reason": "TEXT NULL"},
+        "orders": {
+            "approval_reason": "TEXT NULL",
+            "expected_delivery_date": "DATE NULL",
+        },
         "order_items": {
             "floor_price": "INTEGER NULL",
             "price_list_id": "INTEGER NULL",
             "sku": "VARCHAR(50) NULL",
             "product_name": "VARCHAR(255) NULL",
+            "quantity_delivered": "INTEGER NOT NULL DEFAULT 0",
         },
         "product_units": {
             "is_base_unit": "BOOLEAN NOT NULL DEFAULT 0",

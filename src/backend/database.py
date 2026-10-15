@@ -8,3 +8,6 @@ for target in (str(ROOT), str(BACKEND_ROOT)):
         sys.path.insert(0, target)
 
 from app.core.database import *  # noqa: F401,F403
+from app.core.database import engine, SessionLocal, get_db, init_db, migrate_pricing_schema
+
+__all__ = ["engine", "SessionLocal", "get_db", "init_db", "migrate_pricing_schema"]

@@ -9,6 +9,8 @@ import { CustomerHeader } from "../../components/Header/CustomerHeader";
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
 
+import { OrderTrackingList } from "./OrderTrackingList";
+
 const { Content } = Layout;
 
 export const CustomerDashboard: React.FC = () => {
@@ -104,7 +106,11 @@ export const CustomerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung danh mục sản phẩm, đặt đơn, xem công nợ */}
+          {selectedKey === "orders" || selectedKey === "dashboard" ? (
+            <OrderTrackingList />
+          ) : (
+            <OrderTrackingList />
+          )}
         </Content>
       </Layout>
 

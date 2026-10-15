@@ -1,0 +1,6 @@
+# Pyrefly Configuration for He_thong_ban_hang_va_kho
+search_path = [
+    ".",
+    "backend",
+    "src"
+]

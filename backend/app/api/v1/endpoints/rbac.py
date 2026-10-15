@@ -183,6 +183,8 @@ class AuthenticatedUser(BaseModel):
     warehouse_id: Optional[int] = None
     warehouse_ids: List[int] = Field(default_factory=list)
     territory_id: Optional[int] = None
+    customer_id: Optional[int] = None
+    dealer_id: Optional[int] = None
 
     def has_permission(self, permission: str) -> bool:
         normalized_role = normalize_role(self.role)
@@ -286,6 +288,7 @@ def get_current_user(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Vai trÃ² trong token khÃ´ng há»£p lá»‡ trÃªn há»‡ thá»‘ng.",
                 )
+            cid = payload.get("customer_id") or payload.get("dealer_id")
             return AuthenticatedUser(
                 id=payload.get("user_id") or payload.get("id"),
                 username=username,
@@ -294,6 +297,8 @@ def get_current_user(
                 warehouse_id=payload.get("warehouse_id"),
                 warehouse_ids=payload.get("warehouse_ids") or ([payload["warehouse_id"]] if payload.get("warehouse_id") else []),
                 territory_id=payload.get("territory_id"),
+                customer_id=cid,
+                dealer_id=cid,
             )
         except HTTPException:
             # Fallback for database session token

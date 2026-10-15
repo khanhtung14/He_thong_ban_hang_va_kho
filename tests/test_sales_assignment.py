@@ -6,15 +6,16 @@
 
 from __future__ import annotations
 
+from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import get_db
+from src.backend.database import get_db
 from src.backend.main import app
-from app.models.models import (
+from src.backend.models import (
     Base,
     Customer,
     HandoverHistory,
@@ -23,11 +24,11 @@ from app.models.models import (
     User,
     AccountStatus,
 )
-from app.api.v1.endpoints.rbac import create_access_token
+from src.backend.rbac import create_access_token
 
 
 def make_token(role: str, username: str, user_id: int | None = None) -> dict[str, str]:
-    payload = {"sub": username, "role": role}
+    payload: dict[str, Any] = {"sub": username, "role": role}
     if user_id is not None:
         payload["user_id"] = user_id
     token = create_access_token(payload)

@@ -512,6 +512,16 @@
 - **Query Params:** `months` (default = 3)
 - **Response Data:** Danh sách các mặt hàng đại lý đã mua trong 3 tháng qua, số lượng gần nhất, đơn giá.
 
+#### `GET /orders/my-orders`
+- **Story:** SCRUM-26 (Theo dõi trạng thái đơn hàng cho Đại lý)
+- **Phân quyền:** Customer (Đại lý)
+- **Response Data:** Danh sách đơn hàng của đại lý đang đăng nhập: `id`, `dealer_id`, `status`, `expected_delivery_date`, `total_amount`.
+
+#### `GET /orders/my-orders/{order_id}`
+- **Story:** SCRUM-26 (Theo dõi trạng thái đơn hàng cho Đại lý)
+- **Phân quyền:** Customer (Đại lý sở hữu đơn hàng)
+- **Response Data:** Chi tiết đơn hàng kèm danh sách dòng sản phẩm: `id`, `dealer_id`, `status`, `expected_delivery_date`, `total_amount`, `items` (`product_name`, `quantity_ordered`, `quantity_delivered`, `unit_price`). Chặn 403 Forbidden nếu cố tình truy cập đơn của đại lý khác.
+
 #### `GET /orders`
 - **Story:** S4-07
 - **Phân quyền:** All Staff, Customer (lọc theo chính mình)

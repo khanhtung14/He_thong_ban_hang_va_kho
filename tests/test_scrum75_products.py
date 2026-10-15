@@ -24,9 +24,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import get_db
-from app.models.models import Base, Category, InventoryTransaction, Order, OrderItem, Product, ProductUnit, RoleCode
-from app.api.v1.endpoints.rbac import create_access_token
+from src.backend.database import get_db
+from src.backend.models import Base, Category, InventoryTransaction, Order, OrderItem, Product, ProductUnit, RoleCode
+from src.backend.rbac import create_access_token
 from src.backend.main import app
 
 client = TestClient(app)

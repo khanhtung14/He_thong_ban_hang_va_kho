@@ -554,6 +554,7 @@ class Order(Base):
     total_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     note: Mapped[Optional[str]] = mapped_column(Text)
     approval_reason: Mapped[Optional[str]] = mapped_column(Text)
+    expected_delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -572,11 +573,13 @@ class OrderItem(Base):
     product_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product_units.id", ondelete="SET NULL"))
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    quantity_delivered: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     unit_price: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     floor_price: Mapped[Optional[float]] = mapped_column(Float)
     price_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("price_lists.id", ondelete="SET NULL"))
     
     order: Mapped[Order] = relationship(back_populates="items")
+    product: Mapped[Optional["Product"]] = relationship(foreign_keys=[product_id])
 
 
 # --- EP-05: Kho, Tồn kho & Điều chuyển ---
