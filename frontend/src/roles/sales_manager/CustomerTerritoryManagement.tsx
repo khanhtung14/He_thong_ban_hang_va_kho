@@ -14,6 +14,7 @@ import {
   Tabs,
   Alert,
   Popconfirm,
+  Tooltip,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -26,8 +27,12 @@ import {
   ShopOutlined,
   UserOutlined,
   PlusOutlined,
+  EnvironmentOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import CreateCustomerModal from "../admin/CreateCustomerModal";
+import DeliveryAddressesModal from "../../components/DeliveryAddressesModal";
+import CreditLimitModal from "../../components/CreditLimitModal";
 import {
   fetchCustomersWithTotal,
   fetchSalesReps,
@@ -46,6 +51,8 @@ const { Title, Text } = Typography;
 export const CustomerTerritoryManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState("customers");
   const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [selectedCustomerForAddress, setSelectedCustomerForAddress] = useState<CustomerItem | null>(null);
 
   // State Danh sách đại lý & bộ lọc từ server
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
@@ -60,6 +67,15 @@ export const CustomerTerritoryManagement: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [totalRecords, setTotalRecords] = useState(0);
+
+  // State Modal Điều chỉnh hạn mức tín dụng & ngày nợ
+  const [creditLimitModal, setCreditLimitModal] = useState<{
+    visible: boolean;
+    customer: CustomerItem | null;
+  }>({
+    visible: false,
+    customer: null,
+  });
 
   // State Modal Phân công 1 đại lý
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -94,8 +110,8 @@ export const CustomerTerritoryManagement: React.FC = () => {
           currentRep === "UNASSIGNED"
             ? -1
             : currentRep !== "ALL"
-            ? Number(currentRep)
-            : undefined;
+              ? Number(currentRep)
+              : undefined;
 
         const regionParam =
           currentRegion !== "ALL" && currentRegion !== undefined
@@ -223,7 +239,7 @@ export const CustomerTerritoryManagement: React.FC = () => {
     setHandoverLoading(true);
     try {
       const res = await handoverCustomers({
-        fromSalesRepId: fromRepId,
+        frOMSalesRepId: fromRepId,
         toSalesRepId: toRepId,
         reason: handoverReason.trim(),
       });
@@ -347,20 +363,43 @@ export const CustomerTerritoryManagement: React.FC = () => {
     {
       title: "THAO TÁC",
       key: "actions",
+      width: 290,
       render: (_, r) => (
-        <Button
-          size="small"
-          type="primary"
-          ghost
-          icon={<UserSwitchOutlined />}
-          onClick={() => {
-            setSelectedCustomer(r);
-            setSelectedRepId(r.sales_rep_id || null);
-            setAssignModalOpen(true);
-          }}
-        >
-          {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
-        </Button>
+        <Space size="small">
+          <Button
+            size="small"
+            icon={<EnvironmentOutlined />}
+            onClick={() => {
+              setSelectedCustomerForAddress(r);
+              setIsAddressModalOpen(true);
+            }}
+            style={{ color: "#2563eb", borderColor: "#93c5fd" }}
+          >
+            Điểm giao
+          </Button>
+          <Button
+            size="small"
+            type="primary"
+            ghost
+            icon={<UserSwitchOutlined />}
+            onClick={() => {
+              setSelectedCustomer(r);
+              setSelectedRepId(r.sales_rep_id || null);
+              setAssignModalOpen(true);
+            }}
+          >
+            {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
+          </Button>
+          <Tooltip title="Điều chỉnh hạn mức tín dụng & ngày nợ">
+            <Button
+              size="small"
+              icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
+              onClick={() => setCreditLimitModal({ visible: true, customer: r })}
+            >
+              Hạn mức
+            </Button>
+          </Tooltip>
+        </Space>
       ),
     },
   ];
@@ -765,6 +804,26 @@ export const CustomerTerritoryManagement: React.FC = () => {
         isOpen={isCreateCustomerModalOpen}
         onClose={() => setIsCreateCustomerModalOpen(false)}
         onSuccess={() => loadData()}
+      />
+
+      {/* Modal Quản lý điểm giao hàng (SCRUM-20) */}
+      <DeliveryAddressesModal
+        isOpen={isAddressModalOpen}
+        onClose={() => {
+          setIsAddressModalOpen(false);
+          setSelectedCustomerForAddress(null);
+        }}
+        customerId={selectedCustomerForAddress?.id || null}
+        customerName={selectedCustomerForAddress?.name}
+        customerCode={selectedCustomerForAddress?.code}
+      />
+
+      {/* Modal Điều chỉnh hạn mức tín dụng & ngày nợ */}
+      <CreditLimitModal
+        visible={creditLimitModal.visible}
+        customer={creditLimitModal.customer}
+        onClose={() => setCreditLimitModal({ visible: false, customer: null })}
+        onSuccess={() => fetchCustomersList(currentPage)}
       />
     </div>
   );

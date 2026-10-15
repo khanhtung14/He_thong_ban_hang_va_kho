@@ -14,6 +14,7 @@ import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
 import AgencyLockManager from "./AgencyLockManager";
 import CreditLimitManager from "../../features/credit_limit/CreditLimitManager";
+import { AgencyManagement } from "./AgencyManagement";
 
 const { Content } = Layout;
 
@@ -28,7 +29,26 @@ export const AccountantDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [selectedKey, setSelectedKey] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname;
+      if (
+        p === "/accounting/agencies" ||
+        p === "/accountant/agencies" ||
+        p === "/accounting/customers" ||
+        p === "/accountant/customers"
+      ) {
+        return "agencies";
+      }
+      if (p === "/accounting/agency-locks") {
+        return "agency-locks";
+      }
+      if (p === "/accounting/debt-book" || p === "/accounting/debt") {
+        return "debt";
+      }
+    }
+    return "agencies";
+  });
   const [, setLoading] = useState(false);
 
   // Trạng thái modal
@@ -65,6 +85,26 @@ export const AccountantDashboard: React.FC = () => {
     };
   }, [loadProfileData]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname;
+      if (
+        p === "/accounting/agencies" ||
+        p === "/accountant/agencies" ||
+        p === "/accounting/customers" ||
+        p === "/accountant/customers"
+      ) {
+        setSelectedKey("agencies");
+      } else if (p === "/accounting/agency-locks") {
+        setSelectedKey("agency-locks");
+      } else if (p === "/accounting/debt-book" || p === "/accounting/debt") {
+        setSelectedKey("debt");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   return (
     <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
       {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
@@ -92,7 +132,18 @@ export const AccountantDashboard: React.FC = () => {
       {/* 1. Sidebar Kế toán */}
       <AccountantSidebar
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
+        onSelect={(key) => {
+          setSelectedKey(key);
+          if (key === "agencies") {
+            window.history.pushState({}, "", "/accounting/agencies");
+          } else if (key === "agency-locks") {
+            window.history.pushState({}, "", "/accounting/agency-locks");
+          } else if (key === "debt") {
+            window.history.pushState({}, "", "/accounting/debt-book");
+          } else {
+            window.history.pushState({}, "", "/accounting/debt-book");
+          }
+        }}
         onLogout={logout}
       />
 
@@ -110,7 +161,6 @@ export const AccountantDashboard: React.FC = () => {
         />
 
         {/* Nội dung Dashboard Kế toán */}
-        {/* Nội dung Dashboard Kế toán */}
         <Content
           style={{
             padding: "24px 32px",
@@ -119,6 +169,9 @@ export const AccountantDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
+          {/* Màn hình Quản lý hồ sơ đại lý */}
+          {selectedKey === "agencies" && <AgencyManagement />}
+
           {/* 1. Màn hình Khóa / Mở giao dịch đại lý */}
           {selectedKey === "agency-locks" && <AgencyLockManager />}
 

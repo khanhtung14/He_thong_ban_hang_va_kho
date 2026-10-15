@@ -504,7 +504,7 @@ const CreditLimitManager: React.FC = () => {
 
       {/* ── History Modal ── */}
       <Modal
-        id="modal-credit-limit-history"
+        wrapClassName="modal-credit-limit-history"
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <HistoryOutlined style={{ color: "#2563eb", fontSize: 20 }} />

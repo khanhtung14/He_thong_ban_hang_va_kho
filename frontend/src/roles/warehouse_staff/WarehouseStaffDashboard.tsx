@@ -6,6 +6,7 @@ import ProfileModal from "../../components/ProfileModal";
 import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSidebar";
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
+import SupplierManagement from "./SupplierManagement";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -22,7 +23,16 @@ export const WarehouseStaffDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("scan");
+  const [selectedKey, setSelectedKey] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname;
+      if (p === "/warehouse/suppliers") return "suppliers";
+      if (p === "/warehouse/inventory") return "unit-conversion";
+      if (p === "/warehouse/receiving") return "inbound";
+      if (p === "/warehouse/picking") return "outbound";
+    }
+    return "suppliers";
+  });
   const [, setLoading] = useState(false);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -56,6 +66,18 @@ export const WarehouseStaffDashboard: React.FC = () => {
     };
   }, [loadProfileData]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname;
+      if (p === "/warehouse/suppliers") setSelectedKey("suppliers");
+      else if (p === "/warehouse/inventory") setSelectedKey("unit-conversion");
+      else if (p === "/warehouse/receiving") setSelectedKey("inbound");
+      else if (p === "/warehouse/picking") setSelectedKey("outbound");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   return (
     <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
       {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
@@ -82,7 +104,20 @@ export const WarehouseStaffDashboard: React.FC = () => {
 
       <WarehouseStaffSidebar
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
+        onSelect={(key) => {
+          setSelectedKey(key);
+          if (key === "suppliers") {
+            window.history.pushState({}, "", "/warehouse/suppliers");
+          } else if (key === "unit-conversion") {
+            window.history.pushState({}, "", "/warehouse/inventory");
+          } else if (key === "inbound") {
+            window.history.pushState({}, "", "/warehouse/receiving");
+          } else if (key === "outbound") {
+            window.history.pushState({}, "", "/warehouse/picking");
+          } else {
+            window.history.pushState({}, "", "/warehouse/inventory");
+          }
+        }}
         onLogout={logout}
       />
 
@@ -105,6 +140,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
+          {selectedKey === "suppliers" && <SupplierManagement />}
           {selectedKey === "unit-conversion" && <UnitConversionManager />}
 
           {/* Các tab khác */}

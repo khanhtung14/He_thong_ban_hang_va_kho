@@ -34,13 +34,12 @@ export interface WarehouseManagerHeaderProps {
 export const WarehouseManagerHeader: React.FC<WarehouseManagerHeaderProps> = ({
   fullName = "Quản lý kho",
   roleName = "Trưởng bộ phận kho",
-  avatarUrl: _avatarUrl,
+  avatarUrl,
   notificationCount = 0,
   onProfileClick,
   onChangePassword,
   onLogout,
 }) => {
-  void _avatarUrl;
   const initials =
     fullName
       .trim()
@@ -132,7 +131,7 @@ export const WarehouseManagerHeader: React.FC<WarehouseManagerHeaderProps> = ({
           placement="bottomRight"
         >
           <Space style={{ cursor: "pointer", userSelect: "none" }} size="small">
-            <ProfileAvatar editable={false} size={36} initials={initials} />
+            <ProfileAvatar editable={false} size={36} initials={initials} avatarUrl={avatarUrl} />
             <div
               style={{
                 display: "flex",

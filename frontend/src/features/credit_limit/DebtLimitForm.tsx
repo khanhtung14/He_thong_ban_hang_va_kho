@@ -169,7 +169,7 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
 
   return (
     <Modal
-      id="debt-limit-modal"
+      wrapClassName="debt-limit-modal"
       title={
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div
@@ -314,13 +314,13 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
             { type: "number", min: 0, message: "Hạn mức không được âm!" },
           ]}
         >
-          <InputNumber
+          <InputNumber<number>
             id="input-credit-limit"
             style={{ width: "100%", borderRadius: 8 }}
             min={0}
             step={5000000}
             formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-            parser={(val) => (val ? parseFloat(val.replace(/[,\s₫VND]/g, "")) : 0)}
+            parser={(val) => (val ? parseFloat(val.replace(/[,\s₫VND]/g, "")) : 0) as any}
             placeholder="Ví dụ: 50,000,000"
             size="large"
           />

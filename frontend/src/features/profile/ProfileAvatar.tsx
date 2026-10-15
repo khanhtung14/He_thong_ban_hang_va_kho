@@ -3,7 +3,7 @@ import { authenticatedFetch } from "services/sessionService";
 import "./ProfileAvatar.css";
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
-const AVATAR_UPDATED_EVENT = "oms:profile-avatar-updated";
+const AVATAR_UPDATED_EVENT = "OMS:profile-avatar-updated";
 
 type ApiError = { detail?: string };
 

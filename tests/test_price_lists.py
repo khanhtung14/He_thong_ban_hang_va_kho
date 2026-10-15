@@ -5,8 +5,9 @@ from datetime import date
 import pytest
 from sqlalchemy import delete
 
+import uuid
 from src.backend.database import SessionLocal
-from src.backend.models import Customer, Order, OrderItem, PriceList, PriceListItem
+from src.backend.models import Customer, DeliveryAddress, Order, OrderItem, PriceList, PriceListItem, Product
 from src.backend.rbac import create_access_token
 
 
@@ -19,7 +20,9 @@ def clear_pricing_business_data():
         db.execute(delete(Order))
         db.execute(delete(PriceListItem))
         db.execute(delete(PriceList))
+        db.execute(delete(DeliveryAddress))
         db.execute(delete(Customer))
+        db.execute(delete(Product))
         db.commit()
 
 
@@ -50,9 +53,16 @@ def create_and_publish(client, data=None):
 
 
 def create_customer(client, group="DEALER_LEVEL_1"):
+    suffix = uuid.uuid4().hex[:6]
+    phone_digits = f"{uuid.uuid4().int % 10000000:07d}"
     response = client.post(
         "/api/v1/customers",
-        json={"code": f"CUST-{group}", "name": f"Customer {group}", "customer_group": group},
+        json={
+            "code": f"CUST-{group}-{suffix}",
+            "name": f"Customer {group}",
+            "customer_group": group,
+            "phone": f"091{phone_digits}",
+        },
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -210,3 +220,43 @@ def test_price_list_management_requires_manager_or_admin(client):
     response = client.post("/api/v1/price-lists", json=payload(), headers=auth("Sales Rep"))
     assert response.status_code == 403
     assert client.post("/api/v1/price-lists", json=payload()).status_code == 401
+
+
+def test_order_fallback_to_base_price_when_no_group_price_list(client):
+    """Khi sản phẩm chưa có cấu hình trong bảng giá nhóm đại lý, fallback về base_price của sản phẩm."""
+    # Tạo sản phẩm có base_price trong database
+    prod_id = None
+    try:
+        with SessionLocal() as db:
+            prod = Product(
+                sku="NGK-AQUAFINA-500",
+                name="Nước khoáng Aquafina 500ml",
+                base_price=6000.0,
+                base_unit="Chai",
+                status="ACTIVE",
+            )
+            db.add(prod)
+            db.commit()
+            prod_id = prod.id
+
+        # Tạo đại lý DEALER_LEVEL_1 (chưa có bảng giá riêng cho NGK-AQUAFINA-500)
+        customer = create_customer(client, group="DEALER_LEVEL_1")
+
+        # Tạo đơn hàng -> Không bị lỗi 409 mà tự động fallback về base_price 6000
+        res = client.post(
+            "/api/v1/orders",
+            headers=auth("Sales Rep"),
+            json={
+                "customer_id": customer["id"],
+                "items": [{"sku": "NGK-AQUAFINA-500", "product_name": "Nước khoáng Aquafina 500ml", "quantity": 10}],
+            },
+        )
+        assert res.status_code == 201, res.text
+        order_data = res.json()
+        assert order_data["status"] == "DRAFT"
+        assert order_data["items"][0]["unit_price"] == 6000.0
+        assert order_data["total_amount"] == 60000.0
+    finally:
+        with SessionLocal() as db:
+            db.execute(delete(Product))
+            db.commit()

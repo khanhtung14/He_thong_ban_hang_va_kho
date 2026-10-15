@@ -22,7 +22,7 @@ import { authenticatedFetch } from "../services/sessionService";
 const { Text } = Typography;
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
-const AVATAR_UPDATED_EVENT = "oms:profile-avatar-updated";
+const AVATAR_UPDATED_EVENT = "OMS:profile-avatar-updated";
 
 type ApiError = { detail?: string };
 
@@ -31,6 +31,7 @@ export interface ProfileAvatarProps {
   className?: string;
   editable?: boolean;
   size?: number;
+  avatarUrl?: string | null;
 }
 
 export default function ProfileAvatar({
@@ -38,6 +39,7 @@ export default function ProfileAvatar({
   className = "",
   editable = true,
   size = 54,
+  avatarUrl: providedAvatarUrl,
 }: ProfileAvatarProps) {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [fallbackInitials, setFallbackInitials] = useState(initials);
@@ -58,6 +60,14 @@ export default function ProfileAvatar({
 
     async function loadAvatar() {
       try {
+        if (providedAvatarUrl) {
+          if (!disposed) {
+            setAvatarUrl(providedAvatarUrl);
+            setFallbackInitials(initials);
+          }
+          return;
+        }
+
         // Bước 1: Lấy profile để có avatar_url hiện tại
         const profileRes = await authenticatedFetch("/api/v1/profile", {
           cache: "no-store",
@@ -134,7 +144,7 @@ export default function ProfileAvatar({
       window.removeEventListener(AVATAR_UPDATED_EVENT, handleAvatarUpdated);
       if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current);
     };
-  }, []);
+  }, [initials, providedAvatarUrl]);
 
   useEffect(
     () => () => {

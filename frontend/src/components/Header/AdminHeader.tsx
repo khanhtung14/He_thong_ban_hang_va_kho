@@ -127,7 +127,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           placement="bottomRight"
         >
           <Space style={{ cursor: "pointer", userSelect: "none" }} size={10}>
-            <ProfileAvatar editable={false} size={36} initials={fullName.charAt(0).toUpperCase()} />
+            <ProfileAvatar editable={false} size={36} initials={fullName.charAt(0).toUpperCase()} avatarUrl={undefined} />
             <div style={{ textAlign: "left", lineHeight: 1.2 }}>
               <div style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>
                 {fullName}

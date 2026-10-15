@@ -85,7 +85,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
   };
 
   const handleGenerateCode = () => {
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const randOMSuffix = Math.floor(1000 + Math.random() * 9000);
     const terrVal = form.getFieldValue("territoryId");
     let prefix = "DL";
     if (terrVal) {
@@ -95,7 +95,7 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
       }
     }
     form.setFieldsValue({
-      code: `${prefix}-${randomSuffix}`,
+      code: `${prefix}-${randOMSuffix}`,
     });
   };
 
