@@ -27,8 +27,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import get_db
-from app.models.models import (
+from src.backend.database import get_db
+from src.backend.models import (
     Base,
     RoleCode,
     Supplier,
@@ -36,8 +36,8 @@ from app.models.models import (
     Warehouse,
     WarehouseReceipt,
 )
-from app.api.v1.endpoints.rbac import create_access_token
-from main import app
+from src.backend.rbac import create_access_token
+from src.backend.main import app
 
 
 def make_auth_header(role: str, username: str = "wh_user") -> dict[str, str]:

@@ -5,7 +5,7 @@ import re
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.models.models import AccountStatus
+from src.backend.models import AccountStatus
 
 
 PHONE_REGEX = re.compile(r"^0[1235789]\d{8}$")

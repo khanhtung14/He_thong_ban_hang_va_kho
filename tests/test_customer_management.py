@@ -17,9 +17,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import get_db
+from src.backend.database import get_db
 from src.backend.main import app
-from app.models.models import (
+from src.backend.models import (
     Base,
     Customer,
     Order,
@@ -31,7 +31,7 @@ from app.models.models import (
     User,
     AccountStatus,
 )
-from app.api.v1.endpoints.rbac import create_access_token
+from src.backend.rbac import create_access_token
 
 
 def make_token(role: str, username: str = "test_user", user_id: int | None = None) -> dict[str, str]:

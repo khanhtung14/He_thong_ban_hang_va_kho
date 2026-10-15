@@ -8,6 +8,7 @@ import { CustomerHeader } from "../../components/Header/CustomerHeader";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
+import CustomerOrderList from "./CustomerOrderList";
 
 const { Content } = Layout;
 
@@ -104,7 +105,11 @@ export const CustomerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung danh mục sản phẩm, đặt đơn, xem công nợ */}
+          {selectedKey === "orders" || selectedKey === "dashboard" ? (
+            <CustomerOrderList />
+          ) : (
+            <CustomerOrderList />
+          )}
         </Content>
       </Layout>
 

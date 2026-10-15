@@ -580,6 +580,104 @@
 - **Phân quyền:** Sales Rep, Customer
 - **Response Data:** Stream file PDF in phiếu đặt hàng.
 
+#### `GET /orders/{order_id}/reorder-preview`
+- **Story:** SCRUM-28 (Reorder Preview)
+- **Phân quyền:** Customer, Sales Rep, Admin
+- **Mục đích:** Xem trước việc đặt lại một đơn hàng cũ.
+- **Quy tắc nghiệp vụ:**
+  1. Kiểm tra đối chiếu từng mặt hàng với bảng Products hiện tại.
+  2. Mặt hàng đã ngừng kinh doanh (`is_active=False` hoặc `status != 'ACTIVE'`) tự động bị loại khỏi đơn mới và đưa vào danh sách `discontinued_items` kèm thông báo cảnh báo.
+  3. Cập nhật đơn giá mới nhất của các mặt hàng hợp lệ theo bảng giá hiện hành (`PriceLists`), bỏ qua mức giá cũ trong lịch sử đơn hàng.
+- **Response Data:**
+```json
+{
+  "order_id": 101,
+  "order_code": "ORD-202610-001",
+  "customer_id": 5,
+  "customer_name": "Đại lý Hoàng Long",
+  "customer_group": "DEALER_LEVEL_1",
+  "available_items": [
+    {
+      "product_id": 12,
+      "sku": "SP-001",
+      "product_name": "Nước ép cam 1L",
+      "unit_id": 1,
+      "unit_name": "Thùng 12 hộp",
+      "quantity": 2,
+      "old_unit_price": 100000.0,
+      "new_unit_price": 145000.0,
+      "floor_price": 120000.0,
+      "price_list_id": 3,
+      "price_list_code": "BG-DEALER-2026",
+      "total_price": 290000.0,
+      "is_active": true
+    }
+  ],
+  "discontinued_items": [
+    {
+      "product_id": 15,
+      "sku": "SP-003",
+      "product_name": "Trà sữa Matcha (Ngừng KD)",
+      "old_unit_price": 50000.0,
+      "quantity": 2,
+      "reason": "Sản phẩm đã ngừng kinh doanh (trạng thái: DISCONTINUED)"
+    }
+  ],
+  "has_discontinued_items": true,
+  "warning_message": "Có 1 mặt hàng đã ngừng kinh doanh và được tự động loại bỏ...",
+  "total_estimated_amount": 290000.0
+}
+```
+
+#### `POST /orders/reorder`
+- **Story:** SCRUM-28 (Create Reorder)
+- **Phân quyền:** Customer, Sales Rep, Admin
+- **Mục đích:** Tạo đơn hàng mới từ các mặt hàng được chọn của đơn cũ.
+- **Quy tắc nghiệp vụ:**
+  1. Cho phép đặt lại toàn bộ hoặc tích chọn một phần mặt hàng.
+  2. Chặn đặt lại nếu đại lý đang bị khóa giao dịch (SCRUM-85).
+  3. Tự động loại bỏ bất kỳ mặt hàng ngừng kinh doanh nào.
+  4. Cập nhật giá theo bảng giá hiện hành (PriceLists), tính lại tổng tiền.
+  5. Tạo đơn hàng mới trạng thái DRAFT.
+- **Request Body:**
+```json
+{
+  "original_order_id": 101,
+  "items": [
+    {
+      "sku": "SP-001",
+      "quantity": 2
+    }
+  ],
+  "note": "Đặt lại định kỳ tháng 10"
+}
+```
+- **Response Data:**
+```json
+{
+  "success": true,
+  "code": 201,
+  "message": "Đặt lại đơn hàng thành công từ đơn #ORD-202610-001!",
+  "order_id": 105,
+  "order_code": "ORD-20261015-0004",
+  "customer_id": 5,
+  "customer_name": "Đại lý Hoàng Long",
+  "status": "DRAFT",
+  "total_amount": 290000.0,
+  "items_count": 1,
+  "original_order_id": 101,
+  "original_order_code": "ORD-202610-001",
+  "warning_message": null,
+  "data": {
+    "order_id": 105,
+    "order_code": "ORD-20261015-0004",
+    "customer_id": 5,
+    "status": "DRAFT",
+    "total_amount": 290000.0
+  }
+}
+```
+
 ---
 
 ### EP-05: KHO & TỒN KHO (SPRINT 2, 5, 6, 8)

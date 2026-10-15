@@ -278,6 +278,15 @@ class Product(Base):
         order_by="desc(ProductPriceHistory.effective_date)",
     )
 
+    @property
+    def is_active(self) -> bool:
+        return (self.status or "").upper() == "ACTIVE"
+
+    @is_active.setter
+    def is_active(self, value: bool) -> None:
+        self.status = "ACTIVE" if value else "DISCONTINUED"
+
+
 
 class ProductPriceHistory(Base):
     __tablename__ = "product_price_history"

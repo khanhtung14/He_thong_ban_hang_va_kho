@@ -23,10 +23,12 @@ from . import (
     main as main_module,
     models,
     navigation,
+    orders,
     price_lists,
     products,
     rbac,
     reports,
+    schemas,
     security,
     session,
     suppliers,
@@ -49,6 +51,8 @@ sys.modules["src.backend.audit_logs"] = audit_logs
 sys.modules["src.backend.navigation"] = navigation
 sys.modules["src.backend.products"] = products
 sys.modules["src.backend.price_lists"] = price_lists
+sys.modules["src.backend.orders"] = orders
+sys.modules["src.backend.schemas"] = schemas
 sys.modules["src.backend.user_routes"] = user_routes
 sys.modules["src.backend.email_service"] = email_service
 sys.modules["src.backend.users_service"] = users_service
