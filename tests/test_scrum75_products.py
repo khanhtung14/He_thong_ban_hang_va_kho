@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Automated tests for SCRUM-75: Quản lý danh mục sản phẩm (Product CRUD & Constraints).
 
 Covers:
