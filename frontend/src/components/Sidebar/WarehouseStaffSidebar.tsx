@@ -63,6 +63,11 @@ export const WarehouseStaffSidebar: React.FC<WarehouseStaffSidebarProps> = ({
           label: "Đơn vị tính & Quy đổi",
         },
         {
+          key: "transfers",
+          icon: <SwapOutlined />,
+          label: "Chuyển kho nội bộ",
+        },
+        {
           key: "stocktake-exec",
           icon: <CheckSquareOutlined />,
           label: "Đếm hàng kiểm kê",

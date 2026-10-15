@@ -239,6 +239,10 @@ except ModuleNotFoundError:
 
 app.include_router(avatar_router)
 
+from app.api.v1.endpoints.internal_transfers import router as internal_transfers_router, compat_v1_router as internal_transfers_compat_router
+app.include_router(internal_transfers_router)
+app.include_router(internal_transfers_compat_router)
+
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def home():
