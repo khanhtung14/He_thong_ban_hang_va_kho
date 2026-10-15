@@ -488,3 +488,42 @@ def test_scrum85_locked_customer_cannot_order_with_delivery_address(scrum20_clie
     )
     assert res_order.status_code == 400
     assert "đã bị khóa giao dịch" in res_order.json()["detail"]
+
+
+def test_accountant_can_manage_delivery_address_and_11_digit_phone(scrum20_client):
+    """Kế toán có thể quản lý điểm giao hàng và hỗ trợ số điện thoại 11 chữ số."""
+    client, data = scrum20_client
+    accountant_headers = make_auth_headers("Accountant", "accountant_01")
+
+    # Kế toán thêm điểm giao hàng với SĐT 11 số (VD bàn: 02412345678)
+    res = client.post(
+        f"/api/v1/customers/{data['cust1_id']}/delivery-addresses",
+        headers=accountant_headers,
+        json={
+            "receiverName": "Kế toán chi nhánh",
+            "phone": "02412345678",
+            "address": "Phòng kế toán 11 số",
+            "isDefault": False,
+        },
+    )
+    assert res.status_code == 201
+    addr_id = res.json()["id"]
+    assert res.json()["phone"] == "02412345678"
+
+    # Kế toán cập nhật
+    res_update = client.put(
+        f"/api/v1/customers/{data['cust1_id']}/delivery-addresses/{addr_id}",
+        headers=accountant_headers,
+        json={
+            "phone": "02898765432",
+        },
+    )
+    assert res_update.status_code == 200
+    assert res_update.json()["phone"] == "02898765432"
+
+    # Kế toán xóa
+    res_del = client.delete(
+        f"/api/v1/customers/{data['cust1_id']}/delivery-addresses/{addr_id}",
+        headers=accountant_headers,
+    )
+    assert res_del.status_code == 200

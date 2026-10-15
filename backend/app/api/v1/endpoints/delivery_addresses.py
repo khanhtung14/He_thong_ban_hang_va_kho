@@ -27,7 +27,7 @@ from app.api.v1.endpoints.rbac import (
     require_roles,
 )
 
-PHONE_REGEX = re.compile(r"^0[1235789]\d{8}$")
+PHONE_REGEX = re.compile(r"^0[1235789]\d{8,9}$")
 
 router = APIRouter(prefix="/api/v1/customers", tags=["Delivery Addresses (SCRUM-20)"])
 
@@ -129,6 +129,7 @@ def create_delivery_address(
             RoleCode.SALES_REP,
             RoleCode.SALES_MANAGER,
             RoleCode.ADMIN,
+            RoleCode.ACCOUNTANT,
             RoleCode.CUSTOMER,
         )
     ),
@@ -152,7 +153,7 @@ def create_delivery_address(
     if not PHONE_REGEX.match(clean_phone):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Số điện thoại người nhận không hợp lệ. Phải gồm 10 chữ số bắt đầu bằng đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02).",
+            detail="Số điện thoại người nhận không hợp lệ. Phải gồm 10-11 chữ số bắt đầu bằng đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02).",
         )
 
     clean_address = payload.address.strip()
@@ -192,6 +193,7 @@ def update_delivery_address(
             RoleCode.SALES_REP,
             RoleCode.SALES_MANAGER,
             RoleCode.ADMIN,
+            RoleCode.ACCOUNTANT,
             RoleCode.CUSTOMER,
         )
     ),
@@ -230,7 +232,7 @@ def update_delivery_address(
         if not PHONE_REGEX.match(clean_phone):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Số điện thoại người nhận không hợp lệ. Phải gồm 10 chữ số bắt đầu bằng đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02).",
+                detail="Số điện thoại người nhận không hợp lệ. Phải gồm 10-11 chữ số bắt đầu bằng đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02).",
             )
         addr.phone = clean_phone
 
@@ -276,6 +278,7 @@ def set_default_delivery_address(
             RoleCode.SALES_REP,
             RoleCode.SALES_MANAGER,
             RoleCode.ADMIN,
+            RoleCode.ACCOUNTANT,
             RoleCode.CUSTOMER,
         )
     ),
@@ -320,6 +323,7 @@ def delete_delivery_address(
             RoleCode.SALES_REP,
             RoleCode.SALES_MANAGER,
             RoleCode.ADMIN,
+            RoleCode.ACCOUNTANT,
             RoleCode.CUSTOMER,
         )
     ),
