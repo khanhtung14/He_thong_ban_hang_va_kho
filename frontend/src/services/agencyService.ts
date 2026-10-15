@@ -21,14 +21,38 @@ export async function getAgencies(
 ): Promise<AgencyListResponse> {
   const searchParams = new URLSearchParams();
 
-  if (params?.search) searchParams.append("search", params.search.trim());
-  if (params?.keyword) searchParams.append("keyword", params.keyword.trim());
-  if (params?.customer_group) searchParams.append("customer_group", params.customer_group.trim());
-  if (params?.region) searchParams.append("region", params.region.trim());
-  if (params?.is_active !== undefined) {
+  const kw = params?.keyword?.trim() || params?.search?.trim();
+  if (kw) {
+    searchParams.append("search", kw);
+    searchParams.append("keyword", kw);
+  }
+
+  const grp = params?.customer_group?.trim() || params?.customerGroup?.trim();
+  if (grp && grp.toUpperCase() !== "ALL") {
+    searchParams.append("customer_group", grp);
+    searchParams.append("customerGroup", grp);
+  }
+
+  const reg = params?.region?.trim();
+  if (reg && reg.toUpperCase() !== "ALL") {
+    searchParams.append("region", reg);
+  }
+  if (params?.regionId !== undefined && params?.regionId !== null && String(params.regionId).toUpperCase() !== "ALL") {
+    searchParams.append("regionId", String(params.regionId));
+  }
+
+  const rep = params?.sales_rep_id ?? params?.assignedRepId;
+  if (rep !== undefined && rep !== null && String(rep).toUpperCase() !== "ALL") {
+    searchParams.append("assignedRepId", String(rep));
+    searchParams.append("sales_rep_id", String(rep));
+  }
+
+  if (params?.status && params.status.toUpperCase() !== "ALL") {
+    searchParams.append("status", params.status.trim());
+  } else if (params?.is_active !== undefined) {
     searchParams.append("is_active", String(params.is_active));
   }
-  if (params?.status) searchParams.append("status", params.status.trim());
+
   if (params?.page) searchParams.append("page", String(params.page));
   if (params?.limit) searchParams.append("limit", String(params.limit));
 
@@ -38,11 +62,13 @@ export async function getAgencies(
   const res = await authenticatedFetch(url);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Không thể tải danh sách hồ sơ đại lý.");
+    throw new Error(err.detail || err.message || "Không thể tải danh sách hồ sơ đại lý.");
   }
 
   const result = await res.json();
   if (Array.isArray(result)) {
+    const headerTotal = res.headers.get("X-Total-Count");
+    const totalRecords = headerTotal ? parseInt(headerTotal, 10) : result.length;
     return {
       success: true,
       code: 200,
@@ -51,8 +77,8 @@ export async function getAgencies(
       pagination: {
         page: params?.page || 1,
         limit: params?.limit || result.length,
-        totalRecords: result.length,
-        totalPages: 1,
+        totalRecords: isNaN(totalRecords) ? result.length : totalRecords,
+        totalPages: params?.limit ? Math.ceil(totalRecords / params.limit) : 1,
       },
     };
   }

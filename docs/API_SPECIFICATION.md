@@ -360,6 +360,22 @@
 ```
 - **Response Data:** Điểm giao hàng mới.
 
+#### `PUT /customers/{id}/delivery-addresses/{address_id}`
+- **Story:** S3-04
+- **Phân quyền:** Sales Rep, Customer
+- **Request Body:** Cập nhật thông tin điểm giao hàng (`receiverName`, `phone`, `address`, `note`, `isDefault`).
+- **Response Data:** Điểm giao hàng sau cập nhật.
+
+#### `PATCH /customers/{id}/delivery-addresses/{address_id}/default`
+- **Story:** S3-04
+- **Phân quyền:** Sales Rep, Customer
+- **Response Data:** Đặt điểm giao hàng làm mặc định (tự động chuyển các điểm khác sang `isDefault: false`).
+
+#### `DELETE /customers/{id}/delivery-addresses/{address_id}`
+- **Story:** S3-04
+- **Phân quyền:** Sales Rep, Customer
+- **Response Data:** Xóa điểm giao hàng thành công (tự động chuyển cờ mặc định nếu xóa điểm mặc định).
+
 #### `PUT /customers/{id}/credit-limit`
 - **Story:** S3-05
 - **Phân quyền:** Accountant

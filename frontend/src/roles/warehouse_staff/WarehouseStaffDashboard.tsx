@@ -24,8 +24,12 @@ export const WarehouseStaffDashboard: React.FC = () => {
   });
 
   const [selectedKey, setSelectedKey] = useState<string>(() => {
-    if (typeof window !== "undefined" && window.location.pathname === "/warehouse/suppliers") {
-      return "suppliers";
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname;
+      if (p === "/warehouse/suppliers") return "suppliers";
+      if (p === "/warehouse/inventory") return "unit-conversion";
+      if (p === "/warehouse/receiving") return "inbound";
+      if (p === "/warehouse/picking") return "outbound";
     }
     return "suppliers";
   });
@@ -64,9 +68,11 @@ export const WarehouseStaffDashboard: React.FC = () => {
 
   useEffect(() => {
     const handlePopState = () => {
-      if (window.location.pathname === "/warehouse/suppliers") {
-        setSelectedKey("suppliers");
-      }
+      const p = window.location.pathname;
+      if (p === "/warehouse/suppliers") setSelectedKey("suppliers");
+      else if (p === "/warehouse/inventory") setSelectedKey("unit-conversion");
+      else if (p === "/warehouse/receiving") setSelectedKey("inbound");
+      else if (p === "/warehouse/picking") setSelectedKey("outbound");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -102,8 +108,14 @@ export const WarehouseStaffDashboard: React.FC = () => {
           setSelectedKey(key);
           if (key === "suppliers") {
             window.history.pushState({}, "", "/warehouse/suppliers");
+          } else if (key === "unit-conversion") {
+            window.history.pushState({}, "", "/warehouse/inventory");
+          } else if (key === "inbound") {
+            window.history.pushState({}, "", "/warehouse/receiving");
+          } else if (key === "outbound") {
+            window.history.pushState({}, "", "/warehouse/picking");
           } else {
-            window.history.pushState({}, "", "/warehouse/dashboard");
+            window.history.pushState({}, "", "/warehouse/inventory");
           }
         }}
         onLogout={logout}

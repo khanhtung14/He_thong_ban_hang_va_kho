@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 PHONE_REGEX = re.compile(r"^0[1235789]\d{8}$")
 from sqlalchemy.orm import selectinload
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 try:
@@ -33,6 +33,7 @@ try:
         Order,
         OrderItem,
         OrderStatus,
+        Product,
         Role,
         RoleCode,
         Territory,
@@ -261,24 +262,41 @@ class CustomerPricingGroupRequest(BaseModel):
 
 class OrderItemCreate(BaseModel):
     sku: str = Field(..., min_length=1, max_length=50)
-    product_name: str = Field(..., min_length=1, max_length=255)
+    product_name: Optional[str] = Field(default=None, max_length=255)
     quantity: int = Field(default=1, gt=0)
     unit_price: Optional[float] = Field(default=None, ge=0)
 
 
+class DeliveryAddressBriefResponse(BaseModel):
+    id: int
+    customer_id: int
+    receiver_name: str
+    phone: str
+    address: str
+    is_default: bool
+    note: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
 class OrderCreateRequest(BaseModel):
-    customer_id: int = Field(..., description="ID của đại lý đặt hàng")
+    customer_id: int = Field(..., alias="customerId", description="ID của đại lý đặt hàng")
+    delivery_address_id: Optional[int] = Field(None, alias="deliveryAddressId", description="ID điểm giao hàng")
     items: List[OrderItemCreate] = Field(default_factory=list, min_length=1, description="Danh sách sản phẩm trong đơn")
     note: Optional[str] = None
+    status: Optional[OrderStatus] = Field(None, description="Trạng thái đơn hàng khởi tạo (ví dụ: PENDING_APPROVAL)")
+    submit_for_approval: Optional[bool] = Field(None, alias="submitForApproval", description="Gửi duyệt ngay")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class OrderItemResponse(BaseModel):
     id: int
-    sku: str
-    product_name: str
+    sku: Optional[str] = None
+    product_name: Optional[str] = None
     quantity: int
     unit_price: float
-    floor_price: Optional[int] = None
+    floor_price: Optional[float] = None
     price_list_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -289,6 +307,8 @@ class OrderResponse(BaseModel):
     order_code: str
     customer_id: int
     customer_name: Optional[str] = None
+    delivery_address_id: Optional[int] = None
+    delivery_address: Optional[DeliveryAddressBriefResponse] = None
     status: OrderStatus
     total_amount: float
     note: Optional[str] = None
@@ -300,7 +320,7 @@ class OrderResponse(BaseModel):
     approval_reason: Optional[str] = None
     items: List[OrderItemResponse] = Field(default_factory=list)
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ---------------------------------------------------------
@@ -388,7 +408,7 @@ def list_customers(
                 pass
 
     # 2. Lọc theo Địa bàn / Khu vực
-    if region and isinstance(region, str) and region.strip():
+    if region and isinstance(region, str) and region.strip() and region.strip().upper() != "ALL":
         query = query.where(Customer.region == region.strip())
     if region_id is not None and isinstance(region_id, (int, str)):
         reg_str = str(region_id).strip()
@@ -404,8 +424,9 @@ def list_customers(
     effective_group = customer_group if customer_group is not None else customer_group_id
     if effective_group and isinstance(effective_group, str):
         grp = effective_group.strip()
-        if grp and grp != "ALL":
-            query = query.where(Customer.customer_group == grp)
+        if grp and grp.upper() != "ALL":
+            grp_val = _customer_group_from_value(grp)
+            query = query.where(Customer.customer_group == grp_val)
 
     # 4. Lọc theo Trạng thái hoạt động / Khóa
     if is_active is not None and isinstance(is_active, bool):
@@ -1199,7 +1220,7 @@ def get_agencies_debt_status(
 # Territory & Sales Rep Assignment Endpoints (S3-06 & Handover)
 # ---------------------------------------------------------
 
-@router.get("/sales-reps")
+@router.get("/sales-reps", operation_id="list_sales_reps_customer_lock")
 def list_sales_reps(
     db: Session = Depends(get_db),
     _user: AuthenticatedUser = Depends(require_roles("Sales Rep", "Sales Manager", "Admin")),
@@ -1339,44 +1360,154 @@ def create_order(
     for requested in payload.items:
         sku = requested.sku.strip().upper()
         product = MOCK_PRODUCTS.get(sku)
+        db_product = db.query(Product).filter(func.upper(Product.sku) == sku).first()
         effective = resolve_effective_price(db, sku, customer.customer_group)
-        if effective is None and customer.customer_group in {
-            CustomerGroup.LEVEL_1.value,
-            CustomerGroup.LEVEL_2.value,
-        }:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Chưa có bảng giá đang hiệu lực cho {customer.customer_group} và SKU {sku}.",
-            )
-        if effective is None and product is None:
+
+        # Lấy giá niêm yết gốc (base_price) từ database hoặc mock
+        base_product_price: Optional[float] = None
+        if db_product and db_product.base_price is not None and db_product.base_price > 0:
+            base_product_price = float(db_product.base_price)
+        elif product and product.get("sale_price") is not None and product.get("sale_price") > 0:
+            base_product_price = float(product["sale_price"])
+
+        # Nếu sản phẩm hoàn toàn không tồn tại trong danh mục hệ thống
+        if db_product is None and product is None:
             raise HTTPException(status_code=404, detail=f"Không tìm thấy SKU {sku} trong danh mục sản phẩm.")
 
-        base_price = effective["sale_price"] if effective else product["sale_price"]
-        floor_price = effective["floor_price"] if effective else None
-        actual_price = base_price if is_customer_account or requested.unit_price is None else requested.unit_price
+        # Xác định đơn giá cơ sở & giá sàn (Fallback về base_price nếu chưa có bảng giá riêng theo cấp đại lý)
+        if effective is not None:
+            base_price = effective["sale_price"]
+            floor_price = effective.get("floor_price")
+            price_list_id = effective.get("price_list_id")
+        elif base_product_price is not None:
+            base_price = base_product_price
+            floor_price = None
+            price_list_id = None
+        elif requested.unit_price is not None and requested.unit_price > 0:
+            base_price = requested.unit_price
+            floor_price = None
+            price_list_id = None
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Sản phẩm {sku} chưa có cấu hình giá nào trong hệ thống. Vui lòng nhập đơn giá hợp lệ.",
+            )
+
+        actual_price = (
+            base_price
+            if is_customer_account or requested.unit_price is None or requested.unit_price <= 0
+            else requested.unit_price
+        )
         if floor_price is not None and actual_price < floor_price:
             approval_lines.append(f"{sku}: {actual_price} dưới giá sàn {floor_price}")
+
+        # Gán product_id để tránh vi phạm NOT NULL constraint trên bảng order_items
+        product_id = db_product.id if db_product else None
+        if not product_id and (product or requested.product_name):
+            existing_prod = db.query(Product).filter(func.upper(Product.sku) == sku).first()
+            if existing_prod:
+                product_id = existing_prod.id
+            elif db.query(Product).count() > 0:
+                new_prod = Product(
+                    sku=sku,
+                    name=requested.product_name or (product.get("name") if product else sku),
+                    base_price=float(base_price if base_price else 0.0),
+                    base_unit=product.get("unit") if product and product.get("unit") else "Cái",
+                    status="ACTIVE",
+                )
+                db.add(new_prod)
+                db.flush()
+                product_id = new_prod.id
+
         resolved_items.append({
+            "product_id": product_id,
             "sku": sku,
-            "product_name": requested.product_name,
+            "product_name": requested.product_name or (db_product.name if db_product else (product.get("name") if product else sku)),
             "quantity": requested.quantity,
             "unit_price": actual_price,
             "floor_price": floor_price,
-            "price_list_id": effective["price_list_id"] if effective else None,
+            "price_list_id": price_list_id,
         })
 
     total_amount = sum(item["quantity"] * item["unit_price"] for item in resolved_items)
 
-    actor_user = db.query(User).filter(User.username == user.username).first()
+    # Gắn thông tin người tạo đơn từ session nhân viên hiện tại (hỗ trợ id, username, email, full_name)
+    actor_user = None
+    if user.id:
+        actor_user = db.get(User, user.id)
+    if not actor_user and user.username:
+        actor_user = (
+            db.query(User)
+            .filter(
+                or_(
+                    func.lower(User.username) == user.username.lower(),
+                    func.lower(User.email) == user.username.lower(),
+                    func.lower(User.full_name) == user.username.lower(),
+                )
+            )
+            .first()
+        )
+    if not actor_user and user.full_name:
+        actor_user = (
+            db.query(User)
+            .filter(func.lower(User.full_name) == user.full_name.lower())
+            .first()
+        )
+
+    # SCRUM-20 Validation điểm giao hàng
+    chosen_address_id: Optional[int] = None
+    if payload.delivery_address_id is not None:
+        addr = db.get(DeliveryAddress, payload.delivery_address_id)
+        if not addr:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Không tìm thấy điểm giao hàng với ID {payload.delivery_address_id}!",
+            )
+        if addr.customer_id != customer.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Điểm giao hàng ID {payload.delivery_address_id} không thuộc về đại lý '{customer.name}' (ID: {customer.id})!",
+            )
+        chosen_address_id = addr.id
+    else:
+        # Tự động chọn điểm giao hàng mặc định nếu có
+        default_addr = (
+            db.query(DeliveryAddress)
+            .filter(DeliveryAddress.customer_id == customer.id, DeliveryAddress.is_default == True)
+            .first()
+        )
+        if not default_addr:
+            default_addr = (
+                db.query(DeliveryAddress)
+                .filter(DeliveryAddress.customer_id == customer.id)
+                .order_by(DeliveryAddress.id.asc())
+                .first()
+            )
+        if default_addr:
+            chosen_address_id = default_addr.id
+
+    if payload.submit_for_approval or payload.status in [OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"]:
+        order_status = OrderStatus.PENDING_APPROVAL
+    elif approval_lines:
+        order_status = OrderStatus.PENDING
+    elif payload.status is not None:
+        order_status = payload.status
+    else:
+        order_status = OrderStatus.DRAFT
+
+    approval_reason = "; ".join(approval_lines) if approval_lines else None
+    if order_status in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL) and not approval_reason:
+        approval_reason = payload.note or "Chờ Quản lý kinh doanh phê duyệt"
 
     new_order = Order(
         order_code=order_code,
         customer_id=customer.id,
         created_by_id=actor_user.id if actor_user else None,
-        status=OrderStatus.PENDING if approval_lines else OrderStatus.DRAFT,
+        delivery_address_id=chosen_address_id,
+        status=order_status,
         total_amount=total_amount,
         note=payload.note,
-        approval_reason="; ".join(approval_lines) if approval_lines else None,
+        approval_reason=approval_reason,
     )
     db.add(new_order)
     db.flush()
@@ -1384,6 +1515,7 @@ def create_order(
     for it in resolved_items:
         db.add(OrderItem(
             order_id=new_order.id,
+            product_id=it.get("product_id"),
             sku=it["sku"],
             product_name=it["product_name"],
             quantity=it["quantity"],
@@ -1399,6 +1531,10 @@ def create_order(
     res.customer_name = customer.name
     res.has_warning = False
     res.warning_message = None
+    if new_order.delivery_address_id:
+        res.delivery_address_id = new_order.delivery_address_id
+        if new_order.delivery_address:
+            res.delivery_address = DeliveryAddressBriefResponse.model_validate(new_order.delivery_address)
     return res
 
 
@@ -1425,6 +1561,10 @@ def list_orders(
         resp.customer_name = cust.name if cust else None
         resp.has_warning = has_warn
         resp.warning_message = warn_msg
+        if ord.delivery_address_id:
+            resp.delivery_address_id = ord.delivery_address_id
+            if ord.delivery_address:
+                resp.delivery_address = DeliveryAddressBriefResponse.model_validate(ord.delivery_address)
         results.append(resp)
 
     return results
@@ -1437,7 +1577,7 @@ def list_orders_pending_approval(
 ):
     orders = db.execute(
         select(Order).options(selectinload(Order.items))
-        .where(Order.status.in_([OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL]), Order.approval_reason.is_not(None))
+        .where(Order.status.in_([OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL]))
         .order_by(Order.id.desc())
     ).scalars().all()
     results = []
@@ -1458,8 +1598,8 @@ def approve_below_floor_order(
     order = db.execute(select(Order).options(selectinload(Order.items)).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
-    if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL) or not order.approval_reason:
-        raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt giá sàn.")
+    if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL):
+        raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt.")
     order.status = OrderStatus.APPROVED
     db.commit()
     customer = db.get(Customer, order.customer_id)
@@ -1482,10 +1622,11 @@ def reject_below_floor_order(
     order = db.execute(select(Order).options(selectinload(Order.items)).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
-    if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL) or not order.approval_reason:
-        raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt giá sàn.")
+    if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL):
+        raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt.")
     order.status = OrderStatus.CANCELLED
-    order.approval_reason = f"{order.approval_reason}; Từ chối: {payload.reason.strip()}"
+    rejection_note = f"Từ chối: {payload.reason.strip()}"
+    order.approval_reason = f"{order.approval_reason}; {rejection_note}" if order.approval_reason else rejection_note
     db.commit()
     customer = db.get(Customer, order.customer_id)
     response = OrderResponse.model_validate(order)
@@ -1537,3 +1678,228 @@ def update_order_status(
     resp.has_warning = has_warn
     resp.warning_message = warn_msg
     return resp
+
+
+@router.post("/orders/{order_id}/submit", response_model=OrderResponse)
+def submit_order_for_approval(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
+):
+    """Gửi duyệt đơn hàng nháp (chuyển sang trạng thái PENDING_APPROVAL)."""
+    order = db.execute(
+        select(Order).options(selectinload(Order.items), selectinload(Order.delivery_address)).where(Order.id == order_id)
+    ).scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
+
+    customer = db.get(Customer, order.customer_id)
+    if customer and customer.is_locked:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Đại lý '{customer.name}' hiện đang bị khóa giao dịch, không thể gửi duyệt đơn hàng!",
+        )
+
+    if order.status not in (OrderStatus.DRAFT, OrderStatus.CANCELLED):
+        raise HTTPException(status_code=400, detail="Chỉ có thể gửi duyệt đơn hàng ở trạng thái Bản nháp!")
+
+    order.status = OrderStatus.PENDING_APPROVAL
+    if not order.approval_reason:
+        order.approval_reason = order.note or "Chờ Quản lý kinh doanh phê duyệt"
+
+    db.commit()
+    db.refresh(order)
+
+    resp = OrderResponse.model_validate(order)
+    resp.customer_name = customer.name if customer else None
+    if order.delivery_address_id:
+        resp.delivery_address_id = order.delivery_address_id
+        if order.delivery_address:
+            resp.delivery_address = DeliveryAddressBriefResponse.model_validate(order.delivery_address)
+    return resp
+
+
+@router.put("/orders/{order_id}", response_model=OrderResponse)
+def update_order(
+    order_id: int,
+    payload: OrderCreateRequest,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
+):
+    """Chỉnh sửa đơn hàng (chỉ cho phép khi đơn ở trạng thái DRAFT hoặc PENDING_APPROVAL)."""
+    order = db.execute(
+        select(Order).options(selectinload(Order.items), selectinload(Order.delivery_address)).where(Order.id == order_id)
+    ).scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
+
+    if order.status not in (OrderStatus.DRAFT, OrderStatus.PENDING_APPROVAL):
+        raise HTTPException(status_code=400, detail="Không thể chỉnh sửa đơn hàng đã được duyệt hoặc đang xử lý!")
+
+    customer = db.get(Customer, payload.customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đại lý tương ứng!")
+
+    if customer.is_locked:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Đại lý '{customer.name}' đã bị khóa giao dịch, không thể cập nhật đơn!",
+        )
+
+    # Validate delivery address
+    chosen_address_id: Optional[int] = None
+    if payload.delivery_address_id is not None:
+        addr = db.get(DeliveryAddress, payload.delivery_address_id)
+        if not addr or addr.customer_id != customer.id:
+            raise HTTPException(status_code=400, detail="Điểm giao hàng không hợp lệ hoặc không thuộc đại lý!")
+        chosen_address_id = addr.id
+    else:
+        chosen_address_id = order.delivery_address_id
+
+    # Resolve items and prices
+    resolved_items = []
+    approval_lines = []
+    for requested in payload.items:
+        sku = requested.sku.strip().upper()
+        product = MOCK_PRODUCTS.get(sku)
+        db_product = db.query(Product).filter(func.upper(Product.sku) == sku).first()
+        effective = resolve_effective_price(db, sku, customer.customer_group)
+
+        base_product_price = None
+        if db_product and db_product.base_price is not None and db_product.base_price > 0:
+            base_product_price = float(db_product.base_price)
+        elif product and product.get("sale_price") is not None and product.get("sale_price") > 0:
+            base_product_price = float(product["sale_price"])
+
+        if effective is not None:
+            base_price = effective["sale_price"]
+            floor_price = effective.get("floor_price")
+            price_list_id = effective.get("price_list_id")
+        elif base_product_price is not None:
+            base_price = base_product_price
+            floor_price = None
+            price_list_id = None
+        elif requested.unit_price is not None and requested.unit_price > 0:
+            base_price = requested.unit_price
+            floor_price = None
+            price_list_id = None
+        else:
+            base_price = 0.0
+            floor_price = None
+            price_list_id = None
+
+        actual_price = requested.unit_price if (requested.unit_price is not None and requested.unit_price > 0) else base_price
+        if floor_price is not None and actual_price < floor_price:
+            approval_lines.append(f"{sku}: {actual_price} dưới giá sàn {floor_price}")
+
+        product_id = db_product.id if db_product else None
+        if not product_id and (product or requested.product_name):
+            existing_prod = db.query(Product).filter(func.upper(Product.sku) == sku).first()
+            if existing_prod:
+                product_id = existing_prod.id
+            elif db.query(Product).count() > 0:
+                new_prod = Product(
+                    sku=sku,
+                    name=requested.product_name or (product.get("name") if product else sku),
+                    base_price=float(base_price if base_price else 0.0),
+                    base_unit=product.get("unit") if product and product.get("unit") else "Cái",
+                    status="ACTIVE",
+                )
+                db.add(new_prod)
+                db.flush()
+                product_id = new_prod.id
+
+        resolved_items.append({
+            "product_id": product_id,
+            "sku": sku,
+            "product_name": requested.product_name or (db_product.name if db_product else (product.get("name") if product else sku)),
+            "quantity": requested.quantity,
+            "unit_price": actual_price,
+            "floor_price": floor_price,
+            "price_list_id": price_list_id,
+        })
+
+    total_amount = sum(it["quantity"] * it["unit_price"] for it in resolved_items)
+
+    order.customer_id = customer.id
+    order.delivery_address_id = chosen_address_id
+    order.total_amount = total_amount
+    order.note = payload.note
+    if payload.submit_for_approval or payload.status in (OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"):
+        order.status = OrderStatus.PENDING_APPROVAL
+    if approval_lines:
+        order.approval_reason = "; ".join(approval_lines)
+    elif order.status == OrderStatus.PENDING_APPROVAL and not order.approval_reason:
+        order.approval_reason = payload.note or "Chờ Quản lý kinh doanh phê duyệt"
+
+    # Xóa các dòng hàng cũ và thêm dòng hàng mới
+    for old_it in list(order.items):
+        db.delete(old_it)
+    db.flush()
+
+    for it in resolved_items:
+        db.add(OrderItem(
+            order_id=order.id,
+            product_id=it.get("product_id"),
+            sku=it["sku"],
+            product_name=it["product_name"],
+            quantity=it["quantity"],
+            unit_price=it["unit_price"],
+            floor_price=it["floor_price"],
+            price_list_id=it["price_list_id"],
+        ))
+
+    db.commit()
+    db.refresh(order)
+
+    resp = OrderResponse.model_validate(order)
+    resp.customer_name = customer.name
+    if order.delivery_address_id:
+        resp.delivery_address_id = order.delivery_address_id
+        if order.delivery_address:
+            resp.delivery_address = DeliveryAddressBriefResponse.model_validate(order.delivery_address)
+    return resp
+
+
+@router.post("/orders/{order_id}/cancel", response_model=OrderResponse)
+def cancel_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
+):
+    """Hủy đơn hàng (cho phép khi đơn ở trạng thái DRAFT hoặc PENDING_APPROVAL)."""
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
+
+    if order.status not in (OrderStatus.DRAFT, OrderStatus.PENDING_APPROVAL, OrderStatus.PENDING):
+        raise HTTPException(status_code=400, detail="Chỉ có thể hủy đơn hàng ở trạng thái Bản nháp hoặc Chờ duyệt!")
+
+    order.status = OrderStatus.CANCELLED
+    order.approval_reason = f"Hủy đơn bởi người tạo: {user.full_name or user.username}"
+    db.commit()
+    db.refresh(order)
+
+    customer = db.get(Customer, order.customer_id)
+    resp = OrderResponse.model_validate(order)
+    resp.customer_name = customer.name if customer else None
+    return resp
+
+
+@router.delete("/orders/{order_id}")
+def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
+):
+    """Xóa hẳn đơn hàng nháp."""
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
+
+    if order.status != OrderStatus.DRAFT:
+        raise HTTPException(status_code=400, detail="Chỉ có thể xóa hoàn toàn đơn hàng ở trạng thái Bản nháp (DRAFT)!")
+
+    db.delete(order)
+    db.commit()
+    return {"message": "Đã xóa đơn hàng nháp thành công.", "order_id": order_id}

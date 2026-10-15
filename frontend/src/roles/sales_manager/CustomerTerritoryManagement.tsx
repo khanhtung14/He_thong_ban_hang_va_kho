@@ -27,9 +27,11 @@ import {
   ShopOutlined,
   UserOutlined,
   PlusOutlined,
+  EnvironmentOutlined,
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import CreateCustomerModal from "../admin/CreateCustomerModal";
+import DeliveryAddressesModal from "../../components/DeliveryAddressesModal";
 import CreditLimitModal from "../../components/CreditLimitModal";
 import {
   fetchCustomersWithTotal,
@@ -49,6 +51,8 @@ const { Title, Text } = Typography;
 export const CustomerTerritoryManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState("customers");
   const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [selectedCustomerForAddress, setSelectedCustomerForAddress] = useState<CustomerItem | null>(null);
 
   // State Danh sách đại lý & bộ lọc từ server
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
@@ -359,8 +363,20 @@ export const CustomerTerritoryManagement: React.FC = () => {
     {
       title: "THAO TÁC",
       key: "actions",
+      width: 290,
       render: (_, r) => (
         <Space size="small">
+          <Button
+            size="small"
+            icon={<EnvironmentOutlined />}
+            onClick={() => {
+              setSelectedCustomerForAddress(r);
+              setIsAddressModalOpen(true);
+            }}
+            style={{ color: "#2563eb", borderColor: "#93c5fd" }}
+          >
+            Điểm giao
+          </Button>
           <Button
             size="small"
             type="primary"
@@ -788,6 +804,18 @@ export const CustomerTerritoryManagement: React.FC = () => {
         isOpen={isCreateCustomerModalOpen}
         onClose={() => setIsCreateCustomerModalOpen(false)}
         onSuccess={() => loadData()}
+      />
+
+      {/* Modal Quản lý điểm giao hàng (SCRUM-20) */}
+      <DeliveryAddressesModal
+        isOpen={isAddressModalOpen}
+        onClose={() => {
+          setIsAddressModalOpen(false);
+          setSelectedCustomerForAddress(null);
+        }}
+        customerId={selectedCustomerForAddress?.id || null}
+        customerName={selectedCustomerForAddress?.name}
+        customerCode={selectedCustomerForAddress?.code}
       />
 
       {/* Modal Điều chỉnh hạn mức tín dụng & ngày nợ */}

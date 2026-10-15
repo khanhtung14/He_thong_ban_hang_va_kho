@@ -50,9 +50,13 @@ export interface AgencyListParams {
   search?: string;
   keyword?: string;
   customer_group?: string;
+  customerGroup?: string;
   region?: string;
+  regionId?: number | string;
   is_active?: boolean;
   status?: string;
+  sales_rep_id?: number | string;
+  assignedRepId?: number | string;
   page?: number;
   limit?: number;
 }
@@ -64,6 +68,7 @@ export interface AgencyPagination {
   totalPages: number;
   total_records?: number;
   total_pages?: number;
+  total?: number;
 }
 
 export interface AgencyListResponse {
