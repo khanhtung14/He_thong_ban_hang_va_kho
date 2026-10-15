@@ -918,37 +918,7 @@ def create_product_unit(
     }
 
 
-@router.get("/{product_id}/units")
-def list_product_units(
-    product_id: int,
-    db: Session = Depends(get_db),
-    user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
-) -> Any:
-    """List units for a product."""
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
-        product = Product(
-            id=product_id,
-            sku=f"SKU-{product_id}",
-            name=f"Product {product_id}",
-            category_id=None,
-            base_unit="cái",
-            manage_by_lot=False,
-            min_stock=0,
-            base_price=0.0,
-            cost_price=0.0,
-            status="ACTIVE",
-        )
-        db.add(product)
-        db.commit()
 
-    units = db.query(ProductUnit).filter(ProductUnit.product_id == product_id).all()
-    return [{
-        "id": u.id,
-        "unit_name": u.unit_name,
-        "conversion_rate": u.conversion_rate,
-        "barcode": u.barcode,
-    } for u in units]
 
 
 @router.get("/{id_or_sku}")
@@ -1026,6 +996,7 @@ def list_product_units(
             "product_id": row.product_id,
             "unit_name": row.unit_name,
             "conversion_rate": row.conversion_rate,
+            "barcode": row.barcode,
             "is_base_unit": row.is_base_unit,
         }
         for row in rows
