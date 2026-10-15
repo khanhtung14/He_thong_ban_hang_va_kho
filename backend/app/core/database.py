@@ -182,3 +182,33 @@ def migrate_pricing_schema():
         except Exception:
             pass
 
+
+def migrate_sales_order_draft_schema():
+    """Add persisted delivery and price-breakdown fields for order drafts."""
+    additions = {
+        "orders": {
+            "delivery_address_id": "INTEGER NULL",
+            "desired_delivery_date": "DATE NULL",
+            "subtotal_amount": "FLOAT NOT NULL DEFAULT 0",
+            "discount_amount": "FLOAT NOT NULL DEFAULT 0",
+        },
+        "order_items": {
+            "unit_name": "VARCHAR(50) NULL",
+            "conversion_factor": "FLOAT NOT NULL DEFAULT 1",
+            "discount_percent": "FLOAT NOT NULL DEFAULT 0",
+            "line_subtotal": "FLOAT NOT NULL DEFAULT 0",
+            "discount_amount": "FLOAT NOT NULL DEFAULT 0",
+            "line_total": "FLOAT NOT NULL DEFAULT 0",
+        },
+    }
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        for table_name, columns in additions.items():
+            if not inspector.has_table(table_name):
+                continue
+            existing = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, definition in columns.items():
+                if column_name not in existing:
+                    connection.execute(
+                        text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+                    )

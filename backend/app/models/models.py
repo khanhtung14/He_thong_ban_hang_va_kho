@@ -545,6 +545,8 @@ class Order(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    delivery_address_id: Mapped[Optional[int]] = mapped_column(Integer)
+    desired_delivery_date: Mapped[Optional[date]] = mapped_column(Date)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     status: Mapped[OrderStatus] = mapped_column(
         SqlEnum(OrderStatus, native_enum=False, length=30),
@@ -552,6 +554,8 @@ class Order(Base):
         nullable=False,
     )
     total_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    subtotal_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     note: Mapped[Optional[str]] = mapped_column(Text)
     approval_reason: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -571,8 +575,14 @@ class OrderItem(Base):
     sku: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     product_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product_units.id", ondelete="SET NULL"))
+    unit_name: Mapped[Optional[str]] = mapped_column(String(50))
+    conversion_factor: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     unit_price: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    discount_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    line_subtotal: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    line_total: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     floor_price: Mapped[Optional[float]] = mapped_column(Float)
     price_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("price_lists.id", ondelete="SET NULL"))
     

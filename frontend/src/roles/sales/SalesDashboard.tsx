@@ -8,6 +8,7 @@ import ProfileModal from "../../components/ProfileModal";
 // Sidebar & Header Sales
 import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
 import { SalesHeader } from "../../components/Header/SalesHeader";
+import SalesOrderDraft from "./SalesOrderDraft";
 
 // Customer List Module (S3-08)
 import { SalesCustomerList } from "./SalesCustomerList";
@@ -109,18 +110,24 @@ export const SalesDashboard: React.FC = () => {
         />
 
         <Content
+          className="sales-dashboard-content"
           style={{
             padding: "20px 28px",
             maxWidth: 1500,
             width: "100%",
             margin: "0 auto",
+            minWidth: 0,
           }}
         >
-          {/* Màn hình Khách hàng & Đại lý / Tổng quan */}
-          <SalesCustomerList
-            currentRepName={profile?.full_name}
-            onSelectCustomerForOrder={handleSelectCustomerForOrder}
-          />
+          {selectedKey === "orders" ? (
+            <SalesOrderDraft />
+          ) : (
+            /* Màn hình Khách hàng & Đại lý / Tổng quan */
+            <SalesCustomerList
+              currentRepName={profile?.full_name}
+              onSelectCustomerForOrder={handleSelectCustomerForOrder}
+            />
+          )}
         </Content>
       </Layout>
 
