@@ -263,4 +263,119 @@ def test_direct_import_excel_auto_creates_category():
         db.query(Product).filter(Product.sku == "SKU-DIR-01").delete()
         db.query(Category).filter(Category.name == unique_cat).delete()
         db.commit()
-        db.close()
+        db.close()
+
+
+def test_import_excel_creates_inventory_record_at_default_warehouse():
+    """S2-08: Kiểm tra import sản phẩm từ file Excel tự động tạo/cập nhật bản ghi trong bảng inventory gắn với Kho mặc định."""
+    from app.core.database import SessionLocal
+    from app.models.models import Category, Product, Inventory, Warehouse
+
+    sku_test = "SKU-TEST-INV-150"
+    cat_test = "Đồ uống kiểm thử tồn kho"
+    content = xlsx_file(
+        [
+            [sku_test, "Sản phẩm test tồn kho", cat_test, 25000, 18000, 150, "Chai"],
+        ]
+    )
+
+    response = client.post(
+        "/api/v1/products/import-excel",
+        headers=auth_headers(),
+        files={"file": ("products.xlsx", content)},
+    )
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        wh = db.query(Warehouse).filter(Warehouse.id == 1).first() or db.query(Warehouse).first()
+        assert wh is not None
+
+        prod = db.query(Product).filter(Product.sku == sku_test).first()
+        assert prod is not None
+
+        inv = db.query(Inventory).filter(
+            Inventory.product_id == prod.id,
+            Inventory.warehouse_id == wh.id,
+        ).first()
+        assert inv is not None
+        assert inv.physical_qty == 150.0
+        assert inv.quantity_on_hand == 150.0
+        assert inv.reserved_qty == 0.0
+        assert inv.reserved_quantity == 0.0
+        assert inv.available_qty == 150.0
+        assert inv.available_quantity == 150.0
+
+        # Kiểm tra endpoint API available-stock
+        res_stock = client.get(
+            f"/api/v1/inventory/available-stock?sku={sku_test}&warehouseId={wh.id}",
+            headers=auth_headers(),
+        )
+        assert res_stock.status_code == 200
+        stock_data = res_stock.json()["data"]
+        assert stock_data["physicalQty"] == 150.0
+        assert stock_data["availableQty"] == 150.0
+        assert stock_data["available_quantity"] == 150.0
+    finally:
+        prod_del = db.query(Product).filter(Product.sku == sku_test).first()
+        if prod_del:
+            db.query(Inventory).filter(Inventory.product_id == prod_del.id).delete()
+        db.commit()
+        db.close()
+
+
+def test_import_excel_stock_quantity_alias_and_default_zero():
+    """S2-08: Kiểm tra cột stock_quantity alias và nếu để trống tồn kho thì mặc định là 0."""
+    from app.core.database import SessionLocal
+    from app.models.models import Product, Inventory, Warehouse
+
+    sku_alias = "SKU-TEST-ALIAS-01"
+    sku_empty = "SKU-TEST-EMPTY-02"
+
+    wb = Workbook()
+    ws = wb.active
+    # Sử dụng cột stock_quantity thay vì stock_available
+    ws.append(["sku", "name", "category", "sale_price", "cost_price", "stock_quantity", "unit"])
+    ws.append([sku_alias, "Sản phẩm dùng header stock_quantity", "Đồ uống", 15000, 10000, 75, "Chai"])
+    ws.append([sku_empty, "Sản phẩm để trống tồn kho", "Đồ uống", 20000, 15000, None, "Lon"])
+    content = io.BytesIO()
+    wb.save(content)
+    xlsx_bytes = content.getvalue()
+
+    response = client.post(
+        "/api/v1/products/import-excel",
+        headers=auth_headers(),
+        files={"file": ("products.xlsx", xlsx_bytes)},
+    )
+    assert response.status_code == 200
+
+    db = SessionLocal()
+    try:
+        wh = db.query(Warehouse).filter(Warehouse.id == 1).first() or db.query(Warehouse).first()
+
+        # Kiểm tra sản phẩm dùng header stock_quantity
+        p_alias = db.query(Product).filter(Product.sku == sku_alias).first()
+        assert p_alias is not None
+        inv_alias = db.query(Inventory).filter(Inventory.product_id == p_alias.id, Inventory.warehouse_id == wh.id).first()
+        assert inv_alias is not None
+        assert inv_alias.quantity_on_hand == 75.0
+        assert inv_alias.reserved_quantity == 0.0
+        assert inv_alias.available_quantity == 75.0
+
+        # Kiểm tra sản phẩm để trống tồn kho -> mặc định 0
+        p_empty = db.query(Product).filter(Product.sku == sku_empty).first()
+        assert p_empty is not None
+        inv_empty = db.query(Inventory).filter(Inventory.product_id == p_empty.id, Inventory.warehouse_id == wh.id).first()
+        assert inv_empty is not None
+        assert inv_empty.quantity_on_hand == 0.0
+        assert inv_empty.reserved_quantity == 0.0
+        assert inv_empty.available_quantity == 0.0
+    finally:
+        for s in (sku_alias, sku_empty):
+            p = db.query(Product).filter(Product.sku == s).first()
+            if p:
+                db.query(Inventory).filter(Inventory.product_id == p.id).delete()
+        db.commit()
+        db.close()
+
+

@@ -7,7 +7,7 @@ from sqlalchemy import delete
 
 import uuid
 from src.backend.database import SessionLocal
-from src.backend.models import Customer, DeliveryAddress, Order, OrderItem, PriceList, PriceListItem, Product
+from src.backend.models import Customer, DeliveryAddress, Inventory, Order, OrderItem, PriceList, PriceListItem, Product, Warehouse
 from src.backend.rbac import create_access_token
 
 
@@ -22,6 +22,7 @@ def clear_pricing_business_data():
         db.execute(delete(PriceList))
         db.execute(delete(DeliveryAddress))
         db.execute(delete(Customer))
+        db.execute(delete(Inventory))
         db.execute(delete(Product))
         db.commit()
 
@@ -239,6 +240,21 @@ def test_order_fallback_to_base_price_when_no_group_price_list(client):
             db.commit()
             prod_id = prod.id
 
+            wh = db.query(Warehouse).first()
+            if not wh:
+                wh = Warehouse(code="KHO-HN", name="Kho Tổng Hà Nội", is_active=True)
+                db.add(wh)
+                db.commit()
+            inv = Inventory(
+                product_id=prod.id,
+                warehouse_id=wh.id,
+                physical_qty=100.0,
+                reserved_qty=0.0,
+                available_qty=100.0,
+            )
+            db.add(inv)
+            db.commit()
+
         # Tạo đại lý DEALER_LEVEL_1 (chưa có bảng giá riêng cho NGK-AQUAFINA-500)
         customer = create_customer(client, group="DEALER_LEVEL_1")
 
@@ -258,5 +274,6 @@ def test_order_fallback_to_base_price_when_no_group_price_list(client):
         assert order_data["total_amount"] == 60000.0
     finally:
         with SessionLocal() as db:
+            db.execute(delete(Inventory))
             db.execute(delete(Product))
             db.commit()

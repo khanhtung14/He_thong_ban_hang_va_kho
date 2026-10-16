@@ -375,7 +375,7 @@ class DiscountPolicy(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    tiers: Mapped[list["DiscountTier"]] = relationship(
+    tiers: Mapped[List["DiscountTier"]] = relationship(
         back_populates="policy",
         cascade="all, delete-orphan",
         order_by="DiscountTier.min_quantity",
@@ -436,9 +436,11 @@ class Customer(Base):
     max_debt_amount = synonym("credit_limit")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
     orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     delivery_addresses: Mapped[List["DeliveryAddress"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
+    warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[warehouse_id])
     credit_limit_logs: Mapped[List["CreditLimitLog"]] = relationship(
         "CreditLimitLog",
         back_populates="customer",
@@ -619,8 +621,10 @@ class Order(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
 
     customer: Mapped[Customer] = relationship(back_populates="orders")
+    warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[warehouse_id])
     delivery_address: Mapped[Optional[DeliveryAddress]] = relationship()
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
@@ -637,6 +641,7 @@ class OrderItem(Base):
     unit_price: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     floor_price: Mapped[Optional[float]] = mapped_column(Float)
     price_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("price_lists.id", ondelete="SET NULL"))
+    available_qty: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     order: Mapped[Order] = relationship(back_populates="items")
 
@@ -668,6 +673,22 @@ class Inventory(Base):
     physical_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     reserved_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     available_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    reserved_quantity = synonym("reserved_qty")
+    available_quantity = synonym("available_qty")
+    physical_quantity = synonym("physical_qty")
+    quantity_on_hand = synonym("physical_qty")
+
+    product: Mapped[Optional["Product"]] = relationship("Product")
+    warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse")
+
+    @property
+    def calculated_available_qty(self) -> float:
+        return self.physical_qty - self.reserved_qty
+
+    @property
+    def calculated_available_quantity(self) -> float:
+        return self.physical_qty - self.reserved_qty
 
 
 class InventoryLot(Base):
