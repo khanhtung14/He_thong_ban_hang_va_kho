@@ -14,6 +14,7 @@ import {
   message,
   Tooltip,
   Checkbox,
+  Divider,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -22,9 +23,12 @@ import {
   EnvironmentOutlined,
   ShoppingOutlined,
   WarningOutlined,
+  UserOutlined,
+  PhoneOutlined,
 } from "@ant-design/icons";
 import {
   fetchDeliveryAddresses,
+  createDeliveryAddress,
   createOrder,
   updateOrder,
   type CustomerItem,
@@ -74,10 +78,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   editingOrder,
 }) => {
   const [form] = Form.useForm();
+  const [addressForm] = Form.useForm();
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
   const [deliveryAddresses, setDeliveryAddresses] = useState<DeliveryAddressItem[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
+  const [isAddAddressModalOpen, setIsAddAddressModalOpen] = useState(false);
+  const [submittingAddress, setSubmittingAddress] = useState(false);
 
   // Danh mục sản phẩm load từ API
   const [products, setProducts] = useState<ProductOptionItem[]>([]);
@@ -100,8 +107,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         const list: ProductOptionItem[] = Array.isArray(json)
           ? json
           : json.data && Array.isArray(json.data)
-          ? json.data
-          : [];
+            ? json.data
+            : [];
         // Ưu tiên sản phẩm đang hoạt động ACTIVE
         const activeList = list.filter((p) => !p.status || p.status === "ACTIVE");
         setProducts(activeList.length > 0 ? activeList : list);
@@ -217,12 +224,67 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   const handleClose = () => {
     form.resetFields();
+    addressForm.resetFields();
+    setIsAddAddressModalOpen(false);
     setSelectedCustomer(null);
     setDeliveryAddresses([]);
     setSelectedAddressId(null);
     setErrorMsg(null);
     setItems([{ key: "1", sku: "", product_name: "", quantity: 1, unit_price: 0 }]);
     onClose();
+  };
+
+  const handleOpenAddAddressModal = () => {
+    if (!selectedCustomer) {
+      message.warning("Vui lòng chọn đại lý trước.");
+      return;
+    }
+    addressForm.resetFields();
+    addressForm.setFieldsValue({
+      receiver_name: "",
+      phone: "",
+      address: "",
+      note: "",
+      is_default: deliveryAddresses.length === 0,
+    });
+    setIsAddAddressModalOpen(true);
+  };
+
+  const handleSaveDeliveryAddress = async () => {
+    if (!selectedCustomer) return;
+    try {
+      const values = await addressForm.validateFields();
+      setSubmittingAddress(true);
+      const newAddr = await createDeliveryAddress(selectedCustomer.id, {
+        receiver_name: values.receiver_name.trim(),
+        receiverName: values.receiver_name.trim(),
+        phone: values.phone.trim(),
+        address: values.address.trim(),
+        note: values.note ? values.note.trim() : undefined,
+        is_default: Boolean(values.is_default),
+        isDefault: Boolean(values.is_default),
+      });
+
+      message.success("Thêm điểm giao hàng thành công!");
+      setIsAddAddressModalOpen(false);
+      addressForm.resetFields();
+
+      // Tự động gọi lại danh sách điểm giao của đại lý này để làm mới dropdown
+      const freshAddrs = await fetchDeliveryAddresses(selectedCustomer.id);
+      setDeliveryAddresses(freshAddrs);
+
+      // Tự động gán (select) điểm giao vừa tạo làm giá trị được chọn hiện tại trên form lập đơn hàng
+      setSelectedAddressId(newAddr.id);
+      form.setFieldValue("delivery_address_id", newAddr.id);
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "errorFields" in err) {
+        return;
+      }
+      const msg = err instanceof Error ? err.message : "Không thể thêm điểm giao hàng.";
+      message.error(msg);
+    } finally {
+      setSubmittingAddress(false);
+    }
   };
 
   const handleCustomerChange = async (custId: number) => {
@@ -554,192 +616,322 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   ];
 
   return (
-    <Modal
-      title={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ShoppingOutlined style={{ color: "#2563eb", fontSize: 22 }} />
-          <span>
-            {editingOrder
-              ? `Chỉnh sửa đơn hàng ${editingOrder.order_code}`
-              : "Lập đơn hàng bán (SCRUM-20 & SCRUM-85)"}
-          </span>
-        </div>
-      }
-      open={isOpen}
-      onCancel={handleClose}
-      width={950}
-      onOk={handleSubmit}
-      confirmLoading={submitting}
-      okText={editingOrder ? "Lưu thay đổi" : "Xác nhận tạo đơn"}
-      cancelText="Hủy"
-      okButtonProps={{ disabled: isCustomerLocked }}
-      destroyOnClose
-    >
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {errorMsg && <Alert type="error" message={errorMsg} showIcon closable />}
-
-        {isCustomerLocked && (
-          <Alert
-            type="error"
-            showIcon
-            icon={<WarningOutlined />}
-            message="Đại lý đang bị khóa giao dịch (SCRUM-85)"
-            description={`Lý do: ${
-              selectedCustomer?.lock_reason || "Chặn công nợ quá hạn"
-            }. Hệ thống chặn toàn bộ thao tác lên đơn hàng mới cho đại lý này.`}
-          />
-        )}
-
-        <Form form={form} layout="vertical">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            {/* Chọn đại lý */}
-            <Form.Item
-              name="customer_id"
-              label="Chọn Đại lý / Khách hàng"
-              rules={[{ required: true, message: "Vui lòng chọn đại lý" }]}
-            >
-              <Select
-                showSearch
-                placeholder="Chọn đại lý"
-                onChange={handleCustomerChange}
-                optionFilterProp="children"
-              >
-                {customers.map((c) => (
-                  <Option key={c.id} value={c.id}>
-                    {c.code} — {c.name} {c.is_locked ? "(BỊ KHÓA)" : ""}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            {/* Chọn điểm giao hàng */}
-            <Form.Item
-              name="delivery_address_id"
-              label={
-                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                  <span>Điểm giao hàng của đại lý</span>
-                  {deliveryAddresses.length === 0 && !loadingAddresses && selectedCustomer && (
-                    <Text type="danger" style={{ fontSize: 12 }}>
-                      Chưa có điểm giao hàng
-                    </Text>
-                  )}
-                </div>
-              }
-            >
-              <Select
-                placeholder="Chọn điểm giao hàng (hoặc để trống nhận mặc định)"
-                loading={loadingAddresses}
-                value={selectedAddressId}
-                onChange={(val) => setSelectedAddressId(val)}
-                allowClear
-              >
-                {deliveryAddresses.map((addr) => (
-                  <Option key={addr.id} value={addr.id}>
-                    {addr.is_default ? "★ [MẶC ĐỊNH] " : ""}
-                    {addr.receiver_name} - {addr.phone} ({addr.address})
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
+    <>
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ShoppingOutlined style={{ color: "#2563eb", fontSize: 22 }} />
+            <span>
+              {editingOrder
+                ? `Chỉnh sửa đơn hàng ${editingOrder.order_code}`
+                : "Lập đơn hàng bán (SCRUM-20 & SCRUM-85)"}
+            </span>
           </div>
+        }
+        open={isOpen}
+        onCancel={handleClose}
+        width={950}
+        onOk={handleSubmit}
+        confirmLoading={submitting}
+        okText={editingOrder ? "Lưu thay đổi" : "Xác nhận tạo đơn"}
+        cancelText="Hủy"
+        okButtonProps={{ disabled: isCustomerLocked }}
+        destroyOnClose
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {errorMsg && <Alert type="error" message={errorMsg} showIcon closable />}
 
-          {/* Chi tiết điểm giao hàng được chọn */}
-          {selectedAddress && (
-            <Card
-              size="small"
-              style={{
-                backgroundColor: "#f8fafc",
-                borderColor: "#e2e8f0",
-                borderRadius: 8,
-                marginBottom: 16,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <EnvironmentOutlined style={{ color: "#2563eb", fontSize: 18, marginTop: 2 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Text strong>{selectedAddress.receiver_name}</Text>
-                    <Text type="secondary">({selectedAddress.phone})</Text>
-                    {selectedAddress.is_default && <Tag color="success">Mặc định</Tag>}
-                  </div>
-                  <div style={{ color: "#334155", marginTop: 2 }}>{selectedAddress.address}</div>
-                  {selectedAddress.note && (
-                    <div style={{ color: "#64748b", fontSize: 12, marginTop: 2 }}>
-                      Ghi chú: {selectedAddress.note}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
+          {isCustomerLocked && (
+            <Alert
+              type="error"
+              showIcon
+              icon={<WarningOutlined />}
+              message="Đại lý đang bị khóa giao dịch (SCRUM-85)"
+              description={`Lý do: ${selectedCustomer?.lock_reason || "Chặn công nợ quá hạn"
+                }. Hệ thống chặn toàn bộ thao tác lên đơn hàng mới cho đại lý này.`}
+            />
           )}
 
-          {/* Danh sách sản phẩm trong đơn */}
-          <div style={{ marginTop: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 8,
-              }}
-            >
-              <Text strong style={{ fontSize: 15 }}>
-                Danh sách sản phẩm
-              </Text>
-              <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={handleAddItem}>
-                Thêm sản phẩm
-              </Button>
+          <Form form={form} layout="vertical">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* Chọn đại lý */}
+              <Form.Item
+                name="customer_id"
+                label="Chọn Đại lý / Khách hàng"
+                rules={[{ required: true, message: "Vui lòng chọn đại lý" }]}
+              >
+                <Select
+                  showSearch
+                  placeholder="Chọn đại lý"
+                  onChange={handleCustomerChange}
+                  optionFilterProp="children"
+                >
+                  {customers.map((c) => (
+                    <Option key={c.id} value={c.id}>
+                      {c.code} — {c.name} {c.is_locked ? "(BỊ KHÓA)" : ""}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              {/* Chọn điểm giao hàng */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 4,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ color: "rgba(0, 0, 0, 0.88)", fontSize: 14 }}>
+                      Điểm giao hàng của đại lý
+                    </span>
+                    {deliveryAddresses.length === 0 && !loadingAddresses && selectedCustomer && (
+                      <Text type="danger" style={{ fontSize: 12 }}>
+                        (Chưa có điểm giao hàng)
+                      </Text>
+                    )}
+                  </div>
+                  <Tooltip title={!selectedCustomer ? "Vui lòng chọn đại lý trước" : "Khai báo điểm giao hàng mới cho đại lý"}>
+                    <Button
+                      type="link"
+                      size="small"
+                      disabled={!selectedCustomer}
+                      onClick={handleOpenAddAddressModal}
+                      style={{ padding: 0, height: "auto", fontSize: 13 }}
+                    >
+                      + Thêm điểm giao mới
+                    </Button>
+                  </Tooltip>
+                </div>
+                <Form.Item name="delivery_address_id" style={{ marginBottom: 0 }}>
+                  <Select
+                    placeholder="Chọn điểm giao hàng (hoặc để trống nhận mặc định)"
+                    loading={loadingAddresses}
+                    value={selectedAddressId}
+                    onChange={(val) => {
+                      setSelectedAddressId(val);
+                      form.setFieldValue("delivery_address_id", val);
+                    }}
+                    allowClear
+                    dropdownRender={(menu) => (
+                      <>
+                        {menu}
+                        <Divider style={{ margin: "4px 0" }} />
+                        <div style={{ padding: "4px 8px" }}>
+                          <Tooltip title={!selectedCustomer ? "Vui lòng chọn đại lý trước" : ""}>
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<PlusOutlined />}
+                              disabled={!selectedCustomer}
+                              onClick={handleOpenAddAddressModal}
+                              style={{ width: "100%", textAlign: "left", padding: 0 }}
+                            >
+                              Thêm địa chỉ mới
+                            </Button>
+                          </Tooltip>
+                        </div>
+                      </>
+                    )}
+                  >
+                    {deliveryAddresses.map((addr) => (
+                      <Option key={addr.id} value={addr.id}>
+                        {addr.is_default ? "★ [MẶC ĐỊNH] " : ""}
+                        {addr.receiver_name} - {addr.phone} ({addr.address})
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </div>
             </div>
 
-            <Table
-              columns={columns}
-              dataSource={items}
-              pagination={false}
-              bordered
-              size="small"
-              scroll={{ x: 930 }}
-            />
+            {/* Chi tiết điểm giao hàng được chọn */}
+            {selectedAddress && (
+              <Card
+                size="small"
+                style={{
+                  backgroundColor: "#f8fafc",
+                  borderColor: "#e2e8f0",
+                  borderRadius: 8,
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <EnvironmentOutlined style={{ color: "#2563eb", fontSize: 18, marginTop: 2 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Text strong>{selectedAddress.receiver_name}</Text>
+                      <Text type="secondary">({selectedAddress.phone})</Text>
+                      {selectedAddress.is_default && <Tag color="success">Mặc định</Tag>}
+                    </div>
+                    <div style={{ color: "#334155", marginTop: 2 }}>{selectedAddress.address}</div>
+                    {selectedAddress.note && (
+                      <div style={{ color: "#64748b", fontSize: 12, marginTop: 2 }}>
+                        Ghi chú: {selectedAddress.note}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                marginTop: 12,
-                padding: "8px 16px",
-                backgroundColor: "#f1f5f9",
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ fontSize: 15 }}>
-                Tổng giá trị đơn:{" "}
-                <Text strong style={{ color: "#047857", fontSize: 17 }}>
-                  {totalAmount.toLocaleString("vi-VN")} ₫
+            {/* Danh sách sản phẩm trong đơn */}
+            <div style={{ marginTop: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <Text strong style={{ fontSize: 15 }}>
+                  Danh sách sản phẩm
                 </Text>
-              </Text>
-            </div>
-          </div>
+                <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={handleAddItem}>
+                  Thêm sản phẩm
+                </Button>
+              </div>
 
-          {/* Ghi chú đơn hàng */}
-          <Form.Item name="note" label="Ghi chú đơn hàng" style={{ marginTop: 16, marginBottom: 12 }}>
-            <Input.TextArea rows={2} placeholder="Ghi chú đơn hàng..." />
+              <Table
+                columns={columns}
+                dataSource={items}
+                pagination={false}
+                bordered
+                size="small"
+                scroll={{ x: 930 }}
+              />
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: 12,
+                  padding: "8px 16px",
+                  backgroundColor: "#f1f5f9",
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ fontSize: 15 }}>
+                  Tổng giá trị đơn:{" "}
+                  <Text strong style={{ color: "#047857", fontSize: 17 }}>
+                    {totalAmount.toLocaleString("vi-VN")} ₫
+                  </Text>
+                </Text>
+              </div>
+            </div>
+
+            {/* Ghi chú đơn hàng */}
+            <Form.Item name="note" label="Ghi chú đơn hàng" style={{ marginTop: 16, marginBottom: 12 }}>
+              <Input.TextArea rows={2} placeholder="Ghi chú đơn hàng..." />
+            </Form.Item>
+
+            {/* Gửi phê duyệt ngay cho Quản lý kinh doanh */}
+            <Form.Item
+              name="submit_for_approval"
+              valuePropName="checked"
+              initialValue={true}
+              style={{ marginBottom: 4 }}
+            >
+              <Checkbox defaultChecked>
+                <Text strong style={{ color: "#2563eb" }}>
+                  Gửi phê duyệt ngay cho Quản lý kinh doanh
+                </Text>
+              </Checkbox>
+            </Form.Item>
+          </Form>
+        </div>
+      </Modal>
+
+      {/* Modal con: Thêm điểm giao hàng mới trực tiếp trên modal đơn hàng */}
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <EnvironmentOutlined style={{ color: "#2563eb", fontSize: 20 }} />
+            <span>
+              Thêm điểm giao hàng mới
+              {selectedCustomer ? ` — ${selectedCustomer.name}` : ""}
+            </span>
+          </div>
+        }
+        open={isAddAddressModalOpen}
+        onCancel={() => {
+          setIsAddAddressModalOpen(false);
+          addressForm.resetFields();
+        }}
+        onOk={handleSaveDeliveryAddress}
+        confirmLoading={submittingAddress}
+        okText="Lưu điểm giao"
+        cancelText="Hủy"
+        destroyOnClose
+        zIndex={1050}
+      >
+        <Form
+          form={addressForm}
+          layout="vertical"
+          style={{ marginTop: 16 }}
+        >
+          <Form.Item
+            name="receiver_name"
+            label="Tên người nhận"
+            rules={[
+              { required: true, message: "Vui lòng nhập tên người nhận" },
+              { max: 150, message: "Tên người nhận không vượt quá 150 ký tự" },
+            ]}
+          >
+            <Input placeholder="Ví dụ: Anh Nguyễn Văn Tuấn (Kho A)" prefix={<UserOutlined />} />
           </Form.Item>
 
-          {/* Gửi phê duyệt ngay cho Quản lý kinh doanh */}
           <Form.Item
-            name="submit_for_approval"
-            valuePropName="checked"
-            initialValue={true}
-            style={{ marginBottom: 4 }}
+            name="phone"
+            label="Số điện thoại"
+            rules={[
+              { required: true, message: "Vui lòng nhập số điện thoại" },
+              {
+                pattern: /^0[1235789]\d{8,9}$/,
+                message: "Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng 03, 05, 07, 08, 09, 01, 02)",
+              },
+            ]}
           >
-            <Checkbox defaultChecked>
-              <Text strong style={{ color: "#2563eb" }}>
-                Gửi phê duyệt ngay cho Quản lý kinh doanh (Trạng thái: Chờ duyệt - PENDING_APPROVAL)
-              </Text>
+            <Input placeholder="Ví dụ: 0912345678" prefix={<PhoneOutlined />} />
+          </Form.Item>
+
+          <Form.Item
+            name="address"
+            label="Địa chỉ chi tiết / Tên kho"
+            rules={[{ required: true, message: "Vui lòng nhập địa chỉ chi tiết / tên kho" }]}
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder="Ví dụ: Lô B4 KCN Quang Minh, Mê Linh, Hà Nội"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="note"
+            label="Ghi chú giao hàng / hướng dẫn đường đi"
+          >
+            <Input.TextArea
+              rows={2}
+              placeholder="Ví dụ: Xe tải 5 tấn vào được, giao giờ hành chính, gọi trước 30 phút..."
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="is_default"
+            valuePropName="checked"
+            style={{ marginBottom: 0 }}
+          >
+            <Checkbox>
+              Đặt làm địa chỉ mặc định
             </Checkbox>
           </Form.Item>
         </Form>
-      </div>
-    </Modal>
+      </Modal>
+    </>
   );
 };
 
