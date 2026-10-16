@@ -571,9 +571,16 @@
 - **Response Data:** Đơn chuyển sang `CANCELLED`, giải phóng `reserved_qty`.
 
 #### `POST /orders/{id}/clone`
-- **Story:** S4-09, S5-02
-- **Phân quyền:** Sales Rep, Customer
-- **Response Data:** Sinh đơn hàng mới từ các mặt hàng của đơn cũ, tự động nạp đơn giá hiện hành.
+- **Story:** SCRUM-16 (S4-09, S5-02)
+- **Phân quyền:** Sales Rep, Customer (Sales Manager, Admin)
+- **Mục đích:** Sao chép một đơn cũ thành đơn mới để tạo đơn định kỳ cho khách quen trong vài giây.
+- **Tiêu chí nghiệm thu:**
+  - Sao chép toàn bộ dòng hàng của đơn đã chọn (SKU, số lượng, tên sản phẩm, đơn vị tính).
+  - Giá và chiết khấu được áp dụng theo bảng giá và chính sách chiết khấu hiện hành, không kế thừa giá cũ.
+  - Bản sao luôn bắt đầu ở trạng thái Nháp (`DRAFT`).
+  - Kiểm tra trạng thái đại lý: nếu đại lý bị khóa giao dịch, chặn và trả về HTTP 400 Bad Request.
+- **Request Body:** Không có
+- **Response Data:** `OrderResponse` (HTTP 201 Created) kèm danh sách dòng hàng và tổng tiền đã tính lại theo chính sách hiện hành.
 
 #### `GET /orders/{id}/print-pdf`
 - **Story:** S4-08

@@ -210,6 +210,15 @@ export function renderCustomerViews(view: string) {
               dataIndex: "status",
               render: (text, r) => <Tag color={r.tone}>{text}</Tag>,
             },
+            {
+              title: "Thao tác",
+              key: "action",
+              render: () => (
+                <Button size="small" type="link">
+                  Sao chép
+                </Button>
+              ),
+            },
           ]}
         />
       </Card>

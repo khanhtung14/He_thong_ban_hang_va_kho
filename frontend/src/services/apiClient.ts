@@ -13,6 +13,9 @@ export type ProductMarginDetail = components["schemas"]["ProductMarginDetail"];
 export type SalesMarginReport = components["schemas"]["SalesMarginReportResponse"];
 export type PriceListLine = components["schemas"]["PriceLine"];
 export type PriceListItem = components["schemas"]["PriceListView"];
+export type OrderResponse = components["schemas"]["OrderResponse"];
+export type OrderItemResponse = components["schemas"]["OrderItemResponse"];
+export type OrderStatus = components["schemas"]["OrderStatus"];
 
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -507,3 +510,31 @@ export async function createCustomer(payload: CreateCustomerPayload): Promise<Cu
   }
   return res.json();
 }
+
+export async function fetchOrders(params?: {
+  customerId?: number;
+  status?: string;
+}): Promise<OrderResponse[]> {
+  const query = new URLSearchParams();
+  if (params?.customerId) query.set("customer_id", String(params.customerId));
+  if (params?.status && params.status !== "ALL") query.set("status", params.status);
+
+  const url = `/api/v1/orders${query.toString() ? `?${query.toString()}` : ""}`;
+  const res = await authenticatedFetch(url);
+  if (!res.ok) {
+    throw new Error("Không thể tải danh sách đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function cloneOrder(orderId: number): Promise<OrderResponse> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}/clone`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Không thể sao chép đơn hàng #${orderId}.`);
+  }
+  return res.json();
+}
+
