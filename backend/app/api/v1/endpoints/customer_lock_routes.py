@@ -1056,9 +1056,9 @@ def update_customer_credit_limit(
     db: Session = Depends(get_db),
     _user: AuthenticatedUser = Depends(get_current_user),
 ):
-    # Phân quyền (RBAC/Role Check): Chỉ cho phép các user có role accountant hoặc sales_manager (hoặc admin)
+    # Phân quyền (RBAC/Role Check): Chỉ cho phép các user có role accountant hoặc sales_manager
     user_role = normalize_role(_user.role) if _user else None
-    if user_role not in (RoleCode.ACCOUNTANT.value, RoleCode.SALES_MANAGER.value, RoleCode.ADMIN.value):
+    if user_role not in (RoleCode.ACCOUNTANT.value, RoleCode.SALES_MANAGER.value):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ Kế toán (Accountant) hoặc Quản lý kinh doanh (Sales Manager) mới có quyền điều chỉnh hạn mức công nợ.",

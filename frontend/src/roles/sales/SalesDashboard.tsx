@@ -43,6 +43,7 @@ import CreateOrderModal from "../../components/CreateOrderModal";
 // Sidebar & Header Sales
 import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
 import { SalesHeader } from "../../components/Header/SalesHeader";
+import SalesOrderDraft from "./SalesOrderDraft";
 
 // Customer List Module (S3-08)
 import { SalesCustomerList } from "./SalesCustomerList";
@@ -201,9 +202,12 @@ export const SalesDashboard: React.FC = () => {
     };
   }, [loadProfileData, loadMyCustomers, loadOrders, selectedKey]);
 
+  const [preselectedCustomerId, setPreselectedCustomerId] = useState<number | null>(null);
+
   const handleSelectCustomerForOrder = (customer: CustomerItem) => {
     // Lưu tạm khách hàng để lên đơn
     localStorage.setItem("selectedOrderCustomer", JSON.stringify(customer));
+    setPreselectedCustomerId(customer.id);
     setSelectedKey("orders");
   };
 
@@ -515,101 +519,28 @@ export const SalesDashboard: React.FC = () => {
         />
 
         <Content
+          className="sales-dashboard-content"
           style={{
             padding: "20px 28px",
             maxWidth: 1500,
             width: "100%",
             margin: "0 auto",
+            minWidth: 0,
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {/* Header chào mừng */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <Title level={3} style={{ margin: 0 }}>
-                  {selectedKey === "orders" ? "Quản lý đơn hàng & Điểm giao hàng" : "Đại lý phụ trách của tôi"}
-                </Title>
-                <Text type="secondary">
-                  {selectedKey === "orders"
-                    ? "Theo dõi đơn hàng, địa chỉ giao kho đại lý và cảnh báo công nợ."
-                    : `Danh sách đại lý thuộc địa bàn được phân công chăm sóc bởi ${profile?.full_name || "Nhân viên kinh doanh"}.`}
-                </Text>
-              </div>
-              <Space>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => handleOpenCreateOrderModal()}
-                  style={{ backgroundColor: "#2563eb" }}
-                >
-                  Tạo đơn hàng mới
-                </Button>
-              </Space>
-            </div>
-
-            {/* Thẻ thống kê nhanh */}
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={8}>
-                <Card style={{ borderRadius: 12 }}>
-                  <Statistic
-                    title="Tổng số đại lý phụ trách"
-                    value={customers.length}
-                    prefix={<ShopOutlined style={{ color: "#2563eb" }} />}
-                    suffix="đại lý"
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Card style={{ borderRadius: 12 }}>
-                  <Statistic
-                    title="Đại lý đang hoạt động"
-                    value={activeCount}
-                    prefix={<CheckCircleOutlined style={{ color: "#16a34a" }} />}
-                    suffix="đại lý"
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Card style={{ borderRadius: 12 }}>
-                  <Statistic
-                    title="Tổng dư nợ khách hàng phụ trách"
-                    value={formatMoney(totalDebt)}
-                    prefix={<DollarOutlined style={{ color: "#f59e0b" }} />}
-                  />
-                </Card>
-              </Col>
-            </Row>
-
-            {/* Bảng dữ liệu: Đơn hàng hoặc Khách hàng */}
-            {selectedKey === "orders" ? (
-              <Card style={{ borderRadius: 12 }}>
-                <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Title level={4} style={{ margin: 0 }}>
-                    Danh sách đơn hàng bán
-                  </Title>
-                  <Button icon={<ReloadOutlined />} onClick={loadOrders} loading={ordersLoading}>
-                    Làm mới
-                  </Button>
-                </div>
-
-                <Table
-                  columns={orderColumns}
-                  dataSource={orders}
-                  rowKey="id"
-                  loading={ordersLoading}
-                  pagination={{ pageSize: 15, showTotal: (t) => `Tổng cộng: ${t} đơn hàng` }}
-                  bordered
-                  size="middle"
-                  scroll={{ x: "max-content" }}
-                />
-              </Card>
-            ) : (
-              <SalesCustomerList
-                currentRepName={profile?.full_name}
-                onSelectCustomerForOrder={handleSelectCustomerForOrder}
-              />
-            )}
-          </div>
+          {selectedKey === "orders" ? (
+            <SalesOrderDraft
+              preselectedCustomerId={preselectedCustomerId}
+              onCustomerPreselected={() => setPreselectedCustomerId(null)}
+              onBackToCustomers={() => setSelectedKey("customers")}
+            />
+          ) : (
+            /* Màn hình Khách hàng & Đại lý / Tổng quan */
+            <SalesCustomerList
+              currentRepName={profile?.full_name}
+              onSelectCustomerForOrder={handleSelectCustomerForOrder}
+            />
+          )}
         </Content>
       </Layout>
 

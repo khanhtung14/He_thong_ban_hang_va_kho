@@ -12,8 +12,8 @@ router = APIRouter(prefix="/api/v1/orders", tags=["Orders"])
 class OrderCreate(BaseModel):
     pass # TODO: define schema
 
-@router.get("")
-def list_orders(
+@router.get("", operation_id="list_orders_basic")
+def list_orders_basic(
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions("public")),
 ):

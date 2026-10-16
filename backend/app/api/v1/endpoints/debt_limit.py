@@ -37,16 +37,15 @@ router = APIRouter(prefix="/api/v1", tags=["Kiểm soát hạn mức công nợ"
 compat_router = APIRouter(prefix="/api", tags=["Kiểm soát hạn mức công nợ (Alias)"])
 
 # Tập hợp vai trò được phép cập nhật hạn mức công nợ:
-# Chỉ role Kế toán công nợ (Accountant) và Quản lý kinh doanh (Sales Manager), cùng Admin.
+# Chỉ role Kế toán công nợ (Accountant) và Quản lý kinh doanh (Sales Manager).
 ALLOWED_DEBT_ROLES = {
     RoleCode.ACCOUNTANT.value,
     RoleCode.SALES_MANAGER.value,
-    RoleCode.ADMIN.value,
 }
 
 
 def require_debt_limit_permission(
-    user: AuthenticatedUser = Depends(require_roles("Accountant", "Sales Manager", "Admin")),
+    user: AuthenticatedUser = Depends(require_roles("Accountant", "Sales Manager")),
 ) -> AuthenticatedUser:
     """Xác thực người dùng có vai trò Kế toán công nợ hoặc Quản lý kinh doanh."""
     norm_role = normalize_role(user.role)
@@ -338,8 +337,8 @@ def _execute_debt_limit_update(
 # API Endpoints
 # ---------------------------------------------------------------------------
 
-@router.put("/customers/{customer_id}/credit-limit")
-@router.put("/customers/{customer_id}/debt-limit")
+@router.put("/customers/{customer_id}/credit-limit", operation_id="update_customer_credit_limit_v2")
+@router.put("/customers/{customer_id}/debt-limit", operation_id="update_customer_debt_limit")
 def update_customer_credit_limit(
     customer_id: int,
     payload: DebtLimitUpdateRequest,

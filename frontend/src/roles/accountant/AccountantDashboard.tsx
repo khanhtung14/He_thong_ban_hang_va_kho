@@ -13,8 +13,8 @@ import { AccountantHeader } from "../../components/Header/AccountantHeader";
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
 import AgencyLockManager from "./AgencyLockManager";
-import CreditLimitManager from "../../features/credit_limit/CreditLimitManager";
 import { AgencyManagement } from "./AgencyManagement";
+import CreditLimitManager from "../../features/credit_limit/CreditLimitManager";
 
 const { Content } = Layout;
 

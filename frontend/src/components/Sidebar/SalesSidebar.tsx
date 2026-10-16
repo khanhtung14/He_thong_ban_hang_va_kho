@@ -95,6 +95,8 @@ export const SalesSidebar: React.FC<SalesSidebarProps> = ({
   return (
     <Sider
       width={250}
+      breakpoint="md"
+      collapsedWidth={64}
       theme="light"
       style={{
         height: "100vh",

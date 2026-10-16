@@ -404,8 +404,8 @@ export const DeliveryAddressesModal: React.FC<DeliveryAddressesModalProps> = ({
             rules={[
               { required: true, message: "Vui lòng nhập số điện thoại" },
               {
-                pattern: /^0[1235789]\d{8}$/,
-                message: "Số điện thoại không hợp lệ (yêu cầu 10 chữ số, bắt đầu bằng 0)",
+                pattern: /^0[1235789]\d{8,9}$/,
+                message: "Số điện thoại gồm 10-11 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!",
               },
             ]}
           >

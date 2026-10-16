@@ -425,7 +425,7 @@ class Customer(Base):
     lock_reason: Mapped[Optional[str]] = mapped_column(String(255))
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     locked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    # Credit limit & Debt control (SCRUM-21 & SCRUM-20)
+    # NEW FIELDS: Credit limit & Debt control (SCRUM-21)
     credit_limit: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     max_due_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     max_debt_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
@@ -441,16 +441,40 @@ class Customer(Base):
     delivery_addresses: Mapped[List["DeliveryAddress"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
     warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[warehouse_id])
-    credit_limit_logs: Mapped[List["CreditLimitLog"]] = relationship(
+    debt_limit_histories: Mapped[List["CreditLimitLog"]] = relationship(
         "CreditLimitLog",
         back_populates="customer",
         cascade="all, delete-orphan",
         order_by="desc(CreditLimitLog.id)",
     )
-    debt_limit_histories: Mapped[List["CreditLimitLog"]] = relationship(
+    credit_limit_logs: Mapped[List["CreditLimitLog"]] = relationship(
         "CreditLimitLog",
-        overlaps="credit_limit_logs,customer",
+        overlaps="debt_limit_histories,customer",
     )
+
+
+class HandoverHistory(Base):
+    __tablename__ = "handover_history"
+    __table_args__ = (
+        Index("ix_handover_history_from_user", "from_user_id"),
+        Index("ix_handover_history_to_user", "to_user_id"),
+        Index("ix_handover_history_created_at", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
+    from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    to_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    transferred_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    customer_ids: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    customer_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    from_user: Mapped[Optional["User"]] = relationship(foreign_keys=[from_user_id])
+    to_user: Mapped[Optional["User"]] = relationship(foreign_keys=[to_user_id])
+    transferred_by: Mapped[Optional["User"]] = relationship(foreign_keys=[transferred_by_id])
 
 
 class CreditLimitLog(Base):
@@ -503,29 +527,6 @@ class CreditLimitLog(Base):
 DebtLimitHistory = CreditLimitLog
 Agency = Customer
 
-
-class HandoverHistory(Base):
-    __tablename__ = "handover_history"
-    __table_args__ = (
-        Index("ix_handover_history_from_user", "from_user_id"),
-        Index("ix_handover_history_to_user", "to_user_id"),
-        Index("ix_handover_history_created_at", "created_at"),
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    code: Mapped[str] = mapped_column(String(50), nullable=False)
-    from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
-    to_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
-    transferred_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    customer_ids: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    customer_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    reason: Mapped[str] = mapped_column(String(255), nullable=False)
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    from_user: Mapped[Optional["User"]] = relationship(foreign_keys=[from_user_id])
-    to_user: Mapped[Optional["User"]] = relationship(foreign_keys=[to_user_id])
-    transferred_by: Mapped[Optional["User"]] = relationship(foreign_keys=[transferred_by_id])
 
 
 class DeliveryAddress(Base):
@@ -605,6 +606,10 @@ class Order(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    delivery_address_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("delivery_addresses.id", ondelete="SET NULL"), nullable=True
+    )
+    desired_delivery_date: Mapped[Optional[date]] = mapped_column(Date)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     status: Mapped[OrderStatus] = mapped_column(
         SqlEnum(OrderStatus, native_enum=False, length=30),
@@ -612,9 +617,8 @@ class Order(Base):
         nullable=False,
     )
     total_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    delivery_address_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("delivery_addresses.id", ondelete="SET NULL"), nullable=True
-    )
+    subtotal_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     note: Mapped[Optional[str]] = mapped_column(Text)
     approval_reason: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -637,8 +641,14 @@ class OrderItem(Base):
     sku: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     product_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product_units.id", ondelete="SET NULL"))
+    unit_name: Mapped[Optional[str]] = mapped_column(String(50))
+    conversion_factor: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     unit_price: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    discount_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    line_subtotal: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    line_total: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     floor_price: Mapped[Optional[float]] = mapped_column(Float)
     price_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("price_lists.id", ondelete="SET NULL"))
     available_qty: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

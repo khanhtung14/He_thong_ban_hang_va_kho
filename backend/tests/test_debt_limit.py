@@ -197,8 +197,8 @@ def test_sales_manager_updates_debt_limit_success(debt_test_env):
     assert res_data["max_debt_days"] == 45
 
 
-def test_admin_updates_debt_limit_success(debt_test_env):
-    """Admin có quyền cập nhật hạn mức."""
+def test_admin_cannot_update_debt_limit(debt_test_env):
+    """Admin không có quyền cập nhật hạn mức (Chỉ Kế toán và Quản lý kinh doanh)."""
     client, SessionLocal, customer_id = debt_test_env
     auth_header = make_auth_header("Admin", "admin_user")
 
@@ -209,8 +209,7 @@ def test_admin_updates_debt_limit_success(debt_test_env):
     }
 
     resp = client.put(f"/api/v1/customers/{customer_id}/debt-limit", json=payload, headers=auth_header)
-    assert resp.status_code == 200
-    assert resp.json()["data"]["new_limit"] == 100000000.0
+    assert resp.status_code == 403
 
 
 def test_unauthorized_roles_forbidden(debt_test_env):

@@ -14,6 +14,8 @@ import {
   Divider,
   message,
   Empty,
+  Tooltip,
+  Alert,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -25,7 +27,7 @@ import {
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { authenticatedFetch } from "../services/sessionService";
+import { authenticatedFetch, getCurrentUserRole } from "../services/sessionService";
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -89,6 +91,16 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
   const currentMaxDebtDays =
     customer?.max_debt_days ?? customer?.max_due_days ?? 30;
 
+  // Kiểm tra quyền hạn người dùng (Chỉ Kế toán công nợ và Quản lý kinh doanh)
+  const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
+  const canEditCreditLimit = [
+    "ACCOUNTANT",
+    "KE_TOAN",
+    "SALES_MANAGER",
+    "QUAN_LY_KINH_DOANH",
+    "SALESMANAGER",
+  ].includes(userRole);
+
   // Lấy danh sách lịch sử điều chỉnh hạn mức từ API
   const fetchLogs = useCallback(async (customerId: number | string) => {
     setLoadingLogs(true);
@@ -128,6 +140,10 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
   // Xử lý gửi form cập nhật hạn mức
   const handleFormSubmit = async () => {
     if (!customer) return;
+    if (!canEditCreditLimit) {
+      message.error("Quyền bị từ chối: Chỉ Kế toán công nợ hoặc Quản lý kinh doanh mới có quyền điều chỉnh hạn mức!");
+      return;
+    }
     try {
       const values = await form.validateFields();
       const newCredit = Number(values.new_credit_limit) || 0;
@@ -148,6 +164,10 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       const payload = {
         new_credit_limit: newCredit,
         new_max_debt_days: newDays,
+        credit_limit: newCredit,
+        max_debt_days: newDays,
+        max_due_days: newDays,
+        max_debt_amount: newCredit,
         reason: values.reason.trim(),
       };
 
@@ -299,9 +319,24 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       confirmLoading={submitting}
       okText="Lưu thay đổi"
       cancelText="Đóng"
-      width={850}
+      okButtonProps={{
+        disabled: !canEditCreditLimit,
+        style: !canEditCreditLimit ? { display: "none" } : undefined,
+      }}
+      width={960}
       destroyOnClose
+      style={{ maxWidth: "calc(100vw - 32px)" }}
     >
+      {!canEditCreditLimit && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12, borderRadius: 8 }}
+          message="Giới hạn quyền hạn"
+          description="Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền khai báo và thay đổi hạn mức công nợ. Bạn đang ở chế độ xem lịch sử."
+        />
+      )}
+
       {/* Thẻ hiển thị hạn mức hiện tại */}
       <Card
         size="small"
@@ -309,26 +344,27 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
         style={{
           background: "linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)",
           borderRadius: 8,
-          marginBottom: 16,
+          marginBottom: 10,
           border: "1px solid #bae6fd",
         }}
+        styles={{ body: { padding: "8px 16px" } }}
       >
-        <Row gutter={[16, 8]} align="middle">
+        <Row gutter={[16, 4]} align="middle">
           <Col span={12}>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>
               <DollarOutlined style={{ marginRight: 6, color: "#059669" }} />
               Hạn mức nợ tối đa hiện tại:
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#047857" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#047857" }}>
               {currentCreditLimit.toLocaleString("vi-VN")} ₫
             </div>
           </Col>
           <Col span={12}>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>
               <CalendarOutlined style={{ marginRight: 6, color: "#0284c7" }} />
               Số ngày nợ cho phép hiện tại:
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#0369a1" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0369a1" }}>
               {currentMaxDebtDays} ngày
             </div>
           </Col>
@@ -340,6 +376,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
+              style={{ marginBottom: 10 }}
               label={
                 <span style={{ fontWeight: 600 }}>
                   Hạn mức tiền tối đa mới (VND) <span style={{ color: "#ef4444" }}>*</span>
@@ -356,6 +393,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
               ]}
             >
               <InputNumber
+                disabled={!canEditCreditLimit}
                 min={0}
                 style={{ width: "100%" }}
                 formatter={(value) =>
@@ -373,13 +411,14 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                   }) as any
                 }
                 addonAfter="₫"
-                placeholder="Ví dụ: 100,000,000"
+                placeholder={canEditCreditLimit ? "Ví dụ: 100,000,000" : "Không có quyền sửa"}
               />
             </Form.Item>
           </Col>
 
           <Col span={12}>
             <Form.Item
+              style={{ marginBottom: 10 }}
               label={
                 <span style={{ fontWeight: 600 }}>
                   Số ngày nợ tối đa mới (Ngày) <span style={{ color: "#ef4444" }}>*</span>
@@ -397,16 +436,18 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
               ]}
             >
               <InputNumber
+                disabled={!canEditCreditLimit}
                 min={0}
                 style={{ width: "100%" }}
                 addonAfter="ngày"
-                placeholder="Ví dụ: 30"
+                placeholder={canEditCreditLimit ? "Ví dụ: 30" : "Không có quyền sửa"}
               />
             </Form.Item>
           </Col>
         </Row>
 
         <Form.Item
+          style={{ marginBottom: 8 }}
           label={
             <span style={{ fontWeight: 600 }}>
               Lý do thay đổi <span style={{ color: "#ef4444" }}>*</span>
@@ -415,7 +456,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           name="reason"
           rules={[
             {
-              required: true,
+              required: canEditCreditLimit,
               message: "Vui lòng nhập lý do điều chỉnh hạn mức!",
             },
             {
@@ -425,15 +466,20 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           ]}
         >
           <TextArea
-            rows={3}
-            placeholder="Nhập lý do thay đổi hạn mức tín dụng hoặc ngày nợ (Bắt buộc để lưu lịch sử kiểm toán...)"
+            disabled={!canEditCreditLimit}
+            rows={2}
+            placeholder={
+              canEditCreditLimit
+                ? "Nhập lý do thay đổi hạn mức tín dụng hoặc ngày nợ (Bắt buộc để lưu lịch sử kiểm toán...)"
+                : "Tài khoản của bạn không có quyền sửa hạn mức."
+            }
             maxLength={500}
-            showCount
+            showCount={canEditCreditLimit}
           />
         </Form.Item>
       </Form>
 
-      <Divider style={{ margin: "16px 0 12px 0" }} />
+      <Divider style={{ margin: "10px 0 10px 0" }} />
 
       {/* Lịch sử điều chỉnh hạn mức */}
       <div>
@@ -462,7 +508,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           rowKey="id"
           size="small"
           loading={loadingLogs}
-          scroll={{ x: 900 }}
+          scroll={{ y: 220, x: 900 }}
           pagination={
             logs.length > 5 ? { pageSize: 5, size: "small" } : false
           }

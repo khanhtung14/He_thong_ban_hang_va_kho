@@ -41,7 +41,7 @@ import {
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { authenticatedFetch } from "../../services/sessionService";
+import { authenticatedFetch, getCurrentUserRole } from "../../services/sessionService";
 import { DebtLimitForm } from "./DebtLimitForm";
 
 const { Title, Text } = Typography;
@@ -110,6 +110,16 @@ const CreditLimitManager: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyData, setHistoryData] = useState<CreditLimitLog[]>([]);
 
+  // Kiểm tra quyền: Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền sửa
+  const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
+  const canEditCreditLimit = [
+    "ACCOUNTANT",
+    "KE_TOAN",
+    "SALES_MANAGER",
+    "QUAN_LY_KINH_DOANH",
+    "SALESMANAGER",
+  ].includes(userRole);
+
   // ── Load danh sách đại lý ──
 
   const loadAgencies = useCallback(async () => {
@@ -156,6 +166,10 @@ const CreditLimitManager: React.FC = () => {
   // ── Mở modal cập nhật hạn mức (DebtLimitForm) ──
 
   const openEditModal = (agency: AgencyCreditInfo) => {
+    if (!canEditCreditLimit) {
+      message.warning("Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền cập nhật hạn mức!");
+      return;
+    }
     setSelectedAgency(agency);
     setIsEditModalOpen(true);
   };
@@ -287,29 +301,33 @@ const CreditLimitManager: React.FC = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 140,
+      width: canEditCreditLimit ? 140 : 110,
       render: (_: any, record: AgencyCreditInfo) => (
         <Space>
-          <Tooltip title="Cập nhật hạn mức công nợ">
-            <Button
-              id={`btn-edit-credit-${record.id}`}
-              type="primary"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => openEditModal(record)}
-              style={{ borderRadius: 6 }}
-            >
-              Sửa
-            </Button>
-          </Tooltip>
-          <Tooltip title="Xem lịch sử thay đổi">
+          {canEditCreditLimit && (
+            <Tooltip title="Cập nhật hạn mức công nợ">
+              <Button
+                id={`btn-edit-credit-${record.id}`}
+                type="primary"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => openEditModal(record)}
+                style={{ borderRadius: 6 }}
+              >
+                Sửa
+              </Button>
+            </Tooltip>
+          )}
+          <Tooltip title={canEditCreditLimit ? "Xem lịch sử thay đổi" : "Xem lịch sử điều chỉnh hạn mức"}>
             <Button
               id={`btn-history-credit-${record.id}`}
               size="small"
               icon={<HistoryOutlined />}
               onClick={() => openHistoryModal(record)}
               style={{ borderRadius: 6 }}
-            />
+            >
+              {!canEditCreditLimit ? "Lịch sử" : undefined}
+            </Button>
           </Tooltip>
         </Space>
       ),
@@ -427,6 +445,17 @@ const CreditLimitManager: React.FC = () => {
         </div>
       </div>
 
+      {/* Thông báo quyền hạn nếu là role chỉ xem (như Admin hoặc Sales) */}
+      {!canEditCreditLimit && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16, borderRadius: 12 }}
+          message="Giới hạn quyền hạn (Chỉ xem)"
+          description="Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền khai báo và thay đổi hạn mức công nợ. Bạn đang ở chế độ xem và tra cứu lịch sử."
+        />
+      )}
+
       {/* Filters */}
       <Card
         style={{
@@ -509,7 +538,6 @@ const CreditLimitManager: React.FC = () => {
 
       {/* ── History Modal ── */}
       <Modal
-        wrapClassName="modal-credit-limit-history"
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <HistoryOutlined style={{ color: "#2563eb", fontSize: 20 }} />
@@ -530,7 +558,8 @@ const CreditLimitManager: React.FC = () => {
           setIsHistoryModalOpen(false);
           setHistoryData([]);
         }}
-        width={900}
+        width={940}
+        centered
         footer={
           <Button
             id="btn-close-history"
@@ -562,7 +591,7 @@ const CreditLimitManager: React.FC = () => {
             rowKey="id"
             pagination={{ pageSize: 10, showSizeChanger: false }}
             size="small"
-            scroll={{ x: 800 }}
+            scroll={{ x: 800, y: 350 }}
           />
         )}
       </Modal>

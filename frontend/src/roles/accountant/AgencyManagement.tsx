@@ -41,7 +41,7 @@ import {
 import CreditLimitModal from "../../components/CreditLimitModal";
 import DeliveryAddressModal from "../../components/DeliveryAddressModal";
 
-import { authenticatedFetch } from "../../services/sessionService";
+import { authenticatedFetch, getCurrentUserRole } from "../../services/sessionService";
 import {
   getAgencies,
   getAgencyDetail,
@@ -186,6 +186,15 @@ export const AgencyManagement: React.FC = () => {
   });
 
   // Modal Điều chỉnh hạn mức tín dụng & ngày nợ
+  const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
+  const canEditCreditLimit = [
+    "ACCOUNTANT",
+    "KE_TOAN",
+    "SALES_MANAGER",
+    "QUAN_LY_KINH_DOANH",
+    "SALESMANAGER",
+  ].includes(userRole);
+
   const [creditLimitModal, setCreditLimitModal] = useState<{
     visible: boolean;
     agency: Agency | null;
@@ -497,7 +506,7 @@ export const AgencyManagement: React.FC = () => {
       title: "Mã đại lý",
       dataIndex: "code",
       key: "code",
-      width: 130,
+      width: 110,
       render: (code: string) => (
         <Tag
           color="blue"
@@ -516,28 +525,29 @@ export const AgencyManagement: React.FC = () => {
       title: "Tên đại lý & MST",
       dataIndex: "name",
       key: "name",
+      width: 320,
       render: (name: string, record: Agency) => {
         const tax = record.tax_code ?? record.taxCode;
         return (
-          <div>
-            <Text strong style={{ fontSize: 14, color: "#1e293b" }}>
+          <div style={{ wordBreak: "break-word" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#1e293b", lineHeight: 1.4 }}>
               {name}
-            </Text>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+            </div>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4, display: "flex", flexWrap: "wrap", gap: "4px 8px", alignItems: "center" }}>
               {tax ? (
                 <span>
                   MST:{" "}
-                  <Text code style={{ fontSize: 11, color: "#0f766e" }}>
+                  <Text code style={{ fontSize: 11, color: "#0f766e", fontWeight: 600 }}>
                     {tax}
                   </Text>
                 </span>
               ) : (
-                <Text type="secondary" italic>
+                <Text type="secondary" italic style={{ fontSize: 11 }}>
                   Chưa có MST
                 </Text>
               )}
               {record.address && (
-                <span style={{ marginLeft: 8 }}>📍 {record.address}</span>
+                <span style={{ color: "#64748b" }}>📍 {record.address}</span>
               )}
             </div>
           </div>
@@ -547,7 +557,7 @@ export const AgencyManagement: React.FC = () => {
     {
       title: "Nhóm khách hàng",
       key: "customer_group",
-      width: 170,
+      width: 130,
       render: (_: any, record: Agency) => {
         const group = record.customer_group ?? record.customerGroup ?? "RETAIL";
         let color = "geekblue";
@@ -573,7 +583,7 @@ export const AgencyManagement: React.FC = () => {
     {
       title: "Khu vực",
       key: "region",
-      width: 130,
+      width: 105,
       render: (_: any, record: Agency) =>
         record.region ? (
           <Tag color="purple" style={{ borderRadius: 4 }}>
@@ -588,7 +598,7 @@ export const AgencyManagement: React.FC = () => {
     {
       title: "Người phụ trách",
       key: "person_in_charge",
-      width: 180,
+      width: 155,
       render: (_: any, record: Agency) => {
         const person = getRepDisplayName(record);
         const isAssigned = person !== "Chưa phân công";
@@ -619,7 +629,7 @@ export const AgencyManagement: React.FC = () => {
     {
       title: "Số giao dịch",
       key: "transactions_count",
-      width: 120,
+      width: 95,
       align: "center",
       render: (_: any, record: Agency) => {
         const count = record.transactions_count ?? 0;
@@ -643,7 +653,7 @@ export const AgencyManagement: React.FC = () => {
     {
       title: "Trạng thái",
       key: "is_active",
-      width: 140,
+      width: 115,
       align: "center",
       render: (_: any, record: Agency) => {
         if (record.is_locked) {
@@ -682,7 +692,7 @@ export const AgencyManagement: React.FC = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 180,
+      width: 160,
       align: "center",
       render: (_: any, record: Agency) => {
         const active = record.is_active ?? record.isActive ?? true;
@@ -706,7 +716,7 @@ export const AgencyManagement: React.FC = () => {
               />
             </Tooltip>
 
-            <Tooltip title="Điều chỉnh hạn mức tín dụng & ngày nợ">
+            <Tooltip title={canEditCreditLimit ? "Điều chỉnh hạn mức tín dụng & ngày nợ" : "Xem hạn mức tín dụng & ngày nợ (Chỉ xem)"}>
               <Button
                 type="text"
                 icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
@@ -957,17 +967,18 @@ export const AgencyManagement: React.FC = () => {
         </Col>
       </Row>
 
-      {/* 3. Khối tìm kiếm & Bộ lọc (Truy vấn trực tiếp từ Backend đồng bộ chuẩn AdminUsers & ProductManagement) */}
+      {/* 3. Khối tìm kiếm & Bộ lọc (Được bố cục 2 hàng thông thoáng, chống đè nút / tràn chữ) */}
       <Card
         bordered={false}
         style={{
           borderRadius: 12,
           border: "1px solid #e2e8f0",
         }}
-        bodyStyle={{ padding: 16 }}
+        styles={{ body: { padding: "16px 20px" } }}
       >
         <Row gutter={[12, 12]} align="middle">
-          <Col xs={24} lg={7}>
+          {/* Hàng 1: Ô tìm kiếm và Hai nút Thao tác */}
+          <Col xs={24} md={16} lg={18}>
             <Input
               placeholder="Tìm theo Mã đại lý, Tên, MST, SĐT..."
               prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
@@ -975,11 +986,31 @@ export const AgencyManagement: React.FC = () => {
               onChange={(e) => setSearchKeyword(e.target.value)}
               onPressEnter={handleSearch}
               allowClear
+              style={{ height: 38, borderRadius: 8 }}
             />
           </Col>
-          <Col xs={24} sm={12} md={6} lg={4}>
+          <Col xs={24} md={8} lg={6} style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              onClick={handleSearch}
+              style={{ backgroundColor: "#2563eb", borderRadius: 8, height: 38, fontWeight: 600, flex: 1 }}
+            >
+              Tìm kiếm
+            </Button>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={handleResetFilter}
+              style={{ borderRadius: 8, height: 38 }}
+            >
+              Đặt lại
+            </Button>
+          </Col>
+
+          {/* Hàng 2: 4 bộ lọc chia đều 25% không gian, thoáng mắt, không bao giờ bị cắt chữ hay đè lên nhau */}
+          <Col xs={24} sm={12} md={6} lg={6}>
             <Select
-              style={{ width: "100%" }}
+              style={{ width: "100%", height: 38 }}
               placeholder="Nhóm khách hàng"
               value={groupFilter}
               onChange={(val) => {
@@ -992,9 +1023,9 @@ export const AgencyManagement: React.FC = () => {
               ]}
             />
           </Col>
-          <Col xs={24} sm={12} md={6} lg={3}>
+          <Col xs={24} sm={12} md={6} lg={6}>
             <Select
-              style={{ width: "100%" }}
+              style={{ width: "100%", height: 38 }}
               placeholder="Khu vực"
               value={regionFilter}
               onChange={(val) => {
@@ -1007,9 +1038,9 @@ export const AgencyManagement: React.FC = () => {
               ]}
             />
           </Col>
-          <Col xs={24} sm={12} md={6} lg={4}>
+          <Col xs={24} sm={12} md={6} lg={6}>
             <Select
-              style={{ width: "100%" }}
+              style={{ width: "100%", height: 38 }}
               placeholder="NVKD phụ trách"
               value={repFilter}
               onChange={(val) => {
@@ -1027,9 +1058,9 @@ export const AgencyManagement: React.FC = () => {
               ]}
             />
           </Col>
-          <Col xs={24} sm={12} md={6} lg={3}>
+          <Col xs={24} sm={12} md={6} lg={6}>
             <Select
-              style={{ width: "100%" }}
+              style={{ width: "100%", height: 38 }}
               placeholder="Trạng thái"
               value={statusFilter}
               onChange={(val) => {
@@ -1043,23 +1074,6 @@ export const AgencyManagement: React.FC = () => {
                 { value: "LOCKED", label: "Bị khóa công nợ" },
               ]}
             />
-          </Col>
-          <Col xs={24} lg={3} style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={handleSearch}
-              style={{ backgroundColor: "#2563eb", borderRadius: 6 }}
-            >
-              Tìm kiếm
-            </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={handleResetFilter}
-              style={{ borderRadius: 6 }}
-            >
-              Đặt lại
-            </Button>
           </Col>
         </Row>
       </Card>
@@ -1090,7 +1104,7 @@ export const AgencyManagement: React.FC = () => {
             onChange: (p, ps) =>
               fetchAgencies(p, ps, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter),
           }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1190 }}
         />
       </Card>
 
@@ -1252,7 +1266,12 @@ export const AgencyManagement: React.FC = () => {
               <Form.Item
                 name="phone"
                 label="Số điện thoại"
-                rules={[{ max: 25, message: "Tối đa 25 ký tự" }]}
+                rules={[
+                  {
+                    pattern: /^0[1235789]\d{8,9}$/,
+                    message: "Số điện thoại gồm 10-11 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!",
+                  },
+                ]}
               >
                 <Input placeholder="VD: 0901234567" />
               </Form.Item>
@@ -1488,14 +1507,20 @@ export const AgencyManagement: React.FC = () => {
         visible={creditLimitModal.visible}
         customer={creditLimitModal.agency as any}
         onClose={() => setCreditLimitModal({ visible: false, agency: null })}
-        onSuccess={() => loadAgencies(page)}
+        onSuccess={() => {
+          fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+          loadOverviewStats();
+        }}
       />
 
       <DeliveryAddressModal
         visible={deliveryAddressModal.visible}
         customer={deliveryAddressModal.agency as any}
         onClose={() => setDeliveryAddressModal({ visible: false, agency: null })}
-        onSuccess={() => loadAgencies(page)}
+        onSuccess={() => {
+          fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+          loadOverviewStats();
+        }}
       />
     </div>
   );
