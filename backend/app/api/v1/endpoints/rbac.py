@@ -273,24 +273,27 @@ def get_current_user(
         token = auth.credentials
         try:
             payload = decode_access_token(token)
-            username = payload.get("sub") or payload.get("username")
+            username = payload.get("username") or payload.get("sub")
             role_raw = payload.get("role") or payload.get("role_code")
             if not username or not role_raw:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="MÃ£ token thiáº¿u thÃ´ng tin ngÆ°á»i dÃ¹ng hoáº·c vai trÃ².",
+                    detail="Mã token thiếu thông tin người dùng hoặc vai trò.",
                 )
             normalized = normalize_role(role_raw)
             if not normalized:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Vai trÃ² trong token khÃ´ng há»£p lá»‡ trÃªn há»‡ thá»‘ng.",
+                    detail="Vai trò trong token không hợp lệ trên hệ thống.",
                 )
+            user_id = payload.get("user_id") or payload.get("id")
+            if user_id is None and str(payload.get("sub", "")).isdigit():
+                user_id = int(payload["sub"])
             return AuthenticatedUser(
-                id=payload.get("user_id") or payload.get("id"),
+                id=user_id,
                 username=username,
                 role=normalized,
-                full_name=payload.get("full_name"),
+                full_name=payload.get("full_name") or payload.get("fullName") or payload.get("name"),
                 warehouse_id=payload.get("warehouse_id"),
                 warehouse_ids=payload.get("warehouse_ids") or ([payload["warehouse_id"]] if payload.get("warehouse_id") else []),
                 territory_id=payload.get("territory_id"),

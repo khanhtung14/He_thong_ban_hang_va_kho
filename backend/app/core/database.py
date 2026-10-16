@@ -72,6 +72,7 @@ def migrate_pricing_schema():
         Supplier,
         DiscountPolicy,
         DiscountTier,
+        CreditLimitLog,
     )
 
     Base.metadata.create_all(
@@ -85,6 +86,7 @@ def migrate_pricing_schema():
             Supplier.__table__,
             DiscountPolicy.__table__,
             DiscountTier.__table__,
+            CreditLimitLog.__table__,
         ],
         checkfirst=True,
     )
@@ -104,7 +106,12 @@ def migrate_pricing_schema():
             "lock_reason": "VARCHAR(255) NULL",
             "locked_at": "DATETIME NULL",
             "locked_by_id": "INTEGER NULL",
-            "phone": "VARCHAR(20) NULL",
+            "credit_limit": "FLOAT NOT NULL DEFAULT 0.0",
+            "max_due_days": "INTEGER NOT NULL DEFAULT 30",
+            "max_debt_days": "INTEGER NOT NULL DEFAULT 30",
+            "current_debt": "FLOAT NOT NULL DEFAULT 0.0",
+            "warning_threshold_percent": "FLOAT NOT NULL DEFAULT 80.0",
+            "warning_threshold": "FLOAT NOT NULL DEFAULT 80.0",
         },
         "suppliers": {
             "contact_person": "VARCHAR(100) NULL",
@@ -113,7 +120,13 @@ def migrate_pricing_schema():
             "created_at": "DATETIME NULL",
             "updated_at": "DATETIME NULL",
         },
-        "orders": {"approval_reason": "TEXT NULL"},
+        "delivery_addresses": {
+            "note": "TEXT NULL",
+        },
+        "orders": {
+            "approval_reason": "TEXT NULL",
+            "delivery_address_id": "INTEGER NULL",
+        },
         "order_items": {
             "floor_price": "INTEGER NULL",
             "price_list_id": "INTEGER NULL",
@@ -128,14 +141,23 @@ def migrate_pricing_schema():
         },
         "discount_policies": {
             "name": "VARCHAR(255) NOT NULL DEFAULT ''",
+            "code": "VARCHAR(50) NULL",
+            "scope": "VARCHAR(30) NOT NULL DEFAULT 'SKU'",
             "target_type": "VARCHAR(20) NOT NULL DEFAULT 'SKU'",
-            "target_id": "VARCHAR(100) NOT NULL DEFAULT ''",
+            "target_id": "VARCHAR(100) NULL",
+            "product_id": "INTEGER NULL",
+            "created_by_user_id": "INTEGER NULL",
+            "start_date": "DATETIME NULL",
+            "end_date": "DATETIME NULL",
             "discount_type": "VARCHAR(20) NOT NULL DEFAULT 'PERCENTAGE'",
             "is_active": "BOOLEAN NOT NULL DEFAULT 1",
             "created_at": "DATETIME NULL",
         },
         "discount_tiers": {
             "policy_id": "INTEGER NOT NULL DEFAULT 0",
+            "discount_id": "INTEGER NULL",
+            "min_qty": "INTEGER NOT NULL DEFAULT 1",
+            "discount_percent": "FLOAT NOT NULL DEFAULT 0.0",
             "min_quantity": "INTEGER NOT NULL DEFAULT 1",
             "max_quantity": "INTEGER NULL",
             "discount_value": "FLOAT NOT NULL DEFAULT 0.0",
