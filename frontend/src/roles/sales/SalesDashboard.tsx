@@ -11,6 +11,7 @@ import { SalesHeader } from "../../components/Header/SalesHeader";
 
 // Customer List Module (S3-08)
 import { SalesCustomerList } from "./SalesCustomerList";
+import { CreateOrder } from "./CreateOrder";
 
 // Auth & API
 import { logout } from "../../services/sessionService";
@@ -116,11 +117,14 @@ export const SalesDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Màn hình Khách hàng & Đại lý / Tổng quan */}
-          <SalesCustomerList
-            currentRepName={profile?.full_name}
-            onSelectCustomerForOrder={handleSelectCustomerForOrder}
-          />
+          {selectedKey === "orders" ? (
+            <CreateOrder />
+          ) : (
+            <SalesCustomerList
+              currentRepName={profile?.full_name}
+              onSelectCustomerForOrder={handleSelectCustomerForOrder}
+            />
+          )}
         </Content>
       </Layout>
 

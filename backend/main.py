@@ -203,6 +203,8 @@ app.include_router(reports_router)
 app.include_router(navigation_router)
 app.include_router(user_assignment_router)
 app.include_router(sales_assignment_router)
+from src.backend.routers.sales import router as sales_history_router
+app.include_router(sales_history_router)
 app.include_router(users_router)
 app.include_router(users_compat_router)
 app.include_router(user_router)

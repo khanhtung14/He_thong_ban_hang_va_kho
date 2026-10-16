@@ -1,8 +1,17 @@
 {
   "python.analysis.extraPaths": [
-    "./backend"
+    "${workspaceFolder}",
+    "${workspaceFolder}/backend",
+    "${workspaceFolder}/src"
   ],
   "python.autoComplete.extraPaths": [
-    "./backend"
+    "${workspaceFolder}",
+    "${workspaceFolder}/backend",
+    "${workspaceFolder}/src"
+  ],
+  "pyrefly.extraSearchPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/backend",
+    "${workspaceFolder}/src"
   ]
 }

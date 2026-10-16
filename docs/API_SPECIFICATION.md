@@ -506,6 +506,17 @@
 }
 ```
 
+#### `GET /api/v1/sales/dealers/{dealer_id}/purchase-history`
+- **Story:** SCRUM-11 / S4-04 (Lịch sử mua hàng của đại lý dành cho Sales)
+- **Phân quyền:** Sales Rep (được phân công quản lý đại lý), Sales Manager, Admin
+- **Query Params:** Không (mặc định 90 ngày)
+- **Response Data:** Danh sách các mặt hàng đại lý đã mua trong 90 ngày qua kèm `total_quantity` và `average_quantity`. Bị chặn 403 Forbidden nếu NVKD không được phân công quản lý đại lý.
+
+#### `GET /api/v1/sales/dealers/{dealer_id}/last-order`
+- **Story:** SCRUM-11 (Lấy danh sách sản phẩm từ đơn hàng thành công gần nhất của đại lý)
+- **Phân quyền:** Sales Rep (được phân công quản lý đại lý), Sales Manager, Admin
+- **Response Data:** `LastOrderGroupResponse` chứa `order_id`, `order_code` và mảng `items` (`product_id`, `product_name`, `quantity`, `unit_price`). Bị chặn 403 Forbidden nếu không thuộc quyền quản lý.
+
 #### `GET /customers/{id}/purchase-history`
 - **Story:** S4-04
 - **Phân quyền:** Sales Rep, Sales Manager

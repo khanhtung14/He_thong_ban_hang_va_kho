@@ -1,0 +1,13 @@
+[tool.pyrefly]
+search-path = [
+    ".",
+    "backend",
+    "src"
+]
+
+[tool.pyright]
+extraPaths = [
+    ".",
+    "backend",
+    "src"
+]
