@@ -34,8 +34,12 @@ import {
   UserOutlined,
   DollarCircleOutlined,
   EyeOutlined,
+  SafetyCertificateOutlined,
+  EnvironmentOutlined,
   LockOutlined,
 } from "@ant-design/icons";
+import CreditLimitModal from "../../components/CreditLimitModal";
+import DeliveryAddressModal from "../../components/DeliveryAddressModal";
 
 import { authenticatedFetch } from "../../services/sessionService";
 import {
@@ -181,6 +185,24 @@ export const AgencyManagement: React.FC = () => {
     errorMessage: "",
   });
 
+  // Modal Điều chỉnh hạn mức tín dụng & ngày nợ
+  const [creditLimitModal, setCreditLimitModal] = useState<{
+    visible: boolean;
+    agency: Agency | null;
+  }>({
+    visible: false,
+    agency: null,
+  });
+
+  // Modal Quản lý điểm giao hàng (SCRUM-20)
+  const [deliveryAddressModal, setDeliveryAddressModal] = useState<{
+    visible: boolean;
+    agency: Agency | null;
+  }>({
+    visible: false,
+    agency: null,
+  });
+
   // Tải danh sách đại lý có hỗ trợ bộ lọc và phân trang từ server backend
   const fetchAgencies = useCallback(
     async (
@@ -224,6 +246,13 @@ export const AgencyManagement: React.FC = () => {
       }
     },
     [page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter],
+  );
+
+  const loadAgencies = useCallback(
+    async (targetPage = page) => {
+      await fetchAgencies(targetPage, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+    },
+    [fetchAgencies, page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter],
   );
 
   useEffect(() => {
@@ -674,6 +703,22 @@ export const AgencyManagement: React.FC = () => {
                 type="text"
                 icon={<EditOutlined style={{ color: "#2563eb" }} />}
                 onClick={() => handleOpenEditModal(record)}
+              />
+            </Tooltip>
+
+            <Tooltip title="Điều chỉnh hạn mức tín dụng & ngày nợ">
+              <Button
+                type="text"
+                icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
+                onClick={() => setCreditLimitModal({ visible: true, agency: record })}
+              />
+            </Tooltip>
+
+            <Tooltip title="Quản lý điểm giao hàng">
+              <Button
+                type="text"
+                icon={<EnvironmentOutlined style={{ color: "#0284c7" }} />}
+                onClick={() => setDeliveryAddressModal({ visible: true, agency: record })}
               />
             </Tooltip>
 
@@ -1438,6 +1483,20 @@ export const AgencyManagement: React.FC = () => {
           </ul>
         </div>
       </Modal>
+
+      <CreditLimitModal
+        visible={creditLimitModal.visible}
+        customer={creditLimitModal.agency as any}
+        onClose={() => setCreditLimitModal({ visible: false, agency: null })}
+        onSuccess={() => loadAgencies(page)}
+      />
+
+      <DeliveryAddressModal
+        visible={deliveryAddressModal.visible}
+        customer={deliveryAddressModal.agency as any}
+        onClose={() => setDeliveryAddressModal({ visible: false, agency: null })}
+        onSuccess={() => loadAgencies(page)}
+      />
     </div>
   );
 };

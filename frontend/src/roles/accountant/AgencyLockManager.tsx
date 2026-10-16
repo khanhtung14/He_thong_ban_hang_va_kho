@@ -21,9 +21,11 @@ import {
   SearchOutlined,
   WarningOutlined,
   ShopOutlined,
+  SafetyCertificateOutlined,
   //   HistoryOutlined,
 } from "@ant-design/icons";
 import { authenticatedFetch } from "../../services/sessionService";
+import CreditLimitModal from "../../components/CreditLimitModal";
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -114,6 +116,15 @@ export const AgencyLockManager: React.FC = () => {
   const [targetAgency, setTargetAgency] = useState<AgencyDebtItem | null>(null);
   const [lockSubmitting, setLockSubmitting] = useState(false);
   const [form] = Form.useForm();
+
+  // Trạng thái modal điều chỉnh hạn mức tín dụng & ngày nợ
+  const [creditLimitModal, setCreditLimitModal] = useState<{
+    visible: boolean;
+    agency: AgencyDebtItem | null;
+  }>({
+    visible: false,
+    agency: null,
+  });
 
   // Tải danh sách đại lý và trạng thái công nợ từ CSDL
   const loadAgenciesFromDB = useCallback(async () => {
@@ -431,6 +442,16 @@ export const AgencyLockManager: React.FC = () => {
               Khóa GD
             </Button>
           )}
+
+          <Tooltip title="Điều chỉnh hạn mức tín dụng & ngày nợ">
+            <Button
+              size="small"
+              icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
+              onClick={() => setCreditLimitModal({ visible: true, agency: record })}
+            >
+              Hạn mức
+            </Button>
+          </Tooltip>
         </Space>
       ),
     },
@@ -551,6 +572,14 @@ export const AgencyLockManager: React.FC = () => {
           </div>
         </Form>
       </Modal>
+
+      {/* Modal Điều chỉnh hạn mức tín dụng & ngày nợ */}
+      <CreditLimitModal
+        visible={creditLimitModal.visible}
+        customer={creditLimitModal.agency as any}
+        onClose={() => setCreditLimitModal({ visible: false, agency: null })}
+        onSuccess={() => loadAgenciesFromDB()}
+      />
     </div>
   );
 };

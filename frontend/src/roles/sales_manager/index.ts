@@ -8,4 +8,6 @@ export { default as SalesAssignmentManager, SalesAssignmentManager as SalesAssig
 export { default as SalesReportPage, SalesReportPage as SalesReportPageComponent } from "./SalesReportPage";
 export { default as CustomerTerritoryManagement } from "./CustomerTerritoryManagement";
 export { default as ProductPriceHistoryModal } from "./ProductPriceHistoryModal";
+export { default as ProductCatalogManagement } from "./ProductCatalogManagement";
+export { default as ProductManagement } from "./ProductManagement";
 export { default as DiscountPolicyManagement, DiscountPolicyManagement as DiscountPolicyManagementComponent } from "./DiscountPolicyManagement";
