@@ -121,6 +121,9 @@ def get_available_stock_info(
             "physical_qty": inv.physical_qty,
             "reserved_qty": inv.reserved_qty,
             "available_qty": avail,
+            "physical_quantity": inv.physical_qty,
+            "reserved_quantity": inv.reserved_qty,
+            "available_quantity": avail,
             "inventory_record": inv,
         }
 
@@ -136,6 +139,9 @@ def get_available_stock_info(
         "physical_qty": mock_avail,
         "reserved_qty": 0.0,
         "available_qty": mock_avail,
+        "physical_quantity": mock_avail,
+        "reserved_quantity": 0.0,
+        "available_quantity": mock_avail,
         "inventory_record": None,
     }
 

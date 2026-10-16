@@ -1517,7 +1517,12 @@ def simulate_order(
             "sku": sku,
             "requestedQty": it.quantity,
             "availableQty": avail,
+            "available_qty": avail,
+            "availableQuantity": avail,
+            "available_quantity": avail,
             "maxAllowedQty": max(0.0, avail),
+            "max_allowed_qty": max(0.0, avail),
+            "max_allowed_quantity": max(0.0, avail),
             "isAvailable": is_available,
             "unitPrice": actual_price,
             "floorPrice": floor_price,
@@ -1631,9 +1636,11 @@ def create_order(
             if not success:
                 db.rollback()
                 max_allowed_int = max(0, int(avail))
+                prod_title = db_product.name if db_product else (product.get("name") if product else sku)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=(
+                        f"Sản phẩm [{prod_title} / {sku}] chỉ còn khả dụng tối đa {max_allowed_int} đơn vị! "
                         f"Sản phẩm '{sku}' không đủ số lượng tồn khả dụng tại kho '{serving_wh.name}'! "
                         f"Số lượng yêu cầu: {requested.quantity}, tồn khả dụng: {max_allowed_int}. "
                         f"Số lượng tối đa còn có thể đặt: {max_allowed_int}."

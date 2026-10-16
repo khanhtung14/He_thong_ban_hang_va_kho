@@ -52,6 +52,10 @@ export interface ProductOptionItem {
   baseUnit?: string;
   stock_available?: number;
   stock?: number;
+  available_quantity?: number;
+  available_qty?: number;
+  availableQuantity?: number;
+  reserved_quantity?: number;
   status?: string;
 }
 
@@ -67,6 +71,7 @@ interface CreateOrderModalProps {
 interface OrderItemRow extends OrderItemInput {
   key: string;
   unit?: string;
+  available_quantity?: number;
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
@@ -291,29 +296,53 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const cust = customers.find((c) => c.id === custId);
     if (cust) {
       loadCustomerAddresses(cust);
-      // Khi đổi đại lý, tự động cập nhật lại đơn giá các mặt hàng đã chọn theo bảng giá đại lý mới (hoặc fallback base_price)
-      if (cust.customer_group && items.some((it) => it.sku)) {
+      // Khi đổi đại lý, tự động cập nhật lại đơn giá và tồn khả dụng theo kho đại lý mới
+      if (items.some((it) => it.sku)) {
         const updated = await Promise.all(
           items.map(async (it) => {
             if (!it.sku) return it;
             const prod = products.find((p) => p.sku === it.sku);
             let price = Number(prod?.sale_price ?? prod?.basePrice ?? it.unit_price ?? 0);
+            let avail = it.available_quantity;
+
+            if (cust.customer_group) {
+              try {
+                const res = await authenticatedFetch(
+                  `/api/v1/price-lists/effective/${encodeURIComponent(it.sku)}?customer_group=${encodeURIComponent(
+                    cust.customer_group
+                  )}&fallback=true`
+                );
+                if (res.ok) {
+                  const data = await res.json();
+                  if (data && data.sale_price !== undefined && data.sale_price !== null) {
+                    price = Number(data.sale_price);
+                  }
+                }
+              } catch {
+                // fallback to base_price
+              }
+            }
+
             try {
-              const res = await authenticatedFetch(
-                `/api/v1/price-lists/effective/${encodeURIComponent(it.sku)}?customer_group=${encodeURIComponent(
-                  cust.customer_group
-                )}&fallback=true`
+              const stockRes = await authenticatedFetch(
+                `/api/v1/inventory/available-stock?sku=${encodeURIComponent(it.sku)}&customerId=${cust.id}`
               );
-              if (res.ok) {
-                const data = await res.json();
-                if (data && data.sale_price !== undefined && data.sale_price !== null) {
-                  price = Number(data.sale_price);
+              if (stockRes.ok) {
+                const sJson = await stockRes.json();
+                const sData = sJson.data || sJson;
+                if (sData) {
+                  const val = Number(
+                    sData.available_quantity ?? sData.availableQuantity ?? sData.availableQty ?? sData.available_qty
+                  );
+                  if (!isNaN(val)) avail = val;
                 }
               }
             } catch {
-              // fallback to base_price
+              // keep existing
             }
-            return { ...it, unit_price: price };
+
+            const clampedQty = avail !== undefined && avail > 0 ? Math.min(it.quantity || 1, avail) : it.quantity;
+            return { ...it, unit_price: price, available_quantity: avail, quantity: clampedQty };
           })
         );
         setItems(updated);
@@ -346,6 +375,32 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
     let price = Number(prod.sale_price ?? prod.basePrice ?? 0);
     const unit = prod.unit || prod.baseUnit || "";
+    let availStock = Number(
+      prod.available_quantity ?? prod.availableQuantity ?? prod.available_qty ?? prod.stock_available ?? prod.stock ?? 0
+    );
+
+    // Truy vấn thời gian thực tồn khả dụng từ API kho phục vụ đại lý
+    if (selectedCustomer?.id) {
+      try {
+        const stockRes = await authenticatedFetch(
+          `/api/v1/inventory/available-stock?sku=${encodeURIComponent(prod.sku)}&customerId=${selectedCustomer.id}`
+        );
+        if (stockRes.ok) {
+          const sJson = await stockRes.json();
+          const sData = sJson.data || sJson;
+          if (sData) {
+            const fetchedAvail = Number(
+              sData.available_quantity ?? sData.availableQuantity ?? sData.availableQty ?? sData.available_qty
+            );
+            if (!isNaN(fetchedAvail)) {
+              availStock = fetchedAvail;
+            }
+          }
+        }
+      } catch {
+        // fallback to prod available_quantity
+      }
+    }
 
     // Ưu tiên tra cứu giá theo bảng giá của nhóm đại lý nếu có
     if (selectedCustomer?.customer_group) {
@@ -376,12 +431,15 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setItems((prev) =>
       prev.map((it) => {
         if (it.key === key) {
+          const targetQty = availStock > 0 ? Math.min(it.quantity || 1, availStock) : 1;
           return {
             ...it,
             sku: prod.sku,
             product_name: prod.name,
             unit_price: price,
             unit: unit,
+            available_quantity: availStock,
+            quantity: targetQty,
           };
         }
         return it;
@@ -432,6 +490,22 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       if (items.some((it) => !it.sku || !it.product_name)) {
         message.error("Vui lòng chọn sản phẩm cho tất cả các dòng hàng!");
         return;
+      }
+
+      // Kiểm tra chặn đặt vượt tồn khả dụng ngay trên giao diện
+      for (const it of items) {
+        if (it.available_quantity !== undefined) {
+          if (it.available_quantity <= 0) {
+            message.error(`Sản phẩm [${it.product_name || it.sku}] đã hết hàng trong kho (tồn khả dụng = 0)!`);
+            return;
+          }
+          if (it.quantity > it.available_quantity) {
+            message.error(
+              `Sản phẩm [${it.product_name || it.sku}] chỉ còn khả dụng tối đa ${it.available_quantity} đơn vị!`
+            );
+            return;
+          }
+        }
       }
 
       setSubmitting(true);
@@ -487,7 +561,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       title: "MÃ SKU",
       dataIndex: "sku",
       key: "sku",
-      width: 170,
+      width: 150,
       render: (val: string, r) => (
         <Select
           showSearch
@@ -512,7 +586,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       title: "TÊN SẢN PHẨM",
       dataIndex: "sku",
       key: "product_name",
-      width: 250,
+      width: 220,
       render: (val: string, r) => (
         <Select
           showSearch
@@ -540,7 +614,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       title: "ĐƠN VỊ TÍNH",
       dataIndex: "unit",
       key: "unit",
-      width: 100,
+      width: 95,
       align: "center",
       render: (val: string) =>
         val ? (
@@ -552,26 +626,70 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         ),
     },
     {
+      title: "TỒN KHẢ DỤNG",
+      dataIndex: "available_quantity",
+      key: "available_quantity",
+      width: 125,
+      align: "center",
+      render: (val: number | undefined, r) => {
+        if (!r.sku) return <span style={{ color: "#94a3b8" }}>—</span>;
+        if (val === undefined || val === null) {
+          return <Tag color="default">Chưa rõ</Tag>;
+        }
+        if (val <= 0) {
+          return (
+            <Tag color="error" style={{ fontWeight: 600, borderRadius: 4 }}>
+              Hết hàng (0)
+            </Tag>
+          );
+        }
+        if (val <= 10) {
+          return (
+            <Tag color="warning" style={{ fontWeight: 600, borderRadius: 4 }}>
+              {val} {r.unit || ""}
+            </Tag>
+          );
+        }
+        return (
+          <Tag color="success" style={{ fontWeight: 600, borderRadius: 4 }}>
+            {val} {r.unit || ""}
+          </Tag>
+        );
+      },
+    },
+    {
       title: "SỐ LƯỢNG",
       dataIndex: "quantity",
       key: "quantity",
-      width: 100,
-      render: (val: number, r) => (
-        <InputNumber
-          min={1}
-          defaultValue={1}
-          value={val}
-          onChange={(num) => handleItemChange(r.key, "quantity", num || 1)}
-          size="small"
-          style={{ width: "100%" }}
-        />
-      ),
+      width: 110,
+      render: (val: number, r) => {
+        const maxLimit = r.available_quantity !== undefined && r.available_quantity >= 0
+          ? r.available_quantity
+          : undefined;
+        const isOutOfStock = r.available_quantity !== undefined && r.available_quantity <= 0;
+
+        return (
+          <Tooltip title={isOutOfStock ? `Sản phẩm '${r.sku}' đã hết hàng trong kho!` : (maxLimit !== undefined ? `Tối đa ${maxLimit} ${r.unit || "đơn vị"}` : undefined)}>
+            <InputNumber
+              min={isOutOfStock ? 0 : 1}
+              max={maxLimit !== undefined && maxLimit > 0 ? maxLimit : (isOutOfStock ? 0 : undefined)}
+              disabled={isOutOfStock}
+              status={isOutOfStock ? "error" : (maxLimit !== undefined && val > maxLimit ? "error" : undefined)}
+              defaultValue={1}
+              value={val}
+              onChange={(num) => handleItemChange(r.key, "quantity", num || 1)}
+              size="small"
+              style={{ width: "100%" }}
+            />
+          </Tooltip>
+        );
+      },
     },
     {
       title: "ĐƠN GIÁ (₫)",
       dataIndex: "unit_price",
       key: "unit_price",
-      width: 130,
+      width: 120,
       render: (val: number, r) => (
         <InputNumber
           min={0}
@@ -588,7 +706,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     {
       title: "THÀNH TIỀN (₫)",
       key: "subtotal",
-      width: 130,
+      width: 125,
       align: "right",
       render: (_, r) => (
         <Text strong style={{ color: "#047857" }}>
@@ -630,7 +748,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         }
         open={isOpen}
         onCancel={handleClose}
-        width={950}
+        width={1050}
         onOk={handleSubmit}
         confirmLoading={submitting}
         okText={editingOrder ? "Lưu thay đổi" : "Xác nhận tạo đơn"}

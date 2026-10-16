@@ -136,6 +136,11 @@ def migrate_pricing_schema():
             "product_name": "VARCHAR(255) NULL",
             "available_qty": "FLOAT NULL",
         },
+        "inventory": {
+            "physical_qty": "FLOAT NOT NULL DEFAULT 0.0",
+            "reserved_qty": "FLOAT NOT NULL DEFAULT 0.0",
+            "available_qty": "FLOAT NOT NULL DEFAULT 0.0",
+        },
         "product_units": {
             "is_base_unit": "BOOLEAN NOT NULL DEFAULT 0",
         },

@@ -60,6 +60,32 @@ def seed_default_warehouses_and_territories(db: Session) -> None:
     except Exception:
         db.rollback()
 
+    try:
+        from sqlalchemy import func
+        wh1 = db.query(Warehouse).filter(Warehouse.id == 1).first() or db.query(Warehouse).first()
+        if wh1:
+            prod = db.query(Product).filter(func.upper(Product.sku) == "SUA-VINAMILK-100").first()
+            if prod:
+                inv = db.query(Inventory).filter(
+                    Inventory.product_id == prod.id,
+                    Inventory.warehouse_id == wh1.id,
+                ).first()
+                if inv:
+                    inv.physical_qty = 100.0
+                    inv.reserved_qty = 0.0
+                    inv.available_qty = 100.0
+                else:
+                    db.add(Inventory(
+                        product_id=prod.id,
+                        warehouse_id=wh1.id,
+                        physical_qty=100.0,
+                        reserved_qty=0.0,
+                        available_qty=100.0,
+                    ))
+                db.commit()
+    except Exception:
+        db.rollback()
+
 
 # -------------------------------------------------------------
 # Schemas

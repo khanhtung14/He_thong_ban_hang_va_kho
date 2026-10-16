@@ -284,6 +284,12 @@ def get_available_stock_endpoint(
             "physicalQty": info["physical_qty"],
             "reservedQty": info["reserved_qty"],
             "availableQty": info["available_qty"],
+            "physicalQuantity": info["physical_qty"],
+            "reservedQuantity": info["reserved_qty"],
+            "availableQuantity": info["available_qty"],
+            "physical_quantity": info["physical_qty"],
+            "reserved_quantity": info["reserved_qty"],
+            "available_quantity": info["available_qty"],
         }
     }
 

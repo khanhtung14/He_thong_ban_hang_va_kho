@@ -674,11 +674,20 @@ class Inventory(Base):
     reserved_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     available_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
+    reserved_quantity = synonym("reserved_qty")
+    available_quantity = synonym("available_qty")
+    physical_quantity = synonym("physical_qty")
+    quantity_on_hand = synonym("physical_qty")
+
     product: Mapped[Optional["Product"]] = relationship("Product")
     warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse")
 
     @property
     def calculated_available_qty(self) -> float:
+        return self.physical_qty - self.reserved_qty
+
+    @property
+    def calculated_available_quantity(self) -> float:
         return self.physical_qty - self.reserved_qty
 
 

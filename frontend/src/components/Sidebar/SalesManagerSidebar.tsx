@@ -57,12 +57,6 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       badge: pendingApprovalCount,
     },
     {
-      id: "sales-assignments",
-      title: "Phân công & Bàn giao",
-      path: "/sales/assignments",
-      icon: "user-switch",
-    },
-    {
       id: "manager-products",
       title: "Sản phẩm",
       path: "/manager/products",
@@ -94,32 +88,13 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  const baseItems: MenuItem[] = [
-    ...(customMenuItems && customMenuItems.length > 0
+  const baseItems: MenuItem[] = (
+    customMenuItems && customMenuItems.length > 0
       ? customMenuItems
-      : defaultMenuItems),
-  ];
-
-  // Đảm bảo mục "Phân công & Bàn giao" luôn luôn có mặt trong menu của Sales Manager
-  const hasAssignment = baseItems.some(
-    (item) => item.path === "/sales/assignments" || item.id === "sales-assignments"
+      : defaultMenuItems
+  ).filter(
+    (item) => item.path !== "/sales/assignments" && item.id !== "sales-assignments"
   );
-  if (!hasAssignment) {
-    const insertIdx = baseItems.findIndex(
-      (item) => item.path === "/manager/orders/approval"
-    );
-    const assignmentItem: MenuItem = {
-      id: "sales-assignments",
-      title: "Phân công & Bàn giao",
-      path: "/sales/assignments",
-      icon: "user-switch",
-    };
-    if (insertIdx !== -1) {
-      baseItems.splice(insertIdx + 1, 0, assignmentItem);
-    } else {
-      baseItems.push(assignmentItem);
-    }
-  }
 
   // Đảm bảo mục "Sản phẩm" luôn luôn có mặt trong menu của Sales Manager
   const hasProducts = baseItems.some(
@@ -127,7 +102,7 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
   );
   if (!hasProducts) {
     const insertIdx = baseItems.findIndex(
-      (item) => item.path === "/sales/assignments"
+      (item) => item.path === "/manager/orders/approval"
     );
     const productItem: MenuItem = {
       id: "manager-products",
