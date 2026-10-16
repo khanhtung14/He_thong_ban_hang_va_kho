@@ -40,6 +40,7 @@ import {
   WarningOutlined,
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
+import dayjs from "dayjs";
 import { authenticatedFetch } from "../../services/sessionService";
 import { DebtLimitForm } from "./DebtLimitForm";
 
@@ -120,10 +121,10 @@ const CreditLimitManager: React.FC = () => {
       const items: any[] = Array.isArray(json) ? json : json.data || json.items || [];
 
       const mapped: AgencyCreditInfo[] = items.map((c: any) => {
-        const creditLimit = c.max_debt_amount ?? c.credit_limit ?? 0;
-        const currentDebt = c.current_debt ?? 0;
-        const maxDebtDays = c.max_debt_days ?? c.max_due_days ?? 0;
-        const warningPct = c.warning_threshold_percent ?? 80;
+        const creditLimit = Number(c.credit_limit ?? c.creditLimit ?? c.debt_limit ?? c.max_debt_amount ?? 0);
+        const currentDebt = Number(c.current_debt ?? c.currentDebt ?? 0);
+        const maxDebtDays = Number(c.max_debt_days ?? c.max_due_days ?? c.maxDueDays ?? c.maxDebtDays ?? 0);
+        const warningPct = Number(c.warning_threshold_percent ?? c.warning_threshold ?? 80);
         const usagePct =
           creditLimit > 0 ? Math.round((currentDebt / creditLimit) * 100 * 10) / 10 : 0;
         return {
@@ -255,8 +256,8 @@ const CreditLimitManager: React.FC = () => {
                 record.usage_percent >= 100
                   ? "#ef4444"
                   : record.usage_percent >= 80
-                  ? "#f97316"
-                  : "#374151",
+                    ? "#f97316"
+                    : "#374151",
             }}
           >
             {formatMoney(value)}
@@ -322,8 +323,11 @@ const CreditLimitManager: React.FC = () => {
       title: "Thời gian",
       dataIndex: "created_at",
       key: "created_at",
-      render: (v: string | null) =>
-        v ? new Date(v).toLocaleString("vi-VN") : "—",
+      render: (v: string | null) => {
+        if (!v) return "—";
+        const dateStr = v.endsWith("Z") || v.includes("+") ? v : `${v}Z`;
+        return dayjs(dateStr).format("HH:mm:ss DD/MM/YYYY");
+      },
     },
     {
       title: "Hạn mức cũ",
@@ -417,7 +421,7 @@ const CreditLimitManager: React.FC = () => {
               Quản lý Hạn mức Công nợ
             </Title>
             <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>
-              SCUM-21 · Khai báo hạn mức tiền và số ngày nợ tối đa cho đại lý
+              Khai báo hạn mức tiền và số ngày nợ tối đa cho đại lý
             </Text>
           </div>
         </div>
@@ -486,8 +490,8 @@ const CreditLimitManager: React.FC = () => {
             record.usage_percent >= 100
               ? "row-danger"
               : record.usage_percent >= 80
-              ? "row-warning"
-              : ""
+                ? "row-warning"
+                : ""
           }
         />
       </Card>
@@ -497,8 +501,9 @@ const CreditLimitManager: React.FC = () => {
         open={isEditModalOpen}
         agency={selectedAgency}
         onClose={() => setIsEditModalOpen(false)}
-        onSuccess={() => {
-          loadAgencies();
+        onSuccess={async () => {
+          await loadAgencies();
+          setIsEditModalOpen(false);
         }}
       />
 

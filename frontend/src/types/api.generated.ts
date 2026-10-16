@@ -627,10 +627,11 @@ export interface paths {
          * @description Get product detail by ID or SKU.
          */
         get: operations["get_product_detail_api_v1_products__id_or_sku__get"];
-        /** Cập nhật thông tin sản phẩm */
+        /** Chỉnh sửa thông tin sản phẩm */
         put: operations["update_product_api_v1_products__id_or_sku__put"];
         post?: never;
-        delete?: never;
+        /** Xóa sản phẩm (nếu chưa phát sinh giao dịch) */
+        delete: operations["delete_product_api_v1_products__id_or_sku__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -700,24 +701,7 @@ export interface paths {
         patch: operations["update_product_price_patch"];
         trace?: never;
     };
-    "/api/v1/products/{product_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Xóa sản phẩm (nếu chưa phát sinh giao dịch) */
-        delete: operations["delete_product_api_v1_products__product_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/products/{product_id}/status": {
+    "/api/v1/products/{id_or_sku}/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -731,7 +715,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Cập nhật trạng thái sản phẩm */
-        patch: operations["update_product_status_api_v1_products__product_id__status_patch"];
+        patch: operations["toggle_product_status_api_v1_products__id_or_sku__status_patch"];
         trace?: never;
     };
     "/api/v1/categories/tree": {
@@ -1487,6 +1471,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/{customer_id}/credit-limit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Credit Limit Logs */
+        get: operations["get_customer_credit_limit_logs_api_v1_customers__customer_id__credit_limit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{customer_id}/pricing-group": {
         parameters: {
             query?: never;
@@ -1714,9 +1715,17 @@ export interface paths {
          * @description Xem chi tiết đơn hàng kèm cảnh báo nếu đại lý đang bị khóa (SCRUM-85).
          */
         get: operations["get_order_detail_api_v1_orders__order_id__get"];
-        put?: never;
+        /**
+         * Update Order
+         * @description Chỉnh sửa đơn hàng (chỉ cho phép khi đơn ở trạng thái DRAFT hoặc PENDING_APPROVAL).
+         */
+        put: operations["update_order_api_v1_orders__order_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Order
+         * @description Xóa hẳn đơn hàng nháp.
+         */
+        delete: operations["delete_order_api_v1_orders__order_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1742,6 +1751,115 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{order_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Order For Approval
+         * @description Gửi duyệt đơn hàng nháp (chuyển sang trạng thái PENDING_APPROVAL).
+         */
+        post: operations["submit_order_for_approval_api_v1_orders__order_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{order_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Order
+         * @description Hủy đơn hàng (cho phép khi đơn ở trạng thái DRAFT hoặc PENDING_APPROVAL).
+         */
+        post: operations["cancel_order_api_v1_orders__order_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/delivery-addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Delivery Addresses
+         * @description Lấy danh sách các điểm giao hàng của một đại lý (S3-04).
+         */
+        get: operations["list_delivery_addresses_api_v1_customers__customer_id__delivery_addresses_get"];
+        put?: never;
+        /**
+         * Create Delivery Address
+         * @description Khai báo thêm điểm giao hàng mới cho đại lý (S3-04).
+         */
+        post: operations["create_delivery_address_api_v1_customers__customer_id__delivery_addresses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/delivery-addresses/{address_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Delivery Address
+         * @description Cập nhật thông tin điểm giao hàng của đại lý (S3-04).
+         */
+        put: operations["update_delivery_address_api_v1_customers__customer_id__delivery_addresses__address_id__put"];
+        post?: never;
+        /**
+         * Delete Delivery Address
+         * @description Xóa một điểm giao hàng của đại lý.
+         *     Nếu điểm bị xóa đang là mặc định, tự động chuyển mặc định cho điểm còn lại (nếu có).
+         */
+        delete: operations["delete_delivery_address_api_v1_customers__customer_id__delivery_addresses__address_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/delivery-addresses/{address_id}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Default Delivery Address
+         * @description Đặt một điểm giao hàng làm mặc định cho đại lý (S3-04).
+         */
+        patch: operations["set_default_delivery_address_api_v1_customers__customer_id__delivery_addresses__address_id__default_patch"];
         trace?: never;
     };
     "/api/v1/suppliers": {
@@ -2962,21 +3080,15 @@ export interface components {
         };
         /** CustomerCreditLimitRequest */
         CustomerCreditLimitRequest: {
+            /** Newcreditlimit */
+            newCreditLimit: number;
             /**
-             * Credit Limit
-             * @default 0
+             * Newmaxdebtdays
+             * @default 30
              */
-            credit_limit: number;
-            /**
-             * Max Due Days
-             * @default 0
-             */
-            max_due_days: number;
-            /**
-             * Warning Threshold Percent
-             * @default 80
-             */
-            warning_threshold_percent: number;
+            newMaxDebtDays: number;
+            /** Reason */
+            reason: string;
         };
         /**
          * CustomerGroup
@@ -3069,14 +3181,12 @@ export interface components {
             salesRepId?: number | null;
             /** Sales Rep Name */
             sales_rep_name?: string | null;
-            /** Territory Id */
-            territory_id?: number | null;
-            /** Territory Name */
-            territory_name?: string | null;
-            /** Regionid */
-            regionId?: number | null;
             /** Region */
             region?: string | null;
+            /** Regionid */
+            regionId?: number | null;
+            /** Territory Name */
+            territory_name?: string | null;
             /**
              * Customer Group
              * @default RETAIL
@@ -3133,15 +3243,55 @@ export interface components {
              */
             currentDebt: number;
             /**
-             * Debt Limit
+             * Credit Limit
              * @default 0
              */
-            debt_limit: number;
+            credit_limit: number;
             /**
              * Creditlimit
              * @default 0
              */
             creditLimit: number;
+            /**
+             * Debt Limit
+             * @default 0
+             */
+            debt_limit: number;
+            /**
+             * Max Debt Amount
+             * @default 0
+             */
+            max_debt_amount: number;
+            /**
+             * Max Debt Days
+             * @default 0
+             */
+            max_debt_days: number;
+            /**
+             * Max Due Days
+             * @default 0
+             */
+            max_due_days: number;
+            /**
+             * Maxdebtdays
+             * @default 0
+             */
+            maxDebtDays: number;
+            /**
+             * Maxduedays
+             * @default 0
+             */
+            maxDueDays: number;
+            /**
+             * Warning Threshold Percent
+             * @default 80
+             */
+            warning_threshold_percent: number;
+            /**
+             * Warning Threshold
+             * @default 80
+             */
+            warning_threshold: number;
             /**
              * Overdue Days
              * @default 0
@@ -3277,6 +3427,97 @@ export interface components {
              */
             reason: string;
         };
+        /** DeliveryAddressBriefResponse */
+        DeliveryAddressBriefResponse: {
+            /** Id */
+            id: number;
+            /** Customer Id */
+            customer_id: number;
+            /** Receiver Name */
+            receiver_name: string;
+            /** Phone */
+            phone: string;
+            /** Address */
+            address: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** DeliveryAddressCreate */
+        DeliveryAddressCreate: {
+            /**
+             * Receivername
+             * @description Tên người nhận
+             */
+            receiverName: string;
+            /**
+             * Phone
+             * @description Số điện thoại người nhận (10 chữ số)
+             */
+            phone: string;
+            /**
+             * Address
+             * @description Địa chỉ giao hàng
+             */
+            address: string;
+            /**
+             * Isdefault
+             * @description Đặt làm điểm giao hàng mặc định
+             * @default false
+             */
+            isDefault: boolean;
+            /**
+             * Note
+             * @description Ghi chú đường đi / chỉ dẫn giao hàng
+             */
+            note?: string | null;
+        };
+        /** DeliveryAddressResponse */
+        DeliveryAddressResponse: {
+            /** Id */
+            id: number;
+            /** Customer Id */
+            customer_id: number;
+            /** Receiver Name */
+            receiver_name: string;
+            /** Phone */
+            phone: string;
+            /** Address */
+            address: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** DeliveryAddressUpdate */
+        DeliveryAddressUpdate: {
+            /**
+             * Receivername
+             * @description Tên người nhận
+             */
+            receiverName?: string | null;
+            /**
+             * Phone
+             * @description Số điện thoại người nhận
+             */
+            phone?: string | null;
+            /**
+             * Address
+             * @description Địa chỉ giao hàng
+             */
+            address?: string | null;
+            /**
+             * Isdefault
+             * @description Đặt làm điểm giao hàng mặc định
+             */
+            isDefault?: boolean | null;
+            /**
+             * Note
+             * @description Ghi chú đường đi
+             */
+            note?: string | null;
+        };
         /** DeliveryPointView */
         DeliveryPointView: {
             /** Id */
@@ -3296,6 +3537,8 @@ export interface components {
         };
         /** DiscountPolicyCreate */
         DiscountPolicyCreate: {
+            /** Code */
+            code?: string | null;
             /** Name */
             name: string;
             /**
@@ -3304,7 +3547,15 @@ export interface components {
              */
             scope: string;
             /** Targetid */
-            targetId: string | number;
+            targetId?: string | number | null;
+            /** Productid */
+            productId?: number | null;
+            /** Createdbyuserid */
+            createdByUserId?: number | null;
+            /** Startdate */
+            startDate?: string | null;
+            /** Enddate */
+            endDate?: string | null;
             /**
              * Discounttype
              * @default PERCENTAGE
@@ -3320,12 +3571,22 @@ export interface components {
         };
         /** DiscountPolicyUpdate */
         DiscountPolicyUpdate: {
+            /** Code */
+            code?: string | null;
             /** Name */
             name?: string | null;
             /** Scope */
             scope?: string | null;
             /** Targetid */
             targetId?: string | number | null;
+            /** Productid */
+            productId?: number | null;
+            /** Createdbyuserid */
+            createdByUserId?: number | null;
+            /** Startdate */
+            startDate?: string | null;
+            /** Enddate */
+            endDate?: string | null;
             /** Discounttype */
             discountType?: string | null;
             /** Isactive */
@@ -3539,10 +3800,15 @@ export interface components {
         /** OrderCreateRequest */
         OrderCreateRequest: {
             /**
-             * Customer Id
+             * Customerid
              * @description ID của đại lý đặt hàng
              */
-            customer_id: number;
+            customerId: number;
+            /**
+             * Deliveryaddressid
+             * @description ID điểm giao hàng
+             */
+            deliveryAddressId?: number | null;
             /**
              * Items
              * @description Danh sách sản phẩm trong đơn
@@ -3550,13 +3816,20 @@ export interface components {
             items?: components["schemas"]["OrderItemCreate"][];
             /** Note */
             note?: string | null;
+            /** @description Trạng thái đơn hàng khởi tạo (ví dụ: PENDING_APPROVAL) */
+            status?: components["schemas"]["OrderStatus"] | null;
+            /**
+             * Submitforapproval
+             * @description Gửi duyệt ngay
+             */
+            submitForApproval?: boolean | null;
         };
         /** OrderItemCreate */
         OrderItemCreate: {
             /** Sku */
             sku: string;
             /** Product Name */
-            product_name: string;
+            product_name?: string | null;
             /**
              * Quantity
              * @default 1
@@ -3570,9 +3843,9 @@ export interface components {
             /** Id */
             id: number;
             /** Sku */
-            sku: string;
+            sku?: string | null;
             /** Product Name */
-            product_name: string;
+            product_name?: string | null;
             /** Quantity */
             quantity: number;
             /** Unit Price */
@@ -3592,6 +3865,9 @@ export interface components {
             customer_id: number;
             /** Customer Name */
             customer_name?: string | null;
+            /** Delivery Address Id */
+            delivery_address_id?: number | null;
+            delivery_address?: components["schemas"]["DeliveryAddressBriefResponse"] | null;
             status: components["schemas"]["OrderStatus"];
             /** Total Amount */
             total_amount: number;
@@ -3703,40 +3979,60 @@ export interface components {
             sku: string;
             /** Name */
             name: string;
+            /** Category Id */
+            category_id?: number | null;
             /** Categoryid */
             categoryId?: number | null;
             /**
-             * Baseunit
+             * Base Unit
              * @default Cái
              */
-            baseUnit: string;
-            /** Costprice */
-            costPrice?: number | null;
+            base_unit: string;
+            /** Baseunit */
+            baseUnit?: string | null;
+            /**
+             * Manage By Lot
+             * @default false
+             */
+            manage_by_lot: boolean;
+            /** Managebylot */
+            manageByLot?: boolean | null;
+            /**
+             * Min Stock
+             * @default 0
+             */
+            min_stock: number;
+            /** Minstock */
+            minStock?: number | null;
+            /**
+             * Base Price
+             * @default 0
+             */
+            base_price: number | null;
             /** Baseprice */
             basePrice?: number | null;
             /** Saleprice */
             salePrice?: number | null;
             /**
-             * Minstock
+             * Cost Price
              * @default 0
              */
-            minStock: number;
+            cost_price: number | null;
+            /** Costprice */
+            costPrice?: number | null;
+            /** Image Url */
+            image_url?: string | null;
             /** Imageurl */
             imageUrl?: string | null;
-            /**
-             * Managebylot
-             * @default false
-             */
-            manageByLot: boolean;
             /**
              * Status
              * @default ACTIVE
              */
             status: string;
+            /** Units */
+            units?: components["schemas"]["ProductUnitInput"][] | null;
             /** Description */
             description?: string | null;
-            /** Units */
-            units?: unknown[] | null;
         };
         /** ProductMarginDetail */
         ProductMarginDetail: {
@@ -3757,9 +4053,26 @@ export interface components {
         ProductStatusUpdateRequest: {
             /**
              * Status
-             * @description Trạng thái mới: 'ACTIVE' hoặc 'DISCONTINUED'
+             * @description Trạng thái: ACTIVE, INACTIVE hoặc DISCONTINUED
              */
             status: string;
+        };
+        /** ProductUnitInput */
+        ProductUnitInput: {
+            /** Unitname */
+            unitName: string;
+            /**
+             * Conversionrate
+             * @default 1
+             */
+            conversionRate: number;
+            /** Barcode */
+            barcode?: string | null;
+            /**
+             * Isbaseunit
+             * @default false
+             */
+            isBaseUnit: boolean;
         };
         /** ProductUnitRequest */
         ProductUnitRequest: {
@@ -3790,28 +4103,42 @@ export interface components {
         ProductUpdateRequest: {
             /** Name */
             name?: string | null;
+            /** Category Id */
+            category_id?: number | null;
             /** Categoryid */
             categoryId?: number | null;
+            /** Base Unit */
+            base_unit?: string | null;
             /** Baseunit */
             baseUnit?: string | null;
-            /** Costprice */
-            costPrice?: number | null;
+            /** Manage By Lot */
+            manage_by_lot?: boolean | null;
+            /** Managebylot */
+            manageByLot?: boolean | null;
+            /** Min Stock */
+            min_stock?: number | null;
+            /** Minstock */
+            minStock?: number | null;
+            /** Base Price */
+            base_price?: number | null;
             /** Baseprice */
             basePrice?: number | null;
             /** Saleprice */
             salePrice?: number | null;
-            /** Minstock */
-            minStock?: number | null;
+            /** Cost Price */
+            cost_price?: number | null;
+            /** Costprice */
+            costPrice?: number | null;
+            /** Image Url */
+            image_url?: string | null;
             /** Imageurl */
             imageUrl?: string | null;
-            /** Managebylot */
-            manageByLot?: boolean | null;
             /** Status */
             status?: string | null;
+            /** Units */
+            units?: components["schemas"]["ProductUnitInput"][] | null;
             /** Description */
             description?: string | null;
-            /** Units */
-            units?: unknown[] | null;
         };
         /** ReceiptItemSchema */
         ReceiptItemSchema: {
@@ -5644,6 +5971,39 @@ export interface operations {
             };
         };
     };
+    delete_product_api_v1_products__id_or_sku__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id_or_sku: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     move_product_category_api_v1_products__sku__category_patch: {
         parameters: {
             query?: never;
@@ -5785,45 +6145,12 @@ export interface operations {
             };
         };
     };
-    delete_product_api_v1_products__product_id__delete: {
+    toggle_product_status_api_v1_products__id_or_sku__status_patch: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                product_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_product_status_api_v1_products__product_id__status_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product_id: string;
+                id_or_sku: string;
             };
             cookie?: never;
         };
@@ -6235,6 +6562,8 @@ export interface operations {
             query: {
                 customer_group: components["schemas"]["CustomerGroup"];
                 on_date?: string | null;
+                /** @description Fallback về giá gốc niêm yết nếu chưa có bảng giá riêng */
+                fallback?: boolean;
             };
             header?: never;
             path: {
@@ -7526,6 +7855,37 @@ export interface operations {
             };
         };
     };
+    get_customer_credit_limit_logs_api_v1_customers__customer_id__credit_limit_logs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_customer_pricing_group_api_v1_customers__customer_id__pricing_group_patch: {
         parameters: {
             query?: never;
@@ -7907,6 +8267,72 @@ export interface operations {
             };
         };
     };
+    update_order_api_v1_orders__order_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_order_api_v1_orders__order_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_order_status_api_v1_orders__order_id__status_put: {
         parameters: {
             query: {
@@ -7927,6 +8353,234 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_order_for_approval_api_v1_orders__order_id__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_order_api_v1_orders__order_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_delivery_addresses_api_v1_customers__customer_id__delivery_addresses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryAddressResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_delivery_address_api_v1_customers__customer_id__delivery_addresses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryAddressCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryAddressResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_delivery_address_api_v1_customers__customer_id__delivery_addresses__address_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+                address_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryAddressUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryAddressResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_delivery_address_api_v1_customers__customer_id__delivery_addresses__address_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+                address_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_default_delivery_address_api_v1_customers__customer_id__delivery_addresses__address_id__default_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+                address_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryAddressResponse"];
                 };
             };
             /** @description Validation Error */

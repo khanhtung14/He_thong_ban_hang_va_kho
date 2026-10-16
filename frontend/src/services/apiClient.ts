@@ -312,6 +312,7 @@ export async function deleteSupplier(
   return res.json();
 }
 
+
 export interface CustomerItem {
   id: number;
   code: string;
@@ -504,6 +505,279 @@ export async function createCustomer(payload: CreateCustomerPayload): Promise<Cu
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Không thể tạo đại lý mới.");
+  }
+  return res.json();
+}
+
+// ----------------------------------------------------------------------
+// SCRUM-20: Delivery Address Management & Order Placement
+// ----------------------------------------------------------------------
+
+export interface DeliveryAddressItem {
+  id: number;
+  customer_id: number;
+  receiver_name: string;
+  phone: string;
+  address: string;
+  is_default: boolean;
+  note?: string | null;
+}
+
+export interface CreateDeliveryAddressPayload {
+  receiverName?: string;
+  receiver_name?: string;
+  phone: string;
+  address: string;
+  isDefault?: boolean;
+  is_default?: boolean;
+  note?: string;
+}
+
+export interface UpdateDeliveryAddressPayload {
+  receiverName?: string;
+  receiver_name?: string;
+  phone?: string;
+  address?: string;
+  isDefault?: boolean;
+  is_default?: boolean;
+  note?: string;
+}
+
+export interface OrderItemInput {
+  sku: string;
+  product_name?: string;
+  quantity: number;
+  unit_price?: number;
+}
+
+export interface CreateOrderPayload {
+  customer_id: number;
+  customerId?: number;
+  delivery_address_id?: number | null;
+  deliveryAddressId?: number | null;
+  items: OrderItemInput[];
+  note?: string;
+  status?: string;
+  submit_for_approval?: boolean;
+  submitForApproval?: boolean;
+}
+
+export interface OrderItemView {
+  id: number;
+  sku: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+export interface OrderResponseItem {
+  id: number;
+  order_code: string;
+  customer_id: number;
+  customer_name: string;
+  total_amount: number;
+  status: string;
+  warning_type?: string | null;
+  delivery_address_id?: number | null;
+  delivery_address?: DeliveryAddressItem | null;
+  items?: OrderItemView[];
+  approval_reason?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export async function fetchDeliveryAddresses(
+  customerId: number,
+): Promise<DeliveryAddressItem[]> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses`,
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách điểm giao hàng.");
+  }
+  return res.json();
+}
+
+export async function createDeliveryAddress(
+  customerId: number,
+  payload: CreateDeliveryAddressPayload,
+): Promise<DeliveryAddressItem> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể thêm điểm giao hàng.");
+  }
+  return res.json();
+}
+
+export async function updateDeliveryAddress(
+  customerId: number,
+  addressId: number,
+  payload: UpdateDeliveryAddressPayload,
+): Promise<DeliveryAddressItem> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses/${addressId}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể cập nhật điểm giao hàng.");
+  }
+  return res.json();
+}
+
+export async function deleteDeliveryAddress(
+  customerId: number,
+  addressId: number,
+): Promise<{ message: string; reallocated_default_id?: number | null }> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses/${addressId}`,
+    {
+      method: "DELETE",
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể xóa điểm giao hàng.");
+  }
+  return res.json();
+}
+
+export async function setDefaultDeliveryAddress(
+  customerId: number,
+  addressId: number,
+): Promise<DeliveryAddressItem> {
+  const res = await authenticatedFetch(
+    `/api/v1/customers/${customerId}/delivery-addresses/${addressId}/default`,
+    {
+      method: "PATCH",
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể đặt làm điểm giao mặc định.");
+  }
+  return res.json();
+}
+
+export async function fetchOrders(): Promise<OrderResponseItem[]> {
+  const res = await authenticatedFetch("/api/v1/orders");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function createOrder(
+  payload: CreateOrderPayload,
+): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch("/api/v1/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tạo đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function fetchOrdersPendingApproval(): Promise<OrderResponseItem[]> {
+  const res = await authenticatedFetch("/api/v1/orders/pending-approval");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách đơn chờ duyệt.");
+  }
+  return res.json();
+}
+
+export async function approveOrder(orderId: number): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}/approve`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể phê duyệt đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function rejectOrder(
+  orderId: number,
+  reason: string = "Không được phê duyệt",
+): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể từ chối đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function submitOrderForApproval(orderId: number): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}/submit`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể gửi duyệt đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function updateOrder(
+  orderId: number,
+  payload: CreateOrderPayload,
+): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể cập nhật đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function cancelOrder(orderId: number): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}/cancel`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể hủy đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function deleteOrder(orderId: number): Promise<{ message: string }> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể xóa đơn hàng.");
   }
   return res.json();
 }

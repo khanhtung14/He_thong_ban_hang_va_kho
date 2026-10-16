@@ -21,11 +21,11 @@ Yêu cầu nghiệp vụ:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
@@ -132,6 +132,20 @@ class DebtLimitUpdateRequest(BaseModel):
         json_schema_extra={"example": "Nâng hạn mức sau thẩm định hồ sơ tín dụng đại lý"},
     )
 
+    @field_validator("credit_limit", "creditLimit", "max_debt_amount", "new_limit")
+    @classmethod
+    def validate_debt_amount(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v < 0:
+            raise ValueError("Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0")
+        return v
+
+    @field_validator("max_debt_days", "max_due_days", "maxDueDays", "new_days")
+    @classmethod
+    def validate_debt_days(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 0:
+            raise ValueError("Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0")
+        return v
+
 
 class DebtLimitHistoryItem(BaseModel):
     id: int
@@ -197,11 +211,6 @@ def _execute_debt_limit_update(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Vui lòng cung cấp số tiền hạn mức công nợ (credit_limit).",
         )
-    if amount_val < 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Số tiền hạn mức không được âm.",
-        )
 
     # 3. Xác định số ngày nợ mới
     days_val = None
@@ -211,10 +220,11 @@ def _execute_debt_limit_update(
             break
     if days_val is None:
         days_val = 0
-    if days_val < 0:
+
+    if amount_val < 0 or days_val < 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Số ngày nợ tối đa không được âm.",
+            detail="Hạn mức và số ngày nợ phải lớn hơn hoặc bằng 0",
         )
 
     # 4. Xác định ngưỡng cảnh báo
@@ -234,9 +244,14 @@ def _execute_debt_limit_update(
     old_amount = float(getattr(customer, "credit_limit", 0.0) or 0.0)
     old_days = int(getattr(customer, "max_debt_days", 0) or getattr(customer, "max_due_days", 0) or 0)
 
-    actor_display = user.username
-    if getattr(user, "full_name", None):
-        actor_display = f"{user.full_name} ({user.username})"
+    # Chặn lưu khi không có thay đổi dữ liệu (tránh rác audit log)
+    if float(amount_val) == old_amount and int(days_val) == old_days:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không có thay đổi nào so với hạn mức hiện tại.",
+        )
+
+    actor_display = getattr(user, "full_name", None) or user.username
 
     # 7. DATABASE TRANSACTION: Cập nhật thông tin đại lý và ghi credit_limit_logs đồng thời
     try:
@@ -245,6 +260,7 @@ def _execute_debt_limit_update(
         customer.max_debt_days = int(days_val)
         customer.max_due_days = int(days_val)
         customer.warning_threshold_percent = float(warning_val)
+        customer.warning_threshold = float(warning_val)
 
         # Ghi log lịch sử vào bảng credit_limit_logs (CreditLimitLog)
         log_entry = CreditLimitLog(
@@ -254,6 +270,8 @@ def _execute_debt_limit_update(
             old_max_debt_days=old_days,
             new_max_debt_days=int(days_val),
             reason=clean_reason,
+            changed_by_user_id=getattr(user, "id", None),
+            changed_by_name=actor_display,
             created_by=actor_display,
         )
         db.add(log_entry)
@@ -266,6 +284,12 @@ def _execute_debt_limit_update(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Giao dịch thất bại khi cập nhật hạn mức: {str(exc)}",
         ) from exc
+
+    iso_created_at = (
+        (log_entry.created_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z"))
+        if log_entry.created_at and log_entry.created_at.tzinfo is None
+        else (log_entry.created_at.isoformat() if log_entry.created_at else None)
+    )
 
     return {
         "success": True,
@@ -291,9 +315,21 @@ def _execute_debt_limit_update(
             "warning_threshold_percent": customer.warning_threshold_percent,
             "reason": clean_reason,
             "changed_by": actor_display,
+            "changed_by_name": actor_display,
             "created_by": actor_display,
             "history_id": log_entry.id,
-            "created_at": log_entry.created_at.isoformat() if log_entry.created_at else None,
+            "created_at": iso_created_at,
+            "log": {
+                "id": log_entry.id,
+                "old_credit_limit": log_entry.old_credit_limit,
+                "new_credit_limit": log_entry.new_credit_limit,
+                "old_max_debt_days": log_entry.old_max_debt_days,
+                "new_max_debt_days": log_entry.new_max_debt_days,
+                "reason": log_entry.reason,
+                "changed_by_user_id": getattr(user, "id", None),
+                "changed_by_name": actor_display,
+                "created_at": iso_created_at,
+            },
         },
     }
 
@@ -421,7 +457,11 @@ def get_customer_debt_limit_history(
             "reason": log.reason,
             "changed_by": log.created_by,
             "created_by": log.created_by,
-            "created_at": log.created_at.isoformat() if log.created_at else None,
+            "created_at": (
+                (log.created_at.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z"))
+                if log.created_at and log.created_at.tzinfo is None
+                else (log.created_at.isoformat() if log.created_at else None)
+            ),
         }
         for log in logs
     ]

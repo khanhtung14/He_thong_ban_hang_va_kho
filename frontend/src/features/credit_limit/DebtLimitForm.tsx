@@ -65,6 +65,10 @@ export const updateAgencyCreditLimit = async (
     max_debt_amount: values.credit_limit,
     max_debt_days: values.max_debt_days,
     max_due_days: values.max_debt_days,
+    new_credit_limit: values.credit_limit,
+    newCreditLimit: values.credit_limit,
+    new_max_debt_days: values.max_debt_days,
+    newMaxDebtDays: values.max_debt_days,
     reason: values.reason.trim(),
   };
 
@@ -130,10 +134,21 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
         return;
       }
 
+      // So sánh giá trị nhập vào với giá trị hiện tại của đại lý
+      const newCreditLimit = Number(values.credit_limit);
+      const newMaxDebtDays = Number(values.max_debt_days ?? 0);
+      const currentCreditLimit = Number(agency.credit_limit ?? 0);
+      const currentMaxDebtDays = Number(agency.max_debt_days ?? 0);
+
+      if (newCreditLimit === currentCreditLimit && newMaxDebtDays === currentMaxDebtDays) {
+        message.warning("Hạn mức tiền hoặc số ngày nợ mới phải khác với giá trị hiện tại!");
+        return;
+      }
+
       setSubmitting(true);
       const result = await updateAgencyCreditLimit(agency.id, {
-        credit_limit: values.credit_limit,
-        max_debt_days: values.max_debt_days ?? 0,
+        credit_limit: newCreditLimit,
+        max_debt_days: newMaxDebtDays,
         reason: cleanReason,
       });
 
@@ -310,10 +325,10 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
           name="credit_limit"
           rules={[
             { required: true, message: "Vui lòng nhập hạn mức công nợ mới!" },
-            { type: "number", min: 0, message: "Hạn mức không được âm!" },
+            { type: "number", min: 0, message: "Giá trị không được nhỏ hơn 0!" },
           ]}
         >
-          <InputNumber
+          <InputNumber<number>
             id="input-credit-limit"
             style={{ width: "100%", borderRadius: 8 }}
             min={0}
@@ -334,7 +349,7 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
           }
           name="max_debt_days"
           extra="Nhập 0 nếu không giới hạn số ngày nợ tối đa"
-          rules={[{ type: "number", min: 0, message: "Số ngày nợ không được âm!" }]}
+          rules={[{ type: "number", min: 0, message: "Giá trị không được nhỏ hơn 0!" }]}
         >
           <InputNumber
             id="input-max-debt-days"

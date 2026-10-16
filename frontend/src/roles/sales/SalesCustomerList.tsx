@@ -46,6 +46,7 @@ import {
   type CustomerItem,
   type TerritoryItem,
 } from "../../services/apiClient";
+import DeliveryAddressModal from "../../components/DeliveryAddressModal";
 
 const { Title, Text } = Typography;
 
@@ -80,6 +81,15 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
   // Drawer chi tiết đại lý
   const [detailCustomer, setDetailCustomer] = useState<CustomerItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+
+  // Modal Điểm giao hàng (SCRUM-20)
+  const [deliveryAddressModal, setDeliveryAddressModal] = useState<{
+    visible: boolean;
+    customer: CustomerItem | null;
+  }>({
+    visible: false,
+    customer: null,
+  });
 
   // --- Tải danh mục địa bàn ---
   useEffect(() => {
@@ -313,7 +323,7 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
     {
       title: "THAO TÁC",
       key: "actions",
-      width: 140,
+      width: 175,
       align: "center",
       render: (_, r) => (
         <Space size="small">
@@ -352,7 +362,7 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
             <Tooltip title="Chỉ đường trên Google Maps">
               <Button
                 size="small"
-                icon={<EnvironmentOutlined style={{ color: "#2563eb" }} />}
+                icon={<CompassOutlined style={{ color: "#2563eb" }} />}
                 href={getGoogleMapsUrl(r.address, r.name)}
                 target="_blank"
                 rel="noreferrer"
@@ -367,7 +377,7 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* 1. Header & Thống kê nhanh */}
-      <div
+      {/* <div
         style={{
           background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%)",
           borderRadius: 16,
@@ -454,7 +464,7 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
             </div>
           </Col>
         </Row>
-      </div>
+      </div> */}
 
       {/* 2. Thanh tìm kiếm tức thì & Bộ lọc */}
       <Card
@@ -903,7 +913,7 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
                     <div
                       style={{
                         display: "flex",
-                        gap: 8,
+                        gap: 6,
                         paddingTop: 10,
                         borderTop: "1px solid #f1f5f9",
                       }}
@@ -914,6 +924,13 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
                         onClick={() => handleOpenDetail(c)}
                       >
                         Chi tiết
+                      </Button>
+                      <Button
+                        style={{ flex: 1, borderRadius: 8 }}
+                        icon={<EnvironmentOutlined style={{ color: "#0284c7" }} />}
+                        onClick={() => setDeliveryAddressModal({ visible: true, customer: c })}
+                      >
+                        Điểm giao
                       </Button>
                       <Button
                         type="primary"
@@ -1110,7 +1127,7 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
             </Card>
 
             {/* Nút hành động */}
-            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
               {detailCustomer.phone && (
                 <Button
                   type="primary"
@@ -1118,9 +1135,16 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
                   icon={<PhoneOutlined />}
                   href={`tel:${detailCustomer.phone}`}
                 >
-                  Gọi điện thoại
+                  Gọi điện
                 </Button>
               )}
+              <Button
+                style={{ flex: 1, borderRadius: 8 }}
+                icon={<EnvironmentOutlined style={{ color: "#0284c7" }} />}
+                onClick={() => setDeliveryAddressModal({ visible: true, customer: detailCustomer })}
+              >
+                Điểm giao hàng
+              </Button>
               <Button
                 type="primary"
                 style={{
@@ -1146,6 +1170,13 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
           </div>
         )}
       </Drawer>
+
+      {/* Modal Quản lý điểm giao hàng (SCRUM-20) */}
+      <DeliveryAddressModal
+        visible={deliveryAddressModal.visible}
+        customer={deliveryAddressModal.customer}
+        onClose={() => setDeliveryAddressModal({ visible: false, customer: null })}
+      />
     </div>
   );
 };

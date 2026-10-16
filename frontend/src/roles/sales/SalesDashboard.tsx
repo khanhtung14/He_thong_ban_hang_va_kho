@@ -1,9 +1,44 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Layout } from "antd";
+import {
+  Layout,
+  Card,
+  Table,
+  Input,
+  Tag,
+  Typography,
+  Row,
+  Col,
+  Statistic,
+  Alert,
+  Button,
+  Space,
+  Tooltip,
+  Popconfirm,
+  Modal,
+  message,
+} from "antd";
+import type { ColumnsType } from "antd/es/table";
+import dayjs from "dayjs";
+import {
+  SearchOutlined,
+  ShopOutlined,
+  CheckCircleOutlined,
+  DollarOutlined,
+  EnvironmentOutlined,
+  ShoppingOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SendOutlined,
+  EditOutlined,
+  CloseCircleOutlined,
+  EyeOutlined,
+} from "@ant-design/icons";
 
 // Modals
 import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
+import DeliveryAddressesModal from "../../components/DeliveryAddressesModal";
+import CreateOrderModal from "../../components/CreateOrderModal";
 
 // Sidebar & Header Sales
 import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
@@ -15,9 +50,24 @@ import { SalesCustomerList } from "./SalesCustomerList";
 
 // Auth & API
 import { logout } from "../../services/sessionService";
-import { fetchProfile, type UserProfile, type CustomerItem } from "../../services/apiClient";
+import {
+  fetchProfile,
+  fetchCustomers,
+  fetchOrders,
+  submitOrderForApproval,
+  cancelOrder,
+  type UserProfile,
+  type CustomerItem,
+  type OrderResponseItem,
+} from "../../services/apiClient";
 
 const { Content } = Layout;
+const { Title, Text } = Typography;
+
+const formatMoney = (val?: number) => {
+  if (!val) return "0 ₫";
+  return `${val.toLocaleString("vi-VN")} ₫`;
+};
 
 export const SalesDashboard: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(() => {
@@ -30,10 +80,72 @@ export const SalesDashboard: React.FC = () => {
   });
 
   const [selectedKey, setSelectedKey] = useState("customers");
+  const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [orders, setOrders] = useState<OrderResponseItem[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [search, setSearch] = useState("");
 
   // Trạng thái modal
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isChangePassModalOpen, setIsChangePassModalOpen] = useState(false);
+
+  // SCRUM-20: Trạng thái modal điểm giao hàng & tạo đơn
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [selectedCustomerForAddress, setSelectedCustomerForAddress] = useState<CustomerItem | null>(null);
+
+  const [isCreateOrderModalOpen, setIsCreateOrderModalOpen] = useState(false);
+  const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState<CustomerItem | null>(null);
+  const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<OrderResponseItem | null>(null);
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<OrderResponseItem | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [submittingOrderId, setSubmittingOrderId] = useState<number | null>(null);
+
+  const formatDateTime = (dt?: string | null) => {
+    if (!dt) return "-";
+    try {
+      const raw = String(dt).trim();
+      const utcStr = raw.endsWith("Z") || raw.includes("+") ? raw : `${raw}Z`;
+      return dayjs(utcStr).format("HH:mm:ss DD/MM/YYYY");
+    } catch {
+      return dt;
+    }
+  };
+
+  const handleSubmitForApproval = async (orderId: number) => {
+    setSubmittingOrderId(orderId);
+    try {
+      await submitOrderForApproval(orderId);
+      message.success("Đã gửi duyệt đơn hàng thành công!");
+      loadOrders();
+    } catch (err: any) {
+      message.error(err.message || "Gửi duyệt đơn hàng thất bại.");
+    } finally {
+      setSubmittingOrderId(null);
+    }
+  };
+
+  const handleEditOrder = (order: OrderResponseItem) => {
+    setSelectedOrderForEdit(order);
+    const cust = customers.find((c) => c.id === order.customer_id) || null;
+    setSelectedCustomerForOrder(cust);
+    setIsCreateOrderModalOpen(true);
+  };
+
+  const handleCancelOrder = async (orderId: number) => {
+    try {
+      await cancelOrder(orderId);
+      message.success("Đã hủy đơn hàng thành công!");
+      loadOrders();
+    } catch (err: any) {
+      message.error(err.message || "Hủy đơn hàng thất bại.");
+    }
+  };
+
+  const handleViewOrderDetail = (order: OrderResponseItem) => {
+    setSelectedOrderForDetail(order);
+    setIsDetailModalOpen(true);
+  };
 
   const loadProfileData = useCallback(async () => {
     try {
@@ -47,8 +159,38 @@ export const SalesDashboard: React.FC = () => {
     }
   }, []);
 
+  const loadMyCustomers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await fetchCustomers({
+        search: search.trim() || undefined,
+      });
+      setCustomers(list);
+    } catch (err) {
+      console.error("Lỗi tải danh sách đại lý phụ trách:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  const loadOrders = useCallback(async () => {
+    setOrdersLoading(true);
+    try {
+      const data = await fetchOrders();
+      setOrders(data);
+    } catch (err) {
+      console.error("Lỗi tải danh sách đơn hàng:", err);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadProfileData();
+    loadMyCustomers();
+    if (selectedKey === "orders") {
+      loadOrders();
+    }
 
     const handleProfileSync = () => loadProfileData();
     window.addEventListener("profile-updated", handleProfileSync);
@@ -58,7 +200,7 @@ export const SalesDashboard: React.FC = () => {
       window.removeEventListener("profile-updated", handleProfileSync);
       window.removeEventListener("storage", handleProfileSync);
     };
-  }, [loadProfileData]);
+  }, [loadProfileData, loadMyCustomers, loadOrders, selectedKey]);
 
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<number | null>(null);
 
@@ -68,6 +210,262 @@ export const SalesDashboard: React.FC = () => {
     setPreselectedCustomerId(customer.id);
     setSelectedKey("orders");
   };
+
+  const totalDebt = customers.reduce((sum, c) => sum + (c.current_debt || 0), 0);
+  const activeCount = customers.filter((c) => !c.is_locked).length;
+
+  const handleOpenAddressModal = (cust: CustomerItem) => {
+    setSelectedCustomerForAddress(cust);
+    setIsAddressModalOpen(true);
+  };
+
+  const handleOpenCreateOrderModal = (cust?: CustomerItem) => {
+    setSelectedCustomerForOrder(cust || null);
+    setIsCreateOrderModalOpen(true);
+  };
+
+  const customerColumns: ColumnsType<CustomerItem> = [
+    {
+      title: "MÃ ĐẠI LÝ",
+      dataIndex: "code",
+      key: "code",
+      width: 110,
+      render: (code: string) => <Text strong style={{ color: "#1e40af" }}>{code}</Text>,
+    },
+    {
+      title: "TÊN ĐẠI LÝ",
+      dataIndex: "name",
+      key: "name",
+      render: (name: string, record) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{name}</div>
+          {record.phone && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              SĐT: {record.phone}
+            </Text>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: "PHÂN CẤP ĐẠI LÝ",
+      dataIndex: "customer_group",
+      key: "customer_group",
+      width: 140,
+      render: (grp: string) => {
+        const color =
+          grp === "DEALER_LEVEL_1" ? "blue" : grp === "DEALER_LEVEL_2" ? "cyan" : "default";
+        const label =
+          grp === "DEALER_LEVEL_1" ? "Đại lý Cấp 1" : grp === "DEALER_LEVEL_2" ? "Đại lý Cấp 2" : "Khách lẻ";
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
+    {
+      title: "HẠN MỨC CÔNG NỢ",
+      dataIndex: "debt_limit",
+      key: "debt_limit",
+      width: 150,
+      render: (limit) => formatMoney(limit),
+    },
+    {
+      title: "DƯ NỢ HIỆN TẠI",
+      dataIndex: "current_debt",
+      key: "current_debt",
+      width: 150,
+      render: (debt) => (
+        <span style={{ color: debt > 0 ? "#dc2626" : "#16a34a", fontWeight: 600 }}>
+          {formatMoney(debt)}
+        </span>
+      ),
+    },
+    {
+      title: "TRẠNG THÁI GIAO DỊCH",
+      key: "is_locked",
+      width: 170,
+      render: (_, r) => (
+        <Tag color={r.is_locked ? "error" : "success"}>
+          {r.is_locked ? `Bị khóa (${r.lock_reason || "Chặn nợ"})` : "Đang giao dịch"}
+        </Tag>
+      ),
+    },
+    {
+      title: "ĐIỂM GIAO & LÊN ĐƠN (SCRUM-20)",
+      key: "action",
+      width: 220,
+      align: "center",
+      render: (_, r) => (
+        <Space size="small">
+          <Tooltip title="Khai báo & quản lý các điểm giao hàng cho đại lý">
+            <Button
+              size="small"
+              icon={<EnvironmentOutlined />}
+              onClick={() => handleOpenAddressModal(r)}
+              style={{ color: "#2563eb", borderColor: "#93c5fd" }}
+            >
+              Điểm giao
+            </Button>
+          </Tooltip>
+          <Tooltip title={r.is_locked ? "Đại lý bị khóa không thể tạo đơn" : "Tạo đơn hàng mới cho đại lý"}>
+            <Button
+              type="primary"
+              size="small"
+              icon={<ShoppingOutlined />}
+              disabled={r.is_locked}
+              onClick={() => handleOpenCreateOrderModal(r)}
+              style={{ backgroundColor: r.is_locked ? undefined : "#16a34a", borderColor: r.is_locked ? undefined : "#16a34a" }}
+            >
+              Lên đơn
+            </Button>
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
+
+  const orderColumns: ColumnsType<OrderResponseItem> = [
+    {
+      title: "MÃ ĐƠN HÀNG",
+      dataIndex: "order_code",
+      key: "order_code",
+      width: 140,
+      render: (code: string) => <Text strong style={{ color: "#1e40af" }}>{code}</Text>,
+    },
+    {
+      title: "ĐẠI LÝ ĐẶT HÀNG",
+      dataIndex: "customer_name",
+      key: "customer_name",
+      render: (name: string, r) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{name}</div>
+          <Text type="secondary" style={{ fontSize: 12 }}>ID khách: #{r.customer_id}</Text>
+        </div>
+      ),
+    },
+    {
+      title: "ĐIỂM GIAO HÀNG",
+      key: "delivery_address",
+      render: (_, r) => {
+        if (!r.delivery_address) {
+          return <Text type="secondary" style={{ fontStyle: "italic" }}>Chưa gán điểm giao</Text>;
+        }
+        const da = r.delivery_address;
+        return (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <EnvironmentOutlined style={{ color: "#ef4444" }} />
+              <span style={{ fontWeight: 600 }}>{da.receiver_name}</span>
+              <Text type="secondary">({da.phone})</Text>
+              {da.is_default && <Tag color="success" style={{ fontSize: 10, lineHeight: "16px" }}>Mặc định</Tag>}
+            </div>
+            <div style={{ fontSize: 13, color: "#334155", marginTop: 2 }}>{da.address}</div>
+            {da.note && <div style={{ fontSize: 12, color: "#64748b", fontStyle: "italic" }}>Chỉ dẫn: {da.note}</div>}
+          </div>
+        );
+      },
+    },
+    {
+      title: "TỔNG GIÁ TRỊ",
+      dataIndex: "total_amount",
+      key: "total_amount",
+      width: 150,
+      align: "right",
+      render: (val: number) => (
+        <Text strong style={{ color: "#2563eb" }}>{formatMoney(val)}</Text>
+      ),
+    },
+    {
+      title: "TRẠNG THÁI",
+      dataIndex: "status",
+      key: "status",
+      width: 150,
+      render: (st: string) => {
+        const color =
+          st === "PENDING_APPROVAL" ? "warning" : st === "APPROVED" ? "success" : st === "REJECTED" ? "error" : "default";
+        const label =
+          st === "PENDING_APPROVAL" ? "Chờ duyệt" : st === "APPROVED" ? "Đã duyệt" : st === "REJECTED" ? "Bị từ chối" : st;
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
+    {
+      title: "NGÀY TẠO",
+      dataIndex: "created_at",
+      key: "created_at",
+      width: 170,
+      render: (dt: string) => (
+        <span style={{ fontSize: 13, color: "#334155" }}>{formatDateTime(dt)}</span>
+      ),
+    },
+    {
+      title: "THAO TÁC",
+      key: "actions",
+      width: 240,
+      align: "center",
+      render: (_, r) => {
+        const isDraft = r.status === "DRAFT";
+        if (isDraft) {
+          return (
+            <Space size="small">
+              <Popconfirm
+                title="Gửi duyệt đơn hàng"
+                description={`Xác nhận gửi đơn ${r.order_code} tới Quản lý kinh doanh để phê duyệt?`}
+                onConfirm={() => handleSubmitForApproval(r.id)}
+                okText="Gửi duyệt"
+                cancelText="Hủy"
+              >
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<SendOutlined />}
+                  loading={submittingOrderId === r.id}
+                  style={{ backgroundColor: "#2563eb", fontSize: 12 }}
+                >
+                  Gửi duyệt
+                </Button>
+              </Popconfirm>
+
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleEditOrder(r)}
+                style={{ fontSize: 12 }}
+              >
+                Sửa
+              </Button>
+
+              <Popconfirm
+                title="Xác nhận hủy đơn hàng"
+                description={`Bạn có chắc chắn muốn hủy đơn hàng nháp ${r.order_code}?`}
+                onConfirm={() => handleCancelOrder(r.id)}
+                okText="Hủy đơn"
+                cancelText="Đóng"
+                okButtonProps={{ danger: true }}
+              >
+                <Button
+                  danger
+                  size="small"
+                  icon={<CloseCircleOutlined />}
+                  style={{ fontSize: 12 }}
+                >
+                  Hủy
+                </Button>
+              </Popconfirm>
+            </Space>
+          );
+        }
+
+        return (
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewOrderDetail(r)}
+            style={{ color: "#2563eb", borderColor: "#bfdbfe", fontSize: 12 }}
+          >
+            Xem chi tiết
+          </Button>
+        );
+      },
+    },
+  ];
 
   return (
     <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
@@ -137,6 +535,160 @@ export const SalesDashboard: React.FC = () => {
           )}
         </Content>
       </Layout>
+
+      {/* Modal Quản lý điểm giao hàng (SCRUM-20) */}
+      <DeliveryAddressesModal
+        isOpen={isAddressModalOpen}
+        onClose={() => {
+          setIsAddressModalOpen(false);
+          setSelectedCustomerForAddress(null);
+        }}
+        customerId={selectedCustomerForAddress?.id || null}
+        customerName={selectedCustomerForAddress?.name}
+        customerCode={selectedCustomerForAddress?.code}
+      />
+
+      {/* Modal Lên đơn hàng (SCRUM-20 & SCRUM-85) */}
+      <CreateOrderModal
+        isOpen={isCreateOrderModalOpen}
+        onClose={() => {
+          setIsCreateOrderModalOpen(false);
+          setSelectedCustomerForOrder(null);
+          setSelectedOrderForEdit(null);
+        }}
+        customers={customers}
+        preselectedCustomerId={selectedCustomerForOrder?.id || null}
+        editingOrder={selectedOrderForEdit}
+        onOrderCreated={() => {
+          if (selectedKey === "orders") {
+            loadOrders();
+          }
+          loadMyCustomers();
+        }}
+      />
+
+      {/* Modal Xem chi tiết đơn hàng */}
+      <Modal
+        open={isDetailModalOpen}
+        onCancel={() => setIsDetailModalOpen(false)}
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ShoppingOutlined style={{ color: "#2563eb", fontSize: 20 }} />
+            <span>Chi tiết đơn hàng {selectedOrderForDetail?.order_code}</span>
+          </div>
+        }
+        width={800}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsDetailModalOpen(false)}>
+            Đóng
+          </Button>,
+        ]}
+      >
+        {selectedOrderForDetail && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Card size="small" style={{ backgroundColor: "#f8fafc" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
+                <div>
+                  <Text type="secondary">Mã đơn hàng: </Text>
+                  <Text strong>{selectedOrderForDetail.order_code}</Text>
+                </div>
+                <div>
+                  <Text type="secondary">Trạng thái: </Text>
+                  <Tag
+                    color={
+                      selectedOrderForDetail.status === "PENDING_APPROVAL"
+                        ? "warning"
+                        : selectedOrderForDetail.status === "APPROVED"
+                        ? "success"
+                        : selectedOrderForDetail.status === "CANCELLED"
+                        ? "error"
+                        : "default"
+                    }
+                  >
+                    {selectedOrderForDetail.status === "PENDING_APPROVAL"
+                      ? "Chờ duyệt"
+                      : selectedOrderForDetail.status === "APPROVED"
+                      ? "Đã duyệt"
+                      : selectedOrderForDetail.status === "CANCELLED"
+                      ? "Đã hủy"
+                      : selectedOrderForDetail.status}
+                  </Tag>
+                </div>
+                <div>
+                  <Text type="secondary">Đại lý đặt hàng: </Text>
+                  <Text strong>{selectedOrderForDetail.customer_name || `ID #${selectedOrderForDetail.customer_id}`}</Text>
+                </div>
+                <div>
+                  <Text type="secondary">Thời gian tạo: </Text>
+                  <Text>{formatDateTime(selectedOrderForDetail.created_at)}</Text>
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <Text type="secondary">Điểm giao hàng: </Text>
+                  {selectedOrderForDetail.delivery_address ? (
+                    <Text>
+                      {selectedOrderForDetail.delivery_address.receiver_name} ({selectedOrderForDetail.delivery_address.phone}) - {selectedOrderForDetail.delivery_address.address}
+                    </Text>
+                  ) : (
+                    <Text type="secondary" italic>Chưa gán điểm giao hàng</Text>
+                  )}
+                </div>
+                {selectedOrderForDetail.approval_reason && (
+                  <div style={{ gridColumn: "span 2" }}>
+                    <Text type="secondary">Lý do duyệt / Ghi chú: </Text>
+                    <Tag color="orange">{selectedOrderForDetail.approval_reason}</Tag>
+                  </div>
+                )}
+                {selectedOrderForDetail.note && (
+                  <div style={{ gridColumn: "span 2" }}>
+                    <Text type="secondary">Ghi chú đơn: </Text>
+                    <Text>{selectedOrderForDetail.note}</Text>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Table
+              dataSource={selectedOrderForDetail.items || []}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              bordered
+              columns={[
+                { title: "MÃ SKU", dataIndex: "sku", width: 150 },
+                { title: "TÊN SẢN PHẨM", dataIndex: "product_name" },
+                { title: "SỐ LƯỢNG", dataIndex: "quantity", width: 90, align: "center" },
+                {
+                  title: "ĐƠN GIÁ (₫)",
+                  dataIndex: "unit_price",
+                  width: 130,
+                  align: "right",
+                  render: (p: number) => formatMoney(p),
+                },
+                {
+                  title: "THÀNH TIỀN (₫)",
+                  key: "subtotal",
+                  width: 140,
+                  align: "right",
+                  render: (_, it) => (
+                    <Text strong style={{ color: "#047857" }}>
+                      {formatMoney((it.quantity || 0) * (it.unit_price || 0))}
+                    </Text>
+                  ),
+                },
+              ]}
+            />
+
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 16px", backgroundColor: "#f1f5f9", borderRadius: 8 }}>
+              <Text style={{ fontSize: 15 }}>
+                Tổng giá trị đơn:{" "}
+                <Text strong style={{ color: "#2563eb", fontSize: 18 }}>
+                  {formatMoney(selectedOrderForDetail.total_amount)}
+                </Text>
+              </Text>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Modal Hồ sơ cá nhân */}
       <ProfileModal
