@@ -264,10 +264,26 @@ def get_effective_price(
     sku: str,
     customer_group: CustomerGroup = Query(...),
     on_date: Optional[date] = Query(None),
+    fallback: bool = Query(True, description="Fallback về giá gốc niêm yết nếu chưa có bảng giá riêng"),
     db: Session = Depends(get_db),
 ):
     result = resolve_effective_price(db, sku, customer_group.value, on_date)
     if result is None:
+        if fallback:
+            normalized_sku = sku.strip().upper()
+            db_prod = db.query(Product).filter(func.upper(Product.sku) == normalized_sku).first()
+            if db_prod and db_prod.base_price is not None and db_prod.base_price > 0:
+                return {
+                    "price_list_id": None,
+                    "code": "BASE_PRICE",
+                    "version": 1,
+                    "customer_group": customer_group.value,
+                    "sale_price": int(db_prod.base_price),
+                    "floor_price": int(db_prod.base_price),
+                    "requires_approval": False,
+                    "is_fallback": True,
+                    "warning": f"Sản phẩm {sku} chưa có bảng giá riêng cho {customer_group.value}, áp dụng giá gốc niêm yết.",
+                }
         raise HTTPException(status_code=404, detail="Không có giá hiệu lực cho SKU, nhóm khách hàng và ngày này.")
     result["requires_approval"] = result["sale_price"] < result["floor_price"]
     return result

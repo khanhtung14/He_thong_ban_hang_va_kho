@@ -247,12 +247,18 @@ def serialize_customer(customer: Customer, db: Session) -> dict:
         "lock_reason": customer.lock_reason,
         "lockReason": customer.lock_reason,
         "locked_at": customer.locked_at,
-        "locked_by_id": customer.locked_by_id,
-        "current_debt": 0.0,
-        "currentDebt": 0.0,
-        "debt_limit": getattr(customer, "credit_limit", 0.0),
-        "creditLimit": getattr(customer, "credit_limit", 0.0),
-        "maxDueDays": getattr(customer, "max_due_days", 0),
+        "current_debt": float(getattr(customer, "current_debt", 0.0) or 0.0),
+        "currentDebt": float(getattr(customer, "current_debt", 0.0) or 0.0),
+        "credit_limit": float(getattr(customer, "credit_limit", 0.0) or 0.0),
+        "creditLimit": float(getattr(customer, "credit_limit", 0.0) or 0.0),
+        "debt_limit": float(getattr(customer, "credit_limit", 0.0) or 0.0),
+        "max_debt_amount": float(getattr(customer, "credit_limit", 0.0) or 0.0),
+        "max_debt_days": int(getattr(customer, "max_debt_days", None) or getattr(customer, "max_due_days", None) or 0),
+        "max_due_days": int(getattr(customer, "max_due_days", None) or getattr(customer, "max_debt_days", None) or 0),
+        "maxDebtDays": int(getattr(customer, "max_debt_days", None) or getattr(customer, "max_due_days", None) or 0),
+        "maxDueDays": int(getattr(customer, "max_due_days", None) or getattr(customer, "max_debt_days", None) or 0),
+        "warning_threshold_percent": float(getattr(customer, "warning_threshold_percent", 80.0) or 80.0),
+        "warning_threshold": float(getattr(customer, "warning_threshold", 80.0) or 80.0),
         "pending_orders_count": pending_count,
         "transactions_count": tx_count,
         "created_at": customer.created_at,
@@ -460,13 +466,13 @@ def handle_list_customers(
         )
 
     # Lọc khu vực
-    if isinstance(region, str) and region.strip():
+    if isinstance(region, str) and region.strip() and region.strip().upper() != "ALL":
         query = query.where(Customer.region == region.strip())
     if isinstance(region_id, int):
         query = query.where(Customer.territory_id == region_id)
 
     # Lọc nhóm khách hàng
-    if isinstance(customer_group, str) and customer_group.strip():
+    if isinstance(customer_group, str) and customer_group.strip() and customer_group.strip().upper() != "ALL":
         query = query.where(
             Customer.customer_group == _coerce_customer_group(customer_group)
         )
@@ -477,9 +483,11 @@ def handle_list_customers(
     elif isinstance(status_filter, str) and status_filter.strip():
         st = status_filter.strip().upper()
         if st in ["ACTIVE", "HOẠT ĐỘNG"]:
-            query = query.where(Customer.is_active.is_(True))
+            query = query.where(Customer.is_locked == False, Customer.is_active == True)
         elif st in ["INACTIVE", "NGỪNG GIAO DỊCH"]:
-            query = query.where(Customer.is_active.is_(False))
+            query = query.where(Customer.is_active == False)
+        elif st in ["LOCKED", "ĐÃ KHÓA", "BỊ KHÓA"]:
+            query = query.where(Customer.is_locked == True)
 
     # Lọc trạng thái khóa
     if isinstance(is_locked, bool):

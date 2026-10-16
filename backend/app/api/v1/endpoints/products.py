@@ -18,6 +18,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.core.database import get_db
 from app.models.models import (
     Product,
+    Inventory,
+    Warehouse,
     Category,
     ProductUnit,
     ProductPriceHistory,
@@ -300,11 +302,25 @@ HEADER_ALIASES: dict[str, str] = {
     "giá vốn": "cost_price",
     "gia von": "cost_price",
     "stock_available": "stock_available",
+    "stock available": "stock_available",
+    "stock_quantity": "stock_available",
+    "stock quantity": "stock_available",
+    "stockquantity": "stock_available",
+    "stock_qty": "stock_available",
+    "stock qty": "stock_available",
+    "quantity": "stock_available",
+    "qty": "stock_available",
     "tồn kho": "stock_available",
     "ton kho": "stock_available",
+    "ton_kho": "stock_available",
     "số lượng tồn": "stock_available",
+    "so luong ton": "stock_available",
+    "so_luong_ton": "stock_available",
     "số lượng": "stock_available",
     "so luong": "stock_available",
+    "so_luong": "stock_available",
+    "soluong": "stock_available",
+    "tonkho": "stock_available",
     "unit": "unit",
     "đơn vị tính": "unit",
     "don vi tinh": "unit",
@@ -344,7 +360,11 @@ def _row_to_import_item(row_number: int, values: dict[str, Any]) -> dict[str, An
 
     for col in ("sale_price", "cost_price", "stock_available"):
         raw_val = values.get(col)
+        if col == "stock_available" and (raw_val is None or str(raw_val).strip() == ""):
+            raw_val = values.get("stock_quantity")
         if raw_val is None or str(raw_val).strip() == "":
+            if col == "stock_available":
+                item[col] = 0
             continue
         try:
             num = float(str(raw_val).strip())
@@ -354,6 +374,9 @@ def _row_to_import_item(row_number: int, values: dict[str, Any]) -> dict[str, An
         except (TypeError, ValueError):
             suffix = " nguyên." if col == "stock_available" else "."
             errors.append(f"{col} phải là số không âm{suffix}")
+
+    if "stock_available" not in item:
+        item["stock_available"] = 0
 
     unit = str(values.get("unit") or "").strip()
     item["unit"] = unit or "Cái"
@@ -367,7 +390,8 @@ def _row_to_import_item(row_number: int, values: dict[str, Any]) -> dict[str, An
         "unit": item["unit"],
         "sale_price": item.get("sale_price"),
         "cost_price": item.get("cost_price"),
-        "stock_available": item.get("stock_available"),
+        "stock_available": item.get("stock_available", 0),
+        "stock_quantity": item.get("stock_available", 0),
         "item": item,
         "errors": errors,
     }
@@ -518,6 +542,17 @@ def _apply_import_rows(
     updated_count = 0
     category_cache: dict[str, Category] = {}
 
+    default_wh = db.query(Warehouse).filter(Warehouse.id == 1).first()
+    if not default_wh:
+        default_wh = db.query(Warehouse).filter(Warehouse.is_active == True).first()
+    if not default_wh:
+        default_wh = db.query(Warehouse).first()
+    if not default_wh:
+        default_wh = Warehouse(code="WH-HN-01", name="Kho Tổng Hà Nội", is_active=True)
+        db.add(default_wh)
+        db.flush()
+    default_wh_id = default_wh.id
+
     for row in rows:
         item = row.get("item") or row
         sku = str(item.get("sku") or "").strip().upper()
@@ -544,7 +579,9 @@ def _apply_import_rows(
                 category_cache[category_name] = category_obj
 
         existing_product = db.query(Product).filter(Product.sku.ilike(sku)).first()
+        target_product_obj = None
         if existing_product:
+            target_product_obj = existing_product
             updated_count += 1
             if item.get("name"):
                 existing_product.name = str(item["name"]).strip()
@@ -586,6 +623,7 @@ def _apply_import_rows(
             )
             db.add(new_product)
             db.flush()
+            target_product_obj = new_product
 
             if new_product.base_price > 0:
                 record_price_history(
@@ -604,6 +642,56 @@ def _apply_import_rows(
                 conversion_rate=1.0,
             )
             db.add(base_unit_entry)
+
+        # S2-08: Tự động lưu tồn kho vào bảng inventory gắn với Kho mặc định (default_wh_id = 1)
+        if target_product_obj:
+            raw_s = item.get("stock_available")
+            if raw_s is None:
+                raw_s = item.get("stock_quantity")
+            if raw_s is None:
+                raw_s = item.get("stockQuantity")
+            if raw_s is None:
+                raw_s = item.get("quantity_on_hand")
+            try:
+                stock_val = float(str(raw_s).strip()) if (raw_s is not None and str(raw_s).strip() != "") else 0.0
+            except (ValueError, TypeError):
+                stock_val = 0.0
+
+            target_wh_id = default_wh_id or 1
+            inv_entry = db.query(Inventory).filter(
+                Inventory.product_id == target_product_obj.id,
+                Inventory.warehouse_id == target_wh_id,
+            ).first()
+            if inv_entry:
+                inv_entry.physical_qty = stock_val
+                inv_entry.reserved_qty = 0.0
+                inv_entry.available_qty = stock_val
+            else:
+                inv_entry = Inventory(
+                    product_id=target_product_obj.id,
+                    warehouse_id=target_wh_id,
+                    physical_qty=stock_val,
+                    reserved_qty=0.0,
+                    available_qty=stock_val,
+                )
+                db.add(inv_entry)
+
+            # Đồng bộ thêm bảng inventory_stock nếu có
+            try:
+                stock_stock = db.query(InventoryStock).filter(
+                    InventoryStock.product_id == target_product_obj.id,
+                    InventoryStock.warehouse_id == target_wh_id,
+                ).first()
+                if stock_stock:
+                    stock_stock.base_quantity = stock_val
+                else:
+                    db.add(InventoryStock(
+                        product_id=target_product_obj.id,
+                        warehouse_id=target_wh_id,
+                        base_quantity=stock_val,
+                    ))
+            except Exception:
+                pass
 
         # Sync with MOCK_PRODUCTS
         if sku in MOCK_PRODUCTS:
@@ -725,12 +813,15 @@ async def commit_product_import(
 
     if session_id and session_id in IMPORT_SESSIONS:
         cached_rows = IMPORT_SESSIONS.pop(session_id)
-        if any(r.get("action_type") == "ERROR" for r in cached_rows):
-            raise HTTPException(
-                status_code=422,
-                detail="Không thể lưu vì phiên nhập chứa dòng dữ liệu lỗi.",
-            )
-        items_to_commit = cached_rows
+        if "items" in body and isinstance(body["items"], list) and len(body["items"]) > 0:
+            items_to_commit = body["items"]
+        else:
+            if any(r.get("action_type") == "ERROR" for r in cached_rows):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Không thể lưu vì phiên nhập chứa dòng dữ liệu lỗi.",
+                )
+            items_to_commit = cached_rows
     elif "items" in body and isinstance(body["items"], list):
         items_to_commit = body["items"]
     else:
@@ -799,8 +890,32 @@ def list_products(
             products = query.all()
         
         categories_map = {c.id: c.name for c in db.query(Category).all()}
+        inv_data = {}
+        for row in db.query(
+            Inventory.product_id,
+            func.sum(Inventory.physical_qty),
+            func.sum(Inventory.reserved_qty),
+            func.sum(Inventory.available_qty),
+        ).group_by(Inventory.product_id).all():
+            inv_data[row[0]] = {
+                "physical_qty": float(row[1] or 0.0),
+                "reserved_qty": float(row[2] or 0.0),
+                "available_qty": float(row[3] or 0.0),
+            }
+
         products_list = []
         for p in products:
+            stk = inv_data.get(p.id)
+            if stk:
+                avail_qty = max(0.0, stk["available_qty"])
+                res_qty = stk["reserved_qty"]
+                phys_qty = stk["physical_qty"]
+            else:
+                mock_p = MOCK_PRODUCTS.get(p.sku.upper()) or MOCK_PRODUCTS.get(p.sku)
+                avail_qty = float(mock_p.get("stock_available", 0.0)) if mock_p else 0.0
+                res_qty = 0.0
+                phys_qty = avail_qty
+
             p_dict = {
                 "id": p.id,
                 "sku": p.sku,
@@ -821,6 +936,14 @@ def list_products(
                 else None,
                 "status": p.status,
                 "imageUrl": p.image_url,
+                "available_quantity": avail_qty,
+                "available_qty": avail_qty,
+                "availableQuantity": avail_qty,
+                "reserved_quantity": res_qty,
+                "reserved_qty": res_qty,
+                "physical_quantity": phys_qty,
+                "stock_available": avail_qty,
+                "stock": avail_qty,
             }
             products_list.append(p_dict)
     else:
@@ -835,7 +958,16 @@ def list_products(
             mock_items = mock_items[effective_offset : effective_offset + limit]
         elif page is not None and limit is not None:
             mock_items = mock_items[(page - 1) * limit : page * limit]
-        products_list = [p.copy() for p in mock_items]
+        products_list = []
+        for p in mock_items:
+            p_copy = p.copy()
+            stk_val = float(p_copy.get("stock_available") or p_copy.get("stock") or 0.0)
+            p_copy["available_quantity"] = stk_val
+            p_copy["available_qty"] = stk_val
+            p_copy["availableQuantity"] = stk_val
+            p_copy["reserved_quantity"] = float(p_copy.get("quantity_reserved") or 0.0)
+            p_copy["reserved_qty"] = float(p_copy.get("quantity_reserved") or 0.0)
+            products_list.append(p_copy)
 
     sanitized = sanitize_financial_data(products_list, user)
     
@@ -875,6 +1007,22 @@ def get_product_detail(
 
     if product:
         units = db.query(ProductUnit).filter(ProductUnit.product_id == product.id).all()
+        inv_row = db.query(
+            func.sum(Inventory.physical_qty),
+            func.sum(Inventory.reserved_qty),
+            func.sum(Inventory.available_qty),
+        ).filter(Inventory.product_id == product.id).first()
+
+        if inv_row and inv_row[2] is not None:
+            avail_qty = max(0.0, float(inv_row[2] or 0.0))
+            res_qty = float(inv_row[1] or 0.0)
+            phys_qty = float(inv_row[0] or 0.0)
+        else:
+            mock_p = MOCK_PRODUCTS.get(product.sku.upper()) or MOCK_PRODUCTS.get(product.sku)
+            avail_qty = float(mock_p.get("stock_available", 0.0)) if mock_p else 0.0
+            res_qty = 0.0
+            phys_qty = avail_qty
+
         p_dict = {
             "id": product.id,
             "sku": product.sku,
@@ -895,6 +1043,14 @@ def get_product_detail(
             else None,
             "status": product.status,
             "imageUrl": product.image_url,
+            "available_quantity": avail_qty,
+            "available_qty": avail_qty,
+            "availableQuantity": avail_qty,
+            "reserved_quantity": res_qty,
+            "reserved_qty": res_qty,
+            "physical_quantity": phys_qty,
+            "stock_available": avail_qty,
+            "stock": avail_qty,
             "units": [
                 {
                     "id": u.id,
@@ -909,7 +1065,14 @@ def get_product_detail(
 
     mock_p = MOCK_PRODUCTS.get(id_or_sku.upper()) or MOCK_PRODUCTS.get(id_or_sku)
     if mock_p:
-        return sanitize_financial_data(mock_p.copy(), user)
+        p_copy = mock_p.copy()
+        stk_val = float(p_copy.get("stock_available") or p_copy.get("stock") or 0.0)
+        p_copy["available_quantity"] = stk_val
+        p_copy["available_qty"] = stk_val
+        p_copy["availableQuantity"] = stk_val
+        p_copy["reserved_quantity"] = float(p_copy.get("quantity_reserved") or 0.0)
+        p_copy["reserved_qty"] = float(p_copy.get("quantity_reserved") or 0.0)
+        return sanitize_financial_data(p_copy, user)
 
     raise HTTPException(status_code=404, detail=f"Sản phẩm '{id_or_sku}' không tồn tại")
 
@@ -1434,6 +1597,16 @@ def create_product(
                     is_base_unit=False,
                 )
                 db.add(extra_unit)
+
+    default_wh = db.query(Warehouse).filter(Warehouse.id == 1).first() or db.query(Warehouse).first()
+    if default_wh:
+        db.add(Inventory(
+            product_id=new_prod.id,
+            warehouse_id=default_wh.id,
+            physical_qty=0.0,
+            reserved_qty=0.0,
+            available_qty=0.0,
+        ))
 
     db.commit()
     db.refresh(new_prod)

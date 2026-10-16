@@ -22,7 +22,7 @@ const { Text } = Typography;
 
 export interface ApprovalItem {
   id: string;
-  type: "price_list" | "below_floor" | "credit_limit";
+  type: "price_list" | "below_floor" | "credit_limit" | "order";
   typeLabel: string;
   badgeBg?: string;
   badgeText?: string;
@@ -34,6 +34,7 @@ export interface ApprovalItem {
   assigneeName: string;
   approveActionLabel: string;
   priceListId?: number;
+  orderId?: number;
 }
 
 export interface ApprovalListProps {
@@ -60,6 +61,8 @@ export const ApprovalList: React.FC<ApprovalListProps> = ({
         return "warning"; // Cam: Dưới giá sàn
       case "price_list":
         return "processing"; // Xanh dương: Bảng giá mới
+      case "order":
+        return "cyan"; // Xanh ngọc: Đơn hàng chờ duyệt
       default:
         return "default";
     }

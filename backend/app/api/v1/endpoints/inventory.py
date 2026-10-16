@@ -258,6 +258,42 @@ def list_inventory_items(
         "data": sanitized
     }
 
+
+@router.get("/available-stock")
+def get_available_stock_endpoint(
+    sku: str = Query(..., min_length=1),
+    warehouse_id: Optional[int] = Query(None, alias="warehouseId"),
+    customer_id: Optional[int] = Query(None, alias="customerId"),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_INVENTORY_VIEW)),
+    db: Session = Depends(get_db),
+):
+    """Lấy tồn khả dụng theo công thức: Tồn thực tế - Tồn đang giữ chỗ (SCRUM-10)."""
+    from app.services.inventory_service import get_customer_serving_warehouse, get_available_stock_info
+
+    wh = get_customer_serving_warehouse(db, customer_id or 0, warehouse_id)
+    info = get_available_stock_info(db, sku, wh.id)
+    return {
+        "success": True,
+        "code": 200,
+        "data": {
+            "sku": info["sku"],
+            "productId": info["product_id"],
+            "productName": info["product_name"],
+            "warehouseId": info["warehouse_id"],
+            "warehouseName": info["warehouse_name"],
+            "physicalQty": info["physical_qty"],
+            "reservedQty": info["reserved_qty"],
+            "availableQty": info["available_qty"],
+            "physicalQuantity": info["physical_qty"],
+            "reservedQuantity": info["reserved_qty"],
+            "availableQuantity": info["available_qty"],
+            "physical_quantity": info["physical_qty"],
+            "reserved_quantity": info["reserved_qty"],
+            "available_quantity": info["available_qty"],
+        }
+    }
+
+
 @router.get("/alerts")
 def get_inventory_alerts(
     warehouse_id: Optional[int] = Query(None, alias="warehouseId"),

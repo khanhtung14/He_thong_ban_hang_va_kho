@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Card,
   Table,
@@ -15,42 +15,65 @@ import {
   Alert,
   Popconfirm,
   Tooltip,
+  Row,
+  Col,
+  Statistic,
+  Steps,
+  Divider,
 } from "antd";
-import type { ColumnsType } from "antd/es/table";
+import type { ColumnsType, TableProps } from "antd/es/table";
 import {
   SearchOutlined,
   UserSwitchOutlined,
   HistoryOutlined,
   SwapOutlined,
   CheckCircleOutlined,
+  ExclamationCircleOutlined,
   ReloadOutlined,
   ShopOutlined,
   UserOutlined,
   PlusOutlined,
+  EnvironmentOutlined,
   SafetyCertificateOutlined,
+  ArrowRightOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import CreateCustomerModal from "../admin/CreateCustomerModal";
+import DeliveryAddressesModal from "../../components/DeliveryAddressesModal";
 import CreditLimitModal from "../../components/CreditLimitModal";
 import {
   fetchCustomersWithTotal,
-  fetchSalesReps,
+  fetchSalesReps as fetchSalesRepsApi,
   fetchTerritories,
   assignSalesRep,
-  handoverCustomers,
-  fetchHandoverHistory,
   type CustomerItem,
   type SalesRepUser,
   type TerritoryItem,
-  type HandoverLogItem,
 } from "../../services/apiClient";
+import {
+  fetchCustomers as fetchAllCustomers,
+  assignSalesToCustomer,
+  assignSalesBatch,
+  bulkHandoverSales,
+  fetchHandoverHistory,
+  type HandoverRecord,
+} from "../../services/salesAssignmentService";
 
 const { Title, Text } = Typography;
+const { Option } = Select;
+const { TextArea } = Input;
 
 export const CustomerTerritoryManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("customers");
+  const [activeTab, setActiveTab] = useState<string>("customers");
   const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [selectedCustomerForAddress, setSelectedCustomerForAddress] = useState<CustomerItem | null>(null);
 
-  // State Danh sách đại lý & bộ lọc từ server
+  // Dữ liệu tổng thể dùng để thống kê
+  const [allCustomers, setAllCustomers] = useState<CustomerItem[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
+
+  // State Danh sách đại lý phân trang & bộ lọc
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRepUser[]>([]);
   const [territories, setTerritories] = useState<TerritoryItem[]>([]);
@@ -64,6 +87,9 @@ export const CustomerTerritoryManagement: React.FC = () => {
   const [pageSize, setPageSize] = useState(15);
   const [totalRecords, setTotalRecords] = useState(0);
 
+  // Checkbox chọn đại lý hàng loạt ở Tab 1
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+
   // State Modal Điều chỉnh hạn mức tín dụng & ngày nợ
   const [creditLimitModal, setCreditLimitModal] = useState<{
     visible: boolean;
@@ -73,23 +99,57 @@ export const CustomerTerritoryManagement: React.FC = () => {
     customer: null,
   });
 
-  // State Modal Phân công 1 đại lý
+  // State Modal Phân công (Đơn lẻ & Hàng loạt)
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
-  const [selectedRepId, setSelectedRepId] = useState<number | null>(null);
+  const [assignForm] = Form.useForm();
   const [assignLoading, setAssignLoading] = useState(false);
 
-  // State Bàn giao hàng loạt
-  const [fromRepId, setFromRepId] = useState<number | undefined>(undefined);
-  const [toRepId, setToRepId] = useState<number | undefined>(undefined);
-  const [handoverReason, setHandoverReason] = useState("");
-  const [handoverLoading, setHandoverLoading] = useState(false);
+  // State Tab 2: Bàn giao hàng loạt
+  const [fromUserId, setFromUserId] = useState<number | undefined>(undefined);
+  const [toUserId, setToUserId] = useState<number | undefined>(undefined);
+  const [fromUserCustomers, setFromUserCustomers] = useState<CustomerItem[]>([]);
+  const [loadingFromCustomers, setLoadingFromCustomers] = useState<boolean>(false);
+  const [selectedHandoverCustomerKeys, setSelectedHandoverCustomerKeys] = useState<React.Key[]>([]);
+  const [reasonCategory, setReasonCategory] = useState<string>("Nhân viên nghỉ việc");
+  const [customReason, setCustomReason] = useState<string>("");
+  const [handoverNotes, setHandoverNotes] = useState<string>("");
+  const [submittingHandover, setSubmittingHandover] = useState<boolean>(false);
 
-  // State Lịch sử bàn giao
-  const [historyLogs, setHistoryLogs] = useState<HandoverLogItem[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  // State Tab 3: Lịch sử bàn giao
+  const [historyItems, setHistoryItems] = useState<HandoverRecord[]>([]);
+  const [historyTotal, setHistoryTotal] = useState<number>(0);
+  const [historyPage, setHistoryPage] = useState<number>(1);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+  const [selectedHistoryDetail, setSelectedHistoryDetail] = useState<HandoverRecord | null>(null);
 
-  // Truy vấn danh sách đại lý và lọc từ backend (server-side query & filter)
+  // Load danh sách tổng để tính thẻ thống kê
+  const loadStatsData = useCallback(async () => {
+    setLoadingAll(true);
+    try {
+      const all = await fetchAllCustomers();
+      setAllCustomers(all);
+    } catch {
+      // bỏ qua lỗi stats nếu không thể fetch
+    } finally {
+      setLoadingAll(false);
+    }
+  }, []);
+
+  // Tính toán 3 thẻ thống kê ở trên cùng
+  const stats = useMemo(() => {
+    const list = allCustomers.length > 0 ? allCustomers : customers;
+    const total = allCustomers.length > 0 ? allCustomers.length : totalRecords;
+    const assigned = list.filter((c) => !!c.sales_rep_id).length;
+    const unassigned = Math.max(0, total - assigned);
+    return {
+      total,
+      assigned: allCustomers.length > 0 ? assigned : list.filter((c) => !!c.sales_rep_id).length,
+      unassigned: allCustomers.length > 0 ? unassigned : list.filter((c) => !c.sales_rep_id).length,
+    };
+  }, [allCustomers, customers, totalRecords]);
+
+  // Truy vấn danh sách đại lý phân trang & lọc từ backend
   const fetchCustomersList = useCallback(
     async (
       targetPage = currentPage,
@@ -138,12 +198,13 @@ export const CustomerTerritoryManagement: React.FC = () => {
 
   const loadData = useCallback(async () => {
     fetchCustomersList(currentPage);
-  }, [fetchCustomersList, currentPage]);
+    loadStatsData();
+  }, [fetchCustomersList, currentPage, loadStatsData]);
 
   const loadInitialData = useCallback(async () => {
     try {
       const [repsData, terrsData] = await Promise.all([
-        fetchSalesReps().catch(() => []),
+        fetchSalesRepsApi().catch(() => []),
         fetchTerritories().catch(() => []),
       ]);
       setSalesReps(repsData);
@@ -152,14 +213,15 @@ export const CustomerTerritoryManagement: React.FC = () => {
       // bỏ qua lỗi load phụ
     }
     fetchCustomersList(1);
-  }, [fetchCustomersList]);
+    loadStatsData();
+  }, [fetchCustomersList, loadStatsData]);
 
   useEffect(() => {
     loadInitialData();
   }, [loadInitialData]);
 
   const handleSearch = () => {
-    fetchCustomersList(1, search, repFilter, regionFilter, groupFilter, statusFilter);
+    fetchCustomersList(1, search, repFilter, regionFilter, groupFilter, statusFilter, pageSize);
   };
 
   const handleResetFilter = () => {
@@ -168,15 +230,17 @@ export const CustomerTerritoryManagement: React.FC = () => {
     setRegionFilter("ALL");
     setGroupFilter("ALL");
     setStatusFilter("ALL");
-    fetchCustomersList(1, "", "ALL", "ALL", "ALL", "ALL");
+    fetchCustomersList(1, "", "ALL", "ALL", "ALL", "ALL", pageSize);
   };
 
-  // Tải lịch sử bàn giao
-  const loadHistory = useCallback(async () => {
+  // Tải lịch sử bàn giao (Tab 3)
+  const loadHistory = useCallback(async (page = 1) => {
     setHistoryLoading(true);
     try {
-      const logs = await fetchHandoverHistory();
-      setHistoryLogs(logs);
+      const res = await fetchHandoverHistory({ page, limit: 10 });
+      setHistoryItems(res.items);
+      setHistoryTotal(res.total);
+      setHistoryPage(res.page);
     } catch (err: any) {
       message.error(err.message || "Lỗi khi tải lịch sử bàn giao.");
     } finally {
@@ -186,69 +250,162 @@ export const CustomerTerritoryManagement: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === "history") {
-      loadHistory();
+      loadHistory(1);
     }
   }, [activeTab, loadHistory]);
 
-  // Xử lý gán 1 NVKD cho đại lý
-  const handleAssignSubmit = async () => {
-    if (!selectedCustomer || !selectedRepId) {
-      message.warning("Vui lòng chọn nhân viên kinh doanh phụ trách!");
+  // Modal Phân công (Mở đơn lẻ hoặc Mở hàng loạt)
+  const openSingleAssignModal = (customer: CustomerItem) => {
+    setSelectedCustomer(customer);
+    assignForm.setFieldsValue({
+      sales_user_id: customer.sales_rep_id || undefined,
+      region: customer.region || customer.territory_name || undefined,
+    });
+    setAssignModalOpen(true);
+  };
+
+  const openBatchAssignModal = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning("Vui lòng chọn ít nhất một đại lý từ danh sách để gán hàng loạt.");
       return;
     }
-    setAssignLoading(true);
+    setSelectedCustomer(null);
+    assignForm.resetFields();
+    setAssignModalOpen(true);
+  };
+
+  const openCreateAssignModal = () => {
+    setSelectedCustomer(null);
+    assignForm.resetFields();
+    setAssignModalOpen(true);
+  };
+
+  const handleSaveAssignment = async () => {
     try {
-      await assignSalesRep(selectedCustomer.id, selectedRepId);
-      message.success(
-        `Đã phân công NVKD cho đại lý ${selectedCustomer.name} thành công!`
-      );
+      const values = await assignForm.validateFields();
+      setAssignLoading(true);
+
+      if (selectedCustomer) {
+        // Gán 1 đại lý
+        await assignSalesToCustomer(selectedCustomer.id, {
+          sales_user_id: values.sales_user_id,
+          region: values.region,
+        });
+        message.success(`Đã phân công thành công đại lý ${selectedCustomer.name}!`);
+      } else if (selectedRowKeys.length > 0) {
+        // Gán hàng loạt qua checkbox
+        const ids = selectedRowKeys.map((k) => Number(k));
+        await assignSalesBatch(ids, values.sales_user_id, values.region);
+        message.success(`Đã phân công hàng loạt ${ids.length} đại lý thành công!`);
+        setSelectedRowKeys([]);
+      } else if (values.customer_id) {
+        // Gán qua dropdown chọn đại lý
+        const chosen = customers.find((c) => c.id === values.customer_id);
+        await assignSalesToCustomer(values.customer_id, {
+          sales_user_id: values.sales_user_id,
+          region: values.region,
+        });
+        message.success(`Đã phân công thành công đại lý ${chosen?.name || ""}!`);
+      }
+
       setAssignModalOpen(false);
+      assignForm.resetFields();
       setSelectedCustomer(null);
-      setSelectedRepId(null);
       loadData();
     } catch (err: any) {
-      message.error(err.message || "Không thể phân công nhân viên.");
+      message.error(err.message || "Không thể thực hiện phân công.");
     } finally {
       setAssignLoading(false);
     }
   };
 
-  // Xử lý chuyển giao hàng loạt
-  const handleBulkHandover = async () => {
-    if (!fromRepId) {
-      message.warning("Vui lòng chọn nhân viên cần bàn giao!");
+  // Tab 2: Khi chọn nhân viên bàn giao (From User)
+  const handleSelectFromUser = async (userId: number) => {
+    setFromUserId(userId);
+    setSelectedHandoverCustomerKeys([]);
+    setLoadingFromCustomers(true);
+    try {
+      const list = await fetchAllCustomers({ sales_rep_id: userId });
+      setFromUserCustomers(list);
+      // Mặc định chọn tất cả đại lý của NVKD này để chuyển giao thuận tiện
+      setSelectedHandoverCustomerKeys(list.map((c) => c.id));
+    } catch (err: any) {
+      message.error(err.message || "Không thể tải danh sách đại lý của nhân viên này.");
+      setFromUserCustomers([]);
+    } finally {
+      setLoadingFromCustomers(false);
+    }
+  };
+
+  const fromRep = useMemo(
+    () => salesReps.find((r) => r.id === fromUserId),
+    [salesReps, fromUserId]
+  );
+  const toRep = useMemo(
+    () => salesReps.find((r) => r.id === toUserId),
+    [salesReps, toUserId]
+  );
+
+  // Tab 2: Xác nhận chuyển giao hàng loạt
+  const handleConfirmHandover = async () => {
+    if (!fromUserId) {
+      message.warning("Vui lòng chọn nhân viên bàn giao!");
       return;
     }
-    if (!toRepId) {
-      message.warning("Vui lòng chọn nhân viên mới tiếp nhận!");
+    if (!toUserId) {
+      message.warning("Vui lòng chọn nhân viên tiếp nhận!");
       return;
     }
-    if (fromRepId === toRepId) {
-      message.warning("Nhân viên bàn giao và tiếp nhận không được trùng nhau!");
+    if (fromUserId === toUserId) {
+      message.warning("Nhân viên bàn giao và nhân viên tiếp nhận không được trùng nhau!");
       return;
     }
-    if (!handoverReason.trim()) {
-      message.warning("Vui lòng nhập lý do chuyển giao địa bàn!");
+    if (selectedHandoverCustomerKeys.length === 0) {
+      message.warning("Vui lòng chọn ít nhất 1 đại lý để bàn giao!");
       return;
     }
 
-    setHandoverLoading(true);
+    const finalReason =
+      reasonCategory === "Khác..."
+        ? customReason.trim()
+        : reasonCategory;
+
+    if (!finalReason) {
+      message.warning("Vui lòng nhập lý do bàn giao địa bàn!");
+      return;
+    }
+
+    setSubmittingHandover(true);
     try {
-      const res = await handoverCustomers({
-        frOMSalesRepId: fromRepId,
-        toSalesRepId: toRepId,
-        reason: handoverReason.trim(),
+      const res = await bulkHandoverSales({
+        from_user_id: fromUserId,
+        to_user_id: toUserId,
+        customer_ids: selectedHandoverCustomerKeys.map((k) => Number(k)),
+        reason: finalReason,
+        notes: handoverNotes.trim() || undefined,
       });
-      message.success(res.message || "Chuyển giao địa bàn hàng loạt thành công!");
-      setFromRepId(undefined);
-      setToRepId(undefined);
-      setHandoverReason("");
+
+      message.success(
+        res.message ||
+          `Đã chuyển giao thành công ${selectedHandoverCustomerKeys.length} đại lý từ ${fromRep?.full_name} sang ${toRep?.full_name}!`
+      );
+
+      // Reset form bàn giao
+      setFromUserId(undefined);
+      setToUserId(undefined);
+      setFromUserCustomers([]);
+      setSelectedHandoverCustomerKeys([]);
+      setHandoverNotes("");
+      setCustomReason("");
+      setReasonCategory("Nhân viên nghỉ việc");
+
+      // Cập nhật lại dữ liệu & chuyển sang tab Lịch sử
       loadData();
       setActiveTab("history");
     } catch (err: any) {
-      message.error(err.message || "Lỗi khi chuyển giao địa bàn.");
+      message.error(err.message || "Lỗi khi thực hiện bàn giao hàng loạt.");
     } finally {
-      setHandoverLoading(false);
+      setSubmittingHandover(false);
     }
   };
 
@@ -258,18 +415,24 @@ export const CustomerTerritoryManagement: React.FC = () => {
     return `${val.toLocaleString("vi-VN")} ₫`;
   };
 
-  // Đại lý đang phụ trách của NVKD được chọn bàn giao
-  const assignedCustomersToHandover = customers.filter(
-    (c) => c.sales_rep_id === fromRepId
-  );
+  // Cấu hình chọn dòng cho bảng đại lý (Tab 1)
+  const rowSelection: TableProps<CustomerItem>["rowSelection"] = {
+    selectedRowKeys,
+    onChange: (keys) => setSelectedRowKeys(keys),
+  };
 
-  // Columns Bảng Đại lý
+  // Columns Bảng Đại lý (Tab 1)
   const customerColumns: ColumnsType<CustomerItem> = [
     {
       title: "MÃ ĐẠI LÝ",
       dataIndex: "code",
       key: "code",
-      render: (code: string) => <Text strong style={{ color: "#1e40af" }}>{code}</Text>,
+      width: 130,
+      render: (code: string) => (
+        <Text strong style={{ color: "#1e40af" }}>
+          {code}
+        </Text>
+      ),
     },
     {
       title: "TÊN ĐẠI LÝ",
@@ -290,6 +453,7 @@ export const CustomerTerritoryManagement: React.FC = () => {
       title: "PHÂN NHÓM",
       dataIndex: "customer_group",
       key: "customer_group",
+      width: 140,
       render: (grp: string) => {
         const color =
           grp === "DEALER_LEVEL_1" ? "blue" : grp === "DEALER_LEVEL_2" ? "cyan" : "default";
@@ -301,25 +465,33 @@ export const CustomerTerritoryManagement: React.FC = () => {
     {
       title: "ĐỊA BÀN / KHU VỰC",
       key: "territory",
+      width: 170,
       render: (_, r) => {
         const terr = territories.find((t) => t.id === r.territory_id);
-        const name = r.territory_name || terr?.name;
+        const name = r.territory_name || terr?.name || r.region;
         return name ? (
           <Tag color="cyan">{name}</Tag>
         ) : (
-          <Text type="secondary" style={{ fontStyle: "italic", fontSize: 12 }}>Chưa gán địa bàn</Text>
+          <Text type="secondary" style={{ fontStyle: "italic", fontSize: 12 }}>
+            Chưa gán địa bàn
+          </Text>
         );
       },
     },
     {
       title: "NVKD PHỤ TRÁCH CHÍNH",
       key: "sales_rep",
+      width: 220,
       render: (_, r) => {
         const rep = salesReps.find((s) => s.id === r.sales_rep_id);
         const name = r.sales_rep_name || rep?.full_name || (rep?.username ? `@${rep.username}` : "");
         if (name) {
           return (
-            <Tag icon={<UserOutlined />} color="geekblue" style={{ fontSize: 13, padding: "3px 8px", fontWeight: 600 }}>
+            <Tag
+              icon={<UserOutlined />}
+              color="geekblue"
+              style={{ fontSize: 13, padding: "3px 8px", fontWeight: 600 }}
+            >
               {name}
             </Tag>
           );
@@ -335,14 +507,16 @@ export const CustomerTerritoryManagement: React.FC = () => {
       title: "HẠN MỨC NỢ",
       dataIndex: "debt_limit",
       key: "debt_limit",
+      width: 140,
       render: (limit) => formatMoney(limit),
     },
     {
       title: "DƯ NỢ HIỆN TẠI",
       dataIndex: "current_debt",
       key: "current_debt",
+      width: 140,
       render: (debt) => (
-        <span style={{ color: debt > 0 ? "#dc2626" : "#16a34a", fontWeight: 600 }}>
+        <span style={{ color: (debt || 0) > 0 ? "#dc2626" : "#16a34a", fontWeight: 600 }}>
           {formatMoney(debt)}
         </span>
       ),
@@ -350,6 +524,7 @@ export const CustomerTerritoryManagement: React.FC = () => {
     {
       title: "TRẠNG THÁI",
       key: "status",
+      width: 110,
       render: (_, r) => (
         <Tag color={r.is_locked ? "error" : "success"}>
           {r.is_locked ? "Bị khóa" : "Hoạt động"}
@@ -359,18 +534,26 @@ export const CustomerTerritoryManagement: React.FC = () => {
     {
       title: "THAO TÁC",
       key: "actions",
+      width: 280,
       render: (_, r) => (
         <Space size="small">
+          <Button
+            size="small"
+            icon={<EnvironmentOutlined />}
+            onClick={() => {
+              setSelectedCustomerForAddress(r);
+              setIsAddressModalOpen(true);
+            }}
+            style={{ color: "#2563eb", borderColor: "#93c5fd" }}
+          >
+            Điểm giao
+          </Button>
           <Button
             size="small"
             type="primary"
             ghost
             icon={<UserSwitchOutlined />}
-            onClick={() => {
-              setSelectedCustomer(r);
-              setSelectedRepId(r.sales_rep_id || null);
-              setAssignModalOpen(true);
-            }}
+            onClick={() => openSingleAssignModal(r)}
           >
             {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
           </Button>
@@ -388,35 +571,50 @@ export const CustomerTerritoryManagement: React.FC = () => {
     },
   ];
 
-  // Columns Lịch sử Bàn giao
-  const historyColumns: ColumnsType<HandoverLogItem> = [
+  // Columns Lịch sử Bàn giao (Tab 3)
+  const historyColumns: ColumnsType<HandoverRecord> = [
     {
       title: "THỜI GIAN",
       dataIndex: "created_at",
       key: "created_at",
+      width: 170,
       render: (d: string) => (d ? new Date(d).toLocaleString("vi-VN") : "—"),
     },
     {
-      title: "ĐẠI LÝ",
-      key: "customer",
-      render: (_, r) => (
-        <div>
-          <div style={{ fontWeight: 600 }}>{r.customer_name || "—"}</div>
-          <Text type="secondary" style={{ fontSize: 12 }}>{r.customer_code}</Text>
-        </div>
-      ),
+      title: "MÃ BIÊN BẢN",
+      dataIndex: "code",
+      key: "code",
+      width: 130,
+      render: (code: string) => <Tag color="blue">{code || "—"}</Tag>,
     },
     {
       title: "NVKD BÀN GIAO",
-      dataIndex: "from_sales_rep_name",
-      key: "from_sales_rep_name",
-      render: (name) => name || <Text type="secondary">Chưa có (Gán mới)</Text>,
+      dataIndex: "from_user_name",
+      key: "from_user_name",
+      render: (name) => (
+        <Space>
+          <UserOutlined style={{ color: "#ef4444" }} />
+          <Text strong>{name || "Chưa có (Gán mới)"}</Text>
+        </Space>
+      ),
     },
     {
       title: "NVKD TIẾP NHẬN",
-      dataIndex: "to_sales_rep_name",
-      key: "to_sales_rep_name",
-      render: (name) => <Tag color="green" icon={<CheckCircleOutlined />}>{name}</Tag>,
+      dataIndex: "to_user_name",
+      key: "to_user_name",
+      render: (name) => (
+        <Tag color="green" icon={<CheckCircleOutlined />} style={{ fontWeight: 600 }}>
+          {name}
+        </Tag>
+      ),
+    },
+    {
+      title: "SỐ ĐẠI LÝ",
+      dataIndex: "customer_count",
+      key: "customer_count",
+      width: 110,
+      align: "center",
+      render: (cnt) => <Tag color="cyan">{cnt} đại lý</Tag>,
     },
     {
       title: "NGƯỜI THỰC HIỆN",
@@ -428,20 +626,51 @@ export const CustomerTerritoryManagement: React.FC = () => {
       title: "LÝ DO BÀN GIAO",
       dataIndex: "reason",
       key: "reason",
-      render: (reason) => reason || "—",
+      render: (reason, record) => (
+        <div>
+          <div>{reason || "—"}</div>
+          {record.notes && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Ghi chú: {record.notes}
+            </Text>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: "CHI TIẾT",
+      key: "detail",
+      width: 100,
+      render: (_, record) => (
+        <Button
+          size="small"
+          type="link"
+          onClick={() => setSelectedHistoryDetail(record)}
+        >
+          Xem ĐL
+        </Button>
+      ),
     },
   ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Tiêu đề trang */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+      {/* Tiêu đề trang & Thao tác nhanh */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
         <div>
           <Title level={3} style={{ margin: 0 }}>
-            Phân công & Quản lý Địa bàn Đại lý
+            Đại lý & Phân công Địa bàn
           </Title>
           <Text type="secondary">
-            Phân công nhân viên kinh doanh phụ trách đại lý và bàn giao địa bàn hàng loạt khi có biến động nhân sự.
+            Quản lý thông tin đại lý, phân bổ nhân viên kinh doanh phụ trách và bàn giao địa bàn hàng loạt.
           </Text>
         </div>
         <Space>
@@ -454,29 +683,91 @@ export const CustomerTerritoryManagement: React.FC = () => {
             onClick={() => setActiveTab("handover")}
             style={{ backgroundColor: "#2563eb" }}
           >
-            Chuyển giao hàng loạt
+            Chuyển giao địa bàn
           </Button>
         </Space>
       </div>
 
-      <Card style={{ borderRadius: 12 }}>
+      {/* CỤM 3 THẺ THỐNG KÊ Ở TRÊN CÙNG */}
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={8}>
+          <Card
+            bordered
+            style={{ borderRadius: 10, backgroundColor: "#ffffff" }}
+            bodyStyle={{ padding: "16px 20px" }}
+          >
+            <Statistic
+              title={<span style={{ color: "#64748b", fontSize: 13, fontWeight: 500 }}>Tổng số đại lý</span>}
+              value={stats.total}
+              valueStyle={{ fontWeight: 700, color: "#1e293b", fontSize: 24 }}
+              prefix={<ShopOutlined style={{ color: "#2563eb", marginRight: 8, fontSize: 22 }} />}
+              loading={loadingAll && stats.total === 0}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card
+            bordered
+            style={{ borderRadius: 10, backgroundColor: "#ffffff" }}
+            bodyStyle={{ padding: "16px 20px" }}
+          >
+            <Statistic
+              title={<span style={{ color: "#64748b", fontSize: 13, fontWeight: 500 }}>Đã phân công</span>}
+              value={stats.assigned}
+              valueStyle={{ fontWeight: 700, color: "#16a34a", fontSize: 24 }}
+              prefix={<CheckCircleOutlined style={{ color: "#16a34a", marginRight: 8, fontSize: 22 }} />}
+              loading={loadingAll && stats.total === 0}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card
+            bordered
+            style={{ borderRadius: 10, backgroundColor: "#ffffff" }}
+            bodyStyle={{ padding: "16px 20px" }}
+          >
+            <Statistic
+              title={<span style={{ color: "#64748b", fontSize: 13, fontWeight: 500 }}>Chưa phân công</span>}
+              value={stats.unassigned}
+              valueStyle={{ fontWeight: 700, color: "#d97706", fontSize: 24 }}
+              prefix={<ExclamationCircleOutlined style={{ color: "#d97706", marginRight: 8, fontSize: 22 }} />}
+              loading={loadingAll && stats.total === 0}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Card chứa hệ thống 3 Tab chính */}
+      <Card
+        bordered={false}
+        style={{ borderRadius: 12, boxShadow: "0 2px 10px rgba(0, 0, 0, 0.04)" }}
+        bodyStyle={{ padding: "16px 24px" }}
+      >
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
+          onChange={(k) => {
+            setActiveTab(k);
+            if (k === "history") loadHistory(1);
+          }}
+          type="line"
+          size="large"
           items={[
+            // =====================================================================
+            // TAB 1: DANH SÁCH ĐẠI LÝ & PHÂN CÔNG
+            // =====================================================================
             {
               key: "customers",
               label: (
                 <span>
-                  <ShopOutlined /> Danh sách Đại lý & Phân công
+                  <TeamOutlined /> Danh sách Đại lý & Phân công
                 </span>
               ),
               children: (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {/* Thanh tìm kiếm & Bộ lọc (Server-side) */}
+                  {/* Thanh tìm kiếm & Bộ lọc */}
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
                     <Input
-                      prefix={<SearchOutlined />}
+                      prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
                       placeholder="Tìm theo mã, tên, SĐT đại lý..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
@@ -490,14 +781,14 @@ export const CustomerTerritoryManagement: React.FC = () => {
                         setRegionFilter(v);
                         fetchCustomersList(1, search, repFilter, v, groupFilter, statusFilter, pageSize);
                       }}
-                      style={{ width: 200 }}
+                      style={{ width: 190 }}
                       placeholder="Địa bàn / Khu vực"
                     >
-                      <Select.Option value="ALL">Tất cả Địa bàn</Select.Option>
+                      <Option value="ALL">Tất cả Địa bàn</Option>
                       {territories.map((t) => (
-                        <Select.Option key={t.id} value={t.id}>
+                        <Option key={t.id} value={t.id}>
                           {t.name}
-                        </Select.Option>
+                        </Option>
                       ))}
                     </Select>
                     <Select
@@ -509,12 +800,12 @@ export const CustomerTerritoryManagement: React.FC = () => {
                       style={{ width: 220 }}
                       placeholder="Lọc theo NVKD phụ trách"
                     >
-                      <Select.Option value="ALL">Tất cả NVKD phụ trách</Select.Option>
-                      <Select.Option value="UNASSIGNED">Chưa phân công phụ trách</Select.Option>
+                      <Option value="ALL">Tất cả NVKD phụ trách</Option>
+                      <Option value="UNASSIGNED">Chưa phân công phụ trách</Option>
                       {salesReps.map((rep) => (
-                        <Select.Option key={rep.id} value={String(rep.id)}>
+                        <Option key={rep.id} value={String(rep.id)}>
                           {rep.full_name || rep.username}
-                        </Select.Option>
+                        </Option>
                       ))}
                     </Select>
                     <Select
@@ -523,13 +814,13 @@ export const CustomerTerritoryManagement: React.FC = () => {
                         setGroupFilter(v);
                         fetchCustomersList(1, search, repFilter, regionFilter, v, statusFilter, pageSize);
                       }}
-                      style={{ width: 160 }}
+                      style={{ width: 150 }}
                       placeholder="Phân nhóm"
                     >
-                      <Select.Option value="ALL">Tất cả nhóm</Select.Option>
-                      <Select.Option value="DEALER_LEVEL_1">Đại lý Cấp 1</Select.Option>
-                      <Select.Option value="DEALER_LEVEL_2">Đại lý Cấp 2</Select.Option>
-                      <Select.Option value="RETAIL">Khách lẻ / Sỉ</Select.Option>
+                      <Option value="ALL">Tất cả nhóm</Option>
+                      <Option value="DEALER_LEVEL_1">Đại lý Cấp 1</Option>
+                      <Option value="DEALER_LEVEL_2">Đại lý Cấp 2</Option>
+                      <Option value="RETAIL">Khách lẻ / Sỉ</Option>
                     </Select>
                     <Select
                       value={statusFilter}
@@ -537,12 +828,12 @@ export const CustomerTerritoryManagement: React.FC = () => {
                         setStatusFilter(v);
                         fetchCustomersList(1, search, repFilter, regionFilter, groupFilter, v, pageSize);
                       }}
-                      style={{ width: 160 }}
+                      style={{ width: 150 }}
                       placeholder="Trạng thái"
                     >
-                      <Select.Option value="ALL">Tất cả trạng thái</Select.Option>
-                      <Select.Option value="ACTIVE">Hoạt động</Select.Option>
-                      <Select.Option value="LOCKED">Bị khóa</Select.Option>
+                      <Option value="ALL">Tất cả trạng thái</Option>
+                      <Option value="ACTIVE">Hoạt động</Option>
+                      <Option value="LOCKED">Bị khóa</Option>
                     </Select>
                     <Button
                       type="primary"
@@ -559,23 +850,64 @@ export const CustomerTerritoryManagement: React.FC = () => {
                     >
                       Đặt lại
                     </Button>
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => setIsCreateCustomerModalOpen(true)}
-                      style={{
-                        borderRadius: 8,
-                        backgroundColor: "#16a34a",
-                        fontWeight: 600,
-                        marginLeft: "auto",
-                      }}
-                    >
-                      Thêm đại lý mới
-                    </Button>
+
+                    <Space style={{ marginLeft: "auto" }}>
+                      {selectedRowKeys.length > 0 && (
+                        <Button
+                          type="primary"
+                          icon={<UserSwitchOutlined />}
+                          style={{
+                            backgroundColor: "#059669",
+                            borderColor: "#059669",
+                            borderRadius: 8,
+                            fontWeight: 600,
+                          }}
+                          onClick={openBatchAssignModal}
+                        >
+                          Gán hàng loạt ({selectedRowKeys.length} đại lý)
+                        </Button>
+                      )}
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => setIsCreateCustomerModalOpen(true)}
+                        style={{
+                          borderRadius: 8,
+                          backgroundColor: "#16a34a",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Thêm đại lý mới
+                      </Button>
+                    </Space>
                   </div>
 
-                  {/* Bảng danh sách đại lý (Dữ liệu từ server) */}
-                  <Table
+                  {/* Banner chọn hàng loạt khi có tickbox */}
+                  {selectedRowKeys.length > 0 && (
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ borderRadius: 8 }}
+                      message={
+                        <Space>
+                          <span>
+                            Đang chọn <strong>{selectedRowKeys.length}</strong> đại lý.
+                          </span>
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => setSelectedRowKeys([])}
+                          >
+                            Bỏ chọn tất cả
+                          </Button>
+                        </Space>
+                      }
+                    />
+                  )}
+
+                  {/* Bảng danh sách đại lý */}
+                  <Table<CustomerItem>
+                    rowSelection={rowSelection}
                     columns={customerColumns}
                     dataSource={customers}
                     rowKey="id"
@@ -598,6 +930,10 @@ export const CustomerTerritoryManagement: React.FC = () => {
                 </div>
               ),
             },
+
+            // =====================================================================
+            // TAB 2: BÀN GIAO ĐỊA BÀN HÀNG LOẠT
+            // =====================================================================
             {
               key: "handover",
               label: (
@@ -606,107 +942,317 @@ export const CustomerTerritoryManagement: React.FC = () => {
                 </span>
               ),
               children: (
-                <div style={{ maxWidth: 800, margin: "16px auto", display: "flex", flexDirection: "column", gap: 20 }}>
-                  <Alert
-                    message="Chuyển giao địa bàn hàng loạt"
-                    description="Khi nhân viên kinh doanh nghỉ việc hoặc chuyển đổi khu vực phụ trách, chức năng này cho phép chuyển toàn bộ hoặc các đại lý của nhân viên đó sang một nhân viên kinh doanh mới tiếp nhận. Tất cả lịch sử bàn giao sẽ được ghi nhận minh bạch."
-                    type="info"
-                    showIcon
+                <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 0" }}>
+                  <Steps
+                    current={fromUserId ? (toUserId ? 2 : 1) : 0}
+                    style={{ marginBottom: 32 }}
+                    items={[
+                      {
+                        title: "Bước 1: Nhân viên bàn giao",
+                        description: "Chọn nhân sự cũ chuyển công tác / nghỉ việc",
+                      },
+                      {
+                        title: "Bước 2: Nhân viên tiếp nhận",
+                        description: "Chọn nhân sự mới phụ trách thay thế",
+                      },
+                      {
+                        title: "Bước 3: Xác nhận danh sách",
+                        description: "Kiểm tra đại lý & lưu biên bản bàn giao",
+                      },
+                    ]}
                   />
 
-                  <Form layout="vertical" style={{ background: "#f8fafc", padding: 24, borderRadius: 12, border: "1px solid #e2e8f0" }}>
-                    <Form.Item
-                      label={<Text strong>1. Nhân viên bàn giao (Nghỉ việc / Chuyển địa bàn)</Text>}
-                      required
-                    >
-                      <Select
-                        placeholder="Chọn nhân viên bàn giao..."
-                        value={fromRepId}
-                        onChange={(v) => setFromRepId(v)}
-                        size="large"
+                  <Row gutter={[24, 24]}>
+                    {/* Cột trái: Thông tin nhân sự & Lý do */}
+                    <Col xs={24} md={10}>
+                      <Card
+                        title="Thông Tin Nhân Sự Bàn Giao"
+                        bordered
+                        style={{ borderRadius: 10, height: "100%" }}
                       >
-                        {salesReps.map((rep) => {
-                          const count = customers.filter((c) => c.sales_rep_id === rep.id).length;
-                          return (
-                            <Select.Option key={rep.id} value={rep.id}>
-                              {rep.full_name || rep.username} ({count} đại lý đang phụ trách)
-                            </Select.Option>
-                          );
-                        })}
-                      </Select>
-                    </Form.Item>
+                        <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+                          <div>
+                            <Text strong style={{ display: "block", marginBottom: 6 }}>
+                              1. Nhân viên bàn giao (Nghỉ việc / Chuyển vùng):
+                            </Text>
+                            <Select
+                              placeholder="-- Chọn nhân viên bàn giao --"
+                              style={{ width: "100%" }}
+                              size="large"
+                              value={fromUserId}
+                              onChange={handleSelectFromUser}
+                              showSearch
+                              optionFilterProp="children"
+                            >
+                              {salesReps.map((r) => {
+                                const count = (allCustomers.length > 0 ? allCustomers : customers).filter(
+                                  (c) => c.sales_rep_id === r.id
+                                ).length;
+                                return (
+                                  <Option key={r.id} value={r.id}>
+                                    {r.full_name || r.username} ({count} đại lý)
+                                  </Option>
+                                );
+                              })}
+                            </Select>
+                            {fromRep && (
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  padding: "8px 12px",
+                                  backgroundColor: "#f8fafc",
+                                  borderRadius: 6,
+                                  border: "1px solid #e2e8f0",
+                                }}
+                              >
+                                <div style={{ fontSize: 13, color: "#334155" }}>
+                                  Email: <strong>{fromRep.email}</strong>
+                                </div>
+                                <div style={{ fontSize: 13, color: "#334155" }}>
+                                  Đang phụ trách:{" "}
+                                  <Tag color="blue">{fromUserCustomers.length} đại lý</Tag>
+                                </div>
+                              </div>
+                            )}
+                          </div>
 
-                    {fromRepId && (
-                      <div style={{ marginBottom: 16, padding: 12, background: "#ffffff", borderRadius: 8, border: "1px solid #cbd5e1" }}>
-                        <Text strong>Danh sách đại lý sẽ được chuyển giao ({assignedCustomersToHandover.length} đại lý):</Text>
-                        {assignedCustomersToHandover.length === 0 ? (
-                          <div style={{ color: "#64748b", marginTop: 4 }}>Nhân viên này hiện không phụ trách đại lý nào.</div>
-                        ) : (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                            {assignedCustomersToHandover.map((c) => (
-                              <Tag key={c.id} color="blue">
-                                {c.code} - {c.name}
+                          <Divider style={{ margin: "8px 0" }}>
+                            <ArrowRightOutlined style={{ color: "#2563eb" }} />
+                          </Divider>
+
+                          <div>
+                            <Text strong style={{ display: "block", marginBottom: 6 }}>
+                              2. Nhân viên tiếp nhận (NVKD mới thay thế):
+                            </Text>
+                            <Select
+                              placeholder="-- Chọn nhân viên tiếp nhận --"
+                              style={{ width: "100%" }}
+                              size="large"
+                              value={toUserId}
+                              onChange={setToUserId}
+                              showSearch
+                              optionFilterProp="children"
+                            >
+                              {salesReps
+                                .filter((r) => r.id !== fromUserId)
+                                .map((r) => (
+                                  <Option key={r.id} value={r.id}>
+                                    {r.full_name || r.username}
+                                  </Option>
+                                ))}
+                            </Select>
+                            {toRep && (
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  padding: "8px 12px",
+                                  backgroundColor: "#f0fdf4",
+                                  borderRadius: 6,
+                                  border: "1px solid #bbf7d0",
+                                }}
+                              >
+                                <div style={{ fontSize: 13, color: "#166534" }}>
+                                  Nhân viên nhận: <strong>{toRep.full_name || toRep.username}</strong>
+                                </div>
+                                <div style={{ fontSize: 13, color: "#166534" }}>
+                                  Email: {toRep.email}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <Text strong style={{ display: "block", marginBottom: 6 }}>
+                              Lý do bàn giao (Bắt buộc):
+                            </Text>
+                            <Select
+                              style={{ width: "100%" }}
+                              size="large"
+                              value={reasonCategory}
+                              onChange={(val) => {
+                                setReasonCategory(val);
+                                if (val !== "Khác...") {
+                                  setCustomReason("");
+                                }
+                              }}
+                            >
+                              <Option value="Nhân viên nghỉ việc">Nhân viên nghỉ việc</Option>
+                              <Option value="Điều chuyển công tác / địa bàn">
+                                Điều chuyển công tác / địa bàn
+                              </Option>
+                              <Option value="Tái cơ cấu đội ngũ">Tái cơ cấu đội ngũ</Option>
+                              <Option value="Khác...">Khác...</Option>
+                            </Select>
+
+                            {reasonCategory === "Khác..." && (
+                              <div style={{ marginTop: 8 }}>
+                                <TextArea
+                                  rows={3}
+                                  placeholder="Nhập lý do bàn giao chi tiết (Bắt buộc)..."
+                                  value={customReason}
+                                  onChange={(e) => setCustomReason(e.target.value)}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <Text strong style={{ display: "block", marginBottom: 6 }}>
+                              Ghi chú bổ sung:
+                            </Text>
+                            <TextArea
+                              rows={3}
+                              placeholder="Nhập ghi chú bàn giao hồ sơ, công nợ, hợp đồng..."
+                              value={handoverNotes}
+                              onChange={(e) => setHandoverNotes(e.target.value)}
+                            />
+                          </div>
+                        </Space>
+                      </Card>
+                    </Col>
+
+                    {/* Cột phải: Danh sách đại lý chuyển giao & Nút xác nhận */}
+                    <Col xs={24} md={14}>
+                      <Card
+                        title={
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span>3. Danh Sách Đại Lý Chuyển Giao</span>
+                            {fromUserCustomers.length > 0 && (
+                              <Tag color="cyan">
+                                Đã chọn {selectedHandoverCustomerKeys.length} / {fromUserCustomers.length}
                               </Tag>
-                            ))}
+                            )}
+                          </div>
+                        }
+                        bordered
+                        style={{ borderRadius: 10, height: "100%", display: "flex", flexDirection: "column" }}
+                        bodyStyle={{ flex: 1, display: "flex", flexDirection: "column" }}
+                      >
+                        {!fromUserId ? (
+                          <div style={{ padding: "40px 20px", textAlign: "center", color: "#94a3b8" }}>
+                            <UserOutlined style={{ fontSize: 40, marginBottom: 12 }} />
+                            <div>Vui lòng chọn <strong>Nhân viên bàn giao</strong> ở bước 1 để tải danh sách đại lý.</div>
+                          </div>
+                        ) : fromUserCustomers.length === 0 ? (
+                          <div style={{ padding: "40px 20px", textAlign: "center" }}>
+                            <Alert
+                              type="warning"
+                              showIcon
+                              message="Nhân viên này hiện không phụ trách đại lý nào."
+                              description="Bạn có thể chọn nhân viên khác hoặc gán đại lý cho nhân viên này trước."
+                            />
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 16 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <Text type="secondary" style={{ fontSize: 13 }}>
+                                Tick chọn các đại lý cần chuyển giao sang nhân sự mới:
+                              </Text>
+                              <Space>
+                                <Button
+                                  size="small"
+                                  onClick={() => setSelectedHandoverCustomerKeys(fromUserCustomers.map((c) => c.id))}
+                                >
+                                  Chọn tất cả
+                                </Button>
+                                <Button
+                                  size="small"
+                                  onClick={() => setSelectedHandoverCustomerKeys([])}
+                                >
+                                  Bỏ chọn
+                                </Button>
+                              </Space>
+                            </div>
+
+                            <Table<CustomerItem>
+                              rowKey="id"
+                              size="small"
+                              rowSelection={{
+                                selectedRowKeys: selectedHandoverCustomerKeys,
+                                onChange: (keys) => setSelectedHandoverCustomerKeys(keys),
+                              }}
+                              dataSource={fromUserCustomers}
+                              loading={loadingFromCustomers}
+                              pagination={{ pageSize: 6 }}
+                              columns={[
+                                {
+                                  title: "Mã",
+                                  dataIndex: "code",
+                                  key: "code",
+                                  width: 100,
+                                  render: (c) => <Tag color="blue">{c}</Tag>,
+                                },
+                                {
+                                  title: "Tên đại lý",
+                                  dataIndex: "name",
+                                  key: "name",
+                                },
+                                {
+                                  title: "Khu vực / Địa bàn",
+                                  dataIndex: "region",
+                                  key: "region",
+                                  width: 150,
+                                  render: (r, row) => r || row.territory_name || "—",
+                                },
+                              ]}
+                            />
+
+                            <div style={{ marginTop: "auto", paddingTop: 16, borderTop: "1px solid #f1f5f9", textAlign: "right" }}>
+                              <Popconfirm
+                                title="Xác nhận bàn giao đại lý hàng loạt?"
+                                description={
+                                  <div style={{ maxWidth: 320 }}>
+                                    Bạn có chắc chắn muốn chuyển giao{" "}
+                                    <strong>{selectedHandoverCustomerKeys.length} đại lý</strong> từ{" "}
+                                    <strong>{fromRep?.full_name || fromRep?.username}</strong> sang{" "}
+                                    <strong>{toRep?.full_name || toRep?.username}</strong>?
+                                  </div>
+                                }
+                                onConfirm={handleConfirmHandover}
+                                okText="Bàn giao ngay"
+                                cancelText="Hủy bỏ"
+                                okButtonProps={{
+                                  danger: true,
+                                  loading: submittingHandover,
+                                }}
+                                disabled={
+                                  !fromUserId ||
+                                  !toUserId ||
+                                  selectedHandoverCustomerKeys.length === 0
+                                }
+                              >
+                                <Button
+                                  type="primary"
+                                  size="large"
+                                  icon={<SwapOutlined />}
+                                  style={{
+                                    backgroundColor: "#2563eb",
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                  }}
+                                  loading={submittingHandover}
+                                  disabled={
+                                    !fromUserId ||
+                                    !toUserId ||
+                                    selectedHandoverCustomerKeys.length === 0
+                                  }
+                                >
+                                  Xác Nhận Bàn Giao Hàng Loạt
+                                </Button>
+                              </Popconfirm>
+                            </div>
                           </div>
                         )}
-                      </div>
-                    )}
-
-                    <Form.Item
-                      label={<Text strong>2. Nhân viên kinh doanh tiếp nhận</Text>}
-                      required
-                    >
-                      <Select
-                        placeholder="Chọn nhân viên mới tiếp nhận bàn giao..."
-                        value={toRepId}
-                        onChange={(v) => setToRepId(v)}
-                        size="large"
-                      >
-                        {salesReps
-                          .filter((rep) => rep.id !== fromRepId)
-                          .map((rep) => (
-                            <Select.Option key={rep.id} value={rep.id}>
-                              {rep.full_name || rep.username}
-                            </Select.Option>
-                          ))}
-                      </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                      label={<Text strong>3. Lý do chuyển giao địa bàn</Text>}
-                      required
-                    >
-                      <Input.TextArea
-                        rows={3}
-                        placeholder="Nhập lý do bàn giao (bắt buộc, ví dụ: Nhân viên nghỉ việc bàn giao tuyến, điều động khu vực kinh doanh...)"
-                        value={handoverReason}
-                        onChange={(e) => setHandoverReason(e.target.value)}
-                      />
-                    </Form.Item>
-
-                    <Popconfirm
-                      title="Xác nhận chuyển giao địa bàn hàng loạt?"
-                      description={`Toàn bộ ${assignedCustomersToHandover.length} đại lý sẽ được chuyển sang nhân viên tiếp nhận.`}
-                      onConfirm={handleBulkHandover}
-                      okText="Xác nhận"
-                      cancelText="Hủy"
-                    >
-                      <Button
-                        type="primary"
-                        size="large"
-                        icon={<CheckCircleOutlined />}
-                        loading={handoverLoading}
-                        disabled={assignedCustomersToHandover.length === 0 || !toRepId}
-                        style={{ width: "100%", backgroundColor: "#2563eb", height: 46, borderRadius: 8 }}
-                      >
-                        Thực hiện Chuyển giao hàng loạt
-                      </Button>
-                    </Popconfirm>
-                  </Form>
+                      </Card>
+                    </Col>
+                  </Row>
                 </div>
               ),
             },
+
+            // =====================================================================
+            // TAB 3: LỊCH SỬ CHUYỂN GIAO ĐỊA BÀN
+            // =====================================================================
             {
               key: "history",
               label: (
@@ -716,20 +1262,43 @@ export const CustomerTerritoryManagement: React.FC = () => {
               ),
               children: (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text type="secondary">
-                      Nhật ký ghi nhận chi tiết các đợt phân công và chuyển giao đại lý giữa các nhân viên kinh doanh.
-                    </Text>
-                    <Button icon={<ReloadOutlined />} onClick={() => loadHistory()}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <Title level={4} style={{ margin: 0 }}>
+                        Nhật Ký Chuyển Giao & Phân Công Địa Bàn
+                      </Title>
+                      <Text type="secondary">
+                        Lưu giữ đầy đủ lịch sử bàn giao giữa các nhân viên kinh doanh để quản lý và đối soát minh bạch.
+                      </Text>
+                    </div>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => loadHistory(historyPage)}
+                      loading={historyLoading}
+                      style={{ borderRadius: 8 }}
+                    >
                       Tải lại lịch sử
                     </Button>
                   </div>
-                  <Table
-                    columns={historyColumns}
-                    dataSource={historyLogs}
+
+                  <Table<HandoverRecord>
                     rowKey="id"
+                    columns={historyColumns}
+                    dataSource={historyItems}
                     loading={historyLoading}
-                    pagination={{ pageSize: 15 }}
+                    pagination={{
+                      current: historyPage,
+                      total: historyTotal,
+                      pageSize: 10,
+                      onChange: (p) => loadHistory(p),
+                      showTotal: (total) => `Tổng số ${total} đợt bàn giao`,
+                    }}
                     bordered
                     size="middle"
                   />
@@ -740,62 +1309,177 @@ export const CustomerTerritoryManagement: React.FC = () => {
         />
       </Card>
 
-      {/* Modal Phân công 1 đại lý */}
+      {/* Modal Phân công (Đơn lẻ & Hàng loạt) */}
       <Modal
-        title={`Phân công NVKD cho đại lý: ${selectedCustomer?.name}`}
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <UserSwitchOutlined style={{ color: "#2563eb", fontSize: 20 }} />
+            <span>
+              {selectedCustomer
+                ? `Phân Công Phụ Trách: ${selectedCustomer.name}`
+                : selectedRowKeys.length > 0
+                ? `Phân Công Hàng Loạt Cho ${selectedRowKeys.length} Đại Lý`
+                : "Phân Công Đại Lý Mới"}
+            </span>
+          </div>
+        }
         open={assignModalOpen}
+        onOk={handleSaveAssignment}
         onCancel={() => {
           setAssignModalOpen(false);
           setSelectedCustomer(null);
-          setSelectedRepId(null);
+          assignForm.resetFields();
         }}
-        onOk={handleAssignSubmit}
         confirmLoading={assignLoading}
-        okText="Lưu phân công"
+        okText="Lưu Phân Công"
         cancelText="Hủy"
+        destroyOnClose
+        style={{ borderRadius: 12 }}
       >
-        <div style={{ padding: "12px 0", display: "flex", flexDirection: "column", gap: 16 }}>
-          <div>
-            <Text type="secondary">Mã đại lý: </Text>
-            <Text strong>{selectedCustomer?.code}</Text>
-          </div>
-          <div>
-            <Text type="secondary">NVKD hiện tại: </Text>
-            <Text strong>{selectedCustomer?.sales_rep_name || "Chưa phân công"}</Text>
-          </div>
-          <div>
-            <Text strong style={{ display: "block", marginBottom: 6 }}>
-              Chọn Nhân viên kinh doanh chịu trách nhiệm chính:
-            </Text>
-            <Select
-              style={{ width: "100%" }}
-              placeholder="Chọn nhân viên kinh doanh..."
-              value={selectedRepId}
-              onChange={(val) => setSelectedRepId(val)}
+        <Form form={assignForm} layout="vertical" style={{ marginTop: 16 }}>
+          {selectedCustomer ? (
+            <div
+              style={{
+                backgroundColor: "#f8fafc",
+                padding: "12px 16px",
+                borderRadius: 8,
+                marginBottom: 16,
+                border: "1px solid #e2e8f0",
+              }}
             >
-              {salesReps.map((rep) => (
-                <Select.Option key={rep.id} value={rep.id}>
-                  {rep.full_name || rep.username} ({rep.email || "NVKD"})
-                </Select.Option>
+              <div style={{ fontSize: 13, color: "#475569" }}>
+                Mã đại lý: <strong>{selectedCustomer.code}</strong>
+              </div>
+              <div style={{ fontSize: 13, color: "#475569" }}>
+                Tên đại lý: <strong>{selectedCustomer.name}</strong>
+              </div>
+            </div>
+          ) : selectedRowKeys.length > 0 ? (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message={`Bạn đang chuẩn bị cập nhật người phụ trách chính cho ${selectedRowKeys.length} đại lý được chọn.`}
+            />
+          ) : (
+            <Form.Item
+              name="customer_id"
+              label="Chọn đại lý cần phân công"
+              rules={[{ required: true, message: "Vui lòng chọn đại lý!" }]}
+            >
+              <Select
+                placeholder="-- Tìm và chọn đại lý --"
+                size="large"
+                showSearch
+                optionFilterProp="children"
+              >
+                {customers.map((c) => {
+                  const rep = salesReps.find((r) => r.id === c.sales_rep_id);
+                  return (
+                    <Option key={c.id} value={c.id}>
+                      [{c.code}] {c.name} {rep ? `(Phụ trách: ${rep.full_name || rep.username})` : "(Chưa gán)"}
+                    </Option>
+                  );
+                })}
+              </Select>
+            </Form.Item>
+          )}
+
+          <Form.Item
+            name="sales_user_id"
+            label="Nhân viên kinh doanh phụ trách chính"
+            rules={[{ required: true, message: "Vui lòng chọn nhân viên kinh doanh!" }]}
+          >
+            <Select
+              placeholder="-- Chọn nhân viên kinh doanh --"
+              size="large"
+              showSearch
+              optionFilterProp="children"
+            >
+              {salesReps.map((r) => (
+                <Option key={r.id} value={r.id}>
+                  {r.full_name || r.username} {r.phone ? `· ${r.phone}` : ""}
+                </Option>
               ))}
             </Select>
-          </div>
-        </div>
+          </Form.Item>
+
+          <Form.Item
+            name="region"
+            label="Khu vực / Địa bàn phụ trách"
+            tooltip="Tùy chọn cập nhật vùng thị trường cho đại lý (ví dụ: Miền Bắc, Hà Nội - Cầu Giấy...)"
+          >
+            <Input placeholder="Ví dụ: Hà Nội, TP.HCM, Miền Bắc..." size="large" />
+          </Form.Item>
+        </Form>
       </Modal>
 
-      {/* Modal Thêm Đại Lý Mới */}
+      {/* Modal Xem chi tiết danh sách đại lý của 1 đợt bàn giao */}
+      <Modal
+        title={`Chi tiết bàn giao: ${selectedHistoryDetail?.code || ""}`}
+        open={!!selectedHistoryDetail}
+        onCancel={() => setSelectedHistoryDetail(null)}
+        footer={[
+          <Button key="close" onClick={() => setSelectedHistoryDetail(null)}>
+            Đóng
+          </Button>,
+        ]}
+        width={600}
+      >
+        {selectedHistoryDetail && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ background: "#f8fafc", padding: 12, borderRadius: 8 }}>
+              <div>Từ: <strong>{selectedHistoryDetail.from_user_name || "—"}</strong></div>
+              <div>Đến: <strong>{selectedHistoryDetail.to_user_name}</strong></div>
+              <div>Lý do: {selectedHistoryDetail.reason}</div>
+              <div>Số lượng đại lý: <Tag color="blue">{selectedHistoryDetail.customer_count}</Tag></div>
+            </div>
+            <div>
+              <Text strong>ID các đại lý được chuyển giao:</Text>
+              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {(selectedHistoryDetail.customer_ids || []).map((cid) => (
+                  <Tag key={cid} color="geekblue">
+                    ID #{cid}
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Thêm đại lý mới */}
       <CreateCustomerModal
         isOpen={isCreateCustomerModalOpen}
         onClose={() => setIsCreateCustomerModalOpen(false)}
-        onSuccess={() => loadData()}
+        onSuccess={() => {
+          setIsCreateCustomerModalOpen(false);
+          loadData();
+        }}
       />
 
-      {/* Modal Điều chỉnh hạn mức tín dụng & ngày nợ */}
+      {/* Modal Quản lý Điểm giao hàng */}
+      {selectedCustomerForAddress && (
+        <DeliveryAddressesModal
+          isOpen={isAddressModalOpen}
+          customerId={selectedCustomerForAddress.id}
+          customerName={selectedCustomerForAddress.name}
+          customerCode={selectedCustomerForAddress.code}
+          onClose={() => {
+            setIsAddressModalOpen(false);
+            setSelectedCustomerForAddress(null);
+          }}
+        />
+      )}
+
+      {/* Modal Điều chỉnh hạn mức tín dụng */}
       <CreditLimitModal
         visible={creditLimitModal.visible}
         customer={creditLimitModal.customer}
         onClose={() => setCreditLimitModal({ visible: false, customer: null })}
-        onSuccess={() => fetchCustomersList(currentPage)}
+        onSuccess={() => {
+          loadData();
+        }}
       />
     </div>
   );

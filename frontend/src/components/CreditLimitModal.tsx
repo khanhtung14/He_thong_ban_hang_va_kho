@@ -24,8 +24,8 @@ import {
   ArrowRightOutlined,
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../services/sessionService";
 import dayjs from "dayjs";
+import { authenticatedFetch } from "../services/sessionService";
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -130,11 +130,13 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
     if (!customer) return;
     try {
       const values = await form.validateFields();
-      const newCreditLimit = Number(values.new_credit_limit) || 0;
-      const newMaxDebtDays = Number(values.new_max_debt_days) || 0;
+      const newCredit = Number(values.new_credit_limit) || 0;
+      const newDays = Number(values.new_max_debt_days ?? 0);
+      const currentCredit = Number(currentCreditLimit ?? 0);
+      const currentDays = Number(currentMaxDebtDays ?? 0);
 
       // Ràng buộc: Hạn mức mới không được phép giống hệt hạn mức cũ
-      if (newCreditLimit === currentCreditLimit && newMaxDebtDays === currentMaxDebtDays) {
+      if (newCredit === currentCredit && newDays === currentDays) {
         message.warning(
           "Hạn mức tiền hoặc số ngày nợ mới phải khác với giá trị hiện tại!",
         );
@@ -144,8 +146,8 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       setSubmitting(true);
 
       const payload = {
-        new_credit_limit: newCreditLimit,
-        new_max_debt_days: newMaxDebtDays,
+        new_credit_limit: newCredit,
+        new_max_debt_days: newDays,
         reason: values.reason.trim(),
       };
 
@@ -188,7 +190,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       title: "Thời gian",
       dataIndex: "created_at",
       key: "created_at",
-      width: 160,
+      width: 170,
       render: (val: string) => (
         <Text style={{ fontSize: 12, whiteSpace: "nowrap" }}>
           {formatVietnamDateTime(val)}
@@ -349,7 +351,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                 {
                   type: "number",
                   min: 0,
-                  message: "Hạn mức không được là số âm!",
+                  message: "Giá trị không được nhỏ hơn 0!",
                 },
               ]}
             >
@@ -366,8 +368,8 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                     if (displayValue === undefined || displayValue === null || displayValue === "") {
                       return "";
                     }
-                    const cleaned = displayValue.replace(/[₫\s,]/g, "");
-                    return cleaned === "-" ? cleaned : (Number(cleaned) as any);
+                    const cleaned = displayValue.replace(/[₫\$\s,]/g, "");
+                    return cleaned === "-" ? cleaned : (isNaN(Number(cleaned)) ? "" : (Number(cleaned) as any));
                   }) as any
                 }
                 addonAfter="₫"
@@ -389,7 +391,8 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                 {
                   type: "number",
                   min: 0,
-                  message: "Số ngày nợ không được là số âm!",
+                  max: 365,
+                  message: "Giá trị không được nhỏ hơn 0!",
                 },
               ]}
             >

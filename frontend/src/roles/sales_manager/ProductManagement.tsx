@@ -13,7 +13,6 @@ import {
   Popconfirm,
   message,
   Typography,
-  Image,
   Tooltip,
   Card,
   Row,
@@ -31,8 +30,8 @@ import {
   CheckCircleOutlined,
   StopOutlined,
   ShopOutlined,
-  PictureOutlined,
   ExclamationCircleOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import {
   fetchProducts,
@@ -47,6 +46,7 @@ import {
   type CategoryOption,
 } from "../../services/productService";
 import { getCurrentUserRole } from "../../services/sessionService";
+import { ProductPriceHistoryModal } from "./ProductPriceHistoryModal";
 
 const { Title, Text } = Typography;
 
@@ -62,12 +62,35 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
   const [keyword, setKeyword] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // State Modal Thêm / Sửa
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [form] = Form.useForm();
+
+  // Modal Xem lịch sử thay đổi giá (SCRUM-18)
+  const [isPriceHistoryOpen, setIsPriceHistoryOpen] = useState<boolean>(false);
+  const [priceHistoryProduct, setPriceHistoryProduct] = useState<{
+    id: number;
+    sku: string;
+    name: string;
+    basePrice?: number;
+    baseUnit?: string;
+  } | null>(null);
+
+  const handleOpenPriceHistory = (record: ProductItem) => {
+    setPriceHistoryProduct({
+      id: record.id,
+      sku: record.sku,
+      name: record.name,
+      basePrice: record.basePrice ?? record.sale_price,
+      baseUnit: record.baseUnit || record.unit || "Cái",
+    });
+    setIsPriceHistoryOpen(true);
+  };
 
   const handleNavigateToImport = () => {
     if (onNavigate) {
@@ -296,49 +319,21 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
   // Cấu hình bảng dữ liệu
   const columns: ColumnsType<ProductItem> = [
     {
-      title: "Ảnh",
-      dataIndex: "imageUrl",
-      key: "imageUrl",
-      width: 70,
+      title: "STT",
+      key: "stt",
+      width: 55,
       align: "center",
-      render: (imgUrl: string, record: ProductItem) => {
-        const src = imgUrl || record.image_url;
-        if (!src) {
-          return (
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 8,
-                backgroundColor: "#f1f5f9",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#94a3b8",
-                margin: "0 auto",
-              }}
-            >
-              <PictureOutlined style={{ fontSize: 18 }} />
-            </div>
-          );
-        }
-        return (
-          <Image
-            src={src}
-            alt={record.name}
-            width={44}
-            height={44}
-            style={{ objectFit: "cover", borderRadius: 8 }}
-            fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44' fill='%2394a3b8'><rect width='44' height='44' fill='%23f1f5f9'/></svg>"
-          />
-        );
-      },
+      render: (_: any, __: any, index: number) => (
+        <Text type="secondary" style={{ fontWeight: 500 }}>
+          {(currentPage - 1) * pageSize + index + 1}
+        </Text>
+      ),
     },
     {
       title: "Mã SKU",
       dataIndex: "sku",
       key: "sku",
-      width: 140,
+      width: 125,
       render: (sku: string) => (
         <Tag color="blue" style={{ fontWeight: 600, fontSize: 13 }}>
           {sku}
@@ -349,9 +344,10 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
       title: "Tên sản phẩm",
       dataIndex: "name",
       key: "name",
+      minWidth: 260,
       render: (name: string, record: ProductItem) => (
-        <div>
-          <Text strong style={{ fontSize: 14, color: "#1e293b" }}>
+        <div style={{ wordBreak: "break-word" }}>
+          <Text strong style={{ fontSize: 14, color: "#1e293b", display: "block" }}>
             {name}
           </Text>
           {record.description && (
@@ -366,7 +362,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
       title: "Nhóm hàng",
       dataIndex: "category",
       key: "category",
-      width: 170,
+      width: 130,
       render: (cat: string, record: ProductItem) => {
         const catName = cat || (record.categoryId ? `Nhóm #${record.categoryId}` : "Chưa phân loại");
         return (
@@ -380,7 +376,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
       title: "ĐVT",
       dataIndex: "baseUnit",
       key: "baseUnit",
-      width: 90,
+      width: 70,
       align: "center",
       render: (unit: string, record: ProductItem) => (
         <Tag style={{ margin: 0 }}>{unit || record.unit || "Cái"}</Tag>
@@ -390,19 +386,38 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
       title: "Giá bán",
       dataIndex: "basePrice",
       key: "basePrice",
-      width: 130,
+      width: 160,
       align: "right",
       render: (val: number, record: ProductItem) => (
-        <Text strong style={{ color: "#0f766e" }}>
-          {formatMoney(val ?? record.sale_price)}
-        </Text>
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 6,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <Text strong style={{ color: "#0f766e", whiteSpace: "nowrap" }}>
+            {formatMoney(val ?? record.sale_price)}
+          </Text>
+          <Tooltip title="Xem lịch sử thay đổi giá">
+            <Button
+              type="text"
+              size="small"
+              style={{ padding: "0 4px", display: "inline-flex", alignItems: "center" }}
+              icon={<HistoryOutlined style={{ color: "#722ed1", fontSize: 13 }} />}
+              onClick={() => handleOpenPriceHistory(record)}
+            />
+          </Tooltip>
+        </div>
       ),
     },
     {
       title: "Giá vốn",
       dataIndex: "costPrice",
       key: "costPrice",
-      width: 150,
+      width: 120,
       align: "right",
       render: (cost: number | null, record: ProductItem) => {
         if (!canManageFinancials) {
@@ -431,7 +446,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 150,
+      width: 130,
       align: "center",
       render: (st: string) => {
         const isDiscontinued = st === "DISCONTINUED";
@@ -449,7 +464,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
     {
       title: "Thao tác",
       key: "actions",
-      width: 140,
+      width: 110,
       align: "center",
       render: (_: any, record: ProductItem) => {
         const isDiscontinued = record.status === "DISCONTINUED";
@@ -703,11 +718,16 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
           dataSource={products}
           loading={loading}
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
             showTotal: (total) => `Tổng số ${total} sản phẩm`,
+            onChange: (p, ps) => {
+              setCurrentPage(p);
+              setPageSize(ps);
+            },
           }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1150 }}
         />
       </Card>
 
@@ -867,6 +887,16 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ onNavigate
           </Row>
         </Form>
       </Modal>
+
+      {/* Modal Lịch sử thay đổi giá sản phẩm (SCRUM-18) */}
+      <ProductPriceHistoryModal
+        visible={isPriceHistoryOpen}
+        product={priceHistoryProduct}
+        onClose={() => {
+          setIsPriceHistoryOpen(false);
+          setPriceHistoryProduct(null);
+        }}
+      />
     </div>
   );
 };
