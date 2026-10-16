@@ -112,6 +112,22 @@ def test_update_credit_limit_forbidden_for_sales_rep():
     assert response.status_code == 403
 
 
+def test_update_credit_limit_forbidden_for_admin():
+    """Admin không có quyền cập nhật hạn mức (Chỉ Kế toán và Quản lý kinh doanh)."""
+    token = create_access_token(
+        data={"sub": "99", "username": "admin_user", "role": "Admin", "fullName": "Quản Trị Viên"}
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    payload = {
+        "new_credit_limit": 90000000.0,
+        "new_max_debt_days": 30,
+        "reason": "Admin cố gắng cập nhật hạn mức",
+    }
+    response = client.put("/api/v1/customers/1/credit-limit", json=payload, headers=headers)
+    assert response.status_code == 403
+
+
 def test_credit_limit_logs_history():
     token = create_access_token(
         data={"sub": "1", "username": "accountant_user", "role": "Accountant", "fullName": "Nguyễn Kế Toán"}

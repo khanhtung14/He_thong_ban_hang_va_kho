@@ -12,6 +12,7 @@ import {
   Typography,
   message,
   Divider,
+  Alert,
 } from "antd";
 import {
   ShopOutlined,
@@ -31,6 +32,7 @@ import {
   type TerritoryItem,
   type CreateCustomerPayload,
 } from "../../services/apiClient";
+import { getCurrentUserRole } from "../../services/sessionService";
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -52,18 +54,28 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
   const [territories, setTerritories] = useState<TerritoryItem[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
+  // Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền thiết lập hạn mức
+  const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
+  const canEditCreditLimit = [
+    "ACCOUNTANT",
+    "KE_TOAN",
+    "SALES_MANAGER",
+    "QUAN_LY_KINH_DOANH",
+    "SALESMANAGER",
+  ].includes(userRole);
+
   useEffect(() => {
     if (isOpen) {
       loadOptions();
       form.resetFields();
       form.setFieldsValue({
         customerGroup: "DEALER_LEVEL_1",
-        creditLimit: 50000000,
-        maxDueDays: 30,
+        creditLimit: canEditCreditLimit ? 50000000 : 0,
+        maxDueDays: canEditCreditLimit ? 30 : 0,
         warningThresholdPercent: 80,
       });
     }
-  }, [isOpen]);
+  }, [isOpen, canEditCreditLimit]);
 
   const loadOptions = async () => {
     setLoadingOptions(true);
@@ -110,8 +122,8 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
         customerGroup: values.customerGroup,
         territoryId: values.territoryId || null,
         salesRepId: values.salesRepId || null,
-        creditLimit: values.creditLimit || 0,
-        maxDueDays: values.maxDueDays || 0,
+        creditLimit: canEditCreditLimit ? (values.creditLimit || 0) : 0,
+        maxDueDays: canEditCreditLimit ? (values.maxDueDays || 0) : 0,
         warningThresholdPercent: values.warningThresholdPercent || 80,
         phone: values.phone ? values.phone.trim() : undefined,
         taxCode: values.taxCode ? values.taxCode.trim() : undefined,
@@ -310,6 +322,16 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
           2. HẠN MỨC CÔNG NỢ &amp; ĐIỀU KHOẢN TÍN DỤNG
         </div>
 
+        {!canEditCreditLimit && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12, borderRadius: 8 }}
+            message="Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền thiết lập hạn mức"
+            description="Đại lý mới sẽ được tạo với hạn mức mặc định = 0. Kế toán công nợ hoặc Quản lý kinh doanh sẽ khai báo hạn mức & số ngày nợ sau."
+          />
+        )}
+
         <Row gutter={16}>
           <Col span={8}>
             <Form.Item
@@ -320,12 +342,13 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
                   <span>Hạn mức nợ (VNĐ)</span>
                 </Space>
               }
-              rules={[{ required: true, message: "Nhập hạn mức công nợ" }]}
+              rules={canEditCreditLimit ? [{ required: true, message: "Nhập hạn mức công nợ" }] : []}
             >
               <InputNumber
                 style={{ width: "100%" }}
                 min={0}
                 step={5000000}
+                disabled={!canEditCreditLimit}
                 formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
                 parser={(val) => (val ? Number(val.replace(/\$\s?|(,*)/g, "")) : 0) as any}
               />
@@ -336,9 +359,9 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
             <Form.Item
               name="maxDueDays"
               label="Hạn nợ tối đa (ngày)"
-              rules={[{ required: true, message: "Nhập số ngày nợ tối đa" }]}
+              rules={canEditCreditLimit ? [{ required: true, message: "Nhập số ngày nợ tối đa" }] : []}
             >
-              <InputNumber style={{ width: "100%" }} min={0} max={365} />
+              <InputNumber style={{ width: "100%" }} min={0} max={365} disabled={!canEditCreditLimit} />
             </Form.Item>
           </Col>
 
@@ -346,9 +369,9 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
             <Form.Item
               name="warningThresholdPercent"
               label="Ngưỡng cảnh báo (%)"
-              rules={[{ required: true, message: "Nhập % ngưỡng cảnh báo" }]}
+              rules={canEditCreditLimit ? [{ required: true, message: "Nhập % ngưỡng cảnh báo" }] : []}
             >
-              <InputNumber style={{ width: "100%" }} min={1} max={100} />
+              <InputNumber style={{ width: "100%" }} min={1} max={100} disabled={!canEditCreditLimit} />
             </Form.Item>
           </Col>
         </Row>

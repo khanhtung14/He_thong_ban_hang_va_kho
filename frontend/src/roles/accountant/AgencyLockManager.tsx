@@ -24,7 +24,7 @@ import {
   SafetyCertificateOutlined,
   //   HistoryOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../../services/sessionService";
+import { authenticatedFetch, getCurrentUserRole } from "../../services/sessionService";
 import CreditLimitModal from "../../components/CreditLimitModal";
 
 const { Text } = Typography;
@@ -118,6 +118,15 @@ export const AgencyLockManager: React.FC = () => {
   const [form] = Form.useForm();
 
   // Trạng thái modal điều chỉnh hạn mức tín dụng & ngày nợ
+  const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
+  const canEditCreditLimit = [
+    "ACCOUNTANT",
+    "KE_TOAN",
+    "SALES_MANAGER",
+    "QUAN_LY_KINH_DOANH",
+    "SALESMANAGER",
+  ].includes(userRole);
+
   const [creditLimitModal, setCreditLimitModal] = useState<{
     visible: boolean;
     agency: AgencyDebtItem | null;
@@ -443,13 +452,13 @@ export const AgencyLockManager: React.FC = () => {
             </Button>
           )}
 
-          <Tooltip title="Điều chỉnh hạn mức tín dụng & ngày nợ">
+          <Tooltip title={canEditCreditLimit ? "Điều chỉnh hạn mức tín dụng & ngày nợ" : "Xem hạn mức tín dụng & ngày nợ (Chỉ xem)"}>
             <Button
               size="small"
               icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
               onClick={() => setCreditLimitModal({ visible: true, agency: record })}
             >
-              Hạn mức
+              {canEditCreditLimit ? "Hạn mức" : "Xem hạn mức"}
             </Button>
           </Tooltip>
         </Space>

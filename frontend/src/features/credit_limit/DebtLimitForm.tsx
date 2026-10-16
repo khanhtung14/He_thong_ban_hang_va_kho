@@ -24,7 +24,7 @@ import {
   WarningOutlined,
   HistoryOutlined,
 } from "@ant-design/icons";
-import { authenticatedFetch } from "../../services/sessionService";
+import { authenticatedFetch, getCurrentUserRole } from "../../services/sessionService";
 
 const { Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -104,6 +104,15 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
+  const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
+  const canEditCreditLimit = [
+    "ACCOUNTANT",
+    "KE_TOAN",
+    "SALES_MANAGER",
+    "QUAN_LY_KINH_DOANH",
+    "SALESMANAGER",
+  ].includes(userRole);
+
   // Khi modal mở hoặc agency thay đổi, điền giá trị hiện tại vào form
   useEffect(() => {
     if (open && agency) {
@@ -118,6 +127,10 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
   }, [open, agency, form]);
 
   const handleSubmit = async () => {
+    if (!canEditCreditLimit) {
+      message.error("Chỉ Kế toán công nợ hoặc Quản lý kinh doanh mới có quyền cập nhật hạn mức!");
+      return;
+    }
     try {
       const values = await form.validateFields();
       if (!agency) return;
@@ -225,6 +238,16 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
       destroyOnClose
       centered
     >
+      {!canEditCreditLimit && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16, borderRadius: 8 }}
+          message="Giới hạn quyền hạn"
+          description="Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền khai báo và thay đổi hạn mức công nợ. Bạn đang ở chế độ chỉ xem."
+        />
+      )}
+
       {agency && (
         <div style={{ marginTop: 12, marginBottom: 20 }}>
           {/* Card thông tin hạn mức và công nợ hiện tại */}
@@ -324,18 +347,19 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
           }
           name="credit_limit"
           rules={[
-            { required: true, message: "Vui lòng nhập hạn mức công nợ mới!" },
+            { required: canEditCreditLimit, message: "Vui lòng nhập hạn mức công nợ mới!" },
             { type: "number", min: 0, message: "Giá trị không được nhỏ hơn 0!" },
           ]}
         >
           <InputNumber<number>
             id="input-credit-limit"
+            disabled={!canEditCreditLimit}
             style={{ width: "100%", borderRadius: 8 }}
             min={0}
             step={5000000}
             formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
             parser={(val) => ((val ? parseFloat(val.replace(/[,\s₫VND]/g, "")) : 0) as any)}
-            placeholder="Ví dụ: 50,000,000"
+            placeholder={canEditCreditLimit ? "Ví dụ: 50,000,000" : "Không có quyền sửa"}
             size="large"
           />
         </Form.Item>
@@ -353,11 +377,12 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
         >
           <InputNumber
             id="input-max-debt-days"
+            disabled={!canEditCreditLimit}
             style={{ width: "100%", borderRadius: 8 }}
             min={0}
             max={365}
             addonAfter="ngày"
-            placeholder="Ví dụ: 30"
+            placeholder={canEditCreditLimit ? "Ví dụ: 30" : "Không có quyền sửa"}
             size="large"
           />
         </Form.Item>
@@ -373,6 +398,7 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
           rules={[
             {
               validator: (_, value) => {
+                if (!canEditCreditLimit) return Promise.resolve();
                 if (!value || !value.trim()) {
                   return Promise.reject(
                     new Error("Bắt buộc nhập lý do thay đổi hạn mức!")
@@ -390,10 +416,15 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
         >
           <TextArea
             id="input-debt-limit-reason"
+            disabled={!canEditCreditLimit}
             rows={3}
-            placeholder="Ví dụ: Nâng hạn mức công nợ sau khi thẩm định năng lực tài chính đại lý đợt Q4/2026..."
+            placeholder={
+              canEditCreditLimit
+                ? "Ví dụ: Nâng hạn mức công nợ sau khi thẩm định năng lực tài chính đại lý đợt Q4/2026..."
+                : "Tài khoản của bạn không có quyền sửa hạn mức."
+            }
             style={{ borderRadius: 8, resize: "none" }}
-            showCount
+            showCount={canEditCreditLimit}
             maxLength={500}
           />
         </Form.Item>
@@ -418,24 +449,26 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
             disabled={submitting}
             style={{ borderRadius: 8 }}
           >
-            Hủy bỏ
+            {canEditCreditLimit ? "Hủy bỏ" : "Đóng"}
           </Button>
-          <Button
-            id="btn-submit-debt-limit"
-            type="primary"
-            htmlType="submit"
-            loading={submitting}
-            icon={<CheckCircleOutlined />}
-            style={{
-              borderRadius: 8,
-              background: "linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)",
-              border: "none",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(37,99,235,0.25)",
-            }}
-          >
-            Lưu thay đổi
-          </Button>
+          {canEditCreditLimit && (
+            <Button
+              id="btn-submit-debt-limit"
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              icon={<CheckCircleOutlined />}
+              style={{
+                borderRadius: 8,
+                background: "linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)",
+                border: "none",
+                fontWeight: 600,
+                boxShadow: "0 4px 12px rgba(37,99,235,0.25)",
+              }}
+            >
+              Lưu thay đổi
+            </Button>
+          )}
         </div>
       </Form>
     </Modal>

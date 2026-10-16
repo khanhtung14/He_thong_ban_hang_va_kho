@@ -190,3 +190,112 @@ button {
   z-index: 2147483647 !important; /* Luôn trên cùng */
 }
 
+/* ==========================================================================
+   UNIVERSAL TABLE SCROLL & STICKY HEADER SYSTEM (ALL ROLES)
+   "Khi cuộn xuống chỉ cuộn xuống danh sách dòng trong bảng, 
+    không cuộn cả trang và không cuộn tên cột"
+   ========================================================================== */
+
+/* 1. Giới hạn khung bảng và ngăn tràn trang */
+.ant-table-wrapper {
+  max-width: 100%;
+}
+
+/* 2. Thân bảng (chứa các dòng) có thanh cuộn riêng biệt */
+.ant-table-content,
+.ant-table-body {
+  max-height: calc(100vh - 310px);
+  min-height: 180px;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+  overscroll-behavior: contain;
+  position: relative;
+}
+
+/* 3. CỐ ĐỊNH TÊN CỘT (Sticky Column Headers)
+   Khi cuộn các dòng bên dưới, hàng tên cột luôn ghim cố định ở đỉnh bảng */
+.ant-table-thead {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 15 !important;
+}
+
+.ant-table-thead > tr > th,
+.ant-table-thead > tr > td {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 15 !important;
+  background-color: #f1f5f9 !important; /* Nền xám nhạt đục để không thấy chữ bên dưới khi cuộn qua */
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 4. Giữ vị trí và độ nổi cho các cột cố định trái / phải (Fixed columns) */
+.ant-table-thead > tr > th.ant-table-cell-fix-left,
+.ant-table-thead > tr > th.ant-table-cell-fix-right {
+  z-index: 25 !important;
+  background-color: #e2e8f0 !important;
+}
+
+.ant-table-tbody > tr > td.ant-table-cell-fix-left,
+.ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  z-index: 5 !important;
+  background-color: #ffffff !important;
+}
+
+.ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+.ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background-color: #f8fafc !important;
+}
+
+/* 5. Tùy chỉnh cho bảng hiển thị bên trong Modal */
+.ant-modal .ant-table-content,
+.ant-modal .ant-table-body {
+  max-height: calc(75vh - 200px) !important;
+  min-height: 140px;
+}
+
+/* 6. Tùy chỉnh cho bảng hiển thị bên trong Drawer */
+.ant-drawer .ant-table-content,
+.ant-drawer .ant-table-body {
+  max-height: calc(100vh - 220px) !important;
+}
+
+/* 7. Tùy chỉnh danh sách hiển thị bằng Ant List nếu có */
+.ant-list:not(.ant-list-split-disabled) .ant-list-items {
+  max-height: calc(100vh - 340px);
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.ant-modal .ant-list .ant-list-items {
+  max-height: calc(70vh - 180px) !important;
+}
+
+/* 8. Thanh cuộn bảng thanh lịch, hiện đại */
+.ant-table-content::-webkit-scrollbar,
+.ant-table-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ant-table-content::-webkit-scrollbar-track,
+.ant-table-body::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.ant-table-content::-webkit-scrollbar-thumb,
+.ant-table-body::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.ant-table-content::-webkit-scrollbar-thumb:hover,
+.ant-table-body::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+

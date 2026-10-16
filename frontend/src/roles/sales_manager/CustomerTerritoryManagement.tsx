@@ -33,6 +33,7 @@ import {
 import CreateCustomerModal from "../admin/CreateCustomerModal";
 import DeliveryAddressesModal from "../../components/DeliveryAddressesModal";
 import CreditLimitModal from "../../components/CreditLimitModal";
+import { getCurrentUserRole } from "../../services/sessionService";
 import {
   fetchCustomersWithTotal,
   fetchSalesReps,
@@ -69,6 +70,15 @@ export const CustomerTerritoryManagement: React.FC = () => {
   const [totalRecords, setTotalRecords] = useState(0);
 
   // State Modal Điều chỉnh hạn mức tín dụng & ngày nợ
+  const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
+  const canEditCreditLimit = [
+    "ACCOUNTANT",
+    "KE_TOAN",
+    "SALES_MANAGER",
+    "QUAN_LY_KINH_DOANH",
+    "SALESMANAGER",
+  ].includes(userRole);
+
   const [creditLimitModal, setCreditLimitModal] = useState<{
     visible: boolean;
     customer: CustomerItem | null;
@@ -390,13 +400,13 @@ export const CustomerTerritoryManagement: React.FC = () => {
           >
             {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
           </Button>
-          <Tooltip title="Điều chỉnh hạn mức tín dụng & ngày nợ">
+          <Tooltip title={canEditCreditLimit ? "Điều chỉnh hạn mức tín dụng & ngày nợ" : "Xem hạn mức tín dụng & ngày nợ (Chỉ xem)"}>
             <Button
               size="small"
               icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
               onClick={() => setCreditLimitModal({ visible: true, customer: r })}
             >
-              Hạn mức
+              {canEditCreditLimit ? "Hạn mức" : "Xem hạn mức"}
             </Button>
           </Tooltip>
         </Space>

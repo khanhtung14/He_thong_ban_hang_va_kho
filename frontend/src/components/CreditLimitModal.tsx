@@ -15,6 +15,7 @@ import {
   message,
   Empty,
   Tooltip,
+  Alert,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -26,7 +27,7 @@ import {
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { authenticatedFetch } from "../services/sessionService";
+import { authenticatedFetch, getCurrentUserRole } from "../services/sessionService";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -80,6 +81,16 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
   const currentMaxDebtDays =
     customer?.max_debt_days ?? customer?.max_due_days ?? 30;
 
+  // Kiểm tra quyền hạn người dùng (Chỉ Kế toán công nợ và Quản lý kinh doanh)
+  const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
+  const canEditCreditLimit = [
+    "ACCOUNTANT",
+    "KE_TOAN",
+    "SALES_MANAGER",
+    "QUAN_LY_KINH_DOANH",
+    "SALESMANAGER",
+  ].includes(userRole);
+
   // Lấy danh sách lịch sử điều chỉnh hạn mức từ API
   const fetchLogs = useCallback(async (customerId: number | string) => {
     setLoadingLogs(true);
@@ -119,6 +130,10 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
   // Xử lý gửi form cập nhật hạn mức
   const handleFormSubmit = async () => {
     if (!customer) return;
+    if (!canEditCreditLimit) {
+      message.error("Quyền bị từ chối: Chỉ Kế toán công nợ hoặc Quản lý kinh doanh mới có quyền điều chỉnh hạn mức!");
+      return;
+    }
     try {
       const values = await form.validateFields();
       const newCredit = Number(values.new_credit_limit);
@@ -280,11 +295,25 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       confirmLoading={submitting}
       okText="Lưu thay đổi"
       cancelText="Đóng"
+      okButtonProps={{
+        disabled: !canEditCreditLimit,
+        style: !canEditCreditLimit ? { display: "none" } : undefined,
+      }}
       width={960}
       centered
       destroyOnClose
       style={{ maxWidth: "calc(100vw - 32px)" }}
     >
+      {!canEditCreditLimit && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12, borderRadius: 8 }}
+          message="Giới hạn quyền hạn"
+          description="Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền khai báo và thay đổi hạn mức công nợ. Bạn đang ở chế độ xem lịch sử."
+        />
+      )}
+
       {/* Thẻ hiển thị hạn mức hiện tại */}
       <Card
         size="small"
@@ -341,6 +370,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
               ]}
             >
               <InputNumber
+                disabled={!canEditCreditLimit}
                 min={0}
                 style={{ width: "100%" }}
                 formatter={(value) =>
@@ -354,7 +384,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
                   }) as any
                 }
                 addonAfter="₫"
-                placeholder="Ví dụ: 100,000,000"
+                placeholder={canEditCreditLimit ? "Ví dụ: 100,000,000" : "Không có quyền sửa"}
               />
             </Form.Item>
           </Col>
@@ -379,11 +409,12 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
               ]}
             >
               <InputNumber
+                disabled={!canEditCreditLimit}
                 min={0}
                 max={365}
                 style={{ width: "100%" }}
                 addonAfter="ngày"
-                placeholder="Ví dụ: 30"
+                placeholder={canEditCreditLimit ? "Ví dụ: 30" : "Không có quyền sửa"}
               />
             </Form.Item>
           </Col>
@@ -399,7 +430,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           name="reason"
           rules={[
             {
-              required: true,
+              required: canEditCreditLimit,
               message: "Vui lòng nhập lý do điều chỉnh hạn mức!",
             },
             {
@@ -409,10 +440,15 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           ]}
         >
           <TextArea
+            disabled={!canEditCreditLimit}
             rows={2}
-            placeholder="Nhập lý do thay đổi hạn mức tín dụng hoặc ngày nợ (Bắt buộc để lưu lịch sử kiểm toán...)"
+            placeholder={
+              canEditCreditLimit
+                ? "Nhập lý do thay đổi hạn mức tín dụng hoặc ngày nợ (Bắt buộc để lưu lịch sử kiểm toán...)"
+                : "Tài khoản của bạn không có quyền sửa hạn mức."
+            }
             maxLength={500}
-            showCount
+            showCount={canEditCreditLimit}
           />
         </Form.Item>
       </Form>
