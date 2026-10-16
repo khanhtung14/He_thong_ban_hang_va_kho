@@ -220,10 +220,10 @@ export const DebtLimitForm: React.FC<DebtLimitFormProps> = ({
           onClose();
         }
       }}
-      width={600}
+      width={680}
       footer={null}
       destroyOnClose
-      style={{ top: 70 }}
+      centered
     >
       {agency && (
         <div style={{ marginTop: 12, marginBottom: 20 }}>

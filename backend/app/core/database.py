@@ -204,6 +204,38 @@ def migrate_pricing_schema():
         except Exception:
             pass
 
+    # Đảm bảo bảng credit_limit_logs đồng bộ đầy đủ các cột customer_id, agency_id, changed_by_name, created_by
+    if inspector.has_table("credit_limit_logs"):
+        try:
+            with engine.begin() as connection:
+                cols = {c["name"] for c in inspector.get_columns("credit_limit_logs")}
+                if "customer_id" not in cols:
+                    connection.execute(text("ALTER TABLE credit_limit_logs ADD COLUMN customer_id INTEGER"))
+                    connection.execute(text("UPDATE credit_limit_logs SET customer_id = agency_id WHERE customer_id IS NULL"))
+                if "changed_by_user_id" not in cols:
+                    connection.execute(text("ALTER TABLE credit_limit_logs ADD COLUMN changed_by_user_id INTEGER"))
+                if "changed_by_name" not in cols:
+                    connection.execute(text("ALTER TABLE credit_limit_logs ADD COLUMN changed_by_name VARCHAR(150)"))
+                    connection.execute(text("UPDATE credit_limit_logs SET changed_by_name = created_by WHERE changed_by_name IS NULL"))
+                if "agency_id" not in cols:
+                    connection.execute(text("ALTER TABLE credit_limit_logs ADD COLUMN agency_id INTEGER"))
+                    connection.execute(text("UPDATE credit_limit_logs SET agency_id = customer_id WHERE agency_id IS NULL"))
+                if "created_by" not in cols:
+                    connection.execute(text("ALTER TABLE credit_limit_logs ADD COLUMN created_by VARCHAR(150)"))
+                    connection.execute(text("UPDATE credit_limit_logs SET created_by = changed_by_name WHERE created_by IS NULL"))
+                connection.execute(text("""
+                    CREATE TRIGGER IF NOT EXISTS trg_credit_limit_logs_sync 
+                    AFTER INSERT ON credit_limit_logs 
+                    BEGIN 
+                        UPDATE credit_limit_logs 
+                        SET agency_id = coalesce(NEW.agency_id, NEW.customer_id), 
+                            created_by = coalesce(NEW.created_by, NEW.changed_by_name) 
+                        WHERE id = NEW.id; 
+                    END;
+                """))
+        except Exception:
+            pass
+
 
 def migrate_sales_order_draft_schema():
     """Add persisted delivery and price-breakdown fields for order drafts."""

@@ -529,7 +529,8 @@ const CreditLimitManager: React.FC = () => {
           setIsHistoryModalOpen(false);
           setHistoryData([]);
         }}
-        width={900}
+        width={940}
+        centered
         footer={
           <Button
             id="btn-close-history"
@@ -561,7 +562,7 @@ const CreditLimitManager: React.FC = () => {
             rowKey="id"
             pagination={{ pageSize: 10, showSizeChanger: false }}
             size="small"
-            scroll={{ x: 800 }}
+            scroll={{ x: 800, y: 350 }}
           />
         )}
       </Modal>

@@ -136,6 +136,10 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       const payload = {
         new_credit_limit: newCredit,
         new_max_debt_days: newDays,
+        credit_limit: newCredit,
+        max_debt_days: newDays,
+        max_due_days: newDays,
+        max_debt_amount: newCredit,
         reason: values.reason.trim(),
       };
 
@@ -276,8 +280,10 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       confirmLoading={submitting}
       okText="Lưu thay đổi"
       cancelText="Đóng"
-      width={780}
+      width={960}
+      centered
       destroyOnClose
+      style={{ maxWidth: "calc(100vw - 32px)" }}
     >
       {/* Thẻ hiển thị hạn mức hiện tại */}
       <Card
@@ -286,26 +292,27 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
         style={{
           background: "linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)",
           borderRadius: 8,
-          marginBottom: 16,
+          marginBottom: 10,
           border: "1px solid #bae6fd",
         }}
+        styles={{ body: { padding: "8px 16px" } }}
       >
-        <Row gutter={[16, 8]} align="middle">
+        <Row gutter={[16, 4]} align="middle">
           <Col span={12}>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>
               <DollarOutlined style={{ marginRight: 6, color: "#059669" }} />
               Hạn mức nợ tối đa hiện tại:
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#047857" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#047857" }}>
               {currentCreditLimit.toLocaleString("vi-VN")} ₫
             </div>
           </Col>
           <Col span={12}>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>
               <CalendarOutlined style={{ marginRight: 6, color: "#0284c7" }} />
               Số ngày nợ cho phép hiện tại:
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#0369a1" }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0369a1" }}>
               {currentMaxDebtDays} ngày
             </div>
           </Col>
@@ -317,6 +324,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
+              style={{ marginBottom: 10 }}
               label={
                 <span style={{ fontWeight: 600 }}>
                   Hạn mức tiền tối đa mới (VND) <span style={{ color: "#ef4444" }}>*</span>
@@ -353,6 +361,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
 
           <Col span={12}>
             <Form.Item
+              style={{ marginBottom: 10 }}
               label={
                 <span style={{ fontWeight: 600 }}>
                   Số ngày nợ tối đa mới (Ngày) <span style={{ color: "#ef4444" }}>*</span>
@@ -381,6 +390,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
         </Row>
 
         <Form.Item
+          style={{ marginBottom: 8 }}
           label={
             <span style={{ fontWeight: 600 }}>
               Lý do thay đổi <span style={{ color: "#ef4444" }}>*</span>
@@ -399,7 +409,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           ]}
         >
           <TextArea
-            rows={3}
+            rows={2}
             placeholder="Nhập lý do thay đổi hạn mức tín dụng hoặc ngày nợ (Bắt buộc để lưu lịch sử kiểm toán...)"
             maxLength={500}
             showCount
@@ -407,7 +417,7 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
         </Form.Item>
       </Form>
 
-      <Divider style={{ margin: "16px 0 12px 0" }} />
+      <Divider style={{ margin: "10px 0 10px 0" }} />
 
       {/* Lịch sử điều chỉnh hạn mức */}
       <div>
@@ -436,9 +446,8 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
           rowKey="id"
           size="small"
           loading={loadingLogs}
-          pagination={
-            logs.length > 5 ? { pageSize: 5, size: "small" } : false
-          }
+          pagination={false}
+          scroll={{ y: 190, x: 750 }}
           locale={{
             emptyText: (
               <Empty

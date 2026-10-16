@@ -1493,14 +1493,20 @@ export const AgencyManagement: React.FC = () => {
         visible={creditLimitModal.visible}
         customer={creditLimitModal.agency as any}
         onClose={() => setCreditLimitModal({ visible: false, agency: null })}
-        onSuccess={() => loadAgencies(page)}
+        onSuccess={() => {
+          fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+          loadOverviewStats();
+        }}
       />
 
       <DeliveryAddressModal
         visible={deliveryAddressModal.visible}
         customer={deliveryAddressModal.agency as any}
         onClose={() => setDeliveryAddressModal({ visible: false, agency: null })}
-        onSuccess={() => loadAgencies(page)}
+        onSuccess={() => {
+          fetchAgencies(page, pageSize, searchKeyword, groupFilter, regionFilter, repFilter, statusFilter);
+          loadOverviewStats();
+        }}
       />
     </div>
   );
