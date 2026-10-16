@@ -196,6 +196,7 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
     setDetailCustomer(customer);
     setIsDrawerOpen(true);
   };
+  const handleOpenCustomerDetail = handleOpenDetail;
 
   // Tạo liên kết bản đồ chỉ đường Google Maps
   const getGoogleMapsUrl = (address?: string | null, name?: string) => {
@@ -216,7 +217,20 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
             </Text>
             {getCustomerGroupBadge(r.customer_group)}
           </Space>
-          <div style={{ fontWeight: 600, fontSize: 15, color: "#0f172a", marginTop: 2 }}>
+          <div
+            onClick={() => handleOpenCustomerDetail(r)}
+            style={{
+              fontWeight: 600,
+              fontSize: 15,
+              color: "#0f172a",
+              marginTop: 2,
+              cursor: "pointer",
+              transition: "color 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#1677ff")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#0f172a")}
+            title="Bấm để xem chi tiết đại lý"
+          >
             {r.name}
           </div>
           {r.address && (
@@ -715,15 +729,21 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
                         )}
                       </div>
 
-                      {/* Tên đại lý */}
+                      {/* Tên đại lý - Click để xem chi tiết */}
                       <div
+                        onClick={() => handleOpenCustomerDetail(c)}
                         style={{
                           fontSize: 16,
                           fontWeight: 700,
                           color: "#0f172a",
                           lineHeight: 1.3,
                           marginBottom: 6,
+                          cursor: "pointer",
+                          transition: "color 0.2s",
                         }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "#1677ff")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "#0f172a")}
+                        title="Bấm để xem chi tiết đại lý"
                       >
                         {c.name}
                       </div>
@@ -903,24 +923,17 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
                       </div>
                     </div>
 
-                    {/* Footer Thao tác */}
+                    {/* Footer Thao tác: Chỉ còn 2 nút Điểm giao & Lên đơn */}
                     <div
                       style={{
                         display: "flex",
-                        gap: 6,
+                        gap: 8,
                         paddingTop: 10,
                         borderTop: "1px solid #f1f5f9",
                       }}
                     >
                       <Button
-                        style={{ flex: 1, borderRadius: 8 }}
-                        icon={<EyeOutlined />}
-                        onClick={() => handleOpenDetail(c)}
-                      >
-                        Chi tiết
-                      </Button>
-                      <Button
-                        style={{ flex: 1, borderRadius: 8 }}
+                        style={{ flex: 1, borderRadius: 8, fontWeight: 500 }}
                         icon={<EnvironmentOutlined style={{ color: "#0284c7" }} />}
                         onClick={() => setDeliveryAddressModal({ visible: true, customer: c })}
                       >
@@ -931,6 +944,7 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
                         style={{
                           flex: 1,
                           borderRadius: 8,
+                          fontWeight: 500,
                           backgroundColor: c.is_locked ? "#94a3b8" : "#2563eb",
                           borderColor: c.is_locked ? "#94a3b8" : "#2563eb",
                         }}

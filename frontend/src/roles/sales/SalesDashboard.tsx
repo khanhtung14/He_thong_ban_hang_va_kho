@@ -323,13 +323,18 @@ export const SalesDashboard: React.FC = () => {
       title: "MÃ ĐƠN HÀNG",
       dataIndex: "order_code",
       key: "order_code",
-      width: 140,
-      render: (code: string) => <Text strong style={{ color: "#1e40af" }}>{code}</Text>,
+      width: 170,
+      render: (code: string) => (
+        <Text strong style={{ color: "#1e40af", whiteSpace: "nowrap" }}>
+          {code}
+        </Text>
+      ),
     },
     {
       title: "ĐẠI LÝ ĐẶT HÀNG",
       dataIndex: "customer_name",
       key: "customer_name",
+      width: 210,
       render: (name: string, r) => (
         <div>
           <div style={{ fontWeight: 600 }}>{name}</div>
@@ -340,6 +345,7 @@ export const SalesDashboard: React.FC = () => {
     {
       title: "ĐIỂM GIAO HÀNG",
       key: "delivery_address",
+      width: 350,
       render: (_, r) => {
         if (!r.delivery_address) {
           return <Text type="secondary" style={{ fontStyle: "italic" }}>Chưa gán điểm giao</Text>;
@@ -347,10 +353,10 @@ export const SalesDashboard: React.FC = () => {
         const da = r.delivery_address;
         return (
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <EnvironmentOutlined style={{ color: "#ef4444" }} />
               <span style={{ fontWeight: 600 }}>{da.receiver_name}</span>
-              <Text type="secondary">({da.phone})</Text>
+              <Text type="secondary" style={{ whiteSpace: "nowrap" }}>({da.phone})</Text>
               {da.is_default && <Tag color="success" style={{ fontSize: 10, lineHeight: "16px" }}>Mặc định</Tag>}
             </div>
             <div style={{ fontSize: 13, color: "#334155", marginTop: 2 }}>{da.address}</div>
@@ -363,17 +369,18 @@ export const SalesDashboard: React.FC = () => {
       title: "TỔNG GIÁ TRỊ",
       dataIndex: "total_amount",
       key: "total_amount",
-      width: 150,
+      width: 140,
       align: "right",
       render: (val: number) => (
-        <Text strong style={{ color: "#2563eb" }}>{formatMoney(val)}</Text>
+        <Text strong style={{ color: "#2563eb", whiteSpace: "nowrap" }}>{formatMoney(val)}</Text>
       ),
     },
     {
       title: "TRẠNG THÁI",
       dataIndex: "status",
       key: "status",
-      width: 150,
+      width: 130,
+      align: "center",
       render: (st: string) => {
         const color =
           st === "PENDING_APPROVAL" ? "warning" : st === "APPROVED" ? "success" : st === "REJECTED" ? "error" : "default";
@@ -386,21 +393,22 @@ export const SalesDashboard: React.FC = () => {
       title: "NGÀY TẠO",
       dataIndex: "created_at",
       key: "created_at",
-      width: 170,
+      width: 160,
+      align: "center",
       render: (dt: string) => (
-        <span style={{ fontSize: 13, color: "#334155" }}>{formatDateTime(dt)}</span>
+        <span style={{ fontSize: 13, color: "#334155", whiteSpace: "nowrap" }}>{formatDateTime(dt)}</span>
       ),
     },
     {
       title: "THAO TÁC",
       key: "actions",
-      width: 240,
+      width: 120,
       align: "center",
       render: (_, r) => {
         const isDraft = r.status === "DRAFT";
         if (isDraft) {
           return (
-            <Space size="small">
+            <Space size={4} wrap style={{ justifyContent: "center" }}>
               <Popconfirm
                 title="Gửi duyệt đơn hàng"
                 description={`Xác nhận gửi đơn ${r.order_code} tới Quản lý kinh doanh để phê duyệt?`}
@@ -592,6 +600,7 @@ export const SalesDashboard: React.FC = () => {
                   pagination={{ pageSize: 15, showTotal: (t) => `Tổng cộng: ${t} đơn hàng` }}
                   bordered
                   size="middle"
+                  scroll={{ x: "max-content" }}
                 />
               </Card>
             ) : (
