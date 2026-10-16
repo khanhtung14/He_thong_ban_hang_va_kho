@@ -1,8 +1,13 @@
 {
+  "python.defaultInterpreterPath": "C:\\Users\\TUAN\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
   "python.analysis.extraPaths": [
-    "./backend"
+    "./backend",
+    "./src",
+    "C:/Users/TUAN/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages"
   ],
   "python.autoComplete.extraPaths": [
-    "./backend"
+    "./backend",
+    "./src",
+    "C:/Users/TUAN/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages"
   ]
 }

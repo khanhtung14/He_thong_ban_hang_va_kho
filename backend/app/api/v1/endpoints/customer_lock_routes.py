@@ -32,12 +32,14 @@ try:
         Order,
         OrderItem,
         OrderStatus,
+        Product,
         Role,
         RoleCode,
         Territory,
         User,
     )
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
+    from app.api.v1.endpoints.discount_policy_routes import calculate_best_discount
     from app.api.v1.endpoints.rbac import (
         PERM_CUSTOMERS_LOCK,
         PERM_ORDERS_CREATE,
@@ -59,12 +61,14 @@ except ImportError:  # pragma: no cover
         Order,
         OrderItem,
         OrderStatus,
+        Product,
         Role,
         RoleCode,
         Territory,
         User,
     )
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
+    from app.api.v1.endpoints.discount_policy_routes import calculate_best_discount
     from app.api.v1.endpoints.rbac import (
         PERM_CUSTOMERS_LOCK,
         PERM_ORDERS_CREATE,
@@ -263,6 +267,7 @@ class OrderItemCreate(BaseModel):
     product_name: str = Field(..., min_length=1, max_length=255)
     quantity: int = Field(default=1, gt=0)
     unit_price: Optional[float] = Field(default=None, ge=0)
+    unit_id: Optional[int] = None
 
 
 class OrderCreateRequest(BaseModel):
@@ -279,6 +284,7 @@ class OrderItemResponse(BaseModel):
     unit_price: float
     floor_price: Optional[int] = None
     price_list_id: Optional[int] = None
+    unit_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1232,6 +1238,7 @@ def create_order(
             "unit_price": actual_price,
             "floor_price": floor_price,
             "price_list_id": effective["price_list_id"] if effective else None,
+            "unit_id": requested.unit_id,
         })
 
     total_amount = sum(item["quantity"] * item["unit_price"] for item in resolved_items)
@@ -1256,6 +1263,7 @@ def create_order(
             sku=it["sku"],
             product_name=it["product_name"],
             quantity=it["quantity"],
+            unit_id=it.get("unit_id"),
             unit_price=it["unit_price"],
             floor_price=it["floor_price"],
             price_list_id=it["price_list_id"],
@@ -1406,3 +1414,171 @@ def update_order_status(
     resp.has_warning = has_warn
     resp.warning_message = warn_msg
     return resp
+
+
+@router.post("/orders/{order_id}/clone", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+def clone_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
+):
+    """Sao chép đơn hàng cũ thành đơn hàng mới (SCRUM-16).
+
+    Quy tắc & Tiêu chí nghiệm thu:
+    - AC-01: Sao chép toàn bộ dòng hàng của đơn đã chọn (SKU, số lượng, tên sản phẩm, đơn vị tính).
+    - AC-02: Giá được áp dụng theo bảng giá hiện hành (resolve_effective_price), không kế thừa giá cũ.
+    - AC-03: Chiết khấu được tính lại theo chính sách hiện hành (calculate_best_discount).
+    - AC-04: Bản sao luôn bắt đầu ở trạng thái Nháp (OrderStatus.DRAFT).
+    - AC-05: Đơn mới có mã và ID độc lập, đơn gốc không đổi, rollback toàn bộ nếu có lỗi.
+    - SCRUM-85: Chặn tạo đơn nếu đại lý đang bị khóa giao dịch.
+    """
+    # 1. Lấy đơn hàng nguồn kèm các dòng hàng
+    source_order = db.execute(
+        select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
+    ).scalar_one_or_none()
+    if not source_order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy đơn hàng nguồn với ID {order_id} để sao chép.",
+        )
+
+    if not source_order.items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Đơn hàng nguồn không có dòng hàng nào để sao chép.",
+        )
+
+    # 2. Kiểm tra thông tin đại lý
+    customer = db.get(Customer, source_order.customer_id)
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy thông tin đại lý của đơn hàng nguồn.",
+        )
+
+    # SCRUM-85: Chặn nếu đại lý bị khóa giao dịch
+    if customer.is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Đại lý '{customer.name}' ({customer.code}) đã bị khóa giao dịch, "
+                f"không thể sao chép tạo đơn hàng mới! Lý do: {customer.lock_reason or 'Không xác định'}."
+            ),
+        )
+
+    # 3. Phân quyền và kiểm tra phạm vi dữ liệu (RBAC Data Scoping)
+    user_role = normalize_role(user.role) if user.role else ""
+    actor_user = db.query(User).filter(User.username == user.username).first()
+
+    if user_role == RoleCode.SALES_REP.value:
+        if actor_user and customer.sales_rep_id is not None and customer.sales_rep_id != actor_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền sao chép đơn hàng của đại lý do nhân viên khác phụ trách.",
+            )
+    elif user_role == RoleCode.CUSTOMER.value:
+        if actor_user:
+            cust_match = db.query(Customer).filter(
+                (Customer.email == actor_user.email) | (Customer.phone == actor_user.phone)
+            ).first()
+            if cust_match and cust_match.id != customer.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn chỉ được phép sao chép đơn hàng của chính mình.",
+                )
+
+    # 4. Tính toán giá hiện hành (AC-02) và chiết khấu hiện hành (AC-03) cho từng dòng hàng
+    resolved_items: list[dict[str, Any]] = []
+    for it in source_order.items:
+        sku = it.sku.strip().upper() if it.sku else ""
+        product = db.query(Product).filter(func.upper(Product.sku) == sku).first()
+        mock_p = MOCK_PRODUCTS.get(sku)
+
+        effective = resolve_effective_price(db, sku, customer.customer_group)
+        if effective is None and customer.customer_group in {
+            CustomerGroup.LEVEL_1.value,
+            CustomerGroup.LEVEL_2.value,
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Chưa có bảng giá đang hiệu lực cho {customer.customer_group} và SKU {sku}.",
+            )
+        if effective is None and product is None and mock_p is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Không tìm thấy SKU {sku} trong danh mục sản phẩm.",
+            )
+
+        if effective:
+            base_price = float(effective["sale_price"])
+            floor_price = float(effective["floor_price"])
+            price_list_id = effective["price_list_id"]
+        elif product:
+            base_price = float(product.base_price or 0.0)
+            floor_price = None
+            price_list_id = None
+        else:
+            base_price = float(mock_p.get("sale_price", 0.0))
+            floor_price = None
+            price_list_id = None
+
+        # AC-03: Áp dụng chính sách chiết khấu hiện hành theo số lượng và SKU
+        discount_calc = calculate_best_discount(
+            sku=sku,
+            quantity=it.quantity,
+            base_price=base_price,
+            db=db,
+        )
+        final_unit_price = float(discount_calc.get("final_unit_price", base_price))
+
+        prod_name = it.product_name or (product.name if product else (mock_p.get("name") if mock_p else sku))
+
+        resolved_items.append({
+            "sku": sku,
+            "product_name": prod_name,
+            "quantity": it.quantity,
+            "unit_id": it.unit_id,
+            "unit_price": final_unit_price,
+            "floor_price": floor_price,
+            "price_list_id": price_list_id,
+        })
+
+    # 5. Sinh mã đơn mới độc lập theo ngày và số thứ tự (AC-05)
+    count_today = db.query(func.count(Order.id)).scalar() or 0
+    order_code = f"ORD-{datetime.now().strftime('%Y%m%d')}-{count_today + 1:04d}"
+
+    total_amount = round(sum(item["quantity"] * item["unit_price"] for item in resolved_items), 2)
+
+    # 6. Tạo đơn hàng mới ở trạng thái DRAFT (AC-04)
+    new_order = Order(
+        order_code=order_code,
+        customer_id=customer.id,
+        created_by_id=actor_user.id if actor_user else None,
+        status=OrderStatus.DRAFT,
+        total_amount=total_amount,
+        note=f"Sao chép từ đơn {source_order.order_code}" + (f" - {source_order.note}" if source_order.note else ""),
+        approval_reason=None,
+    )
+    db.add(new_order)
+    db.flush()
+
+    for item_data in resolved_items:
+        db.add(OrderItem(
+            order_id=new_order.id,
+            sku=item_data["sku"],
+            product_name=item_data["product_name"],
+            quantity=item_data["quantity"],
+            unit_id=item_data["unit_id"],
+            unit_price=item_data["unit_price"],
+            floor_price=item_data["floor_price"],
+            price_list_id=item_data["price_list_id"],
+        ))
+
+    db.commit()
+    db.refresh(new_order)
+
+    res = OrderResponse.model_validate(new_order)
+    res.customer_name = customer.name
+    res.has_warning = False
+    res.warning_message = None
+    return res

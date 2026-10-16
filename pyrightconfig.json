@@ -1,0 +1,13 @@
+{
+  "include": [
+    "backend",
+    "src",
+    "tests"
+  ],
+  "extraPaths": [
+    "./backend",
+    "./src",
+    "C:/Users/TUAN/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages"
+  ],
+  "reportMissingImports": "none"
+}
