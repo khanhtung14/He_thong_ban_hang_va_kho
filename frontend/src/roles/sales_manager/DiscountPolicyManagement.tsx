@@ -648,14 +648,14 @@ export const DiscountPolicyManagement: React.FC = () => {
         width={720}
         destroyOnClose
       >
-        {/* <Alert
+        <Alert
           type="info"
           showIcon
           icon={<InfoCircleOutlined />}
-          message="Quy tắc tính giá tự động"
-          description="Nhiều chính sách cùng áp dụng thì lấy chính sách có lợi nhất cho khách hàng."
-          style={{ marginBottom: 20 }}
-        /> */}
+          message="Quy tắc áp dụng chiết khấu tự động"
+          description="Nhiều chính sách cùng áp dụng thì hệ thống tự động chọn chính sách có lợi nhất (mức giảm cao nhất) cho khách hàng."
+          style={{ marginBottom: 20, borderRadius: 8 }}
+        />
 
         <Form form={form} layout="vertical" requiredMark="optional">
           <Form.Item

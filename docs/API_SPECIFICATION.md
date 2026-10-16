@@ -287,19 +287,47 @@
 #### `POST /discount-policies`
 - **Story:** S3-01
 - **Phân quyền:** Sales Manager
-- **Request Body:**
+- **Mô tả nghiệp vụ:** Khai báo chính sách chiết khấu theo sản lượng bậc thang cho từng mã SKU hoặc theo nhóm hàng (Category), nhằm khuyến khích đại lý nhập số lượng lớn.
+- **Quy tắc tính giá & giải quyết xung đột (Bắt buộc tuân thủ):**
+  1. **Đối tượng áp dụng:** Hỗ trợ theo từng mã sản phẩm (`scope: "SKU"`) hoặc theo nhóm ngành hàng (`scope: "CATEGORY"`).
+  2. **Bậc chiết khấu theo sản lượng:** Mỗi chính sách chứa danh sách bậc nấc số lượng (`tiers`) từ `minQty` đến `maxQty` (hoặc không giới hạn nếu `maxQty` là `null`).
+  3. **Hình thức chiết khấu:** Hỗ trợ tính theo phần trăm (`discountType: "PERCENTAGE"`, giá trị ≤ 100%) hoặc giảm trừ tiền mặt cố định trên mỗi đơn vị sản phẩm (`discountType: "FIXED_AMOUNT"`).
+  4. **Quy tắc lấy chính sách có lợi nhất cho khách (Best Deal Rule):** Khi một sản phẩm được đặt mua thỏa mãn đồng thời nhiều chính sách chiết khấu khác nhau (ví dụ: vừa có chính sách riêng theo mã SKU, vừa có chính sách chung theo Nhóm hàng, hoặc có nhiều chính sách cùng kích hoạt), hệ thống tính toán quy đổi số tiền giảm giá trên từng đơn vị sản phẩm và **tự động áp dụng chính sách mang lại mức chiết khấu cao nhất (có lợi nhất) cho khách hàng**.
+- **Request Body (Mẫu):**
 ```json
 {
   "name": "Chiết khấu sản lượng bia lon Q4",
   "scope": "SKU",
   "targetId": 101,
+  "discountType": "PERCENTAGE",
+  "isActive": true,
   "tiers": [
     {"minQty": 50, "maxQty": 99, "discountPercent": 2.0},
-    {"minQty": 100, "maxQty": 999999, "discountPercent": 5.0}
+    {"minQty": 100, "maxQty": null, "discountPercent": 5.0}
   ]
 }
 ```
 - **Response Data:** Chính sách chiết khấu bậc thang vừa lưu.
+
+#### `GET /api/v1/discounts`
+- **Story:** S3-01
+- **Phân quyền:** Sales Manager, Sales Rep
+- **Query Params:** `search`, `target_type` (SKU | CATEGORY), `is_active`
+- **Response Data:** Danh sách tất cả các chính sách chiết khấu kèm theo các bậc nấc (tiers).
+
+#### `POST /api/v1/discounts/calculate`
+- **Story:** S3-01
+- **Phân quyền:** Tất cả người dùng đã đăng nhập (Sales Rep khi lên đơn, Sales Manager)
+- **Mô tả:** Động cơ tự động tính toán chiết khấu tốt nhất cho sản phẩm theo SKU và số lượng đặt hàng.
+- **Request Body:**
+```json
+{
+  "sku": "DISC-COCA-01",
+  "quantity": 60,
+  "base_price": 10000
+}
+```
+- **Response Data:** Chi tiết mức chiết khấu được chọn, chính sách được áp dụng (chính sách có lợi nhất), đơn giá sau giảm và tổng thành tiền.
 
 #### `GET /products/{id}/price-history`
 - **Story:** S3-02
