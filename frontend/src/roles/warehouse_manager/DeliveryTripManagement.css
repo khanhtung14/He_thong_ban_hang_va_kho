@@ -1,0 +1,32 @@
+.delivery-trip-page { display: grid; gap: 24px; color: #172b4d; }
+.delivery-trip-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.delivery-trip-heading h2.ant-typography { margin: 4px 0; }
+.delivery-trip-alert { margin-bottom: -8px; }
+.delivery-trip-form label { display: block; margin-bottom: 6px; font-weight: 600; }
+.delivery-trip-table-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 22px 0 12px; }
+.delivery-trip-table-heading h3.ant-typography, .delivery-trip-table-heading h5.ant-typography { margin: 0; }
+.delivery-trip-submit { display: flex; justify-content: flex-end; margin-top: 16px; }
+.delivery-active-trips { margin-top: 4px; }
+.delivery-active-card { height: 100%; }
+.delivery-active-card .ant-card-head-title { white-space: normal; }
+.delivery-trip-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-bottom: 16px; border-bottom: 1px solid #eef1f6; }
+.delivery-trip-meta span { display: grid; gap: 4px; }
+.delivery-stop-list { margin: 16px 0 0; padding-left: 24px; }
+.delivery-stop-list li { padding: 0 0 14px 4px; margin-bottom: 14px; border-bottom: 1px solid #f0f2f5; }
+.delivery-stop-list li:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.delivery-stop-list li::marker { color: #246bfd; font-weight: 700; }
+.delivery-stop-list li > div { display: grid; gap: 4px; margin-bottom: 6px; }
+.delivery-stop-list li > div span { color: #667085; font-size: 13px; }
+.delivery-trip-empty { padding: 32px; text-align: center; color: #667085; background: #fff; border: 1px dashed #d9e0ea; border-radius: 10px; }
+.delivery-print-sheet { display: none; }
+@media (max-width: 720px) {
+  .delivery-trip-heading, .delivery-trip-table-heading { align-items: flex-start; flex-direction: column; }
+  .delivery-trip-meta { grid-template-columns: 1fr; }
+}
+@media print {
+  body * { visibility: hidden !important; }
+  .delivery-print-sheet, .delivery-print-sheet * { visibility: visible !important; }
+  .delivery-print-sheet { display: block; position: absolute; inset: 0; width: 100%; padding: 24px; color: #111; font: 12pt/1.5 Arial, sans-serif; }
+  .delivery-print-sheet h1 { font-size: 20pt; }
+  .delivery-print-sheet li { padding: 0 0 14px; }
+}

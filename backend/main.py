@@ -32,6 +32,10 @@ from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_ro
 from app.api.v1.endpoints.import_users import router as import_users_router
 from app.api.v1.endpoints.suppliers import compat_router as suppliers_compat_router, router as suppliers_router
 from app.api.v1.endpoints.discount_policy_routes import router as discounts_router, compat_router as discounts_compat_router
+from app.api.v1.endpoints.delivery_trips import (
+    delivery_router as delivery_trips_router,
+    warehouse_router as available_dispatches_router,
+)
 
 
 
@@ -238,6 +242,8 @@ except ModuleNotFoundError:
     pass
 
 app.include_router(avatar_router)
+app.include_router(delivery_trips_router)
+app.include_router(available_dispatches_router)
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)

@@ -2315,6 +2315,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/deliveries/trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Delivery Trip */
+        post: operations["create_delivery_trip_api_v1_deliveries_trips_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/deliveries/trips/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Active Delivery Trips */
+        get: operations["list_active_delivery_trips_api_v1_deliveries_trips_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/warehouse/dispatches/available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Available Dispatches */
+        get: operations["list_available_dispatches_api_v1_warehouse_dispatches_available_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2324,6 +2375,59 @@ export interface components {
          * @enum {string}
          */
         AccountStatus: "ACTIVE" | "LOCKED" | "DISABLED" | "PENDING_ACTIVATION";
+        /** ActiveStop */
+        ActiveStop: {
+            /** Dispatchid */
+            dispatchId: number;
+            /** Orderid */
+            orderId: number;
+            /** Ordercode */
+            orderCode: string;
+            /** Customername */
+            customerName: string;
+            /** Regionname */
+            regionName: string;
+            /** Receivername */
+            receiverName: string;
+            /** Phone */
+            phone: string;
+            /** Address */
+            address: string;
+            /** Status */
+            status: string;
+            /** Deliverystatus */
+            deliveryStatus: string;
+        };
+        /** ActiveTrip */
+        ActiveTrip: {
+            /** Id */
+            id: number;
+            /** Drivername */
+            driverName: string;
+            /** Vehiclenumber */
+            vehicleNumber: string;
+            /** Routename */
+            routeName: string;
+            /** Status */
+            status: string;
+            /** Deliveredstops */
+            deliveredStops: number;
+            /** Remainingstops */
+            remainingStops: number;
+            /** Stops */
+            stops: components["schemas"]["ActiveStop"][];
+        };
+        /** ActiveTripsResponse */
+        ActiveTripsResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message: string;
+            /** Data */
+            data: components["schemas"]["ActiveTrip"][];
+        };
         /** AssignSalesRepRequest */
         AssignSalesRepRequest: {
             /**
@@ -2416,6 +2520,38 @@ export interface components {
             warehouse_ids?: number[];
             /** Territory Id */
             territory_id?: number | null;
+        };
+        /** AvailableDispatch */
+        AvailableDispatch: {
+            /** Dispatchid */
+            dispatchId: number;
+            /** Orderid */
+            orderId: number;
+            /** Ordercode */
+            orderCode: string;
+            /** Customername */
+            customerName: string;
+            /** Regionname */
+            regionName: string;
+            /** Receivername */
+            receiverName: string;
+            /** Phone */
+            phone: string;
+            /** Address */
+            address: string;
+            /** Status */
+            status: string;
+        };
+        /** AvailableDispatchResponse */
+        AvailableDispatchResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message: string;
+            /** Data */
+            data: components["schemas"]["AvailableDispatch"][];
         };
         /** Body_import_excel_direct_api_v1_products_import_excel_post */
         Body_import_excel_direct_api_v1_products_import_excel_post: {
@@ -2555,6 +2691,35 @@ export interface components {
             email_sent: boolean;
             /** Activation Link */
             activation_link?: string | null;
+        };
+        /** CreatedTrip */
+        CreatedTrip: {
+            /** Id */
+            id: number;
+            /** Drivername */
+            driverName: string;
+            /** Vehiclenumber */
+            vehicleNumber: string;
+            /** Routename */
+            routeName: string;
+            /** Status */
+            status: string;
+            /** Dispatchids */
+            dispatchIds: number[];
+            /** Deliveredstops */
+            deliveredStops: number;
+            /** Remainingstops */
+            remainingStops: number;
+        };
+        /** CreatedTripResponse */
+        CreatedTripResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message: string;
+            data: components["schemas"]["CreatedTrip"];
         };
         /** CustomerCreate */
         CustomerCreate: {
@@ -2904,6 +3069,17 @@ export interface components {
             email?: string | null;
             /** Address */
             address?: string | null;
+        };
+        /** DeliveryTripCreate */
+        DeliveryTripCreate: {
+            /** Drivername */
+            driverName: string;
+            /** Vehiclenumber */
+            vehicleNumber: string;
+            /** Dispatchids */
+            dispatchIds: number[];
+            /** Routename */
+            routeName: string;
         };
         /** DiscountPolicyCreate */
         DiscountPolicyCreate: {
@@ -8996,6 +9172,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_delivery_trip_api_v1_deliveries_trips_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliveryTripCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedTripResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_active_delivery_trips_api_v1_deliveries_trips_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveTripsResponse"];
+                };
+            };
+        };
+    };
+    list_available_dispatches_api_v1_warehouse_dispatches_available_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailableDispatchResponse"];
                 };
             };
         };

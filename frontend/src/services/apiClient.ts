@@ -13,6 +13,9 @@ export type ProductMarginDetail = components["schemas"]["ProductMarginDetail"];
 export type SalesMarginReport = components["schemas"]["SalesMarginReportResponse"];
 export type PriceListLine = components["schemas"]["PriceLine"];
 export type PriceListItem = components["schemas"]["PriceListView"];
+export type AvailableDeliveryDispatch = components["schemas"]["AvailableDispatch"];
+export type ActiveDeliveryTrip = components["schemas"]["ActiveTrip"];
+export type DeliveryTripCreate = components["schemas"]["DeliveryTripCreate"];
 
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -506,4 +509,34 @@ export async function createCustomer(payload: CreateCustomerPayload): Promise<Cu
     throw new Error(err.detail || "Không thể tạo đại lý mới.");
   }
   return res.json();
+}
+
+export async function fetchAvailableDeliveryDispatches(): Promise<AvailableDeliveryDispatch[]> {
+  const res = await authenticatedFetch("/api/v1/warehouse/dispatches/available");
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.detail || "Không thể tải phiếu xuất chờ phân tuyến.");
+  }
+  return body.data;
+}
+
+export async function fetchActiveDeliveryTrips(): Promise<ActiveDeliveryTrip[]> {
+  const res = await authenticatedFetch("/api/v1/deliveries/trips/active");
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.detail || "Không thể tải các chuyến giao đang chạy.");
+  }
+  return body.data;
+}
+
+export async function createDeliveryTrip(payload: DeliveryTripCreate): Promise<void> {
+  const res = await authenticatedFetch("/api/v1/deliveries/trips", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.detail?.message || body.detail || "Không thể tạo chuyến giao.");
+  }
 }

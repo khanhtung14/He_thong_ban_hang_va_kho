@@ -8,6 +8,7 @@ import { WarehouseManagerHeader } from "../../components/Header/WarehouseManager
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
+import DeliveryTripManagement from "./DeliveryTripManagement";
 
 const { Content } = Layout;
 
@@ -104,7 +105,7 @@ export const WarehouseManagerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung quản lý duyệt kho */}
+          {selectedKey === "delivery-trips" ? <DeliveryTripManagement /> : null}
         </Content>
       </Layout>
 

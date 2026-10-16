@@ -729,6 +729,7 @@
 #### `POST /deliveries/trips`
 - **Story:** S6-06
 - **Phân quyền:** WH Manager
+- **Content-Type:** `application/json`
 - **Request Body:**
 ```json
 {
@@ -738,12 +739,35 @@
   "routeName": "Tuyến Cầu Giấy - Từ Liêm"
 }
 ```
-- **Response Data:** Gom nhiều phiếu xuất vào một chuyến xe phân tuyến.
+- **Validation:** `dispatchIds` phải có ít nhất một mã; mọi phiếu xuất phải tồn tại, đã xuất kho, chưa thuộc chuyến khác và cùng địa bàn giao. Trả `404` nếu có phiếu không tồn tại, `409` nếu phiếu không đủ điều kiện và `422` nếu trộn địa bàn.
+- **Response Data:**
+```json
+{
+  "id": 12,
+  "driverName": "Bác Tài C",
+  "vehicleNumber": "29H-123.45",
+  "routeName": "Tuyến Cầu Giấy - Từ Liêm",
+  "status": "IN_PROGRESS",
+  "dispatchIds": [401, 402, 403],
+  "deliveredStops": 0,
+  "remainingStops": 3
+}
+```
+
+#### `GET /warehouse/dispatches/available`
+- **Story:** SCRUM-47
+- **Phân quyền:** WH Manager
+- **Mục đích:** Lấy các phiếu xuất đã xuất kho, chưa được xếp vào chuyến giao nào để chọn khi phân tuyến.
+- **Response Data:** Mảng phiếu gồm `dispatchId`, `orderId`, `orderCode`, `customerName`, `regionName`, `receiverName`, `phone`, `address`, `status`. `regionName` lấy từ địa bàn của đại lý, hoặc `Chưa phân khu` nếu chưa gán. Điểm nhận lấy từ địa chỉ giao mặc định của đại lý; nếu chưa có thì dùng số điện thoại đại lý và để địa chỉ/người nhận rỗng.
 
 #### `GET /deliveries/trips/active`
-- **Story:** S6-07
+- **Story:** S6-07, SCRUM-47
 - **Phân quyền:** WH Manager, Sales Manager
-- **Response Data:** Theo dõi chuyến hàng đang chạy, số điểm đã giao, số điểm còn lại.
+- **Response Data:** Mảng chuyến có trạng thái `IN_PROGRESS`. Mỗi chuyến trả `id`, `driverName`, `vehicleNumber`, `routeName`, `status`, `deliveredStops`, `remainingStops` và `stops`. Mỗi điểm trong `stops` trả `dispatchId`, `orderId`, `orderCode`, `customerName`, `regionName`, `receiverName`, `phone`, `address`, `deliveryStatus`.
+- `deliveredStops` đếm điểm có trạng thái phiếu `DELIVERED`; `remainingStops` đếm các điểm còn lại. Điểm giao lấy địa chỉ mặc định của đại lý, theo quy tắc endpoint phiếu xuất khả dụng.
+
+#### Cơ chế in danh sách giao của SCRUM-47
+- Frontend in chuyến đã tải từ `GET /deliveries/trips/active` bằng chức năng in của trình duyệt. Bản in gồm tên tuyến, tài xế, biển số và các điểm giao theo thứ tự API trả về, kèm địa chỉ và số điện thoại người nhận. Không phát sinh endpoint in riêng.
 
 #### `POST /deliveries/{dispatchId}/confirm-pod`
 - **Story:** S6-08
