@@ -334,6 +334,13 @@ export const SalesCustomerList: React.FC<SalesCustomerListProps> = ({
               onClick={() => handleOpenDetail(r)}
             />
           </Tooltip>
+          <Tooltip title="Điểm giao hàng">
+            <Button
+              size="small"
+              icon={<EnvironmentOutlined style={{ color: "#0284c7" }} />}
+              onClick={() => setDeliveryAddressModal({ visible: true, customer: r })}
+            />
+          </Tooltip>
           <Tooltip title={r.is_locked ? "Đại lý bị khóa không thể lên đơn" : "Lên đơn ngay"}>
             <Button
               size="small"
