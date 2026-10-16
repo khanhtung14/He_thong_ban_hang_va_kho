@@ -816,7 +816,12 @@ export const SupplierManagement: React.FC = () => {
               <Form.Item
                 name="phone"
                 label="Số điện thoại liên hệ"
-                rules={[{ max: 20, message: "Tối đa 20 ký tự" }]}
+                rules={[
+                  {
+                    pattern: /^0[1235789]\d{8,9}$/,
+                    message: "Số điện thoại gồm 10-11 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!",
+                  },
+                ]}
               >
                 <Input placeholder="VD: 02854155555" />
               </Form.Item>

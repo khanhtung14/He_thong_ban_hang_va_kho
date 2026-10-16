@@ -548,8 +548,8 @@ export const DeliveryAddressModal: React.FC<DeliveryAddressModalProps> = ({
             rules={[
               { required: true, message: "Vui lòng nhập số điện thoại người nhận!" },
               {
-                pattern: /^0[1-9]\d{8,9}$/,
-                message: "Số điện thoại phải từ 10-11 chữ số, bắt đầu bằng số 0!",
+                pattern: /^0[1235789]\d{8,9}$/,
+                message: "Số điện thoại gồm 10-11 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!",
               },
             ]}
           >

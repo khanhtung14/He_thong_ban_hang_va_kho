@@ -1252,7 +1252,12 @@ export const AgencyManagement: React.FC = () => {
               <Form.Item
                 name="phone"
                 label="Số điện thoại"
-                rules={[{ max: 25, message: "Tối đa 25 ký tự" }]}
+                rules={[
+                  {
+                    pattern: /^0[1235789]\d{8,9}$/,
+                    message: "Số điện thoại gồm 10-11 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!",
+                  },
+                ]}
               >
                 <Input placeholder="VD: 0901234567" />
               </Form.Item>

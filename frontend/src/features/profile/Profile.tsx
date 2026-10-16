@@ -156,8 +156,8 @@ export default function Profile({ embedded = false, onClose }: { embedded?: bool
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="phone" label="Số điện thoại" rules={[{ required: true, pattern: /^0[0-9]{9}$/, message: "Số điện thoại phải có 10 chữ số và bắt đầu bằng 0" }]}>
-                <Input placeholder="09xxxx..." />
+              <Form.Item name="phone" label="Số điện thoại" rules={[{ required: true, pattern: /^0[1235789][0-9]{8}$/, message: "Số điện thoại gồm 10 chữ số với đầu số Việt Nam (03, 05, 07, 08, 09, 01, 02)!" }]}>
+                <Input placeholder="0901234567" />
               </Form.Item>
             </Col>
           </Row>
