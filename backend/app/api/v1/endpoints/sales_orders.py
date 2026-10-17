@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+from typing import List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -339,7 +339,7 @@ def _save_draft(
     return _load_owned_draft(db, account, order.id)
 
 
-@router.get("/customers", response_model=list[SalesCustomerView])
+@router.get("/customers", response_model=List[SalesCustomerView])
 def list_assigned_customers(
     db: Session = Depends(get_db),
     actor: AuthenticatedUser = Depends(require_roles("Sales Rep")),
@@ -357,7 +357,7 @@ def list_assigned_customers(
     ]
 
 
-@router.get("/delivery-points", response_model=list[DeliveryPointView])
+@router.get("/delivery-points", response_model=List[DeliveryPointView])
 def list_delivery_points(
     customer_id: int = Query(gt=0),
     db: Session = Depends(get_db),
@@ -394,7 +394,7 @@ def list_delivery_points(
     ]
 
 
-@router.get("/products", response_model=list[SalesProductView])
+@router.get("/products", response_model=List[SalesProductView])
 def search_sales_products(
     search: str = Query(default="", max_length=100),
     db: Session = Depends(get_db),
@@ -453,7 +453,7 @@ def search_sales_products(
     return response
 
 
-@router.get("/drafts", response_model=list[DraftView])
+@router.get("/drafts", response_model=List[DraftView])
 def list_sales_drafts(
     db: Session = Depends(get_db),
     actor: AuthenticatedUser = Depends(require_roles("Sales Rep")),

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -30,7 +30,9 @@ try:
         CustomerHandoverHistory,
         CreditLimitLog,
         DeliveryAddress,
+        Inventory,
         Order,
+        OrderApprovalHistory,
         OrderItem,
         OrderStatus,
         Product,
@@ -38,6 +40,7 @@ try:
         RoleCode,
         Territory,
         User,
+        Warehouse,
     )
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
     from app.api.v1.endpoints.rbac import (
@@ -59,13 +62,16 @@ except ImportError:  # pragma: no cover
         CustomerHandoverHistory,
         CreditLimitLog,
         DeliveryAddress,
+        Inventory,
         Order,
+        OrderApprovalHistory,
         OrderItem,
         OrderStatus,
         Role,
         RoleCode,
         Territory,
         User,
+        Warehouse,
     )
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
     from app.api.v1.endpoints.rbac import (
@@ -310,6 +316,18 @@ class OrderItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class OrderApprovalHistoryResponse(BaseModel):
+    id: int
+    order_id: int
+    action: str
+    performed_by: str
+    performed_by_id: Optional[int] = None
+    comment: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class OrderResponse(BaseModel):
     id: int
     order_code: str
@@ -328,7 +346,39 @@ class OrderResponse(BaseModel):
     approval_reason: Optional[str] = None
     items: List[OrderItemResponse] = Field(default_factory=list)
 
+    # SCRUM-12 Approval & Violation fields
+    violation_type: Optional[str] = None
+    credit_limit_exceeded_amount: Optional[float] = 0.0
+    floor_price_gap: Optional[float] = 0.0
+    violation_details: Optional[Dict[str, Any]] = None
+    approval_histories: List[OrderApprovalHistoryResponse] = Field(default_factory=list)
+
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class ApproveOrderRequest(BaseModel):
+    comment: Optional[str] = Field(default=None, max_length=500, description="Ý kiến hoặc lý do phê duyệt")
+    override_reason: Optional[str] = Field(default=None, alias="overrideReason", max_length=500)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RejectOrderRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500, description="Lý do từ chối đơn hàng (bắt buộc)")
+    comment: Optional[str] = Field(default=None, max_length=500, description="Ý kiến phản hồi từ chối (bắt buộc)")
+    reject_reason: Optional[str] = Field(default=None, alias="rejectReason", max_length=500)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ReturnOrderRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500, description="Lý do trả lại đơn để sửa (bắt buộc)")
+    comment: Optional[str] = Field(default=None, max_length=500, description="Ý kiến phản hồi yêu cầu sửa (bắt buộc)")
+    note: Optional[str] = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # ---------------------------------------------------------
@@ -1512,6 +1562,18 @@ def create_order(
 
     total_amount = sum(item["quantity"] * item["unit_price"] for item in resolved_items)
 
+    # SCRUM-12: Kiểm tra vượt hạn mức công nợ / tín dụng
+    credit_limit = float(getattr(customer, "credit_limit", 0.0) or 0.0)
+    current_debt = float(getattr(customer, "current_debt", 0.0) or 0.0)
+    debt_record = db.query(CustomerDebt).filter(CustomerDebt.customer_id == customer.id).first()
+    if debt_record and debt_record.total_debt:
+        current_debt = max(current_debt, float(debt_record.total_debt))
+    if credit_limit > 0 and (current_debt + total_amount) > credit_limit:
+        exceeded_amt = (current_debt + total_amount) - credit_limit
+        approval_lines.append(
+            f"Vượt hạn mức tín dụng/công nợ {exceeded_amt:,.0f} ₫ (Hạn mức: {credit_limit:,.0f} ₫, Nợ sau đơn: {current_debt + total_amount:,.0f} ₫)"
+        )
+
     # Gắn thông tin người tạo đơn từ session nhân viên hiện tại (hỗ trợ id, username, email, full_name)
     actor_user = None
     if user.id:
@@ -1570,7 +1632,7 @@ def create_order(
     if payload.submit_for_approval or payload.status in [OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"]:
         order_status = OrderStatus.PENDING_APPROVAL
     elif approval_lines:
-        order_status = OrderStatus.PENDING
+        order_status = OrderStatus.PENDING_APPROVAL if any("Vượt hạn mức" in l for l in approval_lines) else OrderStatus.PENDING
     elif payload.status is not None:
         order_status = payload.status
     else:
@@ -1616,7 +1678,104 @@ def create_order(
         res.delivery_address_id = new_order.delivery_address_id
         if new_order.delivery_address:
             res.delivery_address = DeliveryAddressBriefResponse.model_validate(new_order.delivery_address)
-    return res
+    return _enrich_order_violations(new_order, db, res)
+
+
+def _enrich_order_violations(order: Order, db: Session, response: OrderResponse) -> OrderResponse:
+    customer = db.get(Customer, order.customer_id)
+    response.customer_name = customer.name if customer else None
+
+    # 1. Tính toán vi phạm giá sàn
+    floor_gap_total = 0.0
+    below_floor_items = []
+    for item in order.items:
+        if item.floor_price is not None and item.unit_price < item.floor_price:
+            gap = (item.floor_price - item.unit_price) * item.quantity
+            unit_gap = item.floor_price - item.unit_price
+            floor_gap_total += gap
+            below_floor_items.append({
+                "sku": item.sku,
+                "product_name": item.product_name,
+                "unit_price": item.unit_price,
+                "floor_price": item.floor_price,
+                "unit_gap": round(unit_gap, 2),
+                "quantity": item.quantity,
+                "total_gap": round(gap, 2),
+            })
+
+    # 2. Tính toán vi phạm hạn mức công nợ
+    credit_exceeded_amount = 0.0
+    credit_limit = float(getattr(customer, "credit_limit", 0.0) or 0.0) if customer else 0.0
+    current_debt = float(getattr(customer, "current_debt", 0.0) or 0.0) if customer else 0.0
+    debt_record = db.query(CustomerDebt).filter(CustomerDebt.customer_id == order.customer_id).first()
+    if debt_record and debt_record.total_debt:
+        current_debt = max(current_debt, float(debt_record.total_debt))
+
+    new_projected_debt = current_debt + float(order.total_amount or 0.0)
+    is_credit_exceeded = False
+    if credit_limit > 0 and new_projected_debt > credit_limit:
+        is_credit_exceeded = True
+        credit_exceeded_amount = new_projected_debt - credit_limit
+
+    # 3. Xác định loại vi phạm và lý do chi tiết
+    violation_reasons = []
+    if below_floor_items and is_credit_exceeded:
+        violation_type = "BOTH"
+        violation_reasons.append(
+            f"Vượt hạn mức tín dụng/công nợ {credit_exceeded_amount:,.0f} ₫ (Hạn mức: {credit_limit:,.0f} ₫, Nợ sau đơn: {new_projected_debt:,.0f} ₫)"
+        )
+        violation_reasons.append(
+            f"Bán dưới giá sàn (tổng chênh lệch: {floor_gap_total:,.0f} ₫ qua {len(below_floor_items)} sản phẩm)"
+        )
+    elif below_floor_items:
+        violation_type = "BELOW_FLOOR_PRICE"
+        items_desc = ", ".join([f"{it['sku']} (bán {it['unit_price']:,.0f} < sàn {it['floor_price']:,.0f})" for it in below_floor_items])
+        violation_reasons.append(
+            f"Bán dưới giá sàn: {items_desc} (tổng chênh lệch: {floor_gap_total:,.0f} ₫)"
+        )
+    elif is_credit_exceeded:
+        violation_type = "CREDIT_LIMIT_EXCEEDED"
+        violation_reasons.append(
+            f"Vượt hạn mức tín dụng/công nợ {credit_exceeded_amount:,.0f} ₫ (Hạn mức: {credit_limit:,.0f} ₫, Nợ sau đơn: {new_projected_debt:,.0f} ₫)"
+        )
+    else:
+        violation_type = "OTHER"
+        if order.approval_reason:
+            violation_reasons.append(order.approval_reason)
+
+    response.violation_type = violation_type
+    response.credit_limit_exceeded_amount = round(credit_exceeded_amount, 2)
+    response.floor_price_gap = round(floor_gap_total, 2)
+    response.violation_details = {
+        "violation_type": violation_type,
+        "credit_limit": credit_limit,
+        "current_debt": current_debt,
+        "total_amount": float(order.total_amount or 0.0),
+        "new_projected_debt": new_projected_debt,
+        "credit_limit_exceeded_amount": round(credit_exceeded_amount, 2),
+        "floor_price_gap": round(floor_gap_total, 2),
+        "below_floor_items": below_floor_items,
+    }
+
+    if violation_reasons:
+        structured_reason = "; ".join(violation_reasons)
+        if not order.approval_reason or order.approval_reason == "Chờ Quản lý kinh doanh phê duyệt":
+            response.approval_reason = structured_reason
+        elif any(phrase in order.approval_reason for phrase in ["giá sàn", "hạn mức"]):
+            if str(floor_gap_total) not in (order.approval_reason or "") and str(credit_exceeded_amount) not in (order.approval_reason or ""):
+                response.approval_reason = f"{order.approval_reason} ({structured_reason})"
+        else:
+            response.approval_reason = f"{order.approval_reason}; {structured_reason}"
+
+    # Nạp lịch sử duyệt đơn nếu có
+    histories = (
+        db.query(OrderApprovalHistory)
+        .filter(OrderApprovalHistory.order_id == order.id)
+        .order_by(OrderApprovalHistory.id.desc())
+        .all()
+    )
+    response.approval_histories = [OrderApprovalHistoryResponse.model_validate(h) for h in histories]
+    return response
 
 
 @router.get("/orders", response_model=List[OrderResponse])
@@ -1646,7 +1805,7 @@ def list_orders(
             resp.delivery_address_id = ord.delivery_address_id
             if ord.delivery_address:
                 resp.delivery_address = DeliveryAddressBriefResponse.model_validate(ord.delivery_address)
-        results.append(resp)
+        results.append(_enrich_order_violations(ord, db, resp))
 
     return results
 
@@ -1663,18 +1822,17 @@ def list_orders_pending_approval(
     ).scalars().all()
     results = []
     for order in orders:
-        customer = db.get(Customer, order.customer_id)
-        response = OrderResponse.model_validate(order)
-        response.customer_name = customer.name if customer else None
-        results.append(response)
+        resp = OrderResponse.model_validate(order)
+        results.append(_enrich_order_violations(order, db, resp))
     return results
 
 
 @router.post("/orders/{order_id}/approve", response_model=OrderResponse)
 def approve_below_floor_order(
     order_id: int,
+    payload: Optional[ApproveOrderRequest] = None,
     db: Session = Depends(get_db),
-    _user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
+    user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
 ):
     order = db.execute(select(Order).options(selectinload(Order.items)).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
@@ -1682,37 +1840,177 @@ def approve_below_floor_order(
     if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL):
         raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt.")
     order.status = OrderStatus.APPROVED
+
+    # Giữ chỗ tồn kho (Inventory reservation)
+    for it in order.items:
+        p_id = it.product_id
+        if not p_id and it.sku:
+            p = db.query(Product).filter(func.upper(Product.sku) == func.upper(it.sku)).first()
+            if p:
+                p_id = p.id
+        if p_id:
+            wh = db.query(Warehouse).first()
+            if not wh:
+                wh = Warehouse(id=1, code="WH-DEFAULT", name="Kho Tổng Long Biên", is_active=True)
+                db.add(wh)
+                db.flush()
+            wh_id = wh.id
+            inv = db.query(Inventory).filter(Inventory.product_id == p_id, Inventory.warehouse_id == wh_id).first()
+            qty = float(it.quantity) * float(getattr(it, "conversion_factor", 1.0) or 1.0)
+            if not inv:
+                inv = Inventory(
+                    product_id=p_id,
+                    warehouse_id=wh_id,
+                    physical_qty=max(100.0, qty * 2),
+                    reserved_qty=qty,
+                    available_qty=max(0.0, max(100.0, qty * 2) - qty),
+                )
+                db.add(inv)
+            else:
+                inv.reserved_qty = float(inv.reserved_qty or 0.0) + qty
+                inv.available_qty = max(0.0, float(inv.physical_qty or 0.0) - inv.reserved_qty)
+
+    # Ghi nhận lịch sử duyệt đơn (Audit Log)
+    comment_text = None
+    if payload:
+        comment_text = (payload.comment or payload.override_reason or payload.note or "").strip() or None
+    approval_comment = comment_text or "Quản lý kinh doanh phê duyệt đơn hàng"
+    history = OrderApprovalHistory(
+        order_id=order.id,
+        action="APPROVE",
+        performed_by=user.username or user.full_name or "Sales Manager",
+        performed_by_id=user.id if getattr(user, "id", None) else None,
+        comment=approval_comment,
+    )
+    db.add(history)
+
     db.commit()
-    customer = db.get(Customer, order.customer_id)
-    response = OrderResponse.model_validate(order)
-    response.customer_name = customer.name if customer else None
-    return response
-
-
-class RejectOrderRequest(BaseModel):
-    reason: str = Field(default="Không được phê duyệt", max_length=500)
+    db.refresh(order)
+    resp = OrderResponse.model_validate(order)
+    return _enrich_order_violations(order, db, resp)
 
 
 @router.post("/orders/{order_id}/reject", response_model=OrderResponse)
 def reject_below_floor_order(
     order_id: int,
-    payload: RejectOrderRequest,
+    payload: Optional[RejectOrderRequest] = None,
     db: Session = Depends(get_db),
-    _user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
+    user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
 ):
+    reason_text = (
+        (payload.reason or payload.comment or payload.reject_reason or payload.note or "").strip()
+        if payload
+        else ""
+    )
+    if not reason_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Bắt buộc phải nhập lý do/ý kiến phản hồi khi từ chối đơn hàng.",
+        )
+
     order = db.execute(select(Order).options(selectinload(Order.items)).where(Order.id == order_id)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
     if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL):
         raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt.")
+
     order.status = OrderStatus.CANCELLED
-    rejection_note = f"Từ chối: {payload.reason.strip()}"
+    rejection_note = f"Từ chối: {reason_text}"
     order.approval_reason = f"{order.approval_reason}; {rejection_note}" if order.approval_reason else rejection_note
+
+    history = OrderApprovalHistory(
+        order_id=order.id,
+        action="REJECT",
+        performed_by=user.username or user.full_name or "Sales Manager",
+        performed_by_id=user.id if getattr(user, "id", None) else None,
+        comment=reason_text,
+    )
+    db.add(history)
+
     db.commit()
-    customer = db.get(Customer, order.customer_id)
-    response = OrderResponse.model_validate(order)
-    response.customer_name = customer.name if customer else None
-    return response
+    db.refresh(order)
+    resp = OrderResponse.model_validate(order)
+    return _enrich_order_violations(order, db, resp)
+
+
+@router.post("/orders/{order_id}/return", response_model=OrderResponse)
+@router.post("/orders/{order_id}/request-changes", response_model=OrderResponse)
+@router.post("/orders/{order_id}/return-for-edit", response_model=OrderResponse)
+def return_order_for_changes(
+    order_id: int,
+    payload: Optional[ReturnOrderRequest] = None,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
+):
+    reason_text = (
+        (payload.reason or payload.comment or payload.note or "").strip()
+        if payload
+        else ""
+    )
+    if not reason_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Bắt buộc phải nhập lý do/ý kiến phản hồi khi trả lại đơn hàng để sửa.",
+        )
+
+    order = db.execute(select(Order).options(selectinload(Order.items)).where(Order.id == order_id)).scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
+    if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL):
+        raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt.")
+
+    order.status = OrderStatus.DRAFT
+    return_note = f"Trả lại sửa: {reason_text}"
+    order.approval_reason = f"{order.approval_reason}; {return_note}" if order.approval_reason else return_note
+
+    history = OrderApprovalHistory(
+        order_id=order.id,
+        action="RETURN",
+        performed_by=user.username or user.full_name or "Sales Manager",
+        performed_by_id=user.id if getattr(user, "id", None) else None,
+        comment=reason_text,
+    )
+    db.add(history)
+
+    db.commit()
+    db.refresh(order)
+    resp = OrderResponse.model_validate(order)
+    return _enrich_order_violations(order, db, resp)
+
+
+@router.get("/orders/{order_id}/approval-history", response_model=List[OrderApprovalHistoryResponse])
+def get_order_approval_history(
+    order_id: int,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin", "Sales Rep", "Accountant")),
+):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
+    histories = (
+        db.query(OrderApprovalHistory)
+        .filter(OrderApprovalHistory.order_id == order_id)
+        .order_by(OrderApprovalHistory.id.asc())
+        .all()
+    )
+    return [OrderApprovalHistoryResponse.model_validate(h) for h in histories]
+
+
+@router.put("/orders/{order_id}/approval-history")
+@router.patch("/orders/{order_id}/approval-history")
+@router.delete("/orders/{order_id}/approval-history")
+@router.put("/orders/approval-history/{history_id}")
+@router.patch("/orders/approval-history/{history_id}")
+@router.delete("/orders/approval-history/{history_id}")
+@router.put("/orders/{order_id}/approval-history/{history_id}")
+@router.patch("/orders/{order_id}/approval-history/{history_id}")
+@router.delete("/orders/{order_id}/approval-history/{history_id}")
+def block_modify_order_approval_history():
+    """Chặn sửa/xóa lịch sử duyệt đơn - dữ liệu audit log bất biến (chặn 405 Method Not Allowed)."""
+    raise HTTPException(
+        status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+        detail="Lịch sử duyệt đơn là dữ liệu bất biến (audit log), không được phép chỉnh sửa hoặc xóa.",
+    )
 
 
 @router.get("/orders/{order_id}", response_model=OrderResponse)
@@ -1729,7 +2027,7 @@ def get_order_detail(order_id: int, db: Session = Depends(get_db)):
     resp.customer_name = customer.name if customer else None
     resp.has_warning = has_warn
     resp.warning_message = warn_msg
-    return resp
+    return _enrich_order_violations(order, db, resp)
 
 
 @router.put("/orders/{order_id}/status", response_model=OrderResponse)

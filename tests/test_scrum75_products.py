@@ -17,6 +17,7 @@ Covers:
    - Cập nhật trạng thái sản phẩm giữa ACTIVE và DISCONTINUED.
    - Trạng thái không hợp lệ trả về 400.
 """
+from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient

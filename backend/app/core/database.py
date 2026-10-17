@@ -73,6 +73,7 @@ def migrate_pricing_schema():
         DiscountPolicy,
         DiscountTier,
         CreditLimitLog,
+        OrderApprovalHistory,
     )
 
     Base.metadata.create_all(
@@ -87,6 +88,7 @@ def migrate_pricing_schema():
             DiscountPolicy.__table__,
             DiscountTier.__table__,
             CreditLimitLog.__table__,
+            OrderApprovalHistory.__table__,
         ],
         checkfirst=True,
     )
