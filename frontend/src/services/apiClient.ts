@@ -596,25 +596,35 @@ export interface OrderItemView {
   id: number;
   sku: string;
   product_name: string;
+  unit?: string;
+  unit_name?: string;
   quantity: number;
+  ordered_quantity?: number;
+  delivered_quantity?: number;
+  actual_quantity?: number;
   unit_price: number;
-  subtotal: number;
+  total_price?: number;
+  subtotal?: number;
+  is_partially_delivered?: boolean;
 }
 
 export interface OrderResponseItem {
   id: number;
   order_code: string;
   customer_id: number;
-  customer_name: string;
+  customer_name?: string;
   total_amount: number;
   status: string;
   warning_type?: string | null;
   delivery_address_id?: number | null;
-  delivery_address?: DeliveryAddressItem | null;
+  delivery_point_name?: string | null;
+  delivery_address?: any;
+  expected_delivery_date?: string | null;
   items?: OrderItemView[];
   approval_reason?: string | null;
   note?: string | null;
   created_at: string;
+  is_partially_delivered?: boolean;
 }
 
 export async function fetchDeliveryAddresses(
@@ -717,6 +727,17 @@ export async function fetchPortalOrders(): Promise<OrderResponseItem[]> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Không thể tải danh sách đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function fetchPortalOrderDetail(
+  orderId: number,
+): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch(`/api/v1/portal/orders/${orderId}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Không thể tải chi tiết đơn hàng #${orderId}.`);
   }
   return res.json();
 }

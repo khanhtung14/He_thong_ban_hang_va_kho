@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -317,12 +317,20 @@ class OrderItemResponse(BaseModel):
     id: int
     sku: Optional[str] = None
     product_name: Optional[str] = None
+    unit: Optional[str] = "Cái"
+    unit_name: Optional[str] = "Cái"
     quantity: int
+    ordered_quantity: Optional[int] = None
+    delivered_quantity: Optional[int] = None
+    actual_quantity: Optional[int] = None
     unit_price: float
+    total_price: Optional[float] = None
+    subtotal: Optional[float] = None
     floor_price: Optional[float] = None
     price_list_id: Optional[int] = None
     available_qty: Optional[float] = None
     availableQty: Optional[float] = None
+    is_partially_delivered: bool = False
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -335,11 +343,14 @@ class OrderResponse(BaseModel):
     warehouse_id: Optional[int] = None
     warehouse_name: Optional[str] = None
     delivery_address_id: Optional[int] = None
-    delivery_address: Optional[DeliveryAddressBriefResponse] = None
+    delivery_address: Optional[Union[DeliveryAddressBriefResponse, str, dict]] = None
+    delivery_point_name: Optional[str] = None
+    expected_delivery_date: Optional[Union[date, str, datetime]] = None
     status: OrderStatus
     total_amount: float
     note: Optional[str] = None
     created_at: Optional[datetime] = None
+    is_partially_delivered: bool = False
     
     # SCRUM-85 Warning fields
     has_warning: bool = False
@@ -348,6 +359,46 @@ class OrderResponse(BaseModel):
     items: List[OrderItemResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class PortalOrderItemResponse(BaseModel):
+    id: Optional[int] = None
+    sku: str = ""
+    product_name: str = ""
+    unit: str = "Cái"
+    unit_name: Optional[str] = "Cái"
+    ordered_quantity: int = 0
+    quantity: int = 0
+    delivered_quantity: int = 0
+    actual_quantity: int = 0
+    unit_price: float = 0.0
+    total_price: float = 0.0
+    subtotal: Optional[float] = None
+    is_partially_delivered: bool = False
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class PortalOrderDetailResponse(BaseModel):
+    id: int
+    order_code: str
+    customer_id: Optional[int] = None
+    customer_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+    expected_delivery_date: Optional[Union[date, str, datetime]] = None
+    total_amount: float = 0.0
+    status: str
+    delivery_point_name: Optional[str] = None
+    delivery_address: Optional[Union[str, dict, DeliveryAddressBriefResponse]] = None
+    delivery_address_id: Optional[int] = None
+    delivery_address_detail: Optional[DeliveryAddressBriefResponse] = None
+    note: Optional[str] = None
+    approval_reason: Optional[str] = None
+    is_partially_delivered: bool = False
+    items: List[PortalOrderItemResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
 
 
 class OrderSimulateItem(BaseModel):
@@ -402,11 +453,27 @@ def _build_full_order_response(order: Order, db: Session, cust: Optional[Custome
     resp.has_warning = has_warn
     resp.warning_message = warn_msg
 
-    if getattr(order, "delivery_address_id", None):
-        resp.delivery_address_id = order.delivery_address_id
-        if getattr(order, "delivery_address", None):
-            resp.delivery_address = DeliveryAddressBriefResponse.model_validate(order.delivery_address)
+    # Delivery address & point info
+    deliv_addr = getattr(order, "delivery_address", None)
+    if not deliv_addr and getattr(order, "delivery_address_id", None):
+        deliv_addr = db.get(DeliveryAddress, order.delivery_address_id)
 
+    if deliv_addr:
+        resp.delivery_address_id = deliv_addr.id
+        resp.delivery_address = DeliveryAddressBriefResponse.model_validate(deliv_addr)
+        resp.delivery_point_name = deliv_addr.receiver_name or f"Điểm giao #{deliv_addr.id}"
+    else:
+        resp.delivery_point_name = "Địa chỉ chính"
+        if cust and cust.address:
+            resp.delivery_point_name = "Địa chỉ chính"
+
+    exp_date = getattr(order, "expected_delivery_date", None) or getattr(order, "desired_delivery_date", None)
+    resp.expected_delivery_date = exp_date
+
+    status_str = (str(order.status.value if hasattr(order.status, "value") else order.status)).upper()
+    is_delivering_or_delivered = status_str in ("SHIPPING", "IN_TRANSIT", "DELIVERED", "COMPLETED", "PROCESSING")
+
+    any_partially_delivered = False
     for it_res, it_db in zip(resp.items, order.items):
         avail = getattr(it_db, "available_qty", None)
         if avail is None and wh and it_db.sku:
@@ -414,6 +481,45 @@ def _build_full_order_response(order: Order, db: Session, cust: Optional[Custome
             avail = st["available_qty"]
         it_res.available_qty = avail
         it_res.availableQty = avail
+
+        unit_str = getattr(it_db, "unit_name", None) or "Cái"
+        it_res.unit = unit_str
+        it_res.unit_name = unit_str
+
+        ord_qty = int(it_db.quantity)
+        it_res.ordered_quantity = ord_qty
+
+        deliv_qty = getattr(it_db, "quantity_delivered", None)
+        if deliv_qty is None:
+            deliv_qty = getattr(it_db, "delivered_quantity", None)
+        if status_str in ("COMPLETED", "DELIVERED"):
+            if deliv_qty is None or deliv_qty == 0:
+                deliv_qty = ord_qty
+            else:
+                deliv_qty = int(deliv_qty)
+        elif status_str in ("SHIPPING", "IN_TRANSIT", "PROCESSING"):
+            if deliv_qty is None or deliv_qty == 0:
+                deliv_qty = ord_qty
+            else:
+                deliv_qty = int(deliv_qty)
+        else:
+            deliv_qty = int(deliv_qty or 0)
+
+        it_res.delivered_quantity = deliv_qty
+        it_res.actual_quantity = deliv_qty
+
+        tot_p = getattr(it_db, "line_total", None)
+        if tot_p is None:
+            tot_p = ord_qty * it_db.unit_price
+        it_res.total_price = float(tot_p)
+        it_res.subtotal = float(tot_p)
+
+        item_is_partial = bool(is_delivering_or_delivered and (deliv_qty < ord_qty))
+        it_res.is_partially_delivered = item_is_partial
+        if item_is_partial:
+            any_partially_delivered = True
+
+    resp.is_partially_delivered = any_partially_delivered
     return resp
 
 
@@ -1883,8 +1989,110 @@ def _resolve_customer_for_user(db: Session, user: AuthenticatedUser) -> Optional
     return None
 
 
-@router.get("/portal/orders", response_model=List[OrderResponse])
-@router.get("/customer/orders", response_model=List[OrderResponse])
+def _build_portal_order_dict(order: Order, db: Session, customer: Optional[Customer] = None) -> dict:
+    if not customer and order.customer_id:
+        customer = db.get(Customer, order.customer_id)
+
+    # Ngày giao hàng dự kiến
+    exp_date = getattr(order, "expected_delivery_date", None) or getattr(order, "desired_delivery_date", None)
+    exp_date_str = str(exp_date) if exp_date is not None else None
+
+    # Điểm giao hàng và địa chỉ
+    deliv_addr = getattr(order, "delivery_address", None)
+    if not deliv_addr and getattr(order, "delivery_address_id", None):
+        deliv_addr = db.get(DeliveryAddress, order.delivery_address_id)
+
+    deliv_point = None
+    deliv_addr_str = None
+    deliv_detail = None
+    if deliv_addr:
+        deliv_point = deliv_addr.receiver_name or f"Điểm giao #{deliv_addr.id}"
+        parts = [
+            getattr(deliv_addr, "address", None),
+            getattr(deliv_addr, "ward", None),
+            getattr(deliv_addr, "district", None),
+            getattr(deliv_addr, "province", None),
+        ]
+        deliv_addr_str = ", ".join([p for p in parts if p]) or getattr(deliv_addr, "address", None)
+        deliv_detail = DeliveryAddressBriefResponse.model_validate(deliv_addr)
+    else:
+        deliv_point = "Địa chỉ chính"
+        if customer and customer.address:
+            deliv_addr_str = customer.address
+        else:
+            deliv_addr_str = "Chưa có địa chỉ giao hàng"
+
+    status_val = (order.status.value if hasattr(order.status, "value") else str(order.status)).upper()
+    is_delivering_or_delivered = status_val in ("SHIPPING", "IN_TRANSIT", "DELIVERED", "COMPLETED", "PROCESSING")
+
+    items_res = []
+    has_partially_delivered = False
+
+    for it in (order.items or []):
+        ord_qty = int(it.quantity or 0)
+        deliv_qty = getattr(it, "quantity_delivered", None)
+        if deliv_qty is None:
+            deliv_qty = getattr(it, "delivered_quantity", None)
+
+        if status_val in ("COMPLETED", "DELIVERED"):
+            if deliv_qty is None or deliv_qty == 0:
+                deliv_qty = ord_qty
+            else:
+                deliv_qty = int(deliv_qty)
+        elif status_val in ("SHIPPING", "IN_TRANSIT", "PROCESSING"):
+            if deliv_qty is None or deliv_qty == 0:
+                deliv_qty = ord_qty
+            else:
+                deliv_qty = int(deliv_qty)
+        else:
+            deliv_qty = int(deliv_qty or 0)
+
+        unit_price = float(it.unit_price or 0.0)
+        total_price = float(getattr(it, "line_total", None) or (ord_qty * unit_price))
+        item_is_partial = bool(is_delivering_or_delivered and (deliv_qty < ord_qty))
+        if item_is_partial:
+            has_partially_delivered = True
+
+        unit_str = getattr(it, "unit_name", None) or "Cái"
+
+        items_res.append({
+            "id": it.id,
+            "sku": it.sku or "",
+            "product_name": it.product_name or "",
+            "unit": unit_str,
+            "unit_name": unit_str,
+            "ordered_quantity": ord_qty,
+            "quantity": ord_qty,
+            "delivered_quantity": deliv_qty,
+            "actual_quantity": deliv_qty,
+            "unit_price": unit_price,
+            "total_price": total_price,
+            "subtotal": total_price,
+            "is_partially_delivered": item_is_partial,
+        })
+
+    return {
+        "id": order.id,
+        "order_code": order.order_code,
+        "customer_id": order.customer_id,
+        "customer_name": customer.name if customer else None,
+        "created_at": order.created_at,
+        "expected_delivery_date": exp_date_str,
+        "total_amount": float(order.total_amount or 0.0),
+        "status": status_val,
+        "delivery_point_name": deliv_point,
+        "delivery_address": deliv_addr_str,
+        "delivery_address_id": order.delivery_address_id,
+        "delivery_address_detail": deliv_detail,
+        "note": order.note,
+        "approval_reason": getattr(order, "approval_reason", None),
+        "is_partially_delivered": has_partially_delivered,
+        "items": items_res,
+    }
+
+
+@router.get("/portal/orders", response_model=List[PortalOrderDetailResponse])
+@router.get("/customer/orders", response_model=List[PortalOrderDetailResponse])
 def get_portal_orders(
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -1892,6 +2100,7 @@ def get_portal_orders(
     """
     Lấy danh sách đơn hàng của chính đại lý đăng nhập hiện tại.
     Nếu đại lý chưa có đơn hàng nào hoặc chưa có hồ sơ, trả về danh sách rỗng [].
+    Sắp xếp đơn mới nhất lên đầu (created_at DESC).
     """
     customer = _resolve_customer_for_user(db, user)
     if not customer:
@@ -1900,19 +2109,61 @@ def get_portal_orders(
     orders = (
         db.execute(
             select(Order)
-            .options(selectinload(Order.items))
+            .options(selectinload(Order.items), selectinload(Order.delivery_address))
             .where(Order.customer_id == customer.id)
-            .order_by(Order.id.desc())
+            .order_by(Order.created_at.desc(), Order.id.desc())
         )
         .scalars()
         .all()
     )
 
-    results = []
-    for ord in orders:
-        results.append(_build_full_order_response(ord, db, customer))
+    return [_build_portal_order_dict(ord, db, customer) for ord in orders]
 
-    return results
+
+@router.get("/portal/orders/{order_id}", response_model=PortalOrderDetailResponse)
+@router.get("/customer/orders/{order_id}", response_model=PortalOrderDetailResponse)
+def get_portal_order_detail(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Xem chi tiết đơn hàng của đại lý:
+    1. Kiểm tra quyền sở hữu đơn hàng (order.customer_id == current_user.customer_id),
+       nếu không khớp trả về 403 Forbidden.
+    2. Trả về chi tiết đơn hàng kèm danh sách dòng hàng (items):
+       sku, product_name, unit, ordered_quantity, delivered_quantity, unit_price, total_price,
+       và cờ is_partially_delivered.
+    """
+    customer = _resolve_customer_for_user(db, user)
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản của bạn chưa được liên kết với hồ sơ đại lý nào.",
+        )
+
+    order = (
+        db.execute(
+            select(Order)
+            .options(selectinload(Order.items), selectinload(Order.delivery_address))
+            .where(Order.id == order_id)
+        )
+        .scalar_one_or_none()
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy đơn hàng #{order_id}.",
+        )
+
+    if order.customer_id != customer.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền truy cập hoặc xem chi tiết đơn hàng của đại lý khác.",
+        )
+
+    return _build_portal_order_dict(order, db, customer)
+
 
 
 class ReorderItemDetail(BaseModel):

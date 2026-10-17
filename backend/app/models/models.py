@@ -621,6 +621,7 @@ class Order(Base):
         ForeignKey("delivery_addresses.id", ondelete="SET NULL"), nullable=True
     )
     desired_delivery_date: Mapped[Optional[date]] = mapped_column(Date)
+    expected_delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     status: Mapped[OrderStatus] = mapped_column(
         SqlEnum(OrderStatus, native_enum=False, length=30),
@@ -663,6 +664,7 @@ class OrderItem(Base):
     floor_price: Mapped[Optional[float]] = mapped_column(Float)
     price_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("price_lists.id", ondelete="SET NULL"))
     available_qty: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    quantity_delivered: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
     
     order: Mapped[Order] = relationship(back_populates="items")
 
