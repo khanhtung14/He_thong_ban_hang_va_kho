@@ -5,6 +5,7 @@ import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import { CustomerSidebar } from "../../components/Sidebar/CustomerSidebar";
 import { CustomerHeader } from "../../components/Header/CustomerHeader";
+import CustomerDebtPanel from "../../features/customer_debt/CustomerDebtPanel";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -104,7 +105,7 @@ export const CustomerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung danh mục sản phẩm, đặt đơn, xem công nợ */}
+          {selectedKey === "debt" && <CustomerDebtPanel />}
         </Content>
       </Layout>
 

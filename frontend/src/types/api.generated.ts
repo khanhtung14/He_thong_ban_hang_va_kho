@@ -2657,6 +2657,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/invoices/{invoice_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Invoice */
+        get: operations["download_invoice_api_v1_invoices__invoice_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/invoices/from-dispatch": {
         parameters: {
             query?: never;
@@ -2668,6 +2685,40 @@ export interface paths {
         put?: never;
         /** Create Invoice From Dispatch */
         post: operations["create_invoice_from_dispatch_api_v1_invoices_from_dispatch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/me/debts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get My Debts */
+        get: operations["get_my_debts_api_v1_customers_me_debts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{customer_id}/debts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Debts */
+        get: operations["get_customer_debts_api_v1_customers__customer_id__debts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3089,6 +3140,21 @@ export interface components {
             newMaxDebtDays: number;
             /** Reason */
             reason: string;
+        };
+        /** CustomerDebtResponse */
+        CustomerDebtResponse: {
+            /** Customer Id */
+            customer_id: number;
+            /** Customer Name */
+            customer_name: string;
+            /** Current Debt */
+            current_debt: number;
+            /** Credit Limit */
+            credit_limit: number;
+            /** Remaining Credit Limit */
+            remaining_credit_limit: number;
+            /** Invoices */
+            invoices: components["schemas"]["InvoiceView"][];
         };
         /**
          * CustomerGroup
@@ -3738,12 +3804,47 @@ export interface components {
         };
         /** InvoiceCreate */
         InvoiceCreate: {
+            /** Dispatchid */
+            dispatchId: number;
+            /**
+             * Invoicedate
+             * Format: date
+             */
+            invoiceDate: string;
+            /** Paymenttermdays */
+            paymentTermDays: number;
+        };
+        /** InvoiceListResponse */
+        InvoiceListResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Data */
+            data: components["schemas"]["InvoiceView"][];
+        };
+        /** InvoiceView */
+        InvoiceView: {
+            /** Id */
+            id: number;
             /** Dispatch Id */
-            dispatch_id: number;
+            dispatch_id?: number | null;
+            /** Customer Id */
+            customer_id: number;
             /** Invoice Date */
-            invoice_date: string;
+            invoice_date?: string | null;
+            /** Due Date */
+            due_date?: string | null;
             /** Payment Term Days */
             payment_term_days: number;
+            /** Total Amount */
+            total_amount: number;
+            /** Amount Paid */
+            amount_paid: number;
+            /** Amount Due */
+            amount_due: number;
+            /** Status */
+            status: string;
         };
         /** LegacyTransactionCreateRequest */
         LegacyTransactionCreateRequest: {
@@ -3909,18 +4010,21 @@ export interface components {
         };
         /** PaymentCreate */
         PaymentCreate: {
-            /** Customer Id */
-            customer_id: number;
+            /** Customerid */
+            customerId: number;
             /** Amount */
             amount: number;
-            /** Payment Method */
-            payment_method: string;
-            /** Payment Date */
-            payment_date: string;
-            /** Invoice Ids */
-            invoice_ids: number[];
-            /** Receipt Image */
-            receipt_image?: string | null;
+            /** Paymentmethod */
+            paymentMethod: string;
+            /**
+             * Paymentdate
+             * Format: date
+             */
+            paymentDate: string;
+            /** Invoiceids */
+            invoiceIds: number[];
+            /** Receiptimage */
+            receiptImage?: string | null;
         };
         /** PriceLine */
         PriceLine: {
@@ -10664,8 +10768,10 @@ export interface operations {
     list_invoices_api_v1_invoices_get: {
         parameters: {
             query?: {
-                customer_id?: number | null;
+                customerId?: number | null;
                 status?: string | null;
+                fromDate?: string | null;
+                toDate?: string | null;
             };
             header?: never;
             path?: never;
@@ -10679,7 +10785,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["InvoiceListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_invoice_api_v1_invoices__invoice_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
                 };
             };
             /** @description Validation Error */
@@ -10707,12 +10844,63 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_debts_api_v1_customers_me_debts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDebtResponse"];
+                };
+            };
+        };
+    };
+    get_customer_debts_api_v1_customers__customer_id__debts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDebtResponse"];
                 };
             };
             /** @description Validation Error */
@@ -10740,7 +10928,7 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
