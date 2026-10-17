@@ -511,6 +511,32 @@ export async function createCustomer(payload: CreateCustomerPayload): Promise<Cu
   return res.json();
 }
 
+export interface UpdateManagerCustomerPayload {
+  name?: string;
+  phone?: string;
+  customer_group?: string;
+  region?: string;
+  territory_id?: number | null;
+  status?: string;
+  is_active?: boolean;
+}
+
+export async function updateManagerCustomer(
+  id: number,
+  payload: UpdateManagerCustomerPayload
+): Promise<CustomerItem> {
+  const res = await authenticatedFetch(`/api/v1/manager/customers/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Không thể cập nhật đại lý #${id}.`);
+  }
+  return res.json();
+}
+
 // ----------------------------------------------------------------------
 // SCRUM-20: Delivery Address Management & Order Placement
 // ----------------------------------------------------------------------
@@ -555,6 +581,8 @@ export interface OrderItemInput {
 export interface CreateOrderPayload {
   customer_id: number;
   customerId?: number;
+  warehouse_id?: number | null;
+  warehouseId?: number | null;
   delivery_address_id?: number | null;
   deliveryAddressId?: number | null;
   items: OrderItemInput[];
@@ -692,6 +720,62 @@ export async function fetchPortalOrders(): Promise<OrderResponseItem[]> {
   }
   return res.json();
 }
+
+export interface ReorderItemDetail {
+  product_id: number;
+  sku: string;
+  product_name: string;
+  unit: string;
+  quantity: number;
+  unit_price: number;
+  current_price: number;
+  old_price: number;
+  price_changed: boolean;
+  subtotal: number;
+  floor_price?: number | null;
+  available_qty: number;
+  stock_available: number;
+  is_available: boolean;
+  is_selected?: boolean;
+}
+
+export interface RemovedReorderItem {
+  product_id?: number | null;
+  sku: string;
+  product_name: string;
+  quantity: number;
+  old_price?: number | null;
+  reason: string;
+}
+
+export interface ReorderPreparationResponse {
+  success: boolean;
+  order_id: number;
+  original_order_code: string;
+  customer_id: number;
+  customer_name: string;
+  default_delivery_point_id?: number | null;
+  delivery_address_id?: number | null;
+  items: ReorderItemDetail[];
+  removed_items: RemovedReorderItem[];
+  warehouse_id?: number | null;
+  warehouse_name?: string | null;
+  warning_message?: string | null;
+}
+
+export async function fetchReorderItems(
+  orderId: number,
+): Promise<ReorderPreparationResponse> {
+  const res = await authenticatedFetch(
+    `/api/v1/portal/orders/${orderId}/reorder-items`,
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể lấy thông tin đặt lại đơn hàng.");
+  }
+  return res.json();
+}
+
 
 export async function createOrder(
   payload: CreateOrderPayload,

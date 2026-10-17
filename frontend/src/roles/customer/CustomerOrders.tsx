@@ -11,6 +11,11 @@ import {
   Spin,
   Descriptions,
   Divider,
+  Alert,
+  InputNumber,
+  Input,
+  message,
+  notification,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -23,12 +28,19 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   SyncOutlined,
+  RedoOutlined,
+  CheckOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
   fetchPortalOrders,
+  fetchReorderItems,
+  createOrder,
   type OrderResponseItem,
   type OrderItemView,
+  type ReorderItemDetail,
+  type ReorderPreparationResponse,
+  type CreateOrderPayload,
 } from "../../services/apiClient";
 
 const { Title, Text } = Typography;
@@ -44,6 +56,15 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedOrder, setSelectedOrder] = useState<OrderResponseItem | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+
+  // State cho tính năng Đặt lại đơn hàng (Reorder)
+  const [reorderModalOpen, setReorderModalOpen] = useState<boolean>(false);
+  const [reorderLoadingId, setReorderLoadingId] = useState<number | null>(null);
+  const [reorderSubmitting, setReorderSubmitting] = useState<boolean>(false);
+  const [reorderData, setReorderData] = useState<ReorderPreparationResponse | null>(null);
+  const [reorderItems, setReorderItems] = useState<ReorderItemDetail[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<React.Key[]>([]);
+  const [reorderNote, setReorderNote] = useState<string>("");
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -128,6 +149,91 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
     setIsDetailModalOpen(true);
   };
 
+  // Khởi chạy quy trình Đặt lại đơn hàng (Reorder)
+  const handleStartReorder = async (orderId: number) => {
+    setReorderLoadingId(orderId);
+    try {
+      const data = await fetchReorderItems(orderId);
+      setReorderData(data);
+      setReorderItems(data.items || []);
+      // Mặc định chọn tất cả các mặt hàng còn kinh doanh
+      setSelectedProductIds((data.items || []).map((it) => it.product_id));
+      setReorderNote(`Đặt lại từ đơn hàng #${data.original_order_code}`);
+
+      // Nếu có sản phẩm bị loại bỏ do ngừng kinh doanh, hiển thị cảnh báo
+      if (data.removed_items && data.removed_items.length > 0) {
+        notification.warning({
+          message: "Thông báo điều chỉnh danh mục hàng",
+          description: "Một số mặt hàng đã ngừng kinh doanh và được tự động bỏ qua.",
+          duration: 6,
+          placement: "topRight",
+        });
+      }
+
+      if (!data.items || data.items.length === 0) {
+        message.warning("Tất cả mặt hàng trong đơn hàng cũ đã ngừng kinh doanh hoặc không còn khả dụng.");
+        return;
+      }
+
+      setReorderModalOpen(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể lấy thông tin đặt lại đơn hàng.";
+      message.error(msg);
+    } finally {
+      setReorderLoadingId(null);
+    }
+  };
+
+  // Cập nhật số lượng của từng dòng hàng
+  const handleQuantityChange = (productId: number, val: number | null) => {
+    const qty = Math.max(1, Number(val) || 1);
+    setReorderItems((prev) =>
+      prev.map((item) =>
+        item.product_id === productId
+          ? { ...item, quantity: qty, subtotal: qty * item.current_price }
+          : item
+      )
+    );
+  };
+
+  // Gửi tạo đơn hàng mới từ các mặt hàng đã chọn
+  const handleConfirmReorder = async () => {
+    if (!reorderData) return;
+    const selectedItems = reorderItems.filter((it) => selectedProductIds.includes(it.product_id));
+    if (selectedItems.length === 0) {
+      message.warning("Vui lòng chọn ít nhất 1 mặt hàng để đặt lại!");
+      return;
+    }
+
+    setReorderSubmitting(true);
+    try {
+      const payload: CreateOrderPayload = {
+        customer_id: reorderData.customer_id,
+        warehouse_id: reorderData.warehouse_id || undefined,
+        delivery_address_id: reorderData.default_delivery_point_id || undefined,
+        items: selectedItems.map((it) => ({
+          sku: it.sku,
+          product_name: it.product_name,
+          quantity: it.quantity,
+          unit_price: it.current_price,
+        })),
+        note: reorderNote,
+        submit_for_approval: true,
+      };
+
+      await createOrder(payload);
+      message.success("Đặt lại đơn hàng thành công! Đơn hàng mới đã được gửi duyệt.");
+      setReorderModalOpen(false);
+      setIsDetailModalOpen(false);
+      await loadOrders();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể tạo đơn hàng đặt lại.";
+      message.error(msg);
+    } finally {
+      setReorderSubmitting(false);
+    }
+  };
+
   const columns: ColumnsType<OrderResponseItem> = [
     {
       title: "MÃ ĐƠN HÀNG",
@@ -144,7 +250,7 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
       title: "NGÀY ĐẶT HÀNG",
       dataIndex: "created_at",
       key: "created_at",
-      width: 170,
+      width: 160,
       render: (dt: string) => (
         <span style={{ color: "#475569", fontSize: 13 }}>{formatDateTime(dt)}</span>
       ),
@@ -172,17 +278,28 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
     {
       title: "THAO TÁC",
       key: "action",
-      width: 130,
+      width: 220,
       align: "center",
       render: (_, record) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          style={{ fontWeight: 500, color: "#2563eb" }}
-          onClick={() => handleOpenDetail(record)}
-        >
-          Xem chi tiết
-        </Button>
+        <Space size={4}>
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            style={{ fontWeight: 500, color: "#2563eb", padding: "4px 8px" }}
+            onClick={() => handleOpenDetail(record)}
+          >
+            Chi tiết
+          </Button>
+          <Button
+            type="link"
+            icon={<RedoOutlined />}
+            style={{ fontWeight: 500, color: "#059669", padding: "4px 8px" }}
+            loading={reorderLoadingId === record.id}
+            onClick={() => handleStartReorder(record.id)}
+          >
+            Đặt lại đơn
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -243,6 +360,10 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
       },
     },
   ];
+
+  const selectedItems = reorderItems.filter((it) => selectedProductIds.includes(it.product_id));
+  const totalReorderQuantity = selectedItems.reduce((sum, it) => sum + it.quantity, 0);
+  const totalReorderAmount = selectedItems.reduce((sum, it) => sum + it.quantity * it.current_price, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -388,13 +509,26 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
         footer={[
           <Button
             key="close"
-            type="primary"
             onClick={() => {
               setIsDetailModalOpen(false);
               setSelectedOrder(null);
             }}
           >
             Đóng
+          </Button>,
+          <Button
+            key="reorder"
+            type="primary"
+            icon={<RedoOutlined />}
+            style={{ backgroundColor: "#059669", borderColor: "#059669", fontWeight: 600 }}
+            loading={reorderLoadingId === selectedOrder?.id}
+            onClick={() => {
+              if (selectedOrder) {
+                handleStartReorder(selectedOrder.id);
+              }
+            }}
+          >
+            Đặt lại đơn này
           </Button>,
         ]}
         width={760}
@@ -474,6 +608,223 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 4. Modal Đặt Lại Đơn Hàng (Reorder) */}
+      <Modal
+        open={reorderModalOpen}
+        onCancel={() => setReorderModalOpen(false)}
+        width={920}
+        destroyOnClose
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                backgroundColor: "#ecfdf5",
+                color: "#059669",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 18,
+              }}
+            >
+              <RedoOutlined />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 17, color: "#1e293b" }}>
+                Đặt lại đơn hàng (Reorder)
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 400 }}>
+                Tạo đơn hàng mới dựa trên đơn #{reorderData?.original_order_code} với bảng giá hiện hành
+              </div>
+            </div>
+          </div>
+        }
+        footer={[
+          <Button key="cancel" onClick={() => setReorderModalOpen(false)} disabled={reorderSubmitting}>
+            Hủy
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            icon={<CheckOutlined />}
+            loading={reorderSubmitting}
+            disabled={selectedProductIds.length === 0}
+            style={{
+              backgroundColor: "#059669",
+              borderColor: "#059669",
+              fontWeight: 600,
+              height: 38,
+            }}
+            onClick={handleConfirmReorder}
+          >
+            Xác nhận đặt lại ({selectedProductIds.length} món)
+          </Button>,
+        ]}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 12 }}>
+          {/* Cảnh báo các sản phẩm ngừng kinh doanh nếu có */}
+          {reorderData?.removed_items && reorderData.removed_items.length > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              message={
+                <span style={{ fontWeight: 600 }}>
+                  Một số mặt hàng đã ngừng kinh doanh và được tự động bỏ qua:
+                </span>
+              }
+              description={
+                <div style={{ marginTop: 6 }}>
+                  {reorderData.removed_items.map((it, idx) => (
+                    <div key={idx} style={{ fontSize: 13, color: "#92400e", marginBottom: 2 }}>
+                      • <strong>{it.product_name}</strong> (SKU: {it.sku}) - {it.reason}
+                    </div>
+                  ))}
+                </div>
+              }
+            />
+          )}
+
+          {/* Bảng danh sách mặt hàng đặt lại */}
+          <Table<ReorderItemDetail>
+            rowKey="product_id"
+            rowSelection={{
+              selectedRowKeys: selectedProductIds,
+              onChange: (keys) => setSelectedProductIds(keys),
+            }}
+            dataSource={reorderItems}
+            pagination={false}
+            size="middle"
+            columns={[
+              {
+                title: "MÃ SKU",
+                dataIndex: "sku",
+                key: "sku",
+                width: 110,
+                render: (sku: string) => <Tag color="blue">{sku}</Tag>,
+              },
+              {
+                title: "TÊN SẢN PHẨM",
+                dataIndex: "product_name",
+                key: "product_name",
+                render: (name: string, record) => (
+                  <div>
+                    <Text strong>{name}</Text>
+                    {record.unit && (
+                      <span style={{ color: "#64748b", fontSize: 12, marginLeft: 6 }}>
+                        ({record.unit})
+                      </span>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                title: "ĐƠN GIÁ MỚI",
+                key: "price",
+                width: 160,
+                align: "right",
+                render: (_, r) => (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <Text strong style={{ color: "#0f172a" }}>
+                      {formatMoney(r.current_price)}
+                    </Text>
+                    {r.price_changed && (
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                        Giá cũ: <span style={{ textDecoration: "line-through" }}>{formatMoney(r.old_price)}</span>
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                title: "TỒN KHO",
+                key: "stock",
+                width: 120,
+                align: "center",
+                render: (_, r) => (
+                  <Tag color={r.stock_available > 0 ? "cyan" : "error"}>
+                    {r.stock_available > 0 ? `Còn ${r.stock_available.toLocaleString("vi-VN")}` : "Hết hàng"}
+                  </Tag>
+                ),
+              },
+              {
+                title: "SỐ LƯỢNG",
+                key: "quantity",
+                width: 120,
+                align: "center",
+                render: (_, r) => (
+                  <InputNumber
+                    min={1}
+                    value={r.quantity}
+                    onChange={(val) => handleQuantityChange(r.product_id, val)}
+                    style={{ width: 80 }}
+                  />
+                ),
+              },
+              {
+                title: "THÀNH TIỀN",
+                key: "subtotal",
+                width: 140,
+                align: "right",
+                render: (_, r) => (
+                  <Text strong style={{ color: "#2563eb" }}>
+                    {formatMoney(r.quantity * r.current_price)}
+                  </Text>
+                ),
+              },
+            ]}
+          />
+
+          {/* Ghi chú đơn hàng & Tóm tắt giá trị */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              background: "#f8fafc",
+              padding: "16px",
+              borderRadius: 8,
+              border: "1px solid #e2e8f0",
+              gap: 20,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>
+                Ghi chú đơn hàng:
+              </div>
+              <Input.TextArea
+                rows={2}
+                value={reorderNote}
+                onChange={(e) => setReorderNote(e.target.value)}
+                placeholder="Nhập ghi chú cho đơn hàng đặt lại này..."
+              />
+            </div>
+
+            <div style={{ textAlign: "right", minWidth: 200 }}>
+              <div style={{ fontSize: 13, color: "#64748b" }}>
+                Số mặt hàng chọn:{" "}
+                <Text strong style={{ color: "#1e293b" }}>
+                  {selectedItems.length} / {reorderItems.length}
+                </Text>
+              </div>
+              <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                Tổng số lượng:{" "}
+                <Text strong style={{ color: "#1e293b" }}>
+                  {totalReorderQuantity.toLocaleString("vi-VN")}
+                </Text>
+              </div>
+              <Divider style={{ margin: "10px 0" }} />
+              <div style={{ fontSize: 13, color: "#475569" }}>Tổng tiền thanh toán dự kiến:</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#059669", marginTop: 2 }}>
+                {formatMoney(totalReorderAmount)}
+              </div>
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );

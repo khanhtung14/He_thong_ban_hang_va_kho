@@ -20,8 +20,10 @@ import {
   Statistic,
   Steps,
   Divider,
+  Dropdown,
 } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
+import type { MenuProps } from "antd";
 import {
   SearchOutlined,
   UserSwitchOutlined,
@@ -37,6 +39,9 @@ import {
   SafetyCertificateOutlined,
   ArrowRightOutlined,
   TeamOutlined,
+  DownOutlined,
+  EditOutlined,
+  MoreOutlined,
 } from "@ant-design/icons";
 import CreateCustomerModal from "../admin/CreateCustomerModal";
 import DeliveryAddressesModal from "../../components/DeliveryAddressesModal";
@@ -47,6 +52,7 @@ import {
   fetchSalesReps as fetchSalesRepsApi,
   fetchTerritories,
   assignSalesRep,
+  updateManagerCustomer,
   type CustomerItem,
   type SalesRepUser,
   type TerritoryItem,
@@ -69,6 +75,12 @@ export const CustomerTerritoryManagement: React.FC = () => {
   const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [selectedCustomerForAddress, setSelectedCustomerForAddress] = useState<CustomerItem | null>(null);
+
+  // State Modal Chỉnh sửa thông tin đại lý
+  const [isEditCustomerModalOpen, setIsEditCustomerModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
+  const [editCustomerLoading, setEditCustomerLoading] = useState(false);
+  const [editCustomerForm] = Form.useForm();
 
   // Dữ liệu tổng thể dùng để thống kê
   const [allCustomers, setAllCustomers] = useState<CustomerItem[]>([]);
@@ -397,7 +409,7 @@ export const CustomerTerritoryManagement: React.FC = () => {
 
       message.success(
         res.message ||
-          `Đã chuyển giao thành công ${selectedHandoverCustomerKeys.length} đại lý từ ${fromRep?.full_name} sang ${toRep?.full_name}!`
+        `Đã chuyển giao thành công ${selectedHandoverCustomerKeys.length} đại lý từ ${fromRep?.full_name} sang ${toRep?.full_name}!`
       );
 
       // Reset form bàn giao
@@ -431,6 +443,55 @@ export const CustomerTerritoryManagement: React.FC = () => {
     onChange: (keys) => setSelectedRowKeys(keys),
   };
 
+  // Handler mở Modal Chỉnh sửa thông tin đại lý
+  const handleOpenEditModal = (customer: CustomerItem) => {
+    setEditingCustomer(customer);
+    const isLockedOrInactive = customer.is_locked || customer.is_active === false;
+    editCustomerForm.setFieldsValue({
+      code: customer.code,
+      name: customer.name,
+      phone: customer.phone || "",
+      customer_group: customer.customer_group || "DEALER_LEVEL_1",
+      territory_id: customer.territory_id || undefined,
+      region: customer.region || "",
+      status: isLockedOrInactive ? "INACTIVE" : "ACTIVE",
+    });
+    setIsEditCustomerModalOpen(true);
+  };
+
+  // Handler lưu cập nhật thông tin đại lý (PUT /api/v1/manager/customers/{id})
+  const handleSaveEditCustomer = async () => {
+    try {
+      const values = await editCustomerForm.validateFields();
+      if (!editingCustomer) return;
+
+      setEditCustomerLoading(true);
+      const isActive = values.status === "ACTIVE";
+      const selectedTerritory = territories.find((t) => t.id === values.territory_id);
+
+      await updateManagerCustomer(editingCustomer.id, {
+        name: values.name.trim(),
+        phone: values.phone ? values.phone.trim() : undefined,
+        customer_group: values.customer_group,
+        territory_id: values.territory_id || null,
+        region: values.region?.trim() || selectedTerritory?.name || editingCustomer.region || undefined,
+        status: values.status,
+        is_active: isActive,
+      });
+
+      message.success(`Đã cập nhật thông tin đại lý "${values.name.trim()}" thành công!`);
+      setIsEditCustomerModalOpen(false);
+      setEditingCustomer(null);
+      await loadData();
+      await loadStatsData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Có lỗi xảy ra khi cập nhật đại lý.";
+      message.error(msg);
+    } finally {
+      setEditCustomerLoading(false);
+    }
+  };
+
   // Columns Bảng Đại lý (Tab 1)
   const customerColumns: ColumnsType<CustomerItem> = [
     {
@@ -450,9 +511,33 @@ export const CustomerTerritoryManagement: React.FC = () => {
       key: "name",
       render: (name: string, record) => (
         <div>
-          <div style={{ fontWeight: 600 }}>{name}</div>
+          <Tooltip title="Bấm để chỉnh sửa thông tin đại lý">
+            <span
+              onClick={() => handleOpenEditModal(record)}
+              style={{
+                fontWeight: 600,
+                color: "#2563eb",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = "underline";
+                e.currentTarget.style.color = "#1d4ed8";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = "none";
+                e.currentTarget.style.color = "#2563eb";
+              }}
+            >
+              {name}
+              <EditOutlined style={{ fontSize: 12, opacity: 0.7 }} />
+            </span>
+          </Tooltip>
           {record.phone && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 2 }}>
               SĐT: {record.phone}
             </Text>
           )}
@@ -544,40 +629,63 @@ export const CustomerTerritoryManagement: React.FC = () => {
     {
       title: "THAO TÁC",
       key: "actions",
-      width: 280,
-      render: (_, r) => (
-        <Space size="small">
-          <Button
-            size="small"
-            icon={<EnvironmentOutlined />}
-            onClick={() => {
+      width: 130,
+      align: "center",
+      render: (_, r) => {
+        const actionMenuItems: MenuProps["items"] = [
+          {
+            key: "edit",
+            icon: <EditOutlined style={{ color: "#2563eb", fontSize: 14 }} />,
+            label: "Chỉnh sửa thông tin",
+            onClick: () => handleOpenEditModal(r),
+          },
+          {
+            type: "divider",
+          },
+          {
+            key: "delivery",
+            icon: <EnvironmentOutlined style={{ color: "#0284c7", fontSize: 14 }} />,
+            label: "Quản lý điểm giao hàng",
+            onClick: () => {
               setSelectedCustomerForAddress(r);
               setIsAddressModalOpen(true);
-            }}
-            style={{ color: "#2563eb", borderColor: "#93c5fd" }}
-          >
-            Điểm giao
-          </Button>
-          <Button
-            size="small"
-            type="primary"
-            ghost
-            icon={<UserSwitchOutlined />}
-            onClick={() => openSingleAssignModal(r)}
-          >
-            {r.sales_rep_id ? "Đổi NVKD" : "Gán NVKD"}
-          </Button>
-          <Tooltip title={canEditCreditLimit ? "Điều chỉnh hạn mức tín dụng & ngày nợ" : "Xem hạn mức tín dụng & ngày nợ (Chỉ xem)"}>
+            },
+          },
+          {
+            key: "assign",
+            icon: <UserSwitchOutlined style={{ color: "#7c3aed", fontSize: 14 }} />,
+            label: r.sales_rep_id ? "Đổi NVKD phụ trách" : "Phân bổ NVKD phụ trách",
+            onClick: () => openSingleAssignModal(r),
+          },
+          {
+            key: "credit",
+            icon: <SafetyCertificateOutlined style={{ color: "#059669", fontSize: 14 }} />,
+            label: canEditCreditLimit ? "Cập nhật hạn mức nợ" : "Xem hạn mức nợ",
+            onClick: () => setCreditLimitModal({ visible: true, customer: r }),
+          },
+        ];
+
+        return (
+          <Dropdown menu={{ items: actionMenuItems }} trigger={["click"]} placement="bottomRight">
             <Button
-              size="small"
-              icon={<SafetyCertificateOutlined style={{ color: "#059669" }} />}
-              onClick={() => setCreditLimitModal({ visible: true, customer: r })}
+              size="middle"
+              style={{
+                borderRadius: 8,
+                fontWeight: 500,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 12px",
+                borderColor: "#cbd5e1",
+                color: "#334155",
+              }}
             >
-              {canEditCreditLimit ? "Hạn mức" : "Xem hạn mức"}
+              <span>Thao tác</span>
+              <DownOutlined style={{ fontSize: 11, color: "#64748b" }} />
             </Button>
-          </Tooltip>
-        </Space>
-      ),
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -1328,8 +1436,8 @@ export const CustomerTerritoryManagement: React.FC = () => {
               {selectedCustomer
                 ? `Phân Công Phụ Trách: ${selectedCustomer.name}`
                 : selectedRowKeys.length > 0
-                ? `Phân Công Hàng Loạt Cho ${selectedRowKeys.length} Đại Lý`
-                : "Phân Công Đại Lý Mới"}
+                  ? `Phân Công Hàng Loạt Cho ${selectedRowKeys.length} Đại Lý`
+                  : "Phân Công Đại Lý Mới"}
             </span>
           </div>
         }
@@ -1491,6 +1599,124 @@ export const CustomerTerritoryManagement: React.FC = () => {
           loadData();
         }}
       />
+
+      {/* Modal Chỉnh sửa thông tin đại lý */}
+      <Modal
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                backgroundColor: "#eff6ff",
+                color: "#2563eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 18,
+              }}
+            >
+              <EditOutlined />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>Chỉnh sửa thông tin đại lý</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                Mã đại lý: <strong style={{ color: "#1e40af" }}>{editingCustomer?.code}</strong> - {editingCustomer?.name}
+              </div>
+            </div>
+          </div>
+        }
+        open={isEditCustomerModalOpen}
+        onCancel={() => {
+          setIsEditCustomerModalOpen(false);
+          setEditingCustomer(null);
+        }}
+        onOk={handleSaveEditCustomer}
+        confirmLoading={editCustomerLoading}
+        okText="Lưu thay đổi"
+        cancelText="Hủy"
+        width={560}
+        destroyOnClose
+      >
+        <Form
+          form={editCustomerForm}
+          layout="vertical"
+          style={{ marginTop: 16 }}
+        >
+          <Form.Item name="code" label="Mã đại lý">
+            <Input disabled style={{ backgroundColor: "#f1f5f9", color: "#475569", fontWeight: 600 }} />
+          </Form.Item>
+
+          <Form.Item
+            name="name"
+            label="Tên đại lý"
+            rules={[{ required: true, message: "Vui lòng nhập tên đại lý!" }]}
+          >
+            <Input placeholder="Nhập tên đại lý..." />
+          </Form.Item>
+
+          <Form.Item
+            name="phone"
+            label="Số điện thoại đại diện"
+          >
+            <Input placeholder="Ví dụ: 0912345678" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="customer_group"
+                label="Phân nhóm đại lý"
+                rules={[{ required: true, message: "Vui lòng chọn phân nhóm!" }]}
+              >
+                <Select placeholder="Chọn phân nhóm...">
+                  <Option value="DEALER_LEVEL_1">Đại lý Cấp 1</Option>
+                  <Option value="DEALER_LEVEL_2">Đại lý Cấp 2</Option>
+                  <Option value="RETAIL">Khách lẻ</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="status"
+                label="Trạng thái hoạt động"
+                rules={[{ required: true, message: "Vui lòng chọn trạng thái!" }]}
+              >
+                <Select placeholder="Chọn trạng thái...">
+                  <Option value="ACTIVE">
+                    <Tag color="success" style={{ marginRight: 0 }}>Hoạt động</Tag>
+                  </Option>
+                  <Option value="INACTIVE">
+                    <Tag color="error" style={{ marginRight: 0 }}>Ngừng giao dịch</Tag>
+                  </Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="territory_id"
+            label="Địa bàn phụ trách"
+            tooltip="Gán địa bàn/vùng thị trường quản lý cho đại lý"
+          >
+            <Select placeholder="-- Chọn địa bàn / khu vực --" allowClear showSearch optionFilterProp="children">
+              {territories.map((t) => (
+                <Option key={t.id} value={t.id}>
+                  {t.name} ({t.code})
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="region"
+            label="Ghi chú khu vực / Vùng thị trường"
+          >
+            <Input placeholder="Ví dụ: Miền Bắc, Hà Nội, v.v." />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

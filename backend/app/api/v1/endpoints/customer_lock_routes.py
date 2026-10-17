@@ -933,6 +933,7 @@ from app.api.v1.endpoints.customers import (
 )
 
 
+@router.put("/manager/customers/{customer_id}")
 @router.put("/customers/{customer_id}")
 def update_customer_in_lock_router(
     customer_id: int,
@@ -1912,6 +1913,211 @@ def get_portal_orders(
         results.append(_build_full_order_response(ord, db, customer))
 
     return results
+
+
+class ReorderItemDetail(BaseModel):
+    product_id: int
+    sku: str
+    product_name: str
+    unit: str = "Cái"
+    quantity: int
+    unit_price: float
+    current_price: float
+    old_price: float
+    price_changed: bool = False
+    subtotal: float
+    floor_price: Optional[float] = None
+    available_qty: float = 0.0
+    stock_available: float = 0.0
+    is_available: bool = True
+    is_selected: bool = True
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class RemovedReorderItem(BaseModel):
+    product_id: Optional[int] = None
+    sku: str
+    product_name: str
+    quantity: int
+    old_price: Optional[float] = None
+    reason: str = "Sản phẩm đã ngừng kinh doanh"
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class ReorderPreparationResponse(BaseModel):
+    success: bool = True
+    order_id: int
+    original_order_code: str
+    customer_id: int
+    customer_name: str
+    default_delivery_point_id: Optional[int] = None
+    delivery_address_id: Optional[int] = None
+    items: List[ReorderItemDetail] = Field(default_factory=list)
+    removed_items: List[RemovedReorderItem] = Field(default_factory=list)
+    warehouse_id: Optional[int] = None
+    warehouse_name: Optional[str] = None
+    warning_message: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+@router.get("/portal/orders/{order_id}/reorder-items", response_model=ReorderPreparationResponse)
+@router.post("/portal/orders/{order_id}/reorder", response_model=ReorderPreparationResponse)
+def prepare_order_reorder(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Chuẩn bị dữ liệu đặt lại đơn hàng (Reorder) cho đại lý:
+    1. Kiểm tra quyền sở hữu đơn hàng (chỉ đại lý sở hữu đơn mới được đặt lại).
+    2. Lấy tất cả mặt hàng từ đơn cũ.
+    3. Kiểm tra trạng thái kinh doanh: sản phẩm ngừng bán được ghi nhận vào removed_items và loại bỏ.
+    4. Tính lại đơn giá theo Bảng giá hiện hành của đại lý (áp current_price).
+    5. Kiểm tra tồn kho khả dụng tại kho phục vụ.
+    6. Trả về payload: items, removed_items, default_delivery_point_id.
+    """
+    customer = _resolve_customer_for_user(db, user)
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản của bạn chưa được liên kết với hồ sơ đại lý nào.",
+        )
+
+    order = (
+        db.execute(
+            select(Order)
+            .options(selectinload(Order.items))
+            .where(Order.id == order_id)
+        )
+        .scalar_one_or_none()
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy đơn hàng với ID #{order_id}.",
+        )
+
+    # Bảo mật: Chỉ cho phép đặt lại đơn của chính đại lý đó
+    if order.customer_id != customer.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền truy cập hoặc đặt lại đơn hàng của đại lý khác.",
+        )
+
+    # Xác định kho phục vụ đại lý
+    wh_override = getattr(order, "warehouse_id", None) or getattr(customer, "warehouse_id", None)
+    serving_wh = get_customer_serving_warehouse(db, customer.id, wh_override)
+    wh_id = serving_wh.id if serving_wh else 1
+
+    items: List[dict] = []
+    removed_items: List[dict] = []
+
+    for it in order.items:
+        sku = (it.sku or "").strip().upper()
+        prod = None
+        if it.product_id:
+            prod = db.get(Product, it.product_id)
+        if not prod and sku:
+            prod = db.query(Product).filter(func.upper(Product.sku) == sku).first()
+
+        # Kiểm tra trạng thái kinh doanh của sản phẩm
+        is_discontinued = False
+        if not prod:
+            is_discontinued = True
+        else:
+            prod_status = getattr(prod, "status", "ACTIVE") or "ACTIVE"
+            if prod_status.upper() in ["DISCONTINUED", "INACTIVE", "STOPPED", "NGỪNG BÁN", "NGỪNG KINH DOANH"]:
+                is_discontinued = True
+            elif getattr(prod, "is_active", True) is False:
+                is_discontinued = True
+
+        if is_discontinued:
+            removed_items.append({
+                "product_id": prod.id if prod else it.product_id,
+                "sku": sku or (prod.sku if prod else "UNKNOWN"),
+                "product_name": it.product_name or (prod.name if prod else sku),
+                "quantity": it.quantity,
+                "old_price": it.unit_price,
+                "reason": "Sản phẩm đã ngừng kinh doanh",
+            })
+            continue
+
+        # Sản phẩm còn kinh doanh: tính lại đơn giá theo Bảng giá hiện hành
+        cust_group = getattr(customer, "customer_group", None) or "DEFAULT"
+        effective = resolve_effective_price(db, prod.sku, cust_group)
+        if not effective and cust_group != "DEFAULT":
+            effective = resolve_effective_price(db, prod.sku, "DEFAULT")
+        current_price = (
+            float(effective["sale_price"])
+            if effective and effective.get("sale_price") is not None
+            else (float(prod.base_price) if prod.base_price is not None and prod.base_price > 0 else float(it.unit_price))
+        )
+        floor_price = float(effective["floor_price"]) if effective and effective.get("floor_price") is not None else None
+
+        # Kiểm tra tồn kho khả dụng
+        stock_info = get_available_stock_info(db, prod.sku, wh_id)
+        avail = float(stock_info.get("available_qty", 0.0) or 0.0)
+
+        items.append({
+            "product_id": prod.id,
+            "sku": prod.sku,
+            "product_name": prod.name,
+            "unit": getattr(prod, "base_unit", "Cái") or "Cái",
+            "quantity": it.quantity,
+            "unit_price": current_price,
+            "current_price": current_price,
+            "old_price": float(it.unit_price),
+            "price_changed": round(current_price, 2) != round(float(it.unit_price), 2),
+            "subtotal": round(current_price * it.quantity, 2),
+            "floor_price": floor_price,
+            "available_qty": avail,
+            "stock_available": avail,
+            "is_available": avail >= it.quantity,
+            "is_selected": True,
+        })
+
+    # Điểm giao hàng mặc định
+    default_delivery_point_id = order.delivery_address_id
+    if not default_delivery_point_id:
+        def_addr = (
+            db.query(DeliveryAddress.id)
+            .filter(DeliveryAddress.customer_id == customer.id, DeliveryAddress.is_default == True)
+            .first()
+        )
+        if def_addr:
+            default_delivery_point_id = def_addr[0]
+        else:
+            any_addr = (
+                db.query(DeliveryAddress.id)
+                .filter(DeliveryAddress.customer_id == customer.id)
+                .first()
+            )
+            if any_addr:
+                default_delivery_point_id = any_addr[0]
+
+    warn_msg = None
+    if removed_items:
+        names = ", ".join([f"'{item['product_name']}'" for item in removed_items])
+        warn_msg = f"Một số mặt hàng đã ngừng kinh doanh và được tự động bỏ qua: {names}."
+
+    return {
+        "success": True,
+        "order_id": order.id,
+        "original_order_code": order.order_code,
+        "customer_id": customer.id,
+        "customer_name": customer.name,
+        "default_delivery_point_id": default_delivery_point_id,
+        "delivery_address_id": default_delivery_point_id,
+        "items": items,
+        "removed_items": removed_items,
+        "warehouse_id": wh_id,
+        "warehouse_name": serving_wh.name if serving_wh else None,
+        "warning_message": warn_msg,
+    }
+
 
 
 @router.get("/orders/pending-approval", response_model=List[OrderResponse])

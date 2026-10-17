@@ -123,7 +123,7 @@ MENU_REGISTRY: List[MenuItem] = [
         title="Khách hàng / Đại lý",
         path="/sales/customers",
         icon="building",
-        roles=["SALES", "SALES_REP", "SALES_MANAGER", "ADMIN"],
+        roles=["SALES", "SALES_REP", "ADMIN"],
         order=70,
         category="Bán hàng",
     ),

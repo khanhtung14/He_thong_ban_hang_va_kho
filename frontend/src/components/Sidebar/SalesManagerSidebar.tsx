@@ -93,7 +93,14 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       ? customMenuItems
       : defaultMenuItems
   ).filter(
-    (item) => item.path !== "/sales/assignments" && item.id !== "sales-assignments"
+    (item) =>
+      item.path !== "/sales/assignments" &&
+      item.id !== "sales-assignments" &&
+      item.path !== "/sales/customers" &&
+      item.id !== "customers-list" &&
+      item.id !== "customers" &&
+      item.title !== "Khách hàng / Đại lý" &&
+      item.title !== "Khách hàng & Đại lý"
   );
 
   // Đảm bảo mục "Sản phẩm" luôn luôn có mặt trong menu của Sales Manager
@@ -138,7 +145,7 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
     }
   }
 
-  // Lọc bỏ các mục không dùng (Bảng giá, Quản lý nhóm hàng cũ, Nhập sản phẩm Excel) và deduplicate
+  // Lọc bỏ các mục không dùng (Bảng giá, Quản lý nhóm hàng cũ, Nhập sản phẩm Excel, Khách hàng / Đại lý cũ) và deduplicate
   const filteredItems = baseItems
     .filter(
       (item) =>
@@ -151,7 +158,12 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
         item.title !== "Chính sách giá & Chiết khấu" &&
         item.path !== "/manager/products/import" &&
         item.id !== "excel-import" &&
-        item.title !== "Nhập sản phẩm (Excel)"
+        item.title !== "Nhập sản phẩm (Excel)" &&
+        item.title !== "Khách hàng / Đại lý" &&
+        item.title !== "Khách hàng & Đại lý" &&
+        item.path !== "/sales/customers" &&
+        item.id !== "customers-list" &&
+        item.id !== "customers"
     )
     .filter(
       (item, index, self) =>
