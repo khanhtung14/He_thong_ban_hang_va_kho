@@ -736,9 +736,11 @@
   "driverName": "Bác Tài C",
   "vehicleNumber": "29H-123.45",
   "dispatchIds": [401, 402, 403],
-  "routeName": "Tuyến Cầu Giấy - Từ Liêm"
+  "routeName": "Tuyến Cầu Giấy - Từ Liêm",
+  "estimatedDeliveryAt": "2026-10-17T17:00:00+07:00"
 }
 ```
+- **SCRUM-50:** `estimatedDeliveryAt` là thời gian giao dự kiến RFC 3339, tùy chọn để tương thích chuyến cũ. Chuyến quá giờ khi đã qua thời điểm này và còn ít nhất một điểm chưa giao.
 - **Validation:** `dispatchIds` phải có ít nhất một mã; mọi phiếu xuất phải tồn tại, đã xuất kho, chưa thuộc chuyến khác và cùng địa bàn giao. Trả `404` nếu có phiếu không tồn tại, `409` nếu phiếu không đủ điều kiện và `422` nếu trộn địa bàn.
 - **Response Data:**
 ```json
@@ -748,6 +750,7 @@
   "vehicleNumber": "29H-123.45",
   "routeName": "Tuyến Cầu Giấy - Từ Liêm",
   "status": "IN_PROGRESS",
+  "estimatedDeliveryAt": "2026-10-17T17:00:00+07:00",
   "dispatchIds": [401, 402, 403],
   "deliveredStops": 0,
   "remainingStops": 3
@@ -761,10 +764,13 @@
 - **Response Data:** Mảng phiếu gồm `dispatchId`, `orderId`, `orderCode`, `customerName`, `regionName`, `receiverName`, `phone`, `address`, `status`. `regionName` lấy từ địa bàn của đại lý, hoặc `Chưa phân khu` nếu chưa gán. Điểm nhận lấy từ địa chỉ giao mặc định của đại lý; nếu chưa có thì dùng số điện thoại đại lý và để địa chỉ/người nhận rỗng.
 
 #### `GET /deliveries/trips/active`
-- **Story:** S6-07, SCRUM-47
+- **Story:** S6-07, SCRUM-47, SCRUM-50
 - **Phân quyền:** WH Manager, Sales Manager
-- **Response Data:** Mảng chuyến có trạng thái `IN_PROGRESS`. Mỗi chuyến trả `id`, `driverName`, `vehicleNumber`, `routeName`, `status`, `deliveredStops`, `remainingStops` và `stops`. Mỗi điểm trong `stops` trả `dispatchId`, `orderId`, `orderCode`, `customerName`, `regionName`, `receiverName`, `phone`, `address`, `deliveryStatus`.
+- **Response Data:** Mảng chuyến có trạng thái `IN_PROGRESS`. Mỗi chuyến trả `id`, `driverName`, `vehicleNumber`, `routeName`, `status`, `estimatedDeliveryAt`, `isOverdue`, `inTransitAmount`, `isAmountComplete`, `deliveredStops`, `remainingStops` và `stops`. Mỗi điểm trong `stops` trả `dispatchId`, `orderId`, `orderCode`, `customerName`, `regionName`, `receiverName`, `phone`, `address`, `deliveryStatus`.
 - `deliveredStops` đếm điểm có trạng thái phiếu `DELIVERED`; `remainingStops` đếm các điểm còn lại. Điểm giao lấy địa chỉ mặc định của đại lý, theo quy tắc endpoint phiếu xuất khả dụng.
+- `isOverdue` là `true` khi `estimatedDeliveryAt` đã qua và còn điểm chưa giao; chuyến cũ không có giờ dự kiến trả `false`.
+- `inTransitAmount` cộng giá trị thực xuất của các phiếu chưa giao trong chuyến. Với từng sản phẩm, đơn giá cơ sở là `Σ(quantity × unitPrice) ÷ Σ(quantity × conversionRate)` trên các dòng đơn hàng tương ứng; giá trị dòng xuất là `actualQty × đơn giá cơ sở`. Nếu dữ liệu phiếu, đơn vị quy đổi hoặc giá không đủ để tính thì trả `null` và `isAmountComplete: false`.
+- Phiếu chưa giao vẫn nằm trong chuyến và được tính trong giá trị hàng đang lưu thông; không tự khôi phục tồn kho khi truy vấn hoặc khi quá giờ.
 
 #### Cơ chế in danh sách giao của SCRUM-47
 - Frontend in chuyến đã tải từ `GET /deliveries/trips/active` bằng chức năng in của trình duyệt. Bản in gồm tên tuyến, tài xế, biển số và các điểm giao theo thứ tự API trả về, kèm địa chỉ và số điện thoại người nhận. Không phát sinh endpoint in riêng.

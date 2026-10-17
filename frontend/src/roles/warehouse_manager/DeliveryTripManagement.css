@@ -11,6 +11,7 @@
 .delivery-active-card .ant-card-head-title { white-space: normal; }
 .delivery-trip-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-bottom: 16px; border-bottom: 1px solid #eef1f6; }
 .delivery-trip-meta span { display: grid; gap: 4px; }
+.delivery-transit-value { display: grid; gap: 4px; margin-top: 14px; padding: 12px; border-radius: 8px; background: #f5f8ff; }
 .delivery-stop-list { margin: 16px 0 0; padding-left: 24px; }
 .delivery-stop-list li { padding: 0 0 14px 4px; margin-bottom: 14px; border-bottom: 1px solid #f0f2f5; }
 .delivery-stop-list li:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }

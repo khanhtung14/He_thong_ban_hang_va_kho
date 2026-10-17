@@ -736,6 +736,7 @@ class DeliveryTrip(Base):
     vehicle_number: Mapped[str] = mapped_column(String(50), nullable=False)
     route_name: Mapped[Optional[str]] = mapped_column(String(150))
     status: Mapped[str] = mapped_column(String(30), default="IN_PROGRESS")
+    estimated_delivery_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class DeliveryTripDispatch(Base):

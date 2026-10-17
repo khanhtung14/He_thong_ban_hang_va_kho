@@ -2410,6 +2410,14 @@ export interface components {
             routeName: string;
             /** Status */
             status: string;
+            /** Estimateddeliveryat */
+            estimatedDeliveryAt?: string | null;
+            /** Isoverdue */
+            isOverdue: boolean;
+            /** Intransitamount */
+            inTransitAmount?: number | null;
+            /** Isamountcomplete */
+            isAmountComplete: boolean;
             /** Deliveredstops */
             deliveredStops: number;
             /** Remainingstops */
@@ -2704,6 +2712,8 @@ export interface components {
             routeName: string;
             /** Status */
             status: string;
+            /** Estimateddeliveryat */
+            estimatedDeliveryAt?: string | null;
             /** Dispatchids */
             dispatchIds: number[];
             /** Deliveredstops */
@@ -3080,6 +3090,8 @@ export interface components {
             dispatchIds: number[];
             /** Routename */
             routeName: string;
+            /** Estimateddeliveryat */
+            estimatedDeliveryAt?: string | null;
         };
         /** DiscountPolicyCreate */
         DiscountPolicyCreate: {

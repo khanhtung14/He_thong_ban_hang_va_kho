@@ -168,6 +168,7 @@ def migrate_pricing_schema():
         except Exception:
             pass
 
+
     # Khởi tạo bản ghi giá ban đầu cho các sản phẩm chưa có lịch sử giá
     inspector = inspect(engine)
     if inspector.has_table("product_price_history") and inspector.has_table("products"):
@@ -182,3 +183,13 @@ def migrate_pricing_schema():
         except Exception:
             pass
 
+
+def migrate_delivery_trip_schema():
+    """Add nullable ETA to existing trip tables without changing existing rows."""
+    inspector = inspect(engine)
+    if not inspector.has_table("delivery_trips"):
+        return
+    existing = {column["name"] for column in inspector.get_columns("delivery_trips")}
+    if "estimated_delivery_at" not in existing:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE delivery_trips ADD COLUMN estimated_delivery_at DATETIME NULL"))

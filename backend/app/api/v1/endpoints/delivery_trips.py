@@ -1,6 +1,7 @@
 """Trip planning and active delivery tracking endpoints (SCRUM-47)."""
 
-from typing import List
+from datetime import datetime, timezone
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -14,7 +15,10 @@ from app.models.models import (
     DeliveryTrip,
     DeliveryTripDispatch,
     Dispatch,
+    DispatchItem,
     Order,
+    OrderItem,
+    ProductUnit,
     Territory,
 )
 
@@ -28,6 +32,7 @@ class DeliveryTripCreate(BaseModel):
     vehicleNumber: str = Field(..., min_length=1, max_length=50)
     dispatchIds: List[int] = Field(..., min_length=1)
     routeName: str = Field(..., min_length=1, max_length=150)
+    estimatedDeliveryAt: Optional[datetime] = None
 
 
 class ApiEnvelope(BaseModel):
@@ -54,6 +59,7 @@ class CreatedTrip(BaseModel):
     vehicleNumber: str
     routeName: str
     status: str
+    estimatedDeliveryAt: Optional[datetime] = None
     dispatchIds: List[int]
     deliveredStops: int
     remainingStops: int
@@ -69,6 +75,10 @@ class ActiveTrip(BaseModel):
     vehicleNumber: str
     routeName: str
     status: str
+    estimatedDeliveryAt: Optional[datetime] = None
+    isOverdue: bool
+    inTransitAmount: Optional[float] = None
+    isAmountComplete: bool
     deliveredStops: int
     remainingStops: int
     stops: List[ActiveStop]
@@ -109,6 +119,38 @@ def _format_stop(db: Session, dispatch: Dispatch) -> dict:
         "address": address.address if address else "",
         "status": dispatch.status,
     }
+
+
+def _trip_amount(db: Session, dispatches: List[Dispatch]) -> tuple[Optional[float], bool]:
+    """Value undelivered shipped quantities using each order's base-unit selling price."""
+    amount = 0.0
+    complete = True
+    for dispatch in dispatches:
+        if dispatch.status == "DELIVERED":
+            continue
+        items = db.query(DispatchItem).filter(DispatchItem.dispatch_id == dispatch.id).all()
+        if not items:
+            complete = False
+            continue
+        order_items = db.query(OrderItem).filter(OrderItem.order_id == dispatch.order_id).all()
+        for shipped in items:
+            lines = [line for line in order_items if line.product_id == shipped.product_id]
+            base_qty = 0.0
+            base_value = 0.0
+            line_price_complete = True
+            for line in lines:
+                unit = db.get(ProductUnit, line.unit_id) if line.unit_id else None
+                conversion = unit.conversion_rate if unit else (1.0 if line.unit_id is None else None)
+                if not conversion or conversion <= 0:
+                    line_price_complete = False
+                    continue
+                base_qty += max(float(line.quantity), 0.0) * conversion
+                base_value += max(float(line.quantity), 0.0) * float(line.unit_price)
+            if base_qty <= 0 or not lines or not line_price_complete:
+                complete = False
+                continue
+            amount += float(shipped.actual_qty) * base_value / base_qty
+    return (amount if complete else None), complete
 
 
 @warehouse_router.get("/available", response_model=AvailableDispatchResponse)
@@ -185,6 +227,7 @@ def create_delivery_trip(
         vehicle_number=data.vehicleNumber.strip(),
         route_name=data.routeName.strip(),
         status="IN_PROGRESS",
+        estimated_delivery_at=data.estimatedDeliveryAt,
     )
     db.add(trip)
     db.flush()
@@ -203,6 +246,7 @@ def create_delivery_trip(
             "vehicleNumber": trip.vehicle_number,
             "routeName": trip.route_name,
             "status": trip.status,
+            "estimatedDeliveryAt": trip.estimated_delivery_at,
             "dispatchIds": data.dispatchIds,
             "deliveredStops": 0,
             "remainingStops": len(data.dispatchIds),
@@ -237,14 +281,25 @@ def list_active_delivery_trips(
                 stop["deliveryStatus"] = dispatch.status
                 stops.append(stop)
         delivered = sum(stop["deliveryStatus"] == "DELIVERED" for stop in stops)
+        remaining = len(stops) - delivered
+        eta = trip.estimated_delivery_at
+        if eta is not None and eta.tzinfo is None:
+            eta = eta.replace(tzinfo=timezone.utc)
+        is_overdue = bool(eta and eta < datetime.now(timezone.utc) and remaining > 0)
+        trip_dispatches = [db.get(Dispatch, link.dispatch_id) for link in links]
+        in_transit_amount, amount_complete = _trip_amount(db, [item for item in trip_dispatches if item is not None])
         active_trips.append({
             "id": trip.id,
             "driverName": trip.driver_name,
             "vehicleNumber": trip.vehicle_number,
             "routeName": trip.route_name or "",
             "status": trip.status,
+            "estimatedDeliveryAt": trip.estimated_delivery_at,
+            "isOverdue": is_overdue,
+            "inTransitAmount": in_transit_amount,
+            "isAmountComplete": amount_complete,
             "deliveredStops": delivered,
-            "remainingStops": len(stops) - delivered,
+            "remainingStops": remaining,
             "stops": stops,
         })
 

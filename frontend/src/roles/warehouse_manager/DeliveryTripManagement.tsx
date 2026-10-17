@@ -31,6 +31,7 @@ export const DeliveryTripManagement: React.FC = () => {
   const [driverName, setDriverName] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [routeName, setRouteName] = useState("");
+  const [estimatedDeliveryAt, setEstimatedDeliveryAt] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -69,8 +70,8 @@ export const DeliveryTripManagement: React.FC = () => {
   ], []);
 
   const submit = async () => {
-    if (!selectedIds.length || !driverName.trim() || !vehicleNumber.trim() || !routeName.trim()) {
-      setError("Chọn ít nhất một phiếu xuất và điền đủ tài xế, phương tiện, tên tuyến.");
+    if (!selectedIds.length || !driverName.trim() || !vehicleNumber.trim() || !routeName.trim() || !estimatedDeliveryAt) {
+      setError("Chọn ít nhất một phiếu xuất, điền thông tin chuyến và giờ giao dự kiến.");
       return;
     }
     setSaving(true);
@@ -80,12 +81,14 @@ export const DeliveryTripManagement: React.FC = () => {
         driverName: driverName.trim(),
         vehicleNumber: vehicleNumber.trim(),
         routeName: routeName.trim(),
+        estimatedDeliveryAt: new Date(estimatedDeliveryAt).toISOString(),
         dispatchIds: selectedIds.map(Number),
       });
       setSelectedIds([]);
       setDriverName("");
       setVehicleNumber("");
       setRouteName("");
+      setEstimatedDeliveryAt("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể tạo chuyến giao.");
@@ -117,6 +120,7 @@ export const DeliveryTripManagement: React.FC = () => {
           <Col xs={24} md={8}><label htmlFor="delivery-driver">Tài xế</label><Input id="delivery-driver" value={driverName} onChange={(event) => setDriverName(event.target.value)} placeholder="Tên tài xế" maxLength={150} /></Col>
           <Col xs={24} md={8}><label htmlFor="delivery-vehicle">Phương tiện</label><Input id="delivery-vehicle" value={vehicleNumber} onChange={(event) => setVehicleNumber(event.target.value)} placeholder="Biển số xe" maxLength={50} /></Col>
           <Col xs={24} md={8}><label htmlFor="delivery-route">Tuyến giao</label><Input id="delivery-route" value={routeName} onChange={(event) => setRouteName(event.target.value)} placeholder="Ví dụ: Cầu Giấy - Từ Liêm" maxLength={150} /></Col>
+          <Col xs={24} md={8}><label htmlFor="delivery-eta">Giờ giao dự kiến</label><Input id="delivery-eta" type="datetime-local" value={estimatedDeliveryAt} onChange={(event) => setEstimatedDeliveryAt(event.target.value)} /></Col>
         </Row>
         <div className="delivery-trip-table-heading">
           <Title level={5}>Phiếu xuất chờ phân tuyến</Title>
@@ -155,11 +159,13 @@ export const DeliveryTripManagement: React.FC = () => {
             {trips.map((trip) => (
               <Col xs={24} xl={12} key={trip.id}>
                 <Card className="delivery-active-card" title={<Space><TruckOutlined />{trip.routeName || `Chuyến #${trip.id}`}</Space>} extra={<Button icon={<PrinterOutlined />} onClick={() => printSelectedTrip(trip)}>In danh sách</Button>}>
-                  <div className="delivery-trip-meta"><span><Text type="secondary">Tài xế</Text><strong>{trip.driverName}</strong></span><span><Text type="secondary">Phương tiện</Text><strong>{trip.vehicleNumber}</strong></span><span><Text type="secondary">Tiến độ</Text><strong>{trip.deliveredStops}/{trip.deliveredStops + trip.remainingStops} điểm</strong></span></div>
+                  {trip.isOverdue && <Alert type="error" showIcon message="Chuyến đã quá giờ dự kiến, vẫn còn điểm chưa giao." />}
+                  <div className="delivery-trip-meta"><span><Text type="secondary">Tài xế</Text><strong>{trip.driverName}</strong></span><span><Text type="secondary">Phương tiện</Text><strong>{trip.vehicleNumber}</strong></span><span><Text type="secondary">Tiến độ</Text><strong>{trip.deliveredStops}/{trip.deliveredStops + trip.remainingStops} điểm</strong></span><span><Text type="secondary">Dự kiến</Text><strong>{trip.estimatedDeliveryAt ? new Date(trip.estimatedDeliveryAt).toLocaleString("vi-VN") : "Chưa đặt giờ"}</strong></span></div>
+                  <div className="delivery-transit-value"><Text type="secondary">Giá trị hàng còn trên đường</Text><strong>{trip.isAmountComplete && trip.inTransitAmount !== null ? `${new Intl.NumberFormat("vi-VN").format(trip.inTransitAmount)} ₫` : "Chưa đủ dữ liệu phiếu xuất để tính"}</strong></div>
                   <ol className="delivery-stop-list">
                     {trip.stops.map((stop) => <li key={stop.dispatchId}>
                       <div><strong>{stop.orderCode} · {stop.customerName}</strong><span>{stop.receiverName || "Người nhận chưa khai báo"} · {stop.phone || "Chưa có số điện thoại"}</span><span>{stop.address || "Chưa có địa chỉ giao mặc định"}</span></div>
-                      <Tag color={stop.deliveryStatus === "DELIVERED" ? "green" : "processing"}>{stop.deliveryStatus === "DELIVERED" ? "Đã giao" : "Đang giao"}</Tag>
+                      <Tag color={stop.deliveryStatus === "DELIVERED" ? "green" : "processing"}>{stop.deliveryStatus === "DELIVERED" ? "Đã giao" : "Còn trên chuyến"}</Tag>
                     </li>)}
                   </ol>
                 </Card>

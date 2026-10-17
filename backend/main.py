@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.database import migrate_pricing_schema
+from app.core.database import migrate_delivery_trip_schema, migrate_pricing_schema
 from app.api.v1.endpoints.avatar import router as avatar_router
 from app.api.v1.endpoints.change_password import router as change_password_router
 from app.api.v1.endpoints.audit_logs import router as audit_logs_router
@@ -46,6 +46,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     migrate_pricing_schema()
+    migrate_delivery_trip_schema()
     try:
         from app.api.v1.endpoints.warehouse import seed_default_warehouses_and_territories
         from app.core.database import SessionLocal
