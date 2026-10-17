@@ -25,6 +25,7 @@ import ProductCatalogManagement from "./ProductCatalogManagement";
 import ProductExcelImport from "./ProductExcelImport";
 import CustomerTerritoryManagement from "./CustomerTerritoryManagement";
 import DiscountPolicyManagement from "./DiscountPolicyManagement";
+import OrderDetailModal from "./OrderDetailModal";
 
 import { logout } from "../../services/sessionService";
 import {
@@ -89,6 +90,9 @@ export const SalesManagerDashboard: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isChangePassModalOpen, setIsChangePassModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<OrderResponseItem | null>(null);
+  const [selectedOrderIdForDetail, setSelectedOrderIdForDetail] = useState<number | null>(null);
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
@@ -138,6 +142,7 @@ export const SalesManagerDashboard: React.FC = () => {
             assigneeName: ord.customer_name || `Đại lý #${ord.customer_id}`,
             approveActionLabel: "Phê duyệt đơn",
             orderId: ord.id,
+            orderData: ord,
           };
         });
         allApprovals.push(...orderApprovals);
@@ -359,6 +364,37 @@ export const SalesManagerDashboard: React.FC = () => {
     setApprovals((prev) => prev.filter((a) => a.id !== item.id));
   };
 
+  // Xem chi tiết đơn hàng
+  const handleViewOrderDetail = (item: ApprovalItem) => {
+    if (item.orderId) {
+      setSelectedOrderIdForDetail(item.orderId);
+      setSelectedOrderForDetail(item.orderData || null);
+      setIsDetailModalOpen(true);
+    }
+  };
+
+  const handleApproveFromModal = async (order: OrderResponseItem) => {
+    try {
+      await approveOrder(order.id);
+      message.success(`Đã phê duyệt thành công đơn hàng ${order.order_code}!`);
+      setApprovals((prev) => prev.filter((a) => a.orderId !== order.id));
+      setIsDetailModalOpen(false);
+    } catch (err: any) {
+      message.error(err.message || "Lỗi khi phê duyệt đơn hàng");
+    }
+  };
+
+  const handleRejectFromModal = async (order: OrderResponseItem, reason?: string) => {
+    try {
+      await rejectOrder(order.id, reason || "Quản lý kinh doanh từ chối đơn hàng");
+      message.info(`Đã từ chối đơn hàng ${order.order_code}`);
+      setApprovals((prev) => prev.filter((a) => a.orderId !== order.id));
+      setIsDetailModalOpen(false);
+    } catch (err: any) {
+      message.error(err.message || "Lỗi khi từ chối đơn hàng");
+    }
+  };
+
   // Callback khi tạo mới bảng giá thành công
   const handlePriceListCreated = async (newPriceList: PriceListItem) => {
     message.success(`Tạo thành công bảng giá nháp ${newPriceList.code}!`);
@@ -554,6 +590,7 @@ export const SalesManagerDashboard: React.FC = () => {
                 items={approvals}
                 onApprove={handleApprove}
                 onReject={handleReject}
+                onViewDetail={handleViewOrderDetail}
                 onViewAll={() =>
                   message.info(
                     `Tổng cộng ${approvals.length} yêu cầu đang chờ bạn xử lý`,
@@ -718,6 +755,7 @@ export const SalesManagerDashboard: React.FC = () => {
                     items={approvals}
                     onApprove={handleApprove}
                     onReject={handleReject}
+                    onViewDetail={handleViewOrderDetail}
                     onViewAll={() =>
                       message.info(
                         `Tổng cộng ${approvals.length} yêu cầu đang chờ bạn xử lý`,
@@ -765,6 +803,20 @@ export const SalesManagerDashboard: React.FC = () => {
       <ChangePasswordModal
         isOpen={isChangePassModalOpen}
         onClose={() => setIsChangePassModalOpen(false)}
+      />
+
+      {/* Modal Xem chi tiết đơn hàng trước khi phê duyệt */}
+      <OrderDetailModal
+        isOpen={isDetailModalOpen}
+        orderId={selectedOrderIdForDetail}
+        initialOrder={selectedOrderForDetail}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedOrderForDetail(null);
+          setSelectedOrderIdForDetail(null);
+        }}
+        onApprove={handleApproveFromModal}
+        onReject={handleRejectFromModal}
       />
     </Layout>
   );

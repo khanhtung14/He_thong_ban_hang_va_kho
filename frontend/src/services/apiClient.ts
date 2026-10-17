@@ -603,6 +603,8 @@ export interface OrderItemView {
   delivered_quantity?: number;
   actual_quantity?: number;
   unit_price: number;
+  floor_price?: number | null;
+  available_qty?: number | null;
   total_price?: number;
   subtotal?: number;
   is_partially_delivered?: boolean;
@@ -619,6 +621,10 @@ export interface OrderResponseItem {
   delivery_address_id?: number | null;
   delivery_point_name?: string | null;
   delivery_address?: any;
+  warehouse_id?: number | null;
+  warehouse_name?: string | null;
+  has_warning?: boolean;
+  warning_message?: string | null;
   expected_delivery_date?: string | null;
   items?: OrderItemView[];
   approval_reason?: string | null;
@@ -809,6 +815,15 @@ export async function createOrder(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Không thể tạo đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function fetchOrderById(orderId: number): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải chi tiết đơn hàng.");
   }
   return res.json();
 }

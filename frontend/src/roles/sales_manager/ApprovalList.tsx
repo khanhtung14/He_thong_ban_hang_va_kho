@@ -16,6 +16,7 @@ import {
   CloseOutlined,
   // ExclamationCircleOutlined,
   RightOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 
 const { Text } = Typography;
@@ -35,12 +36,14 @@ export interface ApprovalItem {
   approveActionLabel: string;
   priceListId?: number;
   orderId?: number;
+  orderData?: any;
 }
 
 export interface ApprovalListProps {
   items: ApprovalItem[];
   onApprove: (item: ApprovalItem) => void;
   onReject: (item: ApprovalItem) => void;
+  onViewDetail?: (item: ApprovalItem) => void;
   onViewAll?: () => void;
   loading?: boolean;
 }
@@ -49,6 +52,7 @@ export const ApprovalList: React.FC<ApprovalListProps> = ({
   items,
   onApprove,
   onReject,
+  onViewDetail,
   onViewAll,
   loading = false,
 }) => {
@@ -171,8 +175,14 @@ export const ApprovalList: React.FC<ApprovalListProps> = ({
                       strong
                       style={{
                         fontSize: 14,
-                        color: "#262626",
+                        color: item.orderId && onViewDetail ? "#1d4ed8" : "#262626",
                         display: "block",
+                        cursor: item.orderId && onViewDetail ? "pointer" : "default",
+                      }}
+                      onClick={() => {
+                        if (item.orderId && onViewDetail) {
+                          onViewDetail(item);
+                        }
                       }}
                     >
                       {item.title}
@@ -229,8 +239,26 @@ export const ApprovalList: React.FC<ApprovalListProps> = ({
                   <Text strong>{item.assigneeName}</Text>
                 </div>
 
-                {/* Hai nút Phê duyệt / Từ chối kèm xác nhận an toàn */}
+                {/* Các nút Xem chi tiết / Từ chối / Phê duyệt */}
                 <Space size="small">
+                  {item.orderId && onViewDetail && (
+                    <Button
+                      size="small"
+                      icon={<EyeOutlined />}
+                      onClick={() => onViewDetail(item)}
+                      style={{
+                        borderRadius: 6,
+                        fontSize: 12,
+                        color: "#2563eb",
+                        borderColor: "#bfdbfe",
+                        backgroundColor: "#eff6ff",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Xem chi tiết
+                    </Button>
+                  )}
+
                   <Popconfirm
                     title="Từ chối yêu cầu"
                     description={`Bạn có chắc muốn từ chối ${item.code}?`}

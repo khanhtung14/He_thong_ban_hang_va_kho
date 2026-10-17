@@ -217,6 +217,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           const cust = customers.find((c) => c.id === custId);
           if (cust) {
             form.setFieldValue("customer_id", cust.id);
+            loadPurchaseHistory(cust.id);
             fetchDeliveryAddresses(cust.id)
               .then((addrs) => {
                 if (!ignore) {
@@ -248,7 +249,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     return () => {
       ignore = true;
     };
-  }, [isOpen, preselectedCustomerId, editingOrder, customers, form, loadProducts, loadCustomerAddresses]);
+  }, [isOpen, preselectedCustomerId, editingOrder, customers, form, loadProducts, loadCustomerAddresses, loadPurchaseHistory]);
 
   const handleClose = () => {
     form.resetFields();
