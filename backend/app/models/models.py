@@ -375,7 +375,7 @@ class DiscountPolicy(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    tiers: Mapped[list["DiscountTier"]] = relationship(
+    tiers: Mapped[List["DiscountTier"]] = relationship(
         back_populates="policy",
         cascade="all, delete-orphan",
         order_by="DiscountTier.min_quantity",
@@ -627,6 +627,27 @@ class Order(Base):
     customer: Mapped[Customer] = relationship(back_populates="orders")
     delivery_address: Mapped[Optional[DeliveryAddress]] = relationship()
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    approval_histories: Mapped[List["OrderApprovalHistory"]] = relationship(
+        "OrderApprovalHistory", back_populates="order", cascade="all, delete-orphan", order_by="desc(OrderApprovalHistory.id)"
+    )
+
+
+class OrderApprovalHistory(Base):
+    __tablename__ = "order_approval_history"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    performed_by: Mapped[str] = mapped_column(String(150), nullable=False)
+    performed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped[Order] = relationship("Order", back_populates="approval_histories")
+
+
+@event.listens_for(OrderApprovalHistory, "before_update")
+def block_order_approval_history_update(mapper, connection, target):
+    raise ValueError("OrderApprovalHistory is immutable (audit log) and cannot be modified.")
 
 
 class OrderItem(Base):
