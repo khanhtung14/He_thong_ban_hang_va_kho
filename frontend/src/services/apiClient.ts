@@ -13,6 +13,13 @@ export type ProductMarginDetail = components["schemas"]["ProductMarginDetail"];
 export type SalesMarginReport = components["schemas"]["SalesMarginReportResponse"];
 export type PriceListLine = components["schemas"]["PriceLine"];
 export type PriceListItem = components["schemas"]["PriceListView"];
+export type EligibleReturnInvoice = components["schemas"]["EligibleInvoiceResponse"];
+export type ReturnableInvoice = components["schemas"]["ReturnableInvoiceData"];
+export type ReturnableItem = components["schemas"]["ReturnableItemResponse"];
+export type ReturnOrder = components["schemas"]["ReturnOrderResponse"];
+export type ReturnOrderCreate = components["schemas"]["ReturnCreateRequest"];
+export type ReturnReceipt = components["schemas"]["ReturnReceiveRequest"];
+export type WarehouseDirectory = components["schemas"]["WarehouseDirectoryResponse"]["data"];
 
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -67,6 +74,77 @@ export const fetchProfile = async (): Promise<UserProfile> => {
     throw new Error(err.detail || "Không thể tải thông tin tài khoản.");
   }
   return res.json();
+};
+
+async function returnApiData<T>(response: Response, fallbackMessage: string): Promise<T> {
+  const body: unknown = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail =
+      typeof body === "object" && body !== null && "detail" in body
+        ? body.detail
+        : undefined;
+    if (typeof detail === "string") throw new Error(detail);
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((entry) =>
+          typeof entry === "object" && entry !== null && "msg" in entry && typeof entry.msg === "string"
+            ? entry.msg
+            : "",
+        )
+        .filter(Boolean);
+      if (messages.length) throw new Error(messages.join("; "));
+    }
+    const messageText =
+      typeof body === "object" && body !== null && "message" in body && typeof body.message === "string"
+        ? body.message
+        : fallbackMessage;
+    throw new Error(messageText);
+  }
+  if (typeof body !== "object" || body === null || !("data" in body)) {
+    throw new Error("Phản hồi máy chủ không đúng định dạng.");
+  }
+  return body.data as T;
+}
+
+export const fetchEligibleReturnInvoices = async (): Promise<EligibleReturnInvoice[]> => {
+  const response = await authenticatedFetch("/api/v1/returns/eligible-invoices");
+  return returnApiData(response, "Không thể tải hóa đơn còn được trả.");
+};
+
+export const fetchReturnableInvoice = async (invoiceId: number): Promise<ReturnableInvoice> => {
+  const response = await authenticatedFetch(`/api/v1/returns/invoices/${invoiceId}/items`);
+  return returnApiData(response, "Không thể tải các mặt hàng còn được trả.");
+};
+
+export const fetchReturnOrders = async (): Promise<ReturnOrder[]> => {
+  const response = await authenticatedFetch("/api/v1/returns");
+  return returnApiData(response, "Không thể tải danh sách phiếu trả hàng.");
+};
+
+export const createReturnOrder = async (payload: ReturnOrderCreate): Promise<ReturnOrder> => {
+  const response = await authenticatedFetch("/api/v1/returns", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return returnApiData(response, "Không thể tạo phiếu trả hàng.");
+};
+
+export const receiveReturnOrder = async (
+  returnId: number,
+  payload: ReturnReceipt,
+): Promise<ReturnOrder> => {
+  const response = await authenticatedFetch(`/api/v1/returns/${returnId}/receive`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return returnApiData(response, "Không thể xác nhận nhận hàng trả.");
+};
+
+export const fetchWarehouseDirectory = async (): Promise<WarehouseDirectory> => {
+  const response = await authenticatedFetch("/api/v1/warehouses?is_active=true");
+  return returnApiData(response, "Không thể tải danh sách kho.");
 };
 
 export const fetchSalesMarginReport = async (): Promise<SalesMarginReport> => {

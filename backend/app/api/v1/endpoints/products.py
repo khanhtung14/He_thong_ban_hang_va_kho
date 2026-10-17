@@ -1402,7 +1402,7 @@ def create_product(
     sku_clean = payload.sku.strip()
     if not sku_clean:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Mã SKU không được để trống.",
         )
 
@@ -1807,4 +1807,3 @@ def delete_product(
         "sku": target_sku,
         "data": {"id": p_id, "sku": target_sku},
     }
-

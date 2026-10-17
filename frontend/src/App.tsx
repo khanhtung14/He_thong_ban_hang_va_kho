@@ -1,18 +1,42 @@
-import { useEffect, useState } from "react";
-import Login from "./features/auth/Login";
-import ForgotPassword from "./features/auth/ForgotPassword";
-import ResetPassword from "./features/auth/ResetPassword";
-import ChangePassword from "./features/auth/ChangePassword";
-import CreateUser from "./roles/admin/CreateUser";
-import Profile from "./features/profile/Profile";
-import Navigation from "./Navigation";
-import RoleWorkspace from "./RoleWorkspace";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import Error403 from "./Error403";
 import { hasValidSession, getCurrentUserRole } from "./services/sessionService";
+
+const Login = lazy(() => import("./features/auth/Login"));
+const ForgotPassword = lazy(() => import("./features/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("./features/auth/ResetPassword"));
+const ChangePassword = lazy(() => import("./features/auth/ChangePassword"));
+const CreateUser = lazy(() => import("./roles/admin/CreateUser"));
+const Profile = lazy(() => import("./features/profile/Profile"));
+const Navigation = lazy(() => import("./Navigation"));
+const RoleWorkspace = lazy(() => import("./RoleWorkspace"));
+
+function LazyPage({ children }: { children: ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <main
+          role="status"
+          style={{
+            display: "grid",
+            minHeight: "100vh",
+            placeItems: "center",
+            color: "#64748b",
+          }}
+        >
+          Đang tải...
+        </main>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
 
 const roleWorkspacePaths = [
   "/portal/orders",
   "/sales/orders",
+  "/sales/returns",
   "/sales/customers",
   "/sales/assignments",
   "/manager/dashboard",
@@ -29,6 +53,7 @@ const roleWorkspacePaths = [
   "/warehouse/inventory",
   "/warehouse/suppliers",
   "/warehouse/dashboard",
+  "/warehouse/returns",
   "/accounting/debt-book",
   "/accounting/invoices",
   "/accounting/agencies",
@@ -53,19 +78,21 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  if (currentPath.startsWith("/admin/users")) {
-    document.title = "Quản trị tài khoản | OMS";
-  }
+  useEffect(() => {
+    if (currentPath.startsWith("/admin/users")) {
+      document.title = "Quản trị tài khoản | OMS";
+    }
+  }, [currentPath]);
 
   // 1. Public routes (accessible without login)
   if (currentPath === "/login") {
-    return <Login />;
+    return <LazyPage><Login /></LazyPage>;
   }
   if (currentPath === "/forgot-password") {
-    return <ForgotPassword />;
+    return <LazyPage><ForgotPassword /></LazyPage>;
   }
   if (currentPath === "/reset-password") {
-    return <ResetPassword />;
+    return <LazyPage><ResetPassword /></LazyPage>;
   }
   if (currentPath === "/errors/403") {
     return <Error403 />;
@@ -75,12 +102,12 @@ export default function App() {
   // If not logged in (no token / valid session / valid role), MUST display Login screen.
   // Never hardcode SalesManagerDashboard on root (/) or protected routes.
   if (!isAuthenticated || !userRole) {
-    return <Login />;
+    return <LazyPage><Login /></LazyPage>;
   }
 
   // 3. Authenticated: on root (/) or /workspace, render user's role workspace
   if (currentPath === "/" || currentPath === "/workspace") {
-    return <RoleWorkspace />;
+    return <LazyPage><RoleWorkspace /></LazyPage>;
   }
 
   // 4. Admin create user route
@@ -90,20 +117,20 @@ export default function App() {
       .toUpperCase()
       .replace(/[ -]/g, "_");
     if (["ADMIN", "ADMINISTRATOR"].includes(normalized)) {
-      return <CreateUser />;
+      return <LazyPage><CreateUser /></LazyPage>;
     }
     return <Error403 />;
   }
 
   // 5. User settings / common routes
   if (currentPath === "/change-password") {
-    return <ChangePassword />;
+    return <LazyPage><ChangePassword /></LazyPage>;
   }
   if (currentPath === "/profile") {
-    return <Profile />;
+    return <LazyPage><Profile /></LazyPage>;
   }
   if (currentPath === "/navigation" || currentPath === "/navigation-ui") {
-    return <Navigation />;
+    return <LazyPage><Navigation /></LazyPage>;
   }
 
   // 6. Role workspace routes (e.g. /manager/dashboard, /sales/orders, etc.)
@@ -111,9 +138,9 @@ export default function App() {
     roleWorkspacePaths.includes(currentPath) ||
     currentPath.startsWith("/admin/")
   ) {
-    return <RoleWorkspace />;
+    return <LazyPage><RoleWorkspace /></LazyPage>;
   }
 
   // Fallback for any other route when authenticated
-  return <RoleWorkspace />;
+  return <LazyPage><RoleWorkspace /></LazyPage>;
 }

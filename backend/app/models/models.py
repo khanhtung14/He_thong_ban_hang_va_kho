@@ -678,6 +678,7 @@ class Inventory(Base):
     physical_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     reserved_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     available_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    damaged_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
 class InventoryLot(Base):
@@ -689,6 +690,7 @@ class InventoryLot(Base):
     mfg_date: Mapped[Optional[date]] = mapped_column(Date)
     exp_date: Mapped[Optional[date]] = mapped_column(Date)
     quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    damaged_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
 class InventoryTransaction(Base):
@@ -862,6 +864,10 @@ class ReturnOrder(Base):
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False)
     reason: Mapped[Text] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(30), default="PENDING")
+    return_date: Mapped[Optional[date]] = mapped_column(Date)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    received_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class ReturnOrderItem(Base):
@@ -870,6 +876,12 @@ class ReturnOrderItem(Base):
     return_id: Mapped[int] = mapped_column(ForeignKey("return_orders.id", ondelete="CASCADE"), nullable=False)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
     quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    unit_id: Mapped[Optional[int]] = mapped_column(ForeignKey("product_units.id", ondelete="SET NULL"))
+    unit_name: Mapped[Optional[str]] = mapped_column(String(50))
+    conversion_rate_snapshot: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    base_quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    lot_number: Mapped[Optional[str]] = mapped_column(String(100))
+    received_condition: Mapped[Optional[str]] = mapped_column(String(20))
 
 
 class CreditNote(Base):

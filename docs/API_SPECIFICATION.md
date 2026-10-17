@@ -638,7 +638,8 @@
 - **Story:** S5-03
 - **Phân quyền:** WH Manager
 - **Post Body:** `{"code": "WH-LONG-BIEN", "name": "Kho Tổng Long Biên", "address": "...", "managerId": 3, "locations": [{"code": "K1-A1", "name": "Kệ 1 Dãy A"}]}`
-- **Response Data:** Danh mục kho bãi và vị trí lưu kho.
+- **GET Response Data:** Danh sách kho `{id, code, name, address, is_active}`.
+- **POST Response Data:** Danh mục kho bãi và vị trí lưu kho.
 
 #### `GET /inventory`
 - **Story:** S5-05
@@ -655,6 +656,7 @@
     "physicalQty": 24000,
     "reservedQty": 2400,
     "availableQty": 21600,
+    "damagedQty": 0,
     "minStock": 5000,
     "isBelowMinStock": false
   }
@@ -677,7 +679,7 @@
 - **Story:** S6-01
 - **Phân quyền:** Warehouse, WH Manager
 - **Query Params:** `productId`, `warehouseId`, `isExpired`
-- **Response Data:** Danh sách lô hàng, ngày sản xuất, hạn sử dụng, số lượng tồn theo từng lô.
+- **Response Data:** Danh sách lô hàng, ngày sản xuất, hạn sử dụng, số lượng tồn theo từng lô và lượng hàng lỗi cách ly (`damagedQuantity`).
 
 #### `POST /warehouse/receipts`
 - **Story:** S5-04
@@ -702,7 +704,7 @@
   ]
 }
 ```
-- **Response Data:** Phiếu nhập kho đã ghi sổ, tăng `physicalQty` và cập nhật giá vốn.
+- **Response Data:** Phiếu nhập kho đã ghi sổ, tăng `physicalQty` và cập nhật giá vốn. Hàng lỗi từ phiếu trả được theo dõi riêng qua `damagedQty` và không cộng vào `availableQty`.
 
 #### `POST /warehouse/transfers`
 - **Story:** S5-07
@@ -872,7 +874,7 @@
 
 #### `POST /returns`
 - **Story:** S8-01
-- **Phân quyền:** Sales Rep, Warehouse
+- **Phân quyền:** Sales Rep (chỉ hóa đơn thuộc đại lý đang phụ trách)
 - **Request Body:**
 ```json
 {
@@ -885,7 +887,40 @@
   ]
 }
 ```
-- **Response Data:** Phiếu trả hàng nhập lại kho.
+- `quantity` dùng đơn vị được chọn; SKU quản lý lô bắt buộc gửi đúng `lotNumber` đã giao.
+- Tổng số lượng (quy đổi về đơn vị cơ sở) của phiếu mới và các phiếu chưa bị từ chối không được vượt số lượng thực giao trên hóa đơn.
+- Phiếu được tạo ở trạng thái `PENDING_RECEIPT`; chưa thay đổi tồn kho.
+- **Response Data:** Phiếu trả hàng chờ Quản lý kho xác nhận.
+
+#### `GET /returns/eligible-invoices`
+- **Story:** S8-01
+- **Phân quyền:** Sales Rep (chỉ đại lý đang phụ trách)
+- **Response Data:** Danh sách hóa đơn có ít nhất một dòng còn số lượng được trả.
+
+#### `GET /returns/invoices/{invoiceId}/items`
+- **Story:** S8-01
+- **Phân quyền:** Sales Rep (chỉ hóa đơn thuộc đại lý đang phụ trách)
+- **Response Data:** Các dòng hàng đã giao, lô hàng, đơn vị quy đổi và số lượng còn có thể trả sau khi trừ phiếu đang chờ/đã nhận.
+
+#### `GET /returns`
+- **Story:** S8-01
+- **Phân quyền:** Sales Rep (phiếu của đại lý đang phụ trách), WH Manager (kho được phân công)
+- **Response Data:** Danh sách phiếu trả và trạng thái nhận hàng.
+
+#### `POST /returns/{id}/receive`
+- **Story:** S8-01
+- **Phân quyền:** WH Manager (kho được phân công)
+- **Request Body:**
+```json
+{
+  "items": [
+    {"returnItemId": 1001, "condition": "GOOD"},
+    {"returnItemId": 1002, "condition": "DAMAGED"}
+  ]
+}
+```
+- Mỗi dòng phải được xác nhận đúng một lần. Hàng `GOOD` nhập vào tồn khả dụng đúng lô; hàng `DAMAGED` chỉ cộng vào tồn hàng lỗi, không tăng tồn khả dụng. SKU quản lý lô phải giữ đúng lô gốc.
+- **Response Data:** Phiếu đã nhận hàng; thao tác xác nhận lặp lại không được cộng tồn lần nữa.
 
 #### `POST /returns/{id}/credit-note`
 - **Story:** S8-02

@@ -9,6 +9,7 @@ import {
   AlertOutlined,
   BarChartOutlined,
   LogoutOutlined,
+  RollbackOutlined,
 } from "@ant-design/icons";
 import BrandLogo from "../BrandLogo";
 
@@ -47,6 +48,11 @@ export const WarehouseManagerSidebar: React.FC<
           key: "approvals",
           icon: <AuditOutlined />,
           label: "Duyệt lệnh Nhập / Xuất",
+        },
+        {
+          key: "returns",
+          icon: <RollbackOutlined />,
+          label: "Nhận hàng trả",
         },
         {
           key: "stocktaking",

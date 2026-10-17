@@ -44,6 +44,7 @@ import CreateOrderModal from "../../components/CreateOrderModal";
 import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
 import { SalesHeader } from "../../components/Header/SalesHeader";
 import SalesOrderDraft from "./SalesOrderDraft";
+import ReturnManagement from "../../features/returns/ReturnManagement";
 
 // Customer List Module (S3-08)
 import { SalesCustomerList } from "./SalesCustomerList";
@@ -79,7 +80,9 @@ export const SalesDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("customers");
+  const [selectedKey, setSelectedKey] = useState(
+    window.location.pathname === "/sales/returns" ? "returns" : "customers",
+  );
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [orders, setOrders] = useState<OrderResponseItem[]>([]);
@@ -520,7 +523,9 @@ export const SalesDashboard: React.FC = () => {
             minWidth: 0,
           }}
         >
-          {selectedKey === "orders" ? (
+          {selectedKey === "returns" ? (
+            <ReturnManagement mode="sales" />
+          ) : selectedKey === "orders" ? (
             <SalesOrderDraft
               preselectedCustomerId={preselectedCustomerId}
               onCustomerPreselected={() => setPreselectedCustomerId(null)}
