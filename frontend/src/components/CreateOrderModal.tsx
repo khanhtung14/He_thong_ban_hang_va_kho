@@ -387,10 +387,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
 
   // Xóa dòng sản phẩm
   const handleRemoveItem = (key: string) => {
-    if (items.length <= 1) {
-      message.warning("Đơn hàng phải có ít nhất 1 sản phẩm.");
-      return;
-    }
     setItems((prev) => prev.filter((it) => it.key !== key));
   };
 
@@ -478,7 +474,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setItems((prev) =>
       prev.map((it) => {
         if (it.key === key) {
-          return { ...it, [field]: value };
+          const updated = { ...it, [field]: value };
+          if (field === "quantity") {
+            const numVal = Number(value) || 0;
+            if (it.available_quantity !== undefined && it.available_quantity >= 0 && numVal > it.available_quantity) {
+              message.error(
+                `Vượt quá số lượng hàng tồn khả dụng! Sản phẩm [${it.product_name || it.sku}] chỉ còn khả dụng tối đa ${it.available_quantity} ${it.unit || "đơn vị"}. Số lượng tối đa còn có thể đặt: ${it.available_quantity}.`
+              );
+            }
+          }
+          return updated;
         }
         return it;
       })
@@ -498,7 +503,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const avail = s.available_quantity !== undefined ? s.available_quantity : (matchedProd?.available_quantity ?? matchedProd?.stock_available);
 
     setItems((prev) => {
-      if (prev.length === 1 && !prev[0].sku && !prev[0].product_name) {
+      if (prev.length === 0 || (prev.length === 1 && !prev[0].sku && !prev[0].product_name)) {
         return [
           {
             key: String(Date.now()),
@@ -565,7 +570,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     });
 
     setItems((prev) => {
-      if (prev.length === 1 && !prev[0].sku && !prev[0].product_name) {
+      if (prev.length === 0 || (prev.length === 1 && !prev[0].sku && !prev[0].product_name)) {
         return newRows;
       }
       const existingSkus = new Set(prev.map((it) => it.sku.toUpperCase()));
@@ -628,7 +633,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           }
           if (it.quantity > it.available_quantity) {
             message.error(
-              `Sản phẩm [${it.product_name || it.sku}] chỉ còn khả dụng tối đa ${it.available_quantity} đơn vị!`
+              `Vượt quá số lượng hàng tồn khả dụng! Sản phẩm [${it.product_name || it.sku}] chỉ còn khả dụng tối đa ${it.available_quantity} đơn vị. Số lượng tối đa còn có thể đặt: ${it.available_quantity}!`
             );
             return;
           }
@@ -688,7 +693,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       title: "MÃ SKU",
       dataIndex: "sku",
       key: "sku",
-      width: 150,
+      width: 140,
       render: (val: string, r) => (
         <Select
           showSearch
@@ -738,10 +743,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       ),
     },
     {
-      title: "ĐƠN VỊ TÍNH",
+      title: "ĐVT",
       dataIndex: "unit",
       key: "unit",
-      width: 95,
+      width: 75,
       align: "center",
       render: (val: string) =>
         val ? (
@@ -756,7 +761,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       title: "TỒN KHẢ DỤNG",
       dataIndex: "available_quantity",
       key: "available_quantity",
-      width: 125,
+      width: 115,
       align: "center",
       render: (val: number | undefined, r) => {
         if (!r.sku) return <span style={{ color: "#94a3b8" }}>—</span>;
@@ -788,26 +793,37 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       title: "SỐ LƯỢNG",
       dataIndex: "quantity",
       key: "quantity",
-      width: 110,
+      width: 115,
       render: (val: number, r) => {
-        const maxLimit = r.available_quantity !== undefined && r.available_quantity >= 0
-          ? r.available_quantity
-          : undefined;
         const isOutOfStock = r.available_quantity !== undefined && r.available_quantity <= 0;
+        const isExceeded = r.available_quantity !== undefined && r.available_quantity >= 0 && (val || 0) > r.available_quantity;
 
         return (
-          <Tooltip title={isOutOfStock ? `Sản phẩm '${r.sku}' đã hết hàng trong kho!` : (maxLimit !== undefined ? `Tối đa ${maxLimit} ${r.unit || "đơn vị"}` : undefined)}>
-            <InputNumber
-              min={isOutOfStock ? 0 : 1}
-              max={maxLimit !== undefined && maxLimit > 0 ? maxLimit : (isOutOfStock ? 0 : undefined)}
-              disabled={isOutOfStock}
-              status={isOutOfStock ? "error" : (maxLimit !== undefined && val > maxLimit ? "error" : undefined)}
-              defaultValue={1}
-              value={val}
-              onChange={(num) => handleItemChange(r.key, "quantity", num || 1)}
-              size="small"
-              style={{ width: "100%" }}
-            />
+          <Tooltip
+            title={
+              isOutOfStock
+                ? `Sản phẩm '${r.sku}' đã hết hàng trong kho!`
+                : isExceeded
+                ? `Vượt quá số lượng hàng tồn khả dụng! Tối đa có thể đặt: ${r.available_quantity} ${r.unit || "đơn vị"}`
+                : undefined
+            }
+          >
+            <div>
+              <InputNumber
+                min={isOutOfStock ? 0 : 1}
+                disabled={isOutOfStock}
+                status={isOutOfStock || isExceeded ? "error" : undefined}
+                value={val}
+                onChange={(num) => handleItemChange(r.key, "quantity", num || 0)}
+                size="small"
+                style={{ width: "100%" }}
+              />
+              {isExceeded && (
+                <div style={{ color: "#ef4444", fontSize: 11, marginTop: 2, fontWeight: 500, lineHeight: 1.2 }}>
+                  Vượt tồn (tối đa {r.available_quantity})
+                </div>
+              )}
+            </div>
           </Tooltip>
         );
       },
@@ -816,7 +832,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       title: "ĐƠN GIÁ (₫)",
       dataIndex: "unit_price",
       key: "unit_price",
-      width: 120,
+      width: 115,
       render: (val: number, r) => (
         <InputNumber
           min={0}
@@ -833,10 +849,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     {
       title: "THÀNH TIỀN (₫)",
       key: "subtotal",
-      width: 125,
+      width: 110,
       align: "right",
       render: (_, r) => (
-        <Text strong style={{ color: "#047857" }}>
+        <Text strong style={{ color: "#047857", whiteSpace: "nowrap" }}>
           {((r.quantity || 0) * (r.unit_price || 0)).toLocaleString("vi-VN")} ₫
         </Text>
       ),
@@ -844,7 +860,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     {
       title: "XÓA",
       key: "action",
-      width: 50,
+      width: 48,
       align: "center",
       render: (_, r) => (
         <Tooltip title="Xóa dòng sản phẩm">
@@ -859,6 +875,14 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       ),
     },
   ];
+
+  // SCRUM-10 Tiêu chí 3: Kiểm tra nếu có sản phẩm nào đặt vượt tồn khả dụng hoặc hết hàng
+  const hasExceededStock = items.some(
+    (it) =>
+      Boolean(it.sku) &&
+      it.available_quantity !== undefined &&
+      (Number(it.quantity) > Number(it.available_quantity) || Number(it.available_quantity) <= 0)
+  );
 
   return (
     <>
@@ -875,15 +899,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         }
         open={isOpen}
         onCancel={handleClose}
-        width={1050}
+        width={1520}
+        style={{ top: 12, maxWidth: "98vw" }}
         onOk={handleSubmit}
         confirmLoading={submitting}
         okText={editingOrder ? "Lưu thay đổi" : "Xác nhận tạo đơn"}
         cancelText="Hủy"
-        okButtonProps={{ disabled: isCustomerLocked }}
+        okButtonProps={{ disabled: isCustomerLocked || hasExceededStock }}
         destroyOnClose
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {errorMsg && <Alert type="error" message={errorMsg} showIcon closable />}
 
           {isCustomerLocked && (
@@ -898,311 +923,345 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           )}
 
           <Form form={form} layout="vertical">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              {/* Chọn đại lý */}
-              <Form.Item
-                name="customer_id"
-                label="Chọn Đại lý / Khách hàng"
-                rules={[{ required: true, message: "Vui lòng chọn đại lý" }]}
+            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+              {/* CỘT TRÁI: Mặt hàng đã mua gần đây (S4-04) */}
+              <div
+                style={{
+                  width: 320,
+                  flexShrink: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
               >
-                <Select
-                  showSearch
-                  placeholder="Chọn đại lý"
-                  onChange={handleCustomerChange}
-                  optionFilterProp="children"
-                >
-                  {customers.map((c) => (
-                    <Option key={c.id} value={c.id}>
-                      {c.code} — {c.name} {c.is_locked ? "(BỊ KHÓA)" : ""}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-
-              {/* Chọn điểm giao hàng */}
-              <div>
-                <div
+                <Card
+                  size="small"
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 4,
+                    borderRadius: 8,
+                    borderColor: "#bfdbfe",
+                    backgroundColor: "#f8fafc",
+                    boxShadow: "0 1px 3px rgba(37,99,235,0.06)",
                   }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ color: "rgba(0, 0, 0, 0.88)", fontSize: 14 }}>
-                      Điểm giao hàng của đại lý
-                    </span>
-                    {deliveryAddresses.length === 0 && !loadingAddresses && selectedCustomer && (
-                      <Text type="danger" style={{ fontSize: 12 }}>
-                        (Chưa có điểm giao hàng)
-                      </Text>
-                    )}
-                  </div>
-                  <Tooltip title={!selectedCustomer ? "Vui lòng chọn đại lý trước" : "Khai báo điểm giao hàng mới cho đại lý"}>
-                    <Button
-                      type="link"
-                      size="small"
-                      disabled={!selectedCustomer}
-                      onClick={handleOpenAddAddressModal}
-                      style={{ padding: 0, height: "auto", fontSize: 13 }}
-                    >
-                      + Thêm điểm giao mới
-                    </Button>
-                  </Tooltip>
-                </div>
-                <Form.Item name="delivery_address_id" style={{ marginBottom: 0 }}>
-                  <Select
-                    placeholder="Chọn điểm giao hàng (hoặc để trống nhận mặc định)"
-                    loading={loadingAddresses}
-                    value={selectedAddressId}
-                    onChange={(val) => {
-                      setSelectedAddressId(val);
-                      form.setFieldValue("delivery_address_id", val);
-                    }}
-                    allowClear
-                    dropdownRender={(menu) => (
-                      <>
-                        {menu}
-                        <Divider style={{ margin: "4px 0" }} />
-                        <div style={{ padding: "4px 8px" }}>
-                          <Tooltip title={!selectedCustomer ? "Vui lòng chọn đại lý trước" : ""}>
-                            <Button
-                              type="link"
-                              size="small"
-                              icon={<PlusOutlined />}
-                              disabled={!selectedCustomer}
-                              onClick={handleOpenAddAddressModal}
-                              style={{ width: "100%", textAlign: "left", padding: 0 }}
-                            >
-                              Thêm địa chỉ mới
-                            </Button>
-                          </Tooltip>
-                        </div>
-                      </>
-                    )}
-                  >
-                    {deliveryAddresses.map((addr) => (
-                      <Option key={addr.id} value={addr.id}>
-                        {addr.is_default ? "★ [MẶC ĐỊNH] " : ""}
-                        {addr.receiver_name} - {addr.phone} ({addr.address})
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </div>
-            </div>
-
-            {/* Chi tiết điểm giao hàng được chọn */}
-            {selectedAddress && (
-              <Card
-                size="small"
-                style={{
-                  backgroundColor: "#f8fafc",
-                  borderColor: "#e2e8f0",
-                  borderRadius: 8,
-                  marginBottom: 16,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  <EnvironmentOutlined style={{ color: "#2563eb", fontSize: 18, marginTop: 2 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <Text strong>{selectedAddress.receiver_name}</Text>
-                      <Text type="secondary">({selectedAddress.phone})</Text>
-                      {selectedAddress.is_default && <Tag color="success">Mặc định</Tag>}
-                    </div>
-                    <div style={{ color: "#334155", marginTop: 2 }}>{selectedAddress.address}</div>
-                    {selectedAddress.note && (
-                      <div style={{ color: "#64748b", fontSize: 12, marginTop: 2 }}>
-                        Ghi chú: {selectedAddress.note}
+                  styles={{
+                    header: { padding: "10px 14px", borderBottom: "1px solid #e2e8f0" },
+                    body: {
+                      padding: "10px",
+                      maxHeight: "calc(80vh - 160px)",
+                      overflowY: "auto",
+                    },
+                  }}
+                  title={
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <Space size={6}>
+                          <HistoryOutlined style={{ color: "#2563eb", fontSize: 16 }} />
+                          <span style={{ fontWeight: 600, color: "#1e3a8a", fontSize: 14 }}>
+                            Mặt hàng đã mua
+                          </span>
+                        </Space>
+                        {historyItems.length > 0 && (
+                          <Tag color="blue" style={{ margin: 0 }}>
+                            {historyItems.length} gợi ý
+                          </Tag>
+                        )}
                       </div>
-                    )}
+                      {historyItems.length > 0 && (
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<PlusOutlined />}
+                          style={{ backgroundColor: "#2563eb", fontWeight: 500, width: "100%" }}
+                          onClick={handleAddAllSuggestions}
+                        >
+                          Thêm tất cả vào đơn
+                        </Button>
+                      )}
+                    </div>
+                  }
+                >
+                  {!selectedCustomer ? (
+                    <div style={{ padding: "30px 10px", textAlign: "center", color: "#64748b" }}>
+                      <ShoppingOutlined style={{ fontSize: 32, color: "#94a3b8", marginBottom: 8 }} />
+                      <div style={{ fontSize: 13 }}>Vui lòng chọn đại lý để xem mặt hàng đã mua gần đây.</div>
+                    </div>
+                  ) : loadingHistory ? (
+                    <div style={{ padding: "30px 0", textAlign: "center" }}>
+                      <Spin size="small" tip="Đang tải lịch sử mua hàng..." />
+                    </div>
+                  ) : historyItems.length === 0 ? (
+                    <Text type="secondary" style={{ fontSize: 13, fontStyle: "italic", display: "block", textAlign: "center", padding: "20px 0" }}>
+                      Đại lý chưa có lịch sử mua hàng trong 3 tháng gần nhất.
+                    </Text>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {historyItems.map((s) => (
+                        <div
+                          key={s.product_id || s.sku}
+                          style={{
+                            padding: "8px 10px",
+                            backgroundColor: "#ffffff",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: 6,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 5,
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
+                          }}
+                        >
+                          <div>
+                            <Text strong style={{ color: "#0f172a", fontSize: 13, display: "block" }}>
+                              {s.product_name}
+                            </Text>
+                            <Space size={4} style={{ marginTop: 2 }}>
+                              <Tag color="geekblue" style={{ fontSize: 11, margin: 0 }}>
+                                {s.sku}
+                              </Tag>
+                              {s.unit && (
+                                <Tag color="default" style={{ fontSize: 11, margin: 0 }}>
+                                  ĐVT: {s.unit}
+                                </Tag>
+                              )}
+                            </Space>
+                          </div>
+
+                          <div style={{ fontSize: 12, color: "#475569", display: "flex", flexDirection: "column", gap: 3 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span>Tồn khả dụng:</span>
+                              <Tag color={s.available_quantity > 0 ? "success" : "error"} style={{ margin: 0, fontWeight: 600 }}>
+                                {s.available_quantity > 0 ? `${s.available_quantity} ${s.unit}` : "Hết hàng (0)"}
+                              </Tag>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span>SL bình quân:</span>
+                              <Text strong style={{ color: "#2563eb" }}>
+                                {s.avg_quantity} {s.unit}
+                              </Text>
+                            </div>
+                            {s.last_price > 0 && (
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span>Giá gần nhất:</span>
+                                <Text>{s.last_price.toLocaleString("vi-VN")} ₫</Text>
+                              </div>
+                            )}
+                          </div>
+
+                          <Button
+                            size="small"
+                            icon={<PlusOutlined />}
+                            type="default"
+                            style={{
+                              borderColor: "#2563eb",
+                              color: "#2563eb",
+                              fontWeight: 500,
+                              marginTop: 2,
+                              width: "100%",
+                            }}
+                            onClick={() => handleAddSingleSuggestion(s)}
+                          >
+                            Thêm vào đơn
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+              {/* CỘT PHẢI: Phần tạo đơn hàng (được mở rộng tối đa) */}
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* 1. Chọn đại lý & điểm giao hàng */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  {/* Chọn đại lý */}
+                  <Form.Item
+                    name="customer_id"
+                    label="Chọn Đại lý / Khách hàng"
+                    rules={[{ required: true, message: "Vui lòng chọn đại lý" }]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      showSearch
+                      placeholder="Chọn đại lý"
+                      onChange={handleCustomerChange}
+                      optionFilterProp="children"
+                    >
+                      {customers.map((c) => (
+                        <Option key={c.id} value={c.id}>
+                          {c.code} — {c.name} {c.is_locked ? "(BỊ KHÓA)" : ""}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+
+                  {/* Chọn điểm giao hàng */}
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ color: "rgba(0, 0, 0, 0.88)", fontSize: 14 }}>
+                          Điểm giao hàng của đại lý
+                        </span>
+                        {deliveryAddresses.length === 0 && !loadingAddresses && selectedCustomer && (
+                          <Text type="danger" style={{ fontSize: 12 }}>
+                            (Chưa có điểm giao hàng)
+                          </Text>
+                        )}
+                      </div>
+                      <Tooltip title={!selectedCustomer ? "Vui lòng chọn đại lý trước" : "Khai báo điểm giao hàng mới cho đại lý"}>
+                        <Button
+                          type="link"
+                          size="small"
+                          disabled={!selectedCustomer}
+                          onClick={handleOpenAddAddressModal}
+                          style={{ padding: 0, height: "auto", fontSize: 13 }}
+                        >
+                          + Thêm điểm giao mới
+                        </Button>
+                      </Tooltip>
+                    </div>
+                    <Form.Item name="delivery_address_id" style={{ marginBottom: 0 }}>
+                      <Select
+                        placeholder="Chọn điểm giao hàng (hoặc để trống nhận mặc định)"
+                        loading={loadingAddresses}
+                        value={selectedAddressId}
+                        onChange={(val) => {
+                          setSelectedAddressId(val);
+                          form.setFieldValue("delivery_address_id", val);
+                        }}
+                        allowClear
+                        dropdownRender={(menu) => (
+                          <>
+                            {menu}
+                            <Divider style={{ margin: "4px 0" }} />
+                            <div style={{ padding: "4px 8px" }}>
+                              <Tooltip title={!selectedCustomer ? "Vui lòng chọn đại lý trước" : ""}>
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  icon={<PlusOutlined />}
+                                  disabled={!selectedCustomer}
+                                  onClick={handleOpenAddAddressModal}
+                                  style={{ width: "100%", textAlign: "left", padding: 0 }}
+                                >
+                                  Thêm địa chỉ mới
+                                </Button>
+                              </Tooltip>
+                            </div>
+                          </>
+                        )}
+                      >
+                        {deliveryAddresses.map((addr) => (
+                          <Option key={addr.id} value={addr.id}>
+                            {addr.is_default ? "★ [MẶC ĐỊNH] " : ""}
+                            {addr.receiver_name} - {addr.phone} ({addr.address})
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
                   </div>
                 </div>
-              </Card>
-            )}
 
-            {/* Khối gợi ý: Mặt hàng thường mua (3 tháng gần đây) (S4-04) */}
-            {selectedCustomer && (
-              <Card
-                size="small"
-                style={{
-                  marginTop: 4,
-                  marginBottom: 16,
-                  borderRadius: 8,
-                  borderColor: "#bfdbfe",
-                  backgroundColor: "#f8fafc",
-                  boxShadow: "0 1px 3px rgba(37,99,235,0.06)",
-                }}
-                title={
+                {/* Chi tiết điểm giao hàng được chọn */}
+                {selectedAddress && (
+                  <Card
+                    size="small"
+                    style={{
+                      backgroundColor: "#f8fafc",
+                      borderColor: "#e2e8f0",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <EnvironmentOutlined style={{ color: "#2563eb", fontSize: 18, marginTop: 2 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Text strong>{selectedAddress.receiver_name}</Text>
+                          <Text type="secondary">({selectedAddress.phone})</Text>
+                          {selectedAddress.is_default && <Tag color="success">Mặc định</Tag>}
+                        </div>
+                        <div style={{ color: "#334155", marginTop: 2 }}>{selectedAddress.address}</div>
+                        {selectedAddress.note && (
+                          <div style={{ color: "#64748b", fontSize: 12, marginTop: 2 }}>
+                            Ghi chú: {selectedAddress.note}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Danh sách sản phẩm trong đơn */}
+                <div>
                   <div
                     style={{
                       display: "flex",
-                      alignItems: "center",
                       justifyContent: "space-between",
-                      flexWrap: "wrap",
-                      gap: 8,
+                      alignItems: "center",
+                      marginBottom: 8,
                     }}
                   >
-                    <Space size={8}>
-                      <HistoryOutlined style={{ color: "#2563eb", fontSize: 16 }} />
-                      <span style={{ fontWeight: 600, color: "#1e3a8a", fontSize: 14 }}>
-                        Mặt hàng thường mua (3 tháng gần đây)
-                      </span>
-                      {historyItems.length > 0 && (
-                        <Tag color="blue">{historyItems.length} mặt hàng gợi ý</Tag>
-                      )}
-                    </Space>
-                    {historyItems.length > 0 && (
-                      <Button
-                        type="primary"
-                        size="small"
-                        icon={<PlusOutlined />}
-                        style={{ backgroundColor: "#2563eb", fontWeight: 500 }}
-                        onClick={handleAddAllSuggestions}
-                      >
-                        Thêm tất cả vào đơn
-                      </Button>
-                    )}
+                    <Text strong style={{ fontSize: 15 }}>
+                      Danh sách sản phẩm trong đơn
+                    </Text>
+                    <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={handleAddItem}>
+                      Thêm sản phẩm
+                    </Button>
                   </div>
-                }
-              >
-                {loadingHistory ? (
-                  <div style={{ padding: "12px 0", textAlign: "center" }}>
-                    <Spin size="small" tip="Đang tải lịch sử mua hàng 3 tháng..." />
+
+                  <Table
+                    columns={columns}
+                    dataSource={items}
+                    pagination={false}
+                    bordered
+                    size="small"
+                    scroll={{
+                      y: items.length > 3 ? 205 : undefined,
+                    }}
+                  />
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-end",
+                      marginTop: 10,
+                      padding: "8px 16px",
+                      backgroundColor: "#f1f5f9",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 15 }}>
+                      Tổng giá trị đơn:{" "}
+                      <Text strong style={{ color: "#047857", fontSize: 17 }}>
+                        {totalAmount.toLocaleString("vi-VN")} ₫
+                      </Text>
+                    </Text>
                   </div>
-                ) : historyItems.length === 0 ? (
-                  <Text type="secondary" style={{ fontSize: 13, fontStyle: "italic" }}>
-                    Đại lý chưa có lịch sử mua hàng trong 3 tháng gần nhất.
-                  </Text>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {historyItems.map((s) => (
-                      <div
-                        key={s.product_id || s.sku}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "8px 12px",
-                          backgroundColor: "#ffffff",
-                          border: "1px solid #e2e8f0",
-                          borderRadius: 6,
-                          gap: 12,
-                        }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Space size={8} wrap>
-                            <Text strong style={{ color: "#0f172a" }}>
-                              {s.product_name}
-                            </Text>
-                            <Tag color="geekblue" style={{ fontSize: 11 }}>
-                              {s.sku}
-                            </Tag>
-                            {s.unit && (
-                              <Tag color="default" style={{ fontSize: 11 }}>
-                                ĐVT: {s.unit}
-                              </Tag>
-                            )}
-                          </Space>
-                          <div style={{ display: "flex", gap: 16, marginTop: 4, fontSize: 12, flexWrap: "wrap" }}>
-                            <span style={{ color: "#475569" }}>
-                              SL mua bình quân: <Text strong style={{ color: "#2563eb" }}>{s.avg_quantity} {s.unit}</Text>
-                            </span>
-                            <span style={{ color: "#475569" }}>
-                              Tồn khả dụng hiện tại:{" "}
-                              <Tag color={s.available_quantity > 0 ? "success" : "error"} style={{ marginRight: 0 }}>
-                                {s.available_quantity > 0 ? `${s.available_quantity} ${s.unit}` : "Hết hàng (0)"}
-                              </Tag>
-                            </span>
-                            {s.last_price > 0 && (
-                              <span style={{ color: "#64748b" }}>
-                                Giá mua gần nhất: <Text>{s.last_price.toLocaleString("vi-VN")} ₫</Text>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          size="small"
-                          icon={<PlusOutlined />}
-                          type="default"
-                          style={{ borderColor: "#2563eb", color: "#2563eb", fontWeight: 500 }}
-                          onClick={() => handleAddSingleSuggestion(s)}
-                        >
-                          Thêm
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            )}
+                </div>
 
-            {/* Danh sách sản phẩm trong đơn */}
-            <div style={{ marginTop: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <Text strong style={{ fontSize: 15 }}>
-                  Danh sách sản phẩm
-                </Text>
-                <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={handleAddItem}>
-                  Thêm sản phẩm
-                </Button>
-              </div>
+                {/* Ghi chú đơn hàng */}
+                <Form.Item name="note" label="Ghi chú đơn hàng" style={{ marginBottom: 8 }}>
+                  <Input.TextArea rows={2} placeholder="Ghi chú đơn hàng..." />
+                </Form.Item>
 
-              <Table
-                columns={columns}
-                dataSource={items}
-                pagination={false}
-                bordered
-                size="small"
-                scroll={{ x: 930 }}
-              />
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  marginTop: 12,
-                  padding: "8px 16px",
-                  backgroundColor: "#f1f5f9",
-                  borderRadius: 8,
-                }}
-              >
-                <Text style={{ fontSize: 15 }}>
-                  Tổng giá trị đơn:{" "}
-                  <Text strong style={{ color: "#047857", fontSize: 17 }}>
-                    {totalAmount.toLocaleString("vi-VN")} ₫
-                  </Text>
-                </Text>
+                {/* Gửi phê duyệt ngay cho Quản lý kinh doanh */}
+                <Form.Item
+                  name="submit_for_approval"
+                  valuePropName="checked"
+                  initialValue={true}
+                  style={{ marginBottom: 0 }}
+                >
+                  <Checkbox defaultChecked>
+                    <Text strong style={{ color: "#2563eb" }}>
+                      Gửi phê duyệt ngay cho Quản lý kinh doanh
+                    </Text>
+                  </Checkbox>
+                </Form.Item>
               </div>
             </div>
-
-            {/* Ghi chú đơn hàng */}
-            <Form.Item name="note" label="Ghi chú đơn hàng" style={{ marginTop: 16, marginBottom: 12 }}>
-              <Input.TextArea rows={2} placeholder="Ghi chú đơn hàng..." />
-            </Form.Item>
-
-            {/* Gửi phê duyệt ngay cho Quản lý kinh doanh */}
-            <Form.Item
-              name="submit_for_approval"
-              valuePropName="checked"
-              initialValue={true}
-              style={{ marginBottom: 4 }}
-            >
-              <Checkbox defaultChecked>
-                <Text strong style={{ color: "#2563eb" }}>
-                  Gửi phê duyệt ngay cho Quản lý kinh doanh
-                </Text>
-              </Checkbox>
-            </Form.Item>
           </Form>
         </div>
       </Modal>

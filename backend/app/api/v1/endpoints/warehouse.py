@@ -70,11 +70,7 @@ def seed_default_warehouses_and_territories(db: Session) -> None:
                     Inventory.product_id == prod.id,
                     Inventory.warehouse_id == wh1.id,
                 ).first()
-                if inv:
-                    inv.physical_qty = 100.0
-                    inv.reserved_qty = 0.0
-                    inv.available_qty = 100.0
-                else:
+                if not inv:
                     db.add(Inventory(
                         product_id=prod.id,
                         warehouse_id=wh1.id,
@@ -82,7 +78,7 @@ def seed_default_warehouses_and_territories(db: Session) -> None:
                         reserved_qty=0.0,
                         available_qty=100.0,
                     ))
-                db.commit()
+                    db.commit()
     except Exception:
         db.rollback()
 

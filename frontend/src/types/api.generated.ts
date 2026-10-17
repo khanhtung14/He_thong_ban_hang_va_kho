@@ -402,6 +402,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/available-stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Available Stock Endpoint
+         * @description Lấy tồn khả dụng theo công thức: Tồn thực tế - Tồn đang giữ chỗ (SCRUM-10).
+         */
+        get: operations["get_available_stock_endpoint_api_v1_inventory_available_stock_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/alerts": {
         parameters: {
             query?: never;
@@ -1430,6 +1450,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/manager/customers/{customer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Customer In Lock Router */
+        put: operations["update_customer_in_lock_router_api_v1_manager_customers__customer_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{customer_id}/status": {
         parameters: {
             query?: never;
@@ -1634,6 +1671,26 @@ export interface paths {
         patch: operations["assign_sales_rep_api_v1_customers__customer_id__assign_sales_rep_patch"];
         trace?: never;
     };
+    "/api/v1/orders/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Simulate Order
+         * @description Tính toán giá tự động, kiểm tra tồn khả dụng và hạn mức nợ trước khi lưu đơn thật (EP-04 & SCRUM-10).
+         */
+        post: operations["simulate_order_api_v1_orders_simulate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders": {
         parameters: {
             query?: never;
@@ -1646,6 +1703,152 @@ export interface paths {
         put?: never;
         /** Create Orders */
         post: operations["create_orders_api_v1_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portal Orders
+         * @description Lấy danh sách đơn hàng của chính đại lý đăng nhập hiện tại.
+         *     Nếu đại lý chưa có đơn hàng nào hoặc chưa có hồ sơ, trả về danh sách rỗng [].
+         *     Sắp xếp đơn mới nhất lên đầu (created_at DESC).
+         */
+        get: operations["get_portal_orders_api_v1_customer_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portal Orders
+         * @description Lấy danh sách đơn hàng của chính đại lý đăng nhập hiện tại.
+         *     Nếu đại lý chưa có đơn hàng nào hoặc chưa có hồ sơ, trả về danh sách rỗng [].
+         *     Sắp xếp đơn mới nhất lên đầu (created_at DESC).
+         */
+        get: operations["get_portal_orders_api_v1_portal_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer/orders/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portal Order Detail
+         * @description Xem chi tiết đơn hàng của đại lý:
+         *     1. Kiểm tra quyền sở hữu đơn hàng (order.customer_id == current_user.customer_id),
+         *        nếu không khớp trả về 403 Forbidden.
+         *     2. Trả về chi tiết đơn hàng kèm danh sách dòng hàng (items):
+         *        sku, product_name, unit, ordered_quantity, delivered_quantity, unit_price, total_price,
+         *        và cờ is_partially_delivered.
+         */
+        get: operations["get_portal_order_detail_api_v1_customer_orders__order_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/orders/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portal Order Detail
+         * @description Xem chi tiết đơn hàng của đại lý:
+         *     1. Kiểm tra quyền sở hữu đơn hàng (order.customer_id == current_user.customer_id),
+         *        nếu không khớp trả về 403 Forbidden.
+         *     2. Trả về chi tiết đơn hàng kèm danh sách dòng hàng (items):
+         *        sku, product_name, unit, ordered_quantity, delivered_quantity, unit_price, total_price,
+         *        và cờ is_partially_delivered.
+         */
+        get: operations["get_portal_order_detail_api_v1_portal_orders__order_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/orders/{order_id}/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare Order Reorder
+         * @description Chuẩn bị dữ liệu đặt lại đơn hàng (Reorder) cho đại lý:
+         *     1. Kiểm tra quyền sở hữu đơn hàng (chỉ đại lý sở hữu đơn mới được đặt lại).
+         *     2. Lấy tất cả mặt hàng từ đơn cũ.
+         *     3. Kiểm tra trạng thái kinh doanh: sản phẩm ngừng bán được ghi nhận vào removed_items và loại bỏ.
+         *     4. Tính lại đơn giá theo Bảng giá hiện hành của đại lý (áp current_price).
+         *     5. Kiểm tra tồn kho khả dụng tại kho phục vụ.
+         *     6. Trả về payload: items, removed_items, default_delivery_point_id.
+         */
+        post: operations["prepare_order_reorder_api_v1_portal_orders__order_id__reorder_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portal/orders/{order_id}/reorder-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Prepare Order Reorder
+         * @description Chuẩn bị dữ liệu đặt lại đơn hàng (Reorder) cho đại lý:
+         *     1. Kiểm tra quyền sở hữu đơn hàng (chỉ đại lý sở hữu đơn mới được đặt lại).
+         *     2. Lấy tất cả mặt hàng từ đơn cũ.
+         *     3. Kiểm tra trạng thái kinh doanh: sản phẩm ngừng bán được ghi nhận vào removed_items và loại bỏ.
+         *     4. Tính lại đơn giá theo Bảng giá hiện hành của đại lý (áp current_price).
+         *     5. Kiểm tra tồn kho khả dụng tại kho phục vụ.
+         *     6. Trả về payload: items, removed_items, default_delivery_point_id.
+         */
+        get: operations["prepare_order_reorder_api_v1_portal_orders__order_id__reorder_items_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1712,7 +1915,7 @@ export interface paths {
         };
         /**
          * Get Order Detail
-         * @description Xem chi tiết đơn hàng kèm cảnh báo nếu đại lý đang bị khóa (SCRUM-85).
+         * @description Xem chi tiết đơn hàng kèm cảnh báo nếu đại lý đang bị khóa (SCRUM-85) và tồn khả dụng (SCRUM-10).
          */
         get: operations["get_order_detail_api_v1_orders__order_id__get"];
         /**
@@ -1744,6 +1947,7 @@ export interface paths {
          * @description Cập nhật trạng thái đơn hàng dở dang.
          *
          *     Theo SCRUM-85: Đơn đang dở của đại lý bị khóa VẪN XỬ LÝ TIẾP ĐƯỢC nhưng có cảnh báo.
+         *     Theo SCRUM-10: Nếu hủy đơn (CANCELLED), giải phóng tồn đang giữ chỗ (Reserved Stock).
          */
         put: operations["update_order_status_api_v1_orders__order_id__status_put"];
         post?: never;
@@ -2402,6 +2606,74 @@ export interface paths {
          * @description Alias cho /api/v1/customers/{customer_id}/credit-limit/history.
          */
         get: operations["get_agency_debt_limit_history_alias_api_agencies__agency_id__credit_limit_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dealers/{dealer_id}/purchase-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dealers Purchase History */
+        get: operations["get_dealers_purchase_history_api_v1_dealers__dealer_id__purchase_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/dealers/{dealer_id}/purchase-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Sales Dealers Purchase History */
+        get: operations["get_sales_dealers_purchase_history_api_v1_sales_dealers__dealer_id__purchase_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dealers/{dealer_id}/last-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dealers Last Order */
+        get: operations["get_dealers_last_order_api_v1_dealers__dealer_id__last_order_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/dealers/{dealer_id}/last-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Sales Dealers Last Order */
+        get: operations["get_sales_dealers_last_order_api_v1_sales_dealers__dealer_id__last_order_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3080,10 +3352,14 @@ export interface components {
         };
         /** CustomerCreditLimitRequest */
         CustomerCreditLimitRequest: {
-            /** Newcreditlimit */
+            /**
+             * Newcreditlimit
+             * @description Hạn mức tiền mới phải >= 0
+             */
             newCreditLimit: number;
             /**
              * Newmaxdebtdays
+             * @description Số ngày nợ tối đa mới phải >= 0
              * @default 30
              */
             newMaxDebtDays: number;
@@ -3364,6 +3640,52 @@ export interface components {
             email?: string | null;
             /** Address */
             address?: string | null;
+        };
+        /** DealerPurchaseHistoryItem */
+        DealerPurchaseHistoryItem: {
+            /** Product Id */
+            product_id: number;
+            /** Sku */
+            sku: string;
+            /** Product Name */
+            product_name: string;
+            /**
+             * Unit
+             * @default Cái
+             */
+            unit: string;
+            /**
+             * Total Orders Count
+             * @default 1
+             */
+            total_orders_count: number;
+            /**
+             * Total Quantity
+             * @default 0
+             */
+            total_quantity: number;
+            /**
+             * Avg Quantity
+             * @default 0
+             */
+            avg_quantity: number;
+            /**
+             * Average Quantity
+             * @default 0
+             */
+            average_quantity: number;
+            /**
+             * Last Price
+             * @default 0
+             */
+            last_price: number;
+            /** Last Ordered At */
+            last_ordered_at?: string | null;
+            /**
+             * Available Quantity
+             * @default 0
+             */
+            available_quantity: number;
         };
         /** DebtLimitUpdateRequest */
         DebtLimitUpdateRequest: {
@@ -3745,6 +4067,29 @@ export interface components {
             /** Payment Term Days */
             payment_term_days: number;
         };
+        /** LastOrderGroup */
+        LastOrderGroup: {
+            /** Order Id */
+            order_id?: number | null;
+            /** Order Code */
+            order_code?: string | null;
+            /** Items */
+            items?: components["schemas"]["LastOrderItem"][];
+        };
+        /** LastOrderItem */
+        LastOrderItem: {
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Quantity */
+            quantity: number;
+            /**
+             * Unit Price
+             * @default 0
+             */
+            unit_price: number;
+        };
         /** LegacyTransactionCreateRequest */
         LegacyTransactionCreateRequest: {
             /** Product Id */
@@ -3805,6 +4150,11 @@ export interface components {
              */
             customerId: number;
             /**
+             * Warehouseid
+             * @description ID kho hàng xuất
+             */
+            warehouseId?: number | null;
+            /**
              * Deliveryaddressid
              * @description ID điểm giao hàng
              */
@@ -3827,16 +4177,18 @@ export interface components {
         /** OrderItemCreate */
         OrderItemCreate: {
             /** Sku */
-            sku: string;
+            sku?: string | null;
             /** Product Name */
             product_name?: string | null;
+            /** Productid */
+            productId?: number | null;
             /**
              * Quantity
              * @default 1
              */
             quantity: number;
-            /** Unit Price */
-            unit_price?: number | null;
+            /** Unitprice */
+            unitPrice?: number | null;
         };
         /** OrderItemResponse */
         OrderItemResponse: {
@@ -3846,14 +4198,43 @@ export interface components {
             sku?: string | null;
             /** Product Name */
             product_name?: string | null;
+            /**
+             * Unit
+             * @default Cái
+             */
+            unit: string | null;
+            /**
+             * Unit Name
+             * @default Cái
+             */
+            unit_name: string | null;
             /** Quantity */
             quantity: number;
+            /** Ordered Quantity */
+            ordered_quantity?: number | null;
+            /** Delivered Quantity */
+            delivered_quantity?: number | null;
+            /** Actual Quantity */
+            actual_quantity?: number | null;
             /** Unit Price */
             unit_price: number;
+            /** Total Price */
+            total_price?: number | null;
+            /** Subtotal */
+            subtotal?: number | null;
             /** Floor Price */
             floor_price?: number | null;
             /** Price List Id */
             price_list_id?: number | null;
+            /** Available Qty */
+            available_qty?: number | null;
+            /** Availableqty */
+            availableQty?: number | null;
+            /**
+             * Is Partially Delivered
+             * @default false
+             */
+            is_partially_delivered: boolean;
         };
         /** OrderResponse */
         OrderResponse: {
@@ -3865,9 +4246,20 @@ export interface components {
             customer_id: number;
             /** Customer Name */
             customer_name?: string | null;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /** Warehouse Name */
+            warehouse_name?: string | null;
             /** Delivery Address Id */
             delivery_address_id?: number | null;
-            delivery_address?: components["schemas"]["DeliveryAddressBriefResponse"] | null;
+            /** Delivery Address */
+            delivery_address?: components["schemas"]["DeliveryAddressBriefResponse"] | string | {
+                [key: string]: unknown;
+            } | null;
+            /** Delivery Point Name */
+            delivery_point_name?: string | null;
+            /** Expected Delivery Date */
+            expected_delivery_date?: string | null;
             status: components["schemas"]["OrderStatus"];
             /** Total Amount */
             total_amount: number;
@@ -3875,6 +4267,11 @@ export interface components {
             note?: string | null;
             /** Created At */
             created_at?: string | null;
+            /**
+             * Is Partially Delivered
+             * @default false
+             */
+            is_partially_delivered: boolean;
             /**
              * Has Warning
              * @default false
@@ -3886,6 +4283,31 @@ export interface components {
             approval_reason?: string | null;
             /** Items */
             items?: components["schemas"]["OrderItemResponse"][];
+        };
+        /** OrderSimulateItem */
+        OrderSimulateItem: {
+            /** Productid */
+            productId?: number | null;
+            /** Sku */
+            sku?: string | null;
+            /** Unitid */
+            unitId?: number | null;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+            /** Unitprice */
+            unitPrice?: number | null;
+        };
+        /** OrderSimulateRequest */
+        OrderSimulateRequest: {
+            /** Customerid */
+            customerId: number;
+            /** Warehouseid */
+            warehouseId?: number | null;
+            /** Items */
+            items?: components["schemas"]["OrderSimulateItem"][];
         };
         /**
          * OrderStatus
@@ -3921,6 +4343,110 @@ export interface components {
             invoice_ids: number[];
             /** Receipt Image */
             receipt_image?: string | null;
+        };
+        /** PortalOrderDetailResponse */
+        PortalOrderDetailResponse: {
+            /** Id */
+            id: number;
+            /** Order Code */
+            order_code: string;
+            /** Customer Id */
+            customer_id?: number | null;
+            /** Customer Name */
+            customer_name?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Expected Delivery Date */
+            expected_delivery_date?: string | null;
+            /**
+             * Total Amount
+             * @default 0
+             */
+            total_amount: number;
+            /** Status */
+            status: string;
+            /** Delivery Point Name */
+            delivery_point_name?: string | null;
+            /** Delivery Address */
+            delivery_address?: components["schemas"]["DeliveryAddressBriefResponse"] | string | {
+                [key: string]: unknown;
+            } | null;
+            /** Delivery Address Id */
+            delivery_address_id?: number | null;
+            delivery_address_detail?: components["schemas"]["DeliveryAddressBriefResponse"] | null;
+            /** Note */
+            note?: string | null;
+            /** Approval Reason */
+            approval_reason?: string | null;
+            /**
+             * Is Partially Delivered
+             * @default false
+             */
+            is_partially_delivered: boolean;
+            /** Items */
+            items?: components["schemas"]["PortalOrderItemResponse"][];
+        };
+        /** PortalOrderItemResponse */
+        PortalOrderItemResponse: {
+            /** Id */
+            id?: number | null;
+            /**
+             * Sku
+             * @default
+             */
+            sku: string;
+            /**
+             * Product Name
+             * @default
+             */
+            product_name: string;
+            /**
+             * Unit
+             * @default Cái
+             */
+            unit: string;
+            /**
+             * Unit Name
+             * @default Cái
+             */
+            unit_name: string | null;
+            /**
+             * Ordered Quantity
+             * @default 0
+             */
+            ordered_quantity: number;
+            /**
+             * Quantity
+             * @default 0
+             */
+            quantity: number;
+            /**
+             * Delivered Quantity
+             * @default 0
+             */
+            delivered_quantity: number;
+            /**
+             * Actual Quantity
+             * @default 0
+             */
+            actual_quantity: number;
+            /**
+             * Unit Price
+             * @default 0
+             */
+            unit_price: number;
+            /**
+             * Total Price
+             * @default 0
+             */
+            total_price: number;
+            /** Subtotal */
+            subtotal?: number | null;
+            /**
+             * Is Partially Delivered
+             * @default false
+             */
+            is_partially_delivered: boolean;
         };
         /** PriceLine */
         PriceLine: {
@@ -4177,6 +4703,105 @@ export interface components {
              * @default Không được phê duyệt
              */
             reason: string;
+        };
+        /** RemovedReorderItem */
+        RemovedReorderItem: {
+            /** Product Id */
+            product_id?: number | null;
+            /** Sku */
+            sku: string;
+            /** Product Name */
+            product_name: string;
+            /** Quantity */
+            quantity: number;
+            /** Old Price */
+            old_price?: number | null;
+            /**
+             * Reason
+             * @default Sản phẩm đã ngừng kinh doanh
+             */
+            reason: string;
+        };
+        /** ReorderItemDetail */
+        ReorderItemDetail: {
+            /** Product Id */
+            product_id: number;
+            /** Sku */
+            sku: string;
+            /** Product Name */
+            product_name: string;
+            /**
+             * Unit
+             * @default Cái
+             */
+            unit: string;
+            /** Quantity */
+            quantity: number;
+            /** Unit Price */
+            unit_price: number;
+            /** Current Price */
+            current_price: number;
+            /** Old Price */
+            old_price: number;
+            /**
+             * Price Changed
+             * @default false
+             */
+            price_changed: boolean;
+            /** Subtotal */
+            subtotal: number;
+            /** Floor Price */
+            floor_price?: number | null;
+            /**
+             * Available Qty
+             * @default 0
+             */
+            available_qty: number;
+            /**
+             * Stock Available
+             * @default 0
+             */
+            stock_available: number;
+            /**
+             * Is Available
+             * @default true
+             */
+            is_available: boolean;
+            /**
+             * Is Selected
+             * @default true
+             */
+            is_selected: boolean;
+        };
+        /** ReorderPreparationResponse */
+        ReorderPreparationResponse: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            /** Order Id */
+            order_id: number;
+            /** Original Order Code */
+            original_order_code: string;
+            /** Customer Id */
+            customer_id: number;
+            /** Customer Name */
+            customer_name: string;
+            /** Default Delivery Point Id */
+            default_delivery_point_id?: number | null;
+            /** Delivery Address Id */
+            delivery_address_id?: number | null;
+            /** Items */
+            items?: components["schemas"]["ReorderItemDetail"][];
+            /** Removed Items */
+            removed_items?: components["schemas"]["RemovedReorderItem"][];
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /** Warehouse Name */
+            warehouse_name?: string | null;
+            /** Warning Message */
+            warning_message?: string | null;
         };
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
@@ -5460,6 +6085,39 @@ export interface operations {
                 warehouseId?: number | null;
                 categoryId?: number | null;
                 keyword?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_available_stock_endpoint_api_v1_inventory_available_stock_get: {
+        parameters: {
+            query: {
+                sku: string;
+                warehouseId?: number | null;
+                customerId?: number | null;
             };
             header?: never;
             path?: never;
@@ -7754,6 +8412,41 @@ export interface operations {
             };
         };
     };
+    update_customer_in_lock_router_api_v1_manager_customers__customer_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     customers_update_status_endpoint: {
         parameters: {
             query?: never;
@@ -8097,6 +8790,39 @@ export interface operations {
             };
         };
     };
+    simulate_order_api_v1_orders_simulate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderSimulateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_orders_basic: {
         parameters: {
             query?: never;
@@ -8137,6 +8863,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portal_orders_api_v1_customer_orders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalOrderDetailResponse"][];
+                };
+            };
+        };
+    };
+    get_portal_orders_api_v1_portal_orders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalOrderDetailResponse"][];
+                };
+            };
+        };
+    };
+    get_portal_order_detail_api_v1_customer_orders__order_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalOrderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portal_order_detail_api_v1_portal_orders__order_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalOrderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_order_reorder_api_v1_portal_orders__order_id__reorder_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderPreparationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_order_reorder_api_v1_portal_orders__order_id__reorder_items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReorderPreparationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9931,6 +10821,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dealers_purchase_history_api_v1_dealers__dealer_id__purchase_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dealer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DealerPurchaseHistoryItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sales_dealers_purchase_history_api_v1_sales_dealers__dealer_id__purchase_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dealer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DealerPurchaseHistoryItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dealers_last_order_api_v1_dealers__dealer_id__last_order_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dealer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastOrderGroup"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sales_dealers_last_order_api_v1_sales_dealers__dealer_id__last_order_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dealer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LastOrderGroup"];
                 };
             };
             /** @description Validation Error */
