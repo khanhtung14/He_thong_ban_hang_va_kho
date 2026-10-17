@@ -13,6 +13,9 @@ export type ProductMarginDetail = components["schemas"]["ProductMarginDetail"];
 export type SalesMarginReport = components["schemas"]["SalesMarginReportResponse"];
 export type PriceListLine = components["schemas"]["PriceLine"];
 export type PriceListItem = components["schemas"]["PriceListView"];
+export type InvoiceView = components["schemas"]["InvoiceView"];
+export type InvoiceListResponse = components["schemas"]["InvoiceListResponse"];
+export type CustomerDebtSummary = components["schemas"]["CustomerDebtResponse"];
 
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -780,4 +783,40 @@ export async function deleteOrder(orderId: number): Promise<{ message: string }>
     throw new Error(err.detail || "Không thể xóa đơn hàng.");
   }
   return res.json();
+}
+
+export async function fetchMyInvoices(): Promise<InvoiceView[]> {
+  const response = await authenticatedFetch("/api/v1/invoices");
+  if (!response.ok) {
+    const error = (await response.json().catch(() => null)) as
+      | { detail?: string }
+      | null;
+    throw new Error(error?.detail || "Không thể tải danh sách hóa đơn.");
+  }
+  const result: InvoiceListResponse = await response.json();
+  return result.data;
+}
+
+export async function fetchMyDebtSummary(): Promise<CustomerDebtSummary> {
+  const response = await authenticatedFetch("/api/v1/customers/me/debts");
+  if (!response.ok) {
+    const error = (await response.json().catch(() => null)) as
+      | { detail?: string }
+      | null;
+    throw new Error(error?.detail || "Không thể tải thông tin công nợ.");
+  }
+  return response.json();
+}
+
+export async function fetchInvoiceDocument(invoiceId: number): Promise<Blob> {
+  const response = await authenticatedFetch(
+    `/api/v1/invoices/${invoiceId}/download`,
+  );
+  if (!response.ok) {
+    const error = (await response.json().catch(() => null)) as
+      | { detail?: string }
+      | null;
+    throw new Error(error?.detail || `Không thể tải hóa đơn #${invoiceId}.`);
+  }
+  return response.blob();
 }

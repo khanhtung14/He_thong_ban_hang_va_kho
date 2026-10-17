@@ -809,13 +809,13 @@
 - **Story:** S7-01
 - **Phân quyền:** Accountant
 - **Request Body:** `{"dispatchId": 401, "invoiceDate": "2026-10-10", "paymentTermDays": 30}`
-- **Response Data:** Phát hành hóa đơn bán hàng sinh tự động từ số lượng thực tế giao thành công.
+- **Response Data (201):** Phát hành tối đa một hóa đơn cho mỗi phiếu xuất, lấy đúng đại lý từ đơn hàng và tính thành tiền theo số lượng giao thực tế nhân đơn giá dòng đơn hàng sau chiết khấu. Phiếu xuất không có số lượng giao hợp lệ hoặc số lượng giao vượt đơn hàng bị từ chối.
 
 #### `GET /invoices`
 - **Story:** S7-01
-- **Phân quyền:** Accountant, Sales Rep
+- **Phân quyền:** Accountant, Admin, Sales Rep, Customer (Sales Rep chỉ xem đại lý phụ trách; Customer chỉ xem hóa đơn gắn với email hồ sơ đại lý của chính mình)
 - **Query Params:** `customerId`, `status`, `fromDate`, `toDate`
-- **Response Data:** Danh sách hóa đơn bán hàng (Chưa TT, Thanh toán 1 phần, Đã thanh toán).
+- **Response Data:** `{ "success": true, "code": 200, "data": [{ "id": 801, "dispatch_id": 401, "customer_id": 1024, "invoice_date": "2026-10-10T00:00:00", "due_date": "2026-11-09", "payment_term_days": 30, "total_amount": 12000000, "amount_paid": 2000000, "amount_due": 10000000, "status": "PARTIAL" }] }`. `status` là `UNPAID`, `PARTIAL` hoặc `PAID`; số đã trả lấy từ các khoản phân bổ trên hóa đơn.
 
 #### `POST /payments`
 - **Story:** S7-02, S7-05
@@ -832,6 +832,7 @@
 }
 ```
 - **Response Data:** Ghi nhận khoản thu và đối trừ trực tiếp vào sổ nợ của đại lý.
+- **Quy tắc:** Các hóa đơn phải thuộc đại lý chỉ định; khoản thu được phân bổ theo thứ tự `invoiceIds`, không vượt số dư còn phải trả. Sales Rep chỉ được ghi nhận thu cho đại lý mình phụ trách.
 
 #### `GET /debts/aging`
 - **Story:** S7-03
@@ -842,7 +843,17 @@
 #### `GET /customers/{id}/debts`
 - **Story:** S7-07
 - **Phân quyền:** Customer, Sales Rep
-- **Response Data:** Bảng kê nợ chi tiết của chính đại lý: Danh sách hóa đơn chưa thanh toán, hạn trả, tổng tiền còn nợ.
+- **Response Data:** `{ "customer_id": 1024, "customer_name": "Đại lý ABC", "current_debt": 10000000, "credit_limit": 50000000, "remaining_credit_limit": 40000000, "invoices": [...] }`. Customer chỉ được xem hồ sơ gắn với tài khoản của mình; Sales Rep chỉ được xem đại lý mình phụ trách. Bảng kê nợ gồm các hóa đơn còn dư nợ, hạn trả và hạn mức còn lại.
+
+#### `GET /customers/me/debts`
+- **Story:** S7-07 (portal alias)
+- **Phân quyền:** Customer
+- **Response Data:** Cùng schema với `GET /customers/{id}/debts`; hồ sơ đại lý được phân giải bằng email tài khoản đăng nhập để portal không cần nhận một ID đại lý từ trình duyệt.
+
+#### `GET /invoices/{id}/download`
+- **Story:** S7-07 (portal invoice re-download)
+- **Phân quyền:** Customer, Sales Rep, Accountant, Admin (Customer chỉ được tải hóa đơn của mình; Sales Rep chỉ được tải hóa đơn của đại lý phụ trách)
+- **Response Data:** Tài liệu HTML hóa đơn đã phát hành, có thể xem, in hoặc lưu thành PDF bằng chức năng in của trình duyệt. Tên file `invoice-{id}.html`.
 
 #### `POST /debts/reconciliation`
 - **Story:** S7-06

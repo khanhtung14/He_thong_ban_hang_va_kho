@@ -229,7 +229,10 @@ try:
     )
     from app.api.v1.endpoints.customers import router as customers_router, agencies_router
     from app.api.v1.endpoints.orders import router as orders_router
-    from app.api.v1.endpoints.invoices import router as invoices_router
+    from app.api.v1.endpoints.invoices import (
+        customer_debt_router,
+        router as invoices_router,
+    )
     from app.api.v1.endpoints.payments import router as payments_router
     from app.api.v1.endpoints.returns import router as returns_router
     app.include_router(warehouse_router)
@@ -240,6 +243,7 @@ try:
     app.include_router(agencies_router)
     app.include_router(orders_router)
     app.include_router(invoices_router)
+    app.include_router(customer_debt_router)
     app.include_router(payments_router)
     app.include_router(returns_router)
 except ModuleNotFoundError:
