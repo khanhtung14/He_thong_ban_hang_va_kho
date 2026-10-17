@@ -1,12 +1,22 @@
 import { getCurrentUserRole, hasValidSession } from "./services/sessionService";
-import AdminDashboard from "./roles/admin/AdminDashboard";
-import { SalesManagerDashboard } from "./roles/sales_manager/SalesManagerDashboard";
-import AccountantDashboard from "./roles/accountant/AccountantDashboard";
-import CustomerDashboard from "./roles/customer/CustomerDashboard";
-import SalesDashboard from "./roles/sales/SalesDashboard";
-import WarehouseManagerDashboard from "./roles/warehouse_manager/WarehouseManagerDashboard";
-import WarehouseStaffDashboard from "./roles/warehouse_staff/WarehouseStaffDashboard";
+import { lazy } from "react";
 import Error403 from "./Error403";
+
+const AdminDashboard = lazy(() => import("./roles/admin/AdminDashboard"));
+const SalesManagerDashboard = lazy(
+  () => import("./roles/sales_manager/SalesManagerDashboard"),
+);
+const AccountantDashboard = lazy(
+  () => import("./roles/accountant/AccountantDashboard"),
+);
+const CustomerDashboard = lazy(() => import("./roles/customer/CustomerDashboard"));
+const SalesDashboard = lazy(() => import("./roles/sales/SalesDashboard"));
+const WarehouseManagerDashboard = lazy(
+  () => import("./roles/warehouse_manager/WarehouseManagerDashboard"),
+);
+const WarehouseStaffDashboard = lazy(
+  () => import("./roles/warehouse_staff/WarehouseStaffDashboard"),
+);
 
 type RoleKey =
   | "customer"
@@ -20,6 +30,7 @@ type RoleKey =
 const roleByPath: Record<string, RoleKey> = {
   "/portal/orders": "customer",
   "/sales/orders": "sales",
+  "/sales/returns": "sales",
   "/sales/customers": "sales",
   "/sales/assignments": "salesManager",
   "/manager/dashboard": "salesManager",
@@ -37,6 +48,7 @@ const roleByPath: Record<string, RoleKey> = {
   "/warehouse/inventory": "warehouse",
   "/warehouse/suppliers": "warehouse",
   "/warehouse/dashboard": "warehouseManager",
+  "/warehouse/returns": "warehouseManager",
   "/accounting/debt-book": "accountant",
   "/accounting/invoices": "accountant",
   "/accounting/agencies": "accountant",
@@ -54,6 +66,7 @@ const roleByPath: Record<string, RoleKey> = {
 const allowedRolesByPath: Record<string, RoleKey[]> = {
   "/portal/orders": ["customer", "admin"],
   "/sales/orders": ["sales", "salesManager", "customer", "accountant", "admin"],
+  "/sales/returns": ["sales", "admin"],
   "/sales/customers": ["sales", "salesManager", "admin"],
   "/sales/assignments": ["salesManager", "admin"],
   "/manager/dashboard": ["salesManager", "admin"],
@@ -76,6 +89,7 @@ const allowedRolesByPath: Record<string, RoleKey[]> = {
   ],
   "/warehouse/suppliers": ["warehouse", "warehouseManager", "admin"],
   "/warehouse/dashboard": ["warehouse", "warehouseManager", "admin"],
+  "/warehouse/returns": ["warehouseManager", "admin"],
   "/accounting/debt-book": ["accountant", "admin"],
   "/accounting/invoices": ["accountant", "admin"],
   "/accounting/agencies": ["accountant", "admin"],

@@ -266,3 +266,50 @@ def migrate_sales_order_draft_schema():
                     connection.execute(
                         text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
                     )
+
+
+def migrate_return_receiving_schema():
+    """Add return receiving fields to existing databases before ORM queries use them."""
+    additions = {
+        "inventory": {
+            "damaged_qty": "FLOAT NOT NULL DEFAULT 0",
+        },
+        "inventory_lots": {
+            "damaged_qty": "FLOAT NOT NULL DEFAULT 0",
+        },
+        "return_orders": {
+            "return_date": "DATE NULL",
+            "created_by_id": "INTEGER NULL",
+            "received_by_id": "INTEGER NULL",
+            "received_at": "DATETIME NULL",
+        },
+        "return_order_items": {
+            "unit_id": "INTEGER NULL",
+            "unit_name": "VARCHAR(50) NULL",
+            "conversion_rate_snapshot": "FLOAT NOT NULL DEFAULT 1",
+            "base_quantity": "FLOAT NOT NULL DEFAULT 0",
+            "lot_number": "VARCHAR(100) NULL",
+            "received_condition": "VARCHAR(20) NULL",
+        },
+    }
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        for table_name, columns in additions.items():
+            if not inspector.has_table(table_name):
+                continue
+            existing = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, definition in columns.items():
+                if column_name not in existing:
+                    connection.execute(
+                        text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+                    )
+    if inspector.has_table("return_order_items"):
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE return_order_items SET base_quantity = quantity WHERE base_quantity = 0")
+            )
+    if inspector.has_table("return_orders"):
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE return_orders SET return_date = CURRENT_DATE WHERE return_date IS NULL")
+            )

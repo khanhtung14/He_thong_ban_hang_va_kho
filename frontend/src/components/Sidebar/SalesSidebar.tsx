@@ -8,6 +8,7 @@ import {
   TagOutlined,
   FileDoneOutlined,
   TrophyOutlined,
+  RollbackOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
 import BrandLogo from "../BrandLogo";
@@ -44,6 +45,11 @@ export const SalesSidebar: React.FC<SalesSidebarProps> = ({
           key: "orders",
           icon: <ShoppingOutlined />,
           label: "Tạo & Quản lý đơn",
+        },
+        {
+          key: "returns",
+          icon: <RollbackOutlined />,
+          label: "Trả hàng đại lý",
         },
         {
           key: "customers",

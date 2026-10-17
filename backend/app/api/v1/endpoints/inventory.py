@@ -246,6 +246,7 @@ def list_inventory_items(
             "physicalQty": inv.physical_qty,
             "reservedQty": inv.reserved_qty,
             "availableQty": inv.available_qty,
+            "damagedQty": inv.damaged_qty,
             "minStock": prod.min_stock,
             "isBelowMinStock": inv.physical_qty < prod.min_stock,
             "costPrice": prod.cost_price,
@@ -325,6 +326,7 @@ def list_inventory_lots(
                 "mfgDate": lot.mfg_date,
                 "expDate": lot.exp_date,
                 "quantity": lot.quantity,
+                "damagedQuantity": lot.damaged_qty,
             } for lot in lots
         ]
     }
@@ -461,4 +463,3 @@ def create_legacy_inventory_transaction(
     db: Session = Depends(get_db),
 ) -> InventoryTransaction:
     return _record_stock_movement(payload, user, db)
-

@@ -10,7 +10,11 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.database import migrate_pricing_schema, migrate_sales_order_draft_schema
+from app.core.database import (
+    migrate_pricing_schema,
+    migrate_return_receiving_schema,
+    migrate_sales_order_draft_schema,
+)
 from app.api.v1.endpoints.avatar import router as avatar_router
 from app.api.v1.endpoints.change_password import router as change_password_router
 from app.api.v1.endpoints.audit_logs import router as audit_logs_router
@@ -46,6 +50,7 @@ async def lifespan(app: FastAPI):
         pass
     migrate_pricing_schema()
     migrate_sales_order_draft_schema()
+    migrate_return_receiving_schema()
     try:
         from app.api.v1.endpoints.warehouse import seed_default_warehouses_and_territories
         from app.core.database import SessionLocal
@@ -295,6 +300,7 @@ def admin_create_user_page():
 
 @app.get("/portal/orders", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/sales/orders", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/sales/returns", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/sales/customers", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/sales/assignments", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/manager/dashboard", response_class=HTMLResponse, include_in_schema=False)
@@ -306,6 +312,7 @@ def admin_create_user_page():
 @app.get("/warehouse/inventory", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/warehouse/suppliers", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/warehouse/dashboard", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/returns", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/debt-book", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/invoices", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/agencies", response_class=HTMLResponse, include_in_schema=False)

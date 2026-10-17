@@ -81,6 +81,15 @@ MENU_REGISTRY: List[MenuItem] = [
         category="Kho vận",
     ),
     MenuItem(
+        id="warehouse-returns",
+        title="Nhận hàng trả",
+        path="/warehouse/returns",
+        icon="rotate-ccw",
+        roles=["WH_MANAGER"],
+        order=25,
+        category="Kho vận",
+    ),
+    MenuItem(
         id="warehouse-inventory",
         title="Sổ tồn kho",
         path="/warehouse/inventory",
@@ -116,6 +125,15 @@ MENU_REGISTRY: List[MenuItem] = [
         icon="shopping-cart",
         roles=["SALES", "SALES_REP", "SALES_MANAGER", "CUSTOMER", "ACCOUNTANT"],
         order=60,
+        category="Bán hàng",
+    ),
+    MenuItem(
+        id="sales-returns",
+        title="Lập phiếu trả hàng",
+        path="/sales/returns",
+        icon="rotate-ccw",
+        roles=["SALES", "SALES_REP"],
+        order=65,
         category="Bán hàng",
     ),
     MenuItem(

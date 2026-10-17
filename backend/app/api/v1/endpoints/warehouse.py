@@ -81,6 +81,21 @@ class ReceiptSchema(BaseModel):
     receiptDate: str
     items: List[ReceiptItemSchema]
 
+
+class WarehouseDirectoryItemResponse(BaseModel):
+    id: int
+    code: str
+    name: str
+    address: str
+    is_active: bool
+
+
+class WarehouseDirectoryResponse(BaseModel):
+    success: bool
+    code: int
+    message: str
+    data: List[WarehouseDirectoryItemResponse]
+
 class WarehouseCreateSchema(BaseModel):
     code: str = Field(..., min_length=1, max_length=40, description="Mã định danh kho")
     name: str = Field(..., min_length=1, max_length=150, description="Tên kho hàng")
@@ -311,7 +326,12 @@ def handle_delete_warehouse(
 
 
 # Register routes on both warehouses_router (/api/v1/warehouses) and router (/api/v1/warehouse)
-warehouses_router.add_api_route("", handle_get_warehouses, methods=["GET"])
+warehouses_router.add_api_route(
+    "",
+    handle_get_warehouses,
+    methods=["GET"],
+    response_model=WarehouseDirectoryResponse,
+)
 warehouses_router.add_api_route("/", handle_get_warehouses, methods=["GET"], include_in_schema=False)
 warehouses_router.add_api_route("", handle_create_warehouse, methods=["POST"], status_code=201)
 warehouses_router.add_api_route("/{warehouse_id}", handle_update_warehouse, methods=["PUT"])

@@ -2691,7 +2691,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/returns/eligible-invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Eligible Invoices */
+        get: operations["list_eligible_invoices_api_v1_returns_eligible_invoices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/returns/invoices/{invoice_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Invoice Returnable Items */
+        get: operations["list_invoice_returnable_items_api_v1_returns_invoices__invoice_id__items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Returns */
+        get: operations["list_returns_api_v1_returns_get"];
+        put?: never;
+        /** Create Return */
+        post: operations["create_return_api_v1_returns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/returns/{return_id}/receive": {
         parameters: {
             query?: never;
             header?: never;
@@ -2700,8 +2752,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Return */
-        post: operations["create_return_api_v1_returns_post"];
+        /** Receive Return */
+        post: operations["receive_return_api_v1_returns__return_id__receive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2752,6 +2804,48 @@ export interface components {
          * @enum {string}
          */
         AccountStatus: "ACTIVE" | "LOCKED" | "DISABLED" | "PENDING_ACTIVATION";
+        /** ApiEnvelope[ReturnOrderResponse] */
+        ApiEnvelope_ReturnOrderResponse_: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message?: string | null;
+            data: components["schemas"]["ReturnOrderResponse"];
+        };
+        /** ApiEnvelope[ReturnableInvoiceData] */
+        ApiEnvelope_ReturnableInvoiceData_: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message?: string | null;
+            data: components["schemas"]["ReturnableInvoiceData"];
+        };
+        /** ApiEnvelope[list[EligibleInvoiceResponse]] */
+        ApiEnvelope_list_EligibleInvoiceResponse__: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message?: string | null;
+            /** Data */
+            data: components["schemas"]["EligibleInvoiceResponse"][];
+        };
+        /** ApiEnvelope[list[ReturnOrderResponse]] */
+        ApiEnvelope_list_ReturnOrderResponse__: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message?: string | null;
+            /** Data */
+            data: components["schemas"]["ReturnOrderResponse"][];
+        };
         /** AssignSalesRepRequest */
         AssignSalesRepRequest: {
             /**
@@ -3704,6 +3798,19 @@ export interface components {
             /** Items */
             items: components["schemas"]["DraftItemView"][];
         };
+        /** EligibleInvoiceResponse */
+        EligibleInvoiceResponse: {
+            /** Id */
+            id: number;
+            /** Invoicedate */
+            invoiceDate: string | null;
+            /** Customerid */
+            customerId: number;
+            /** Customername */
+            customerName: string;
+            /** Totalamount */
+            totalAmount: number;
+        };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
             /**
@@ -4196,29 +4303,134 @@ export interface components {
              */
             confirm_password: string;
         };
-        /** ReturnCreate */
-        ReturnCreate: {
-            /** Invoice Id */
-            invoice_id: number;
-            /** Warehouse Id */
-            warehouse_id: number;
-            /** Return Date */
-            return_date: string;
+        /** ReturnCreateRequest */
+        ReturnCreateRequest: {
+            /** Invoiceid */
+            invoiceId: number;
+            /** Warehouseid */
+            warehouseId: number;
+            /**
+             * Returndate
+             * Format: date
+             */
+            returnDate: string;
             /** Reason */
             reason: string;
             /** Items */
-            items: components["schemas"]["ReturnItem"][];
+            items: components["schemas"]["ReturnItemRequest"][];
         };
-        /** ReturnItem */
-        ReturnItem: {
-            /** Product Id */
-            product_id: number;
-            /** Unit Id */
-            unit_id: number;
-            /** Lot Number */
-            lot_number: string;
+        /** ReturnItemRequest */
+        ReturnItemRequest: {
+            /** Productid */
+            productId: number;
+            /** Unitid */
+            unitId?: number | null;
+            /** Lotnumber */
+            lotNumber?: string | null;
             /** Quantity */
             quantity: number;
+        };
+        /** ReturnItemResponse */
+        ReturnItemResponse: {
+            /** Id */
+            id: number;
+            /** Productid */
+            productId: number;
+            /** Sku */
+            sku: string | null;
+            /** Unitid */
+            unitId: number | null;
+            /** Unitname */
+            unitName: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Basequantity */
+            baseQuantity: number;
+            /** Lotnumber */
+            lotNumber: string | null;
+            /** Condition */
+            condition: string | null;
+        };
+        /** ReturnOrderResponse */
+        ReturnOrderResponse: {
+            /** Id */
+            id: number;
+            /** Invoiceid */
+            invoiceId: number;
+            /** Customername */
+            customerName: string | null;
+            /** Warehouseid */
+            warehouseId: number;
+            /** Returndate */
+            returnDate: string | null;
+            /** Reason */
+            reason: string;
+            /** Status */
+            status: string;
+            /** Receivedat */
+            receivedAt: string | null;
+            /** Items */
+            items: components["schemas"]["ReturnItemResponse"][];
+        };
+        /** ReturnReceiveItemRequest */
+        ReturnReceiveItemRequest: {
+            /** Returnitemid */
+            returnItemId: number;
+            /**
+             * Condition
+             * @enum {string}
+             */
+            condition: "GOOD" | "DAMAGED";
+        };
+        /** ReturnReceiveRequest */
+        ReturnReceiveRequest: {
+            /** Items */
+            items: components["schemas"]["ReturnReceiveItemRequest"][];
+        };
+        /** ReturnableInvoiceData */
+        ReturnableInvoiceData: {
+            /** Invoiceid */
+            invoiceId: number;
+            /** Customerid */
+            customerId: number;
+            /** Customername */
+            customerName: string;
+            /** Items */
+            items: components["schemas"]["ReturnableItemResponse"][];
+        };
+        /** ReturnableItemResponse */
+        ReturnableItemResponse: {
+            /** Productid */
+            productId: number;
+            /** Sku */
+            sku: string;
+            /** Productname */
+            productName: string;
+            /** Managebylot */
+            manageByLot: boolean;
+            /** Lotnumber */
+            lotNumber: string | null;
+            /** Deliveredbasequantity */
+            deliveredBaseQuantity: number;
+            /** Returnedbasequantity */
+            returnedBaseQuantity: number;
+            /** Returnablebasequantity */
+            returnableBaseQuantity: number;
+            /** Baseunit */
+            baseUnit: string;
+            /** Units */
+            units: components["schemas"]["ReturnableUnitResponse"][];
+        };
+        /** ReturnableUnitResponse */
+        ReturnableUnitResponse: {
+            /** Unitid */
+            unitId: number;
+            /** Unitname */
+            unitName: string;
+            /** Conversionrate */
+            conversionRate: number;
+            /** Isbaseunit */
+            isBaseUnit: boolean;
         };
         /** RoleResponse */
         RoleResponse: {
@@ -4797,6 +5009,30 @@ export interface components {
              * @default true
              */
             is_active: boolean;
+        };
+        /** WarehouseDirectoryItemResponse */
+        WarehouseDirectoryItemResponse: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Address */
+            address: string;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** WarehouseDirectoryResponse */
+        WarehouseDirectoryResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Message */
+            message: string;
+            /** Data */
+            data: components["schemas"]["WarehouseDirectoryItemResponse"][];
         };
         /** WarehouseUpdateSchema */
         WarehouseUpdateSchema: {
@@ -10161,7 +10397,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["WarehouseDirectoryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -10759,6 +10995,77 @@ export interface operations {
             };
         };
     };
+    list_eligible_invoices_api_v1_returns_eligible_invoices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_list_EligibleInvoiceResponse__"];
+                };
+            };
+        };
+    };
+    list_invoice_returnable_items_api_v1_returns_invoices__invoice_id__items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_ReturnableInvoiceData_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_returns_api_v1_returns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_list_ReturnOrderResponse__"];
+                };
+            };
+        };
+    };
     create_return_api_v1_returns_post: {
         parameters: {
             query?: never;
@@ -10768,7 +11075,42 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReturnCreate"];
+                "application/json": components["schemas"]["ReturnCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiEnvelope_ReturnOrderResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_return_api_v1_returns__return_id__receive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                return_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReturnReceiveRequest"];
             };
         };
         responses: {
@@ -10778,7 +11120,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ApiEnvelope_ReturnOrderResponse_"];
                 };
             };
             /** @description Validation Error */

@@ -409,7 +409,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
             form = await request.form()
         except Exception:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Form data không hợp lệ.",
             )
 
@@ -418,12 +418,12 @@ async def login(request: Request, db: Session = Depends(get_db)):
 
         if not username or not str(username).strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=[{"type": "missing", "loc": ["body", "username"], "msg": "Field required"}],
             )
         if not password or not str(password).strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=[{"type": "missing", "loc": ["body", "password"], "msg": "Field required"}],
             )
 
@@ -431,7 +431,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
         raw_pass = str(password)
         if len(raw_user) > 100 or len(raw_pass) > 256:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Tên đăng nhập hoặc mật khẩu vượt quá độ dài tối đa cho phép.",
             )
 
@@ -442,13 +442,13 @@ async def login(request: Request, db: Session = Depends(get_db)):
         body = await request.json()
     except Exception:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Nội dung gửi lên không phải định dạng JSON hoặc Form data hợp lệ.",
         )
 
     if not isinstance(body, dict):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=[{"type": "model_type", "loc": ["body"], "msg": "Input should be a valid dictionary"}],
         )
 
