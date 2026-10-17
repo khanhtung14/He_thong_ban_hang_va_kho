@@ -2,9 +2,10 @@
 
 import os
 from pathlib import Path
+from typing import Any, cast
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import Table, create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -30,8 +31,8 @@ if DATABASE_URL.startswith("sqlite:///") and not DATABASE_URL.endswith(":memory:
         elif candidate2.exists():
             DATABASE_URL = f"sqlite:///{candidate2.resolve().as_posix()}"
 
-connect_args = {}
-engine_options = {"pool_pre_ping": True}
+connect_args: dict[str, Any] = {}
+engine_options: dict[str, Any] = {"pool_pre_ping": True}
 if "sqlite" in DATABASE_URL:
     connect_args = {"check_same_thread": False}
     engine_options["connect_args"] = connect_args
@@ -75,9 +76,9 @@ def migrate_pricing_schema():
         CreditLimitLog,
     )
 
-    Base.metadata.create_all(
-        bind=engine,
-        tables=[
+    target_tables = cast(
+        list[Table],
+        [
             PriceList.__table__,
             PriceListItem.__table__,
             HandoverHistory.__table__,
@@ -88,11 +89,16 @@ def migrate_pricing_schema():
             DiscountTier.__table__,
             CreditLimitLog.__table__,
         ],
+    )
+    Base.metadata.create_all(
+        bind=engine,
+        tables=target_tables,
         checkfirst=True,
     )
     inspector = inspect(engine)
     additions = {
         "customers": {
+            "user_id": "INTEGER NULL",
             "customer_group": "VARCHAR(30) NOT NULL DEFAULT 'RETAIL'",
             "region": "VARCHAR(100) NULL",
             "tax_code": "VARCHAR(50) NULL",
@@ -243,6 +249,14 @@ def migrate_pricing_schema():
                 """))
         except Exception:
             pass
+
+    # Tự động đồng bộ các tài khoản người dùng có vai trò đại lý vào bảng customers
+    try:
+        from app.services.customer_sync_service import sync_all_dealer_users
+        with SessionLocal() as db:
+            sync_all_dealer_users(db)
+    except Exception:
+        pass
 
 
 def migrate_sales_order_draft_schema():

@@ -15,6 +15,8 @@ import {
   Tooltip,
   Checkbox,
   Divider,
+  Space,
+  Spin,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -25,17 +27,20 @@ import {
   WarningOutlined,
   UserOutlined,
   PhoneOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import {
   fetchDeliveryAddresses,
   createDeliveryAddress,
   createOrder,
   updateOrder,
+  fetchDealerPurchaseHistory,
   type CustomerItem,
   type DeliveryAddressItem,
   type OrderItemInput,
   type CreateOrderPayload,
   type OrderResponseItem,
+  type DealerPurchaseHistoryItem,
 } from "../services/apiClient";
 import { authenticatedFetch } from "../services/sessionService";
 
@@ -102,6 +107,23 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // SCRUM S4-04: Lịch sử mua hàng 3 tháng của đại lý
+  const [historyItems, setHistoryItems] = useState<DealerPurchaseHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const loadPurchaseHistory = useCallback(async (dealerId: number) => {
+    setLoadingHistory(true);
+    try {
+      const data = await fetchDealerPurchaseHistory(dealerId);
+      setHistoryItems(data || []);
+    } catch (err: unknown) {
+      console.warn("Không thể tải lịch sử mua hàng của đại lý:", err);
+      setHistoryItems([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
   // Gọi API lấy danh mục sản phẩm từ backend
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
@@ -130,6 +152,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       setSelectedCustomer(cust);
       setSelectedAddressId(null);
       setLoadingAddresses(true);
+      loadPurchaseHistory(cust.id);
       try {
         const addrs = await fetchDeliveryAddresses(cust.id);
         setDeliveryAddresses(addrs);
@@ -233,6 +256,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setIsAddAddressModalOpen(false);
     setSelectedCustomer(null);
     setDeliveryAddresses([]);
+    setHistoryItems([]);
     setSelectedAddressId(null);
     setErrorMsg(null);
     setItems([{ key: "1", sku: "", product_name: "", quantity: 1, unit_price: 0 }]);
@@ -296,6 +320,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     const cust = customers.find((c) => c.id === custId);
     if (cust) {
       loadCustomerAddresses(cust);
+      loadPurchaseHistory(cust.id);
       // Khi đổi đại lý, tự động cập nhật lại đơn giá và tồn khả dụng theo kho đại lý mới
       if (items.some((it) => it.sku)) {
         const updated = await Promise.all(
@@ -457,6 +482,107 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
         return it;
       })
     );
+  };
+
+  // S4-04: Thêm một mặt hàng gợi ý từ lịch sử vào đơn
+  const handleAddSingleSuggestion = (s: DealerPurchaseHistoryItem) => {
+    let qty = Math.max(1, Math.round(s.avg_quantity));
+    if (s.available_quantity !== undefined && s.available_quantity > 0 && s.available_quantity < qty) {
+      qty = Math.floor(s.available_quantity);
+    }
+    const matchedProd = products.find(
+      (p) => p.sku.toUpperCase() === s.sku.toUpperCase() || p.id === s.product_id
+    );
+    const unitPrice = s.last_price || Number(matchedProd?.sale_price ?? matchedProd?.basePrice ?? 0);
+    const avail = s.available_quantity !== undefined ? s.available_quantity : (matchedProd?.available_quantity ?? matchedProd?.stock_available);
+
+    setItems((prev) => {
+      if (prev.length === 1 && !prev[0].sku && !prev[0].product_name) {
+        return [
+          {
+            key: String(Date.now()),
+            sku: s.sku,
+            product_name: s.product_name,
+            quantity: qty,
+            unit_price: unitPrice,
+            unit: s.unit,
+            available_quantity: avail,
+          },
+        ];
+      }
+      const existingIdx = prev.findIndex((it) => it.sku.toUpperCase() === s.sku.toUpperCase());
+      if (existingIdx >= 0) {
+        const next = [...prev];
+        next[existingIdx] = {
+          ...next[existingIdx],
+          quantity: qty,
+          unit_price: next[existingIdx].unit_price || unitPrice,
+          available_quantity: avail,
+        };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          key: `${Date.now()}_${s.sku}`,
+          sku: s.sku,
+          product_name: s.product_name,
+          quantity: qty,
+          unit_price: unitPrice,
+          unit: s.unit,
+          available_quantity: avail,
+        },
+      ];
+    });
+    message.success(`Đã thêm [${s.product_name}] vào đơn hàng!`);
+  };
+
+  // S4-04: Thêm toàn bộ danh sách mặt hàng gợi ý vào đơn hàng
+  const handleAddAllSuggestions = () => {
+    if (historyItems.length === 0) return;
+
+    const newRows: OrderItemRow[] = historyItems.map((s, idx) => {
+      let qty = Math.max(1, Math.round(s.avg_quantity));
+      if (s.available_quantity !== undefined && s.available_quantity > 0 && s.available_quantity < qty) {
+        qty = Math.floor(s.available_quantity);
+      }
+      const matchedProd = products.find(
+        (p) => p.sku.toUpperCase() === s.sku.toUpperCase() || p.id === s.product_id
+      );
+      const unitPrice = s.last_price || Number(matchedProd?.sale_price ?? matchedProd?.basePrice ?? 0);
+      const avail = s.available_quantity !== undefined ? s.available_quantity : (matchedProd?.available_quantity ?? matchedProd?.stock_available);
+
+      return {
+        key: `${Date.now()}_${idx}_${s.sku}`,
+        sku: s.sku,
+        product_name: s.product_name,
+        quantity: qty,
+        unit_price: unitPrice,
+        unit: s.unit,
+        available_quantity: avail,
+      };
+    });
+
+    setItems((prev) => {
+      if (prev.length === 1 && !prev[0].sku && !prev[0].product_name) {
+        return newRows;
+      }
+      const existingSkus = new Set(prev.map((it) => it.sku.toUpperCase()));
+      const itemsToAppend = newRows.filter((nr) => !existingSkus.has(nr.sku.toUpperCase()));
+      if (itemsToAppend.length === 0) {
+        const skuMap = new Map(newRows.map((nr) => [nr.sku.toUpperCase(), nr]));
+        return prev.map((it) => {
+          const matchingNew = skuMap.get(it.sku.toUpperCase());
+          if (matchingNew) {
+            return { ...it, quantity: matchingNew.quantity };
+          }
+          return it;
+        });
+      }
+      return [...prev, ...itemsToAppend];
+    });
+
+    message.success(`Đã thêm ${historyItems.length} mặt hàng thường mua vào đơn hàng!`);
   };
 
   const selectedAddress = deliveryAddresses.find((a) => a.id === selectedAddressId);
@@ -893,6 +1019,122 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                     )}
                   </div>
                 </div>
+              </Card>
+            )}
+
+            {/* Khối gợi ý: Mặt hàng thường mua (3 tháng gần đây) (S4-04) */}
+            {selectedCustomer && (
+              <Card
+                size="small"
+                style={{
+                  marginTop: 4,
+                  marginBottom: 16,
+                  borderRadius: 8,
+                  borderColor: "#bfdbfe",
+                  backgroundColor: "#f8fafc",
+                  boxShadow: "0 1px 3px rgba(37,99,235,0.06)",
+                }}
+                title={
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    <Space size={8}>
+                      <HistoryOutlined style={{ color: "#2563eb", fontSize: 16 }} />
+                      <span style={{ fontWeight: 600, color: "#1e3a8a", fontSize: 14 }}>
+                        Mặt hàng thường mua (3 tháng gần đây)
+                      </span>
+                      {historyItems.length > 0 && (
+                        <Tag color="blue">{historyItems.length} mặt hàng gợi ý</Tag>
+                      )}
+                    </Space>
+                    {historyItems.length > 0 && (
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<PlusOutlined />}
+                        style={{ backgroundColor: "#2563eb", fontWeight: 500 }}
+                        onClick={handleAddAllSuggestions}
+                      >
+                        Thêm tất cả vào đơn
+                      </Button>
+                    )}
+                  </div>
+                }
+              >
+                {loadingHistory ? (
+                  <div style={{ padding: "12px 0", textAlign: "center" }}>
+                    <Spin size="small" tip="Đang tải lịch sử mua hàng 3 tháng..." />
+                  </div>
+                ) : historyItems.length === 0 ? (
+                  <Text type="secondary" style={{ fontSize: 13, fontStyle: "italic" }}>
+                    Đại lý chưa có lịch sử mua hàng trong 3 tháng gần nhất.
+                  </Text>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {historyItems.map((s) => (
+                      <div
+                        key={s.product_id || s.sku}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "8px 12px",
+                          backgroundColor: "#ffffff",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 6,
+                          gap: 12,
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <Space size={8} wrap>
+                            <Text strong style={{ color: "#0f172a" }}>
+                              {s.product_name}
+                            </Text>
+                            <Tag color="geekblue" style={{ fontSize: 11 }}>
+                              {s.sku}
+                            </Tag>
+                            {s.unit && (
+                              <Tag color="default" style={{ fontSize: 11 }}>
+                                ĐVT: {s.unit}
+                              </Tag>
+                            )}
+                          </Space>
+                          <div style={{ display: "flex", gap: 16, marginTop: 4, fontSize: 12, flexWrap: "wrap" }}>
+                            <span style={{ color: "#475569" }}>
+                              SL mua bình quân: <Text strong style={{ color: "#2563eb" }}>{s.avg_quantity} {s.unit}</Text>
+                            </span>
+                            <span style={{ color: "#475569" }}>
+                              Tồn khả dụng hiện tại:{" "}
+                              <Tag color={s.available_quantity > 0 ? "success" : "error"} style={{ marginRight: 0 }}>
+                                {s.available_quantity > 0 ? `${s.available_quantity} ${s.unit}` : "Hết hàng (0)"}
+                              </Tag>
+                            </span>
+                            {s.last_price > 0 && (
+                              <span style={{ color: "#64748b" }}>
+                                Giá mua gần nhất: <Text>{s.last_price.toLocaleString("vi-VN")} ₫</Text>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="small"
+                          icon={<PlusOutlined />}
+                          type="default"
+                          style={{ borderColor: "#2563eb", color: "#2563eb", fontWeight: 500 }}
+                          onClick={() => handleAddSingleSuggestion(s)}
+                        >
+                          Thêm
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </Card>
             )}
 

@@ -1,15 +1,17 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Layout } from "antd";
+import { Layout, Typography, Card } from "antd";
 
 import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import { CustomerSidebar } from "../../components/Sidebar/CustomerSidebar";
 import { CustomerHeader } from "../../components/Header/CustomerHeader";
+import { CustomerOrders } from "./CustomerOrders";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
 
 const { Content } = Layout;
+const { Title, Text } = Typography;
 
 export const CustomerDashboard: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(() => {
@@ -21,11 +23,41 @@ export const CustomerDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("dashboard");
+  const getInitialKey = () => {
+    const p = window.location.pathname;
+    if (p.includes("/portal/orders")) return "orders";
+    if (p.includes("/portal/products") || p.includes("/portal/catalog")) return "catalog";
+    if (p.includes("/portal/debt")) return "debt";
+    if (p.includes("/portal/contracts")) return "contracts";
+    return "orders";
+  };
+
+  const [selectedKey, setSelectedKey] = useState<string>(getInitialKey);
   const [, setLoading] = useState(false);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isChangePassModalOpen, setIsChangePassModalOpen] = useState(false);
+
+  const handleSelectKey = (key: string) => {
+    setSelectedKey(key);
+    if (key === "orders" || key === "dashboard") {
+      window.history.pushState(null, "", "/portal/orders");
+    } else if (key === "catalog") {
+      window.history.pushState(null, "", "/portal/products");
+    } else if (key === "debt") {
+      window.history.pushState(null, "", "/portal/debt");
+    } else if (key === "contracts") {
+      window.history.pushState(null, "", "/portal/contracts");
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setSelectedKey(getInitialKey());
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const loadProfileData = useCallback(async () => {
     setLoading(true);
@@ -81,7 +113,7 @@ export const CustomerDashboard: React.FC = () => {
 
       <CustomerSidebar
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
+        onSelect={handleSelectKey}
         onLogout={logout}
       />
 
@@ -104,7 +136,28 @@ export const CustomerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung danh mục sản phẩm, đặt đơn, xem công nợ */}
+          {selectedKey === "orders" || selectedKey === "dashboard" ? (
+            <CustomerOrders onNavigateToProducts={() => handleSelectKey("catalog")} />
+          ) : selectedKey === "catalog" ? (
+            <Card
+              style={{
+                borderRadius: 14,
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                backgroundColor: "#ffffff",
+                padding: "24px",
+              }}
+            >
+              <Title level={4} style={{ color: "#1e293b", marginTop: 0 }}>
+                Đặt hàng / Danh mục sản phẩm
+              </Title>
+              <Text type="secondary">
+                Tính năng đặt hàng trực tiếp từ cổng đại lý đang được cập nhật. Bạn có thể theo dõi tiến độ các đơn hàng đã đặt tại mục "Đơn hàng của tôi".
+              </Text>
+            </Card>
+          ) : (
+            <CustomerOrders onNavigateToProducts={() => handleSelectKey("catalog")} />
+          )}
         </Content>
       </Layout>
 

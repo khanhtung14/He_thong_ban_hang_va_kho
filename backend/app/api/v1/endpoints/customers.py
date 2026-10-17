@@ -223,6 +223,8 @@ def serialize_customer(customer: Customer, db: Session) -> dict:
 
     return {
         "id": customer.id,
+        "user_id": getattr(customer, "user_id", None),
+        "userId": getattr(customer, "user_id", None),
         "code": customer.code,
         "name": customer.name,
         "tax_code": customer.tax_code,

@@ -509,6 +509,12 @@ async def import_users(
             db.refresh(new_user)
 
             try:
+                from app.services.customer_sync_service import ensure_customer_profile_for_user
+                ensure_customer_profile_for_user(db, new_user)
+            except Exception as sync_exc:
+                logger.warning(f"Could not auto-create customer for imported user {new_user.id}: {sync_exc}")
+
+            try:
                 audit_log = AccountAuditLog(
                     user_id=new_user.id,
                     action="IMPORT_USER_EXCEL",

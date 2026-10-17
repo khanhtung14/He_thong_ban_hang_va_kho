@@ -19,6 +19,11 @@ type RoleKey =
 
 const roleByPath: Record<string, RoleKey> = {
   "/portal/orders": "customer",
+  "/portal/products": "customer",
+  "/portal/catalog": "customer",
+  "/portal/debt": "customer",
+  "/portal/contracts": "customer",
+  "/portal/dashboard": "customer",
   "/sales/orders": "sales",
   "/sales/customers": "sales",
   "/sales/assignments": "salesManager",
@@ -53,6 +58,11 @@ const roleByPath: Record<string, RoleKey> = {
 
 const allowedRolesByPath: Record<string, RoleKey[]> = {
   "/portal/orders": ["customer", "admin"],
+  "/portal/products": ["customer", "admin"],
+  "/portal/catalog": ["customer", "admin"],
+  "/portal/debt": ["customer", "admin"],
+  "/portal/contracts": ["customer", "admin"],
+  "/portal/dashboard": ["customer", "admin"],
   "/sales/orders": ["sales", "salesManager", "customer", "accountant", "admin"],
   "/sales/customers": ["sales", "salesManager", "admin"],
   "/sales/assignments": ["salesManager", "admin"],

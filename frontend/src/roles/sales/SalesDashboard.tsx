@@ -43,7 +43,6 @@ import CreateOrderModal from "../../components/CreateOrderModal";
 // Sidebar & Header Sales
 import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
 import { SalesHeader } from "../../components/Header/SalesHeader";
-import SalesOrderDraft from "./SalesOrderDraft";
 
 // Customer List Module (S3-08)
 import { SalesCustomerList } from "./SalesCustomerList";
@@ -208,7 +207,8 @@ export const SalesDashboard: React.FC = () => {
     // Lưu tạm khách hàng để lên đơn
     localStorage.setItem("selectedOrderCustomer", JSON.stringify(customer));
     setPreselectedCustomerId(customer.id);
-    setSelectedKey("orders");
+    setSelectedCustomerForOrder(customer);
+    setIsCreateOrderModalOpen(true);
   };
 
   const totalDebt = customers.reduce((sum, c) => sum + (c.current_debt || 0), 0);
@@ -221,6 +221,7 @@ export const SalesDashboard: React.FC = () => {
 
   const handleOpenCreateOrderModal = (cust?: CustomerItem) => {
     setSelectedCustomerForOrder(cust || null);
+    setSelectedOrderForEdit(null);
     setIsCreateOrderModalOpen(true);
   };
 
@@ -529,11 +530,98 @@ export const SalesDashboard: React.FC = () => {
           }}
         >
           {selectedKey === "orders" ? (
-            <SalesOrderDraft
-              preselectedCustomerId={preselectedCustomerId}
-              onCustomerPreselected={() => setPreselectedCustomerId(null)}
-              onBackToCustomers={() => setSelectedKey("customers")}
-            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Khối Header "Danh sách đơn hàng bán" */}
+              <div
+                style={{
+                  background: "#ffffff",
+                  borderRadius: 12,
+                  padding: "16px 20px",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 16,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 10,
+                      backgroundColor: "#eff6ff",
+                      color: "#2563eb",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 22,
+                      border: "1px solid #dbeafe",
+                    }}
+                  >
+                    <ShoppingOutlined />
+                  </div>
+                  <div>
+                    <Title level={4} style={{ margin: 0, fontWeight: 700, color: "#1e293b", fontSize: 18 }}>
+                      Danh sách đơn hàng bán
+                    </Title>
+                    <Text type="secondary" style={{ fontSize: 13 }}>
+                      Theo dõi và quản lý các đơn hàng của đại lý bạn phụ trách
+                    </Text>
+                  </div>
+                </div>
+
+                <Space size={10} wrap>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={() => loadOrders()}
+                    loading={ordersLoading}
+                    style={{ height: 38, borderRadius: 8, fontWeight: 500 }}
+                  >
+                    Làm mới
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    style={{
+                      backgroundColor: "#2563eb",
+                      height: 38,
+                      borderRadius: 8,
+                      fontWeight: 600,
+                      boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)",
+                    }}
+                    onClick={() => handleOpenCreateOrderModal()}
+                  >
+                    Tạo đơn hàng mới
+                  </Button>
+                </Space>
+              </div>
+
+              {/* Bảng danh sách đơn hàng */}
+              <Card
+                style={{
+                  borderRadius: 12,
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                  backgroundColor: "#ffffff",
+                }}
+                styles={{ body: { padding: 0 } }}
+              >
+                <Table<OrderResponseItem>
+                  columns={orderColumns}
+                  dataSource={orders}
+                  rowKey="id"
+                  loading={ordersLoading}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                  scroll={{ x: 1100 }}
+                  locale={{
+                    emptyText: "Chưa có đơn hàng nào. Bấm '+ Tạo đơn hàng mới' để lập đơn.",
+                  }}
+                />
+              </Card>
+            </div>
           ) : (
             /* Màn hình Khách hàng & Đại lý / Tổng quan */
             <SalesCustomerList
@@ -607,19 +695,19 @@ export const SalesDashboard: React.FC = () => {
                       selectedOrderForDetail.status === "PENDING_APPROVAL"
                         ? "warning"
                         : selectedOrderForDetail.status === "APPROVED"
-                        ? "success"
-                        : selectedOrderForDetail.status === "CANCELLED"
-                        ? "error"
-                        : "default"
+                          ? "success"
+                          : selectedOrderForDetail.status === "CANCELLED"
+                            ? "error"
+                            : "default"
                     }
                   >
                     {selectedOrderForDetail.status === "PENDING_APPROVAL"
                       ? "Chờ duyệt"
                       : selectedOrderForDetail.status === "APPROVED"
-                      ? "Đã duyệt"
-                      : selectedOrderForDetail.status === "CANCELLED"
-                      ? "Đã hủy"
-                      : selectedOrderForDetail.status}
+                        ? "Đã duyệt"
+                        : selectedOrderForDetail.status === "CANCELLED"
+                          ? "Đã hủy"
+                          : selectedOrderForDetail.status}
                   </Tag>
                 </div>
                 <div>

@@ -140,6 +140,13 @@ class User(Base):
     warehouses: Mapped[List["Warehouse"]] = relationship(secondary=user_warehouses)
     territories: Mapped[List["Territory"]] = relationship(secondary=user_territories)
     sessions: Mapped[List["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    customer_profile: Mapped[Optional["Customer"]] = relationship(
+        "Customer", foreign_keys="[Customer.user_id]", back_populates="user", uselist=False
+    )
+
+    @property
+    def customer_id(self) -> Optional[int]:
+        return self.customer_profile.id if self.customer_profile else None
 
 
 def seed_default_roles(db):
@@ -415,6 +422,7 @@ class Customer(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
     email: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     sales_rep_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     assigned_sales_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"))
@@ -440,6 +448,9 @@ class Customer(Base):
     orders: Mapped[List["Order"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     delivery_addresses: Mapped[List["DeliveryAddress"]] = relationship(back_populates="customer", cascade="all, delete-orphan")
     sales_rep: Mapped[Optional["User"]] = relationship(foreign_keys=[sales_rep_id])
+    user: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[user_id], back_populates="customer_profile"
+    )
     warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[warehouse_id])
     debt_limit_histories: Mapped[List["CreditLimitLog"]] = relationship(
         "CreditLimitLog",

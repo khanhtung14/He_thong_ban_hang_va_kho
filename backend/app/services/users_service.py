@@ -269,7 +269,14 @@ def create_user(
             detail="Tên tài khoản hoặc Email đã tồn tại trong hệ thống. Vui lòng kiểm tra lại."
         ) from exc
 
-    # Step 6: Record Audit Log (SCRUM-106)
+    # Step 6: Tự động tạo hồ sơ Đại lý nếu vai trò là CUSTOMER / DEALER
+    try:
+        from app.services.customer_sync_service import ensure_customer_profile_for_user
+        ensure_customer_profile_for_user(db, new_user)
+    except Exception as sync_err:
+        logger.warning(f"Could not auto-create customer profile for user {new_user.id}: {sync_err}")
+
+    # Step 7: Record Audit Log (SCRUM-106)
     try:
         audit_log = AccountAuditLog(
             user_id=new_user.id,
@@ -375,6 +382,11 @@ def update_user(
     try:
         db.commit()
         db.refresh(user)
+        try:
+            from app.services.customer_sync_service import ensure_customer_profile_for_user
+            ensure_customer_profile_for_user(db, user)
+        except Exception as sync_err:
+            logger.warning(f"Could not auto-sync customer profile for user {user.id}: {sync_err}")
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(

@@ -508,6 +508,28 @@
 - **Request Body:** `{"status": "ACTIVE" | "LOCKED_FOR_DEBT", "reason": "Nợ quá hạn trên 45 ngày"}`
 - **Response Data:** Khóa/Mở giao dịch bán hàng với đại lý.
 
+#### `GET /api/v1/dealers/{dealer_id}/purchase-history`
+- **Story:** S4-04 (Xem lịch sử mua hàng 3 tháng và thêm nhanh vào đơn mới)
+- **Phân quyền:** Sales Rep (phụ trách đại lý), Sales Manager, Admin
+- **Mục đích:** Lấy danh sách các mặt hàng đại lý đã mua trong 90 ngày gần nhất từ các đơn hàng thành công/hợp lệ, sắp xếp theo tần suất mua giảm dần, kèm số lượng bình quân và tồn kho khả dụng hiện tại.
+- **Response Data:**
+```json
+[
+  {
+    "product_id": 101,
+    "sku": "SKU-BRICK",
+    "product_name": "Gạch Men Cao Cấp",
+    "unit": "Hộp",
+    "total_orders_count": 2,
+    "total_quantity": 30.0,
+    "avg_quantity": 15.0,
+    "last_price": 120000.0,
+    "last_ordered_at": "10/10/2026",
+    "available_quantity": 85.0
+  }
+]
+```
+
 ---
 
 ### EP-04: ĐẶT HÀNG & DUYỆT ĐƠN (SPRINT 3 - 5)

@@ -12,6 +12,11 @@ import { hasValidSession, getCurrentUserRole } from "./services/sessionService";
 
 const roleWorkspacePaths = [
   "/portal/orders",
+  "/portal/products",
+  "/portal/catalog",
+  "/portal/debt",
+  "/portal/contracts",
+  "/portal/dashboard",
   "/sales/orders",
   "/sales/customers",
   "/sales/assignments",

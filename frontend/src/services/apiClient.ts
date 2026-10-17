@@ -684,6 +684,15 @@ export async function fetchOrders(): Promise<OrderResponseItem[]> {
   return res.json();
 }
 
+export async function fetchPortalOrders(): Promise<OrderResponseItem[]> {
+  const res = await authenticatedFetch("/api/v1/portal/orders");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách đơn hàng.");
+  }
+  return res.json();
+}
+
 export async function createOrder(
   payload: CreateOrderPayload,
 ): Promise<OrderResponseItem> {
@@ -783,3 +792,29 @@ export async function deleteOrder(orderId: number): Promise<{ message: string }>
   }
   return res.json();
 }
+
+export interface DealerPurchaseHistoryItem {
+  product_id: number;
+  sku: string;
+  product_name: string;
+  unit: string;
+  total_orders_count: number;
+  total_quantity: number;
+  avg_quantity: number;
+  average_quantity?: number;
+  last_price: number;
+  last_ordered_at: string | null;
+  available_quantity: number;
+}
+
+export async function fetchDealerPurchaseHistory(
+  dealerId: number
+): Promise<DealerPurchaseHistoryItem[]> {
+  const res = await authenticatedFetch(`/api/v1/dealers/${dealerId}/purchase-history`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải lịch sử mua hàng của đại lý này.");
+  }
+  return res.json();
+}
+

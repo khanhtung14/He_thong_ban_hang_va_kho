@@ -1839,6 +1839,78 @@ def list_orders(
 
     return results
 
+
+def _resolve_customer_for_user(db: Session, user: AuthenticatedUser) -> Optional[Customer]:
+    """Tìm bản ghi Customer tương ứng với tài khoản người dùng đăng nhập."""
+    if not user:
+        return None
+
+    # Tìm User trong database theo id hoặc username
+    user_db = None
+    if getattr(user, "id", None):
+        user_db = db.get(User, user.id)
+    if not user_db and getattr(user, "username", None):
+        user_db = (
+            db.query(User)
+            .filter(
+                or_(
+                    func.lower(User.username) == user.username.lower(),
+                    func.lower(User.email) == user.username.lower(),
+                )
+            )
+            .first()
+        )
+
+    # 1. Nếu có user_db, tìm theo user_id đã liên kết
+    if user_db:
+        cust = db.query(Customer).filter(Customer.user_id == user_db.id).first()
+        if cust:
+            return cust
+        # Thử tự động khởi tạo hoặc liên kết hồ sơ đại lý
+        try:
+            from app.services.customer_sync_service import ensure_customer_profile_for_user
+            return ensure_customer_profile_for_user(db, user_db)
+        except Exception:
+            pass
+
+    # 2. Fallback tìm theo code trùng username
+    if getattr(user, "username", None):
+        cust = db.query(Customer).filter(Customer.code == user.username).first()
+        if cust:
+            return cust
+
+    return None
+
+
+@router.get("/portal/orders", response_model=List[OrderResponse])
+@router.get("/customer/orders", response_model=List[OrderResponse])
+def get_portal_orders(
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Lấy danh sách đơn hàng của chính đại lý đăng nhập hiện tại.
+    Nếu đại lý chưa có đơn hàng nào hoặc chưa có hồ sơ, trả về danh sách rỗng [].
+    """
+    customer = _resolve_customer_for_user(db, user)
+    if not customer:
+        return []
+
+    orders = (
+        db.execute(
+            select(Order)
+            .options(selectinload(Order.items))
+            .where(Order.customer_id == customer.id)
+            .order_by(Order.id.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+    results = []
+    for ord in orders:
+        results.append(_build_full_order_response(ord, db, customer))
+
     return results
 
 
