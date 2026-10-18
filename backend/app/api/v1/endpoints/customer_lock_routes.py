@@ -369,8 +369,8 @@ class PortalOrderItemResponse(BaseModel):
     unit_name: Optional[str] = "Cái"
     ordered_quantity: int = 0
     quantity: int = 0
-    delivered_quantity: int = 0
-    actual_quantity: int = 0
+    delivered_quantity: Optional[int] = None
+    actual_quantity: Optional[int] = None
     unit_price: float = 0.0
     total_price: float = 0.0
     subtotal: Optional[float] = None
@@ -2045,11 +2045,11 @@ def _build_portal_order_dict(order: Order, db: Session, customer: Optional[Custo
             else:
                 deliv_qty = int(deliv_qty)
         else:
-            deliv_qty = int(deliv_qty or 0)
+            deliv_qty = int(deliv_qty) if deliv_qty is not None else None
 
         unit_price = float(it.unit_price or 0.0)
         total_price = float(getattr(it, "line_total", None) or (ord_qty * unit_price))
-        item_is_partial = bool(is_delivering_or_delivered and (deliv_qty < ord_qty))
+        item_is_partial = bool(is_delivering_or_delivered and (deliv_qty is not None and deliv_qty < ord_qty))
         if item_is_partial:
             has_partially_delivered = True
 

@@ -16,7 +16,6 @@ import {
   Radio,
   Steps,
   message,
-  notification,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -209,18 +208,12 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
       setSelectedProductIds((data.items || []).map((it) => it.product_id));
       setReorderNote(`Đặt lại từ đơn hàng #${data.original_order_code}`);
 
-      // Nếu có sản phẩm bị loại bỏ do ngừng kinh doanh, hiển thị cảnh báo
+      // Nếu có sản phẩm bị loại bỏ do ngừng kinh doanh, hiển thị cảnh báo bên dưới
       if (data.removed_items && data.removed_items.length > 0) {
-        notification.warning({
-          message: "Thông báo điều chỉnh danh mục hàng",
-          description: "Một số mặt hàng đã ngừng kinh doanh và được tự động bỏ qua.",
-          duration: 6,
-          placement: "topRight",
-        });
+        message.warning("Một số mặt hàng đã ngừng kinh doanh và được tự động bỏ qua.");
       }
 
       if (!data.items || data.items.length === 0) {
-        message.warning("Tất cả mặt hàng trong đơn hàng cũ đã ngừng kinh doanh hoặc không còn khả dụng.");
         return;
       }
 
@@ -461,9 +454,33 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
       width: 150,
       align: "center",
       render: (_, r) => {
+        const orderStatus = (selectedOrder?.status || "").toUpperCase();
+        // Kiểm tra xem đơn hàng đã đến giai đoạn xuất kho / vận chuyển / giao nhận hay chưa
+        const isDeliveredOrDelivering = [
+          "SHIPPING",
+          "IN_TRANSIT",
+          "DELIVERED",
+          "COMPLETED",
+          "PROCESSING",
+        ].includes(orderStatus);
+
+        if (!isDeliveredOrDelivering) {
+          return (
+            <Tag color="default" style={{ color: "#64748b", borderRadius: 4, fontWeight: 500, margin: 0 }}>
+              Chờ xuất kho
+            </Tag>
+          );
+        }
+
         const ordered = r.ordered_quantity !== undefined ? r.ordered_quantity : r.quantity;
-        const delivered = r.delivered_quantity !== undefined ? r.delivered_quantity : (r.actual_quantity !== undefined ? r.actual_quantity : ordered);
-        const isShort = delivered < ordered;
+        const delivered =
+          r.delivered_quantity !== undefined && r.delivered_quantity !== null
+            ? r.delivered_quantity
+            : r.actual_quantity !== undefined && r.actual_quantity !== null
+            ? r.actual_quantity
+            : ordered;
+
+        const isShort = r.is_partially_delivered || delivered < ordered;
 
         if (isShort) {
           const missing = ordered - delivered;
@@ -771,6 +788,19 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
           setIsDetailModalOpen(false);
           setSelectedOrder(null);
         }}
+        centered
+        width={920}
+        styles={{
+          body: {
+            height: "calc(88vh - 110px)",
+            maxHeight: 680,
+            minHeight: 460,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            padding: "16px 20px 10px",
+          },
+        }}
         footer={[
           <Button
             key="close"
@@ -796,12 +826,11 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
             Đặt lại đơn này
           </Button>,
         ]}
-        width={820}
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <ShoppingOutlined style={{ color: "#2563eb", fontSize: 22 }} />
+            <ShoppingOutlined style={{ color: "#2563eb", fontSize: 20 }} />
             <div>
-              <span style={{ fontWeight: 700, fontSize: 18, color: "#1e293b" }}>
+              <span style={{ fontWeight: 700, fontSize: 17, color: "#1e293b" }}>
                 Chi tiết đơn hàng #{selectedOrder?.order_code}
               </span>
             </div>
@@ -809,21 +838,22 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
         }
       >
         {detailLoading ? (
-          <div style={{ padding: "40px 0", textAlign: "center" }}>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Spin tip="Đang tải dữ liệu chi tiết đơn hàng..." />
           </div>
         ) : selectedOrder && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 18, marginTop: 14 }}>
+          <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 10, overflow: "hidden" }}>
             {/* Timeline / Stepper trạng thái đơn */}
             <div
               style={{
                 background: "#f8fafc",
-                borderRadius: 12,
-                padding: "20px 24px",
+                borderRadius: 8,
+                padding: "10px 16px",
                 border: "1px solid #e2e8f0",
+                flexShrink: 0,
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#475569", marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 8 }}>
                 TIẾN ĐỘ XỬ LÝ ĐƠN HÀNG:
               </div>
               <Steps
@@ -847,24 +877,28 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
                 showIcon
                 icon={<WarningOutlined style={{ color: "#d97706" }} />}
                 message={
-                  <span style={{ fontWeight: 600, color: "#92400e" }}>
+                  <span style={{ fontWeight: 600, color: "#92400e", fontSize: 13 }}>
                     Thông báo: Đơn hàng được giao một phần
                   </span>
                 }
                 description={
-                  <span style={{ fontSize: 13, color: "#78350f" }}>
-                    Một số mặt hàng thực tế được giao ít hơn số lượng đặt do điều kiện kho bãi.
-                    Quý đại lý vui lòng đối chiếu số lượng thực giao chi tiết bên dưới.
+                  <span style={{ fontSize: 12, color: "#78350f" }}>
+                    Một số mặt hàng thực tế được giao ít hơn số lượng đặt do điều kiện kho bãi. Quý đại lý vui lòng đối chiếu số lượng thực giao chi tiết bên dưới.
                   </span>
                 }
-                style={{ borderRadius: 8, border: "1px solid #fde68a", backgroundColor: "#fffbeb" }}
+                style={{ borderRadius: 6, border: "1px solid #fde68a", backgroundColor: "#fffbeb", padding: "6px 12px", flexShrink: 0 }}
               />
             )}
 
-            {/* Thông tin đơn hàng & giao nhận */}
-            <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
+            {/* Thông tin đơn hàng & giao nhận (Gọn gàng trong 3 cột) */}
+            <Descriptions
+              bordered
+              size="small"
+              column={{ xs: 1, sm: 3 }}
+              style={{ flexShrink: 0 }}
+            >
               <Descriptions.Item label="Mã đơn hàng">
-                <Text strong style={{ color: "#2563eb", fontSize: 14 }}>
+                <Text strong style={{ color: "#2563eb", fontSize: 13 }}>
                   {selectedOrder.order_code}
                 </Text>
               </Descriptions.Item>
@@ -884,14 +918,14 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
                 <Text strong>{selectedOrder.delivery_point_name || "Địa chỉ mặc định"}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Tổng thanh toán">
-                <Text strong style={{ color: "#059669", fontSize: 16 }}>
+                <Text strong style={{ color: "#059669", fontSize: 15 }}>
                   {formatMoney(selectedOrder.total_amount)}
                 </Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Địa chỉ nhận hàng" span={2}>
+              <Descriptions.Item label="Địa chỉ nhận" span={selectedOrder.note ? 2 : 3}>
                 <Space align="start" size={6}>
                   <EnvironmentOutlined style={{ color: "#ef4444", marginTop: 3 }} />
-                  <span>
+                  <span style={{ fontSize: 12 }}>
                     {typeof selectedOrder.delivery_address === "string"
                       ? selectedOrder.delivery_address
                       : selectedOrder.delivery_address?.address || "Chưa có địa chỉ"}
@@ -899,42 +933,53 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
                 </Space>
               </Descriptions.Item>
               {selectedOrder.note && (
-                <Descriptions.Item label="Ghi chú đơn hàng" span={2}>
-                  {selectedOrder.note}
+                <Descriptions.Item label="Ghi chú" span={1}>
+                  <span style={{ fontSize: 12 }}>{selectedOrder.note}</span>
                 </Descriptions.Item>
               )}
             </Descriptions>
 
-            <Divider style={{ margin: "4px 0" }} />
-
-            {/* Bảng sản phẩm chi tiết */}
-            <div>
+            {/* Bảng sản phẩm chi tiết - Tự động co giãn theo chiều cao và chỉ cuộn trong bảng */}
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", marginTop: 2 }}>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 10,
+                  marginBottom: 6,
+                  flexShrink: 0,
                 }}
               >
-                <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 15 }}>
+                <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 14 }}>
                   Danh sách sản phẩm trong đơn ({selectedOrder.items?.length || 0})
                 </div>
                 {selectedOrder.is_partially_delivered && (
-                  <Tag color="error" style={{ fontWeight: 600 }}>
+                  <Tag color="error" style={{ fontWeight: 600, fontSize: 11 }}>
                     Có mặt hàng giao thiếu
                   </Tag>
                 )}
               </div>
 
-              <Table<OrderItemView>
-                columns={modalItemColumns}
-                dataSource={selectedOrder.items || []}
-                rowKey={(r, idx) => r.id || idx || 0}
-                pagination={false}
-                size="small"
-                locale={{ emptyText: "Không có thông tin chi tiết sản phẩm" }}
-              />
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 8,
+                  backgroundColor: "#ffffff",
+                }}
+              >
+                <Table<OrderItemView>
+                  columns={modalItemColumns}
+                  dataSource={selectedOrder.items || []}
+                  rowKey={(r, idx) => r.id || idx || 0}
+                  pagination={false}
+                  size="small"
+                  sticky
+                  locale={{ emptyText: "Không có thông tin chi tiết sản phẩm" }}
+                />
+              </div>
             </div>
           </div>
         )}
