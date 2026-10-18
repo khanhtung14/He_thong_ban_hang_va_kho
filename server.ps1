@@ -1,51 +1,72 @@
-param([int]$Port = 8088)
+# ===================================================================
+# NEXUS OMS - Lightweight Local Web Server (PowerShell & .NET)
+# ===================================================================
+$port = 5500
+$rootPath = $PSScriptRoot
 
-$root = $PSScriptRoot
 $listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://127.0.0.1:$Port/")
-$listener.Prefixes.Add("http://localhost:$Port/")
-$listener.Start()
-Write-Host "DistriCare CRM server started at http://localhost:$Port/"
+$url = "http://localhost:$port/"
+$listener.Prefixes.Add($url)
 
 try {
-    while ($listener.IsListening) {
+    $listener.Start()
+    Write-Host "======================================================================" -ForegroundColor Cyan
+    Write-Host " [NEXUS OMS] Enterprise Order & WMS Lifecycle System" -ForegroundColor Green
+    Write-Host " Running on: $url" -ForegroundColor Yellow
+    Write-Host " Web root:   $rootPath" -ForegroundColor Gray
+    Write-Host " Nhan Ctrl + C de dung server." -ForegroundColor DarkGray
+    Write-Host "======================================================================" -ForegroundColor Cyan
+    
+    # Auto open browser
+    Start-Process $url
+}
+catch {
+    Write-Host "Khong the khoi dong HttpListener tren port $port. Mo file truc tiep trong trinh duyet..." -ForegroundColor Red
+    Start-Process "$rootPath\index.html"
+    exit
+}
+
+$mimeTypes = @{
+    ".html" = "text/html; charset=utf-8"
+    ".css"  = "text/css; charset=utf-8"
+    ".js"   = "application/javascript; charset=utf-8"
+    ".json" = "application/json; charset=utf-8"
+    ".png"  = "image/png"
+    ".jpg"  = "image/jpeg"
+    ".svg"  = "image/svg+xml"
+}
+
+while ($listener.IsListening) {
+    try {
         $context = $listener.GetContext()
         $request = $context.Request
         $response = $context.Response
-        
-        try {
-            $relPath = $request.Url.LocalPath
-            if ($relPath -eq '/' -or [string]::IsNullOrWhiteSpace($relPath)) {
-                $relPath = '/index.html'
-            }
-            
-            $filePath = Join-Path $root ($relPath.TrimStart('/').Replace('/', '\'))
-            
-            if (Test-Path $filePath -PathType Leaf) {
-                $bytes = [System.IO.File]::ReadAllBytes($filePath)
-                
-                if ($filePath.EndsWith('.html')) { $response.ContentType = 'text/html; charset=utf-8' }
-                elseif ($filePath.EndsWith('.js')) { $response.ContentType = 'application/javascript; charset=utf-8' }
-                elseif ($filePath.EndsWith('.css')) { $response.ContentType = 'text/css; charset=utf-8' }
-                elseif ($filePath.EndsWith('.json')) { $response.ContentType = 'application/json; charset=utf-8' }
-                elseif ($filePath.EndsWith('.png')) { $response.ContentType = 'image/png' }
-                elseif ($filePath.EndsWith('.jpg') -or $filePath.EndsWith('.jpeg')) { $response.ContentType = 'image/jpeg' }
-                elseif ($filePath.EndsWith('.svg')) { $response.ContentType = 'image/svg+xml' }
-                else { $response.ContentType = 'application/octet-stream' }
-                
-                $response.OutputStream.Write($bytes, 0, $bytes.Length)
-            } else {
-                $response.StatusCode = 404
-                $msg = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found: $relPath")
-                $response.OutputStream.Write($msg, 0, $msg.Length)
-            }
-        } catch {
-            Write-Warning "Error processing request: $_"
-        } finally {
-            try { $response.Close() } catch {}
+
+        $relPath = $request.Url.LocalPath.TrimStart('/')
+        if ([string]::IsNullOrEmpty($relPath)) {
+            $relPath = "index.html"
         }
+        $relPath = $relPath -replace '/', '\'
+
+        $filePath = Join-Path $rootPath $relPath
+
+        if (Test-Path $filePath -PathType Leaf) {
+            $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
+            $contentType = if ($mimeTypes.ContainsKey($ext)) { $mimeTypes[$ext] } else { "application/octet-stream" }
+            $response.ContentType = $contentType
+            $bytes = [System.IO.File]::ReadAllBytes($filePath)
+            $response.ContentLength64 = $bytes.Length
+            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            $response.StatusCode = 200
+        }
+        else {
+            $response.StatusCode = 404
+            $notFound = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found")
+            $response.OutputStream.Write($notFound, 0, $notFound.Length)
+        }
+        $response.Close()
     }
-} finally {
-    $listener.Stop()
-    $listener.Close()
+    catch {
+        # Silent ignore on close
+    }
 }
