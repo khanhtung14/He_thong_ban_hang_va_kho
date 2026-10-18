@@ -1,651 +1,535 @@
-export function formatCurrencyVND(val) {
-  if (!val || isNaN(val)) return '0 đ';
-  if (val >= 1000000000) {
-    return (val / 1000000000).toFixed(2).replace('.', ',') + ' tỷ đ';
-  }
-  return (val / 1000000).toLocaleString('vi-VN') + ' triệu đ';
-}
+/**
+ * INITIAL MOCK DATA - DOANH NGHIỆP THƯƠNG MẠI & BÁN LẺ TOÀN QUỐC
+ * Hệ thống Quản lý Đơn hàng (OMS) & Tồn kho Kho bãi (WMS)
+ */
 
-export const INITIAL_EMPLOYEES = [
+const INITIAL_PRODUCTS = [
   {
-    id: 'NV001',
-    code: 'EMP-001',
-    name: 'Nguyễn Hồng Vĩnh',
-    role: 'MANAGER', // Quản lý kinh doanh (Sales Manager)
-    roleTitle: 'Giám Đốc / Quản Lý Kinh Doanh',
-    email: 'vinh.nguyen@districare.vn',
-    phone: '0903.112.334',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    region: 'Toàn Quốc',
-    status: 'ACTIVE',
-    joinDate: '2021-03-15',
-    notes: 'Quản lý toàn bộ kênh phân phối và chỉ tiêu doanh số toàn quốc'
+    id: "PROD-001",
+    sku: "LAP-DELL-XPS15",
+    name: "Dell XPS 15 9530 (i7-13700H, 32GB, 1TB RTX 4060)",
+    category: "Laptop Cao Cấp",
+    price: 48500000,
+    physicalStock: 25, // Tồn thực tế trong kho
+    reservedStock: 7,  // Đang giữ chỗ cho các đơn chưa xuất
+    unit: "Máy",
+    binLocation: "Kệ A1-Tầng 2 (Kho Thủ Đức)",
+    image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=200&auto=format&fit=crop&q=80"
   },
   {
-    id: 'NV002',
-    code: 'EMP-002',
-    name: 'Trần Minh Quang',
-    role: 'SALES_REP', // Nhân viên kinh doanh
-    roleTitle: 'Chuyên Viên Kinh Doanh Cao Cấp',
-    email: 'quang.tran@districare.vn',
-    phone: '0912.445.667',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    region: 'Miền Bắc',
-    status: 'ACTIVE',
-    joinDate: '2022-01-10',
-    targetRevenue: 12000000000, // 12 tỷ
-    notes: 'Phụ trách thị trường vùng Thủ đô & các tỉnh đồng bằng Bắc Bộ'
+    id: "PROD-002",
+    sku: "DISP-LG-34WN80C",
+    name: "Màn hình cong LG UltraWide 34WN80C-B 34 inch IPS HDR10",
+    category: "Màn hình",
+    price: 13900000,
+    physicalStock: 18,
+    reservedStock: 4,
+    unit: "Cái",
+    binLocation: "Kệ B3-Tầng 1 (Kho Thủ Đức)",
+    image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=200&auto=format&fit=crop&q=80"
   },
   {
-    id: 'NV003',
-    code: 'EMP-003',
-    name: 'Lê Thu Hà',
-    role: 'SALES_REP',
-    roleTitle: 'Chuyên Viên Kinh Doanh',
-    email: 'ha.le@districare.vn',
-    phone: '0988.776.554',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    region: 'Miền Trung',
-    status: 'ACTIVE',
-    joinDate: '2022-06-20',
-    targetRevenue: 8000000000,
-    notes: 'Phụ trách trục Duyên Hải Nam Trung Bộ và Tây Nguyên Bắc'
+    id: "PROD-003",
+    sku: "MOU-LOGI-MXM3S",
+    name: "Chuột không dây Logitech MX Master 3S Quiet (Graphite)",
+    category: "Phụ kiện",
+    price: 2450000,
+    physicalStock: 60,
+    reservedStock: 12,
+    unit: "Chiếc",
+    binLocation: "Kệ C2-Tầng 3 (Kho Thủ Đức)",
+    image: "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=200&auto=format&fit=crop&q=80"
   },
   {
-    id: 'NV004',
-    code: 'EMP-004',
-    name: 'Phạm Văn Đức',
-    role: 'SALES_REP',
-    roleTitle: 'Trưởng Nhóm Kinh Doanh KV',
-    email: 'duc.pham@districare.vn',
-    phone: '0933.221.889',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    region: 'Miền Nam',
-    status: 'ACTIVE',
-    joinDate: '2021-08-01',
-    targetRevenue: 18000000000,
-    notes: 'Phụ trách vùng kinh tế trọng điểm TP.HCM, Bình Dương, Đồng Nai'
+    id: "PROD-004",
+    sku: "KB-KEYCH-K8PRO",
+    name: "Bàn phím cơ không dây Keychron K8 Pro RGB Hotswap",
+    category: "Phụ kiện",
+    price: 2890000,
+    physicalStock: 35,
+    reservedStock: 5,
+    unit: "Chiếc",
+    binLocation: "Kệ C2-Tầng 1 (Kho Thủ Đức)",
+    image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=200&auto=format&fit=crop&q=80"
   },
   {
-    id: 'NV005',
-    code: 'EMP-005',
-    name: 'Vũ Thị Mai Anh',
-    role: 'SALES_REP',
-    roleTitle: 'Chuyên Viên Kinh Doanh',
-    email: 'maianh.vu@districare.vn',
-    phone: '0977.334.112',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-    region: 'Tây Nam Bộ',
-    status: 'ACTIVE',
-    joinDate: '2023-02-15',
-    targetRevenue: 9000000000,
-    notes: 'Phụ trách mạng lưới đại lý sông Mekong & Tây Nam Bộ'
-  },
-  {
-    id: 'NV006',
-    code: 'EMP-006',
-    name: 'Hoàng Kim Ngân',
-    role: 'SALES_REP',
-    roleTitle: 'Chuyên Viên Phát Triển Thị Trường',
-    email: 'ngan.hoang@districare.vn',
-    phone: '0944.556.778',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    region: 'Miền Bắc & Tây Nguyên',
-    status: 'RESIGNING', // Đang trong quy trình xin nghỉ việc - Cần chuyển giao
-    joinDate: '2022-04-01',
-    resignationDate: '2026-10-15',
-    targetRevenue: 10000000000,
-    notes: 'Đã nộp đơn xin thôi việc. Cần chuyển giao gấp 5 đại lý cho nhân sự khác!'
-  },
-  {
-    id: 'NV007',
-    code: 'EMP-007',
-    name: 'Đỗ Tuấn Kiệt',
-    role: 'SALES_REP',
-    roleTitle: 'Chuyên Viên Kinh Doanh Mới',
-    email: 'kiet.do@districare.vn',
-    phone: '0965.889.123',
-    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    region: 'Toàn Quốc',
-    status: 'ACTIVE',
-    joinDate: '2026-10-01',
-    targetRevenue: 6000000000,
-    notes: 'Nhân sự mới tuyển dụng sẵn sàng tiếp nhận địa bàn chuyển giao'
+    id: "PROD-005",
+    sku: "CHAIR-HERMAN-AERON",
+    name: "Ghế công thái học Herman Miller Aeron Remastered (Size B)",
+    category: "Nội thất",
+    price: 36500000,
+    physicalStock: 10,
+    reservedStock: 2,
+    unit: "Chiếc",
+    binLocation: "Khu Vực Hàng Cồng Kềnh (Zone D)",
+    image: "https://images.unsplash.com/photo-1580481077195-c324a3aef39c?w=200&auto=format&fit=crop&q=80"
   }
 ];
 
-export const INITIAL_AGENCIES = [
-  {
-    id: 'DL001',
-    code: 'DL-HN-001',
-    name: 'Công Ty Cổ Phần Thương Mại Hà Thành',
-    shortName: 'Hà Thành Trading',
-    taxId: '0102345678',
-    phone: '024.3822.4567',
-    email: 'contact@hathanhtrading.vn',
-    address: 'Số 45 Đường Hoàng Diệu, Phường Điện Biên',
-    province: 'Hà Nội',
-    region: 'Miền Bắc',
-    tier: 'DIAMOND', // Kim Cương
-    creditLimit: 5000000000, // 5 tỷ
-    monthlyRevenue: 4850000000, // 4.85 tỷ
-    debtBalance: 1200000000,
-    assignedSalesId: 'NV002', // Trần Minh Quang
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-06',
-    healthScore: 98 // Điểm sức khỏe đại lý
+// Danh sách trạng thái chuẩn theo đề bài:
+// Nháp -> Chờ duyệt -> Đã duyệt -> Đang soạn hàng -> Đã xuất -> Đã giao -> Đóng, và nhánh Huỷ
+const ORDER_STATUSES = {
+  DRAFT: {
+    key: "DRAFT",
+    label: "Nháp",
+    badgeClass: "badge-draft",
+    stepIndex: 0,
+    color: "#64748b",
+    description: "Đơn mới tạo bởi Sales, đang lưu nháp, chưa tác động tồn kho."
   },
-  {
-    id: 'DL002',
-    code: 'DL-HN-002',
-    name: 'Công Ty TNHH Phân Phối Thăng Long',
-    shortName: 'Thăng Long Distribution',
-    taxId: '0103456789',
-    phone: '024.3755.8899',
-    email: 'info@thanglongdist.vn',
-    address: 'Tòa nhà Charmvit, 117 Trần Duy Hưng, Cầu Giấy',
-    province: 'Hà Nội',
-    region: 'Miền Bắc',
-    tier: 'GOLD', // Vàng
-    creditLimit: 3000000000,
-    monthlyRevenue: 2500000000,
-    debtBalance: 650000000,
-    assignedSalesId: 'NV002',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-04',
-    healthScore: 92
+  PENDING_APPROVAL: {
+    key: "PENDING_APPROVAL",
+    label: "Chờ duyệt",
+    badgeClass: "badge-pending",
+    stepIndex: 1,
+    color: "#f59e0b",
+    description: "Chờ Quản lý kinh doanh duyệt chiết khấu và điều khoản công nợ."
   },
-  {
-    id: 'DL003',
-    code: 'DL-HP-001',
-    name: 'Đại Lý Cung Ứng Vật Tư Duyên Hải',
-    shortName: 'Duyên Hải Logistics & Trade',
-    taxId: '0201122334',
-    phone: '0225.3842.112',
-    email: 'kinhdoanh@duyenhaihp.vn',
-    address: '88 Cầu Đất, Quận Ngô Quyền',
-    province: 'Hải Phòng',
-    region: 'Miền Bắc',
-    tier: 'GOLD',
-    creditLimit: 3500000000,
-    monthlyRevenue: 3100000000,
-    debtBalance: 900000000,
-    assignedSalesId: 'NV002',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-02',
-    healthScore: 88
+  APPROVED: {
+    key: "APPROVED",
+    label: "Đã duyệt",
+    badgeClass: "badge-approved",
+    stepIndex: 2,
+    color: "#3b82f6",
+    description: "Quản lý đã duyệt. Đơn lập tức GIỮ CHỖ TỒN KHO tại kho Thủ Đức."
   },
-  {
-    id: 'DL004',
-    code: 'DL-QN-001',
-    name: 'Công Ty TM & Dịch Vụ Quảng Ninh Xanh',
-    shortName: 'Quảng Ninh Xanh',
-    taxId: '1400897654',
-    phone: '0203.3622.789',
-    email: 'support@quangninhxanh.com',
-    address: '12 Lê Thánh Tông, TP. Hạ Long',
-    province: 'Quảng Ninh',
-    region: 'Miền Bắc',
-    tier: 'SILVER',
-    creditLimit: 2000000000,
-    monthlyRevenue: 1400000000,
-    debtBalance: 320000000,
-    assignedSalesId: 'NV006', // Hoàng Kim Ngân (Sắp nghỉ việc)
-    status: 'ACTIVE',
-    lastContactDate: '2026-09-28',
-    healthScore: 82
+  PICKING: {
+    key: "PICKING",
+    label: "Đang soạn hàng",
+    badgeClass: "badge-picking",
+    stepIndex: 3,
+    color: "#8b5cf6",
+    description: "Thủ kho đang lấy hàng từ vị trí kệ, đóng gói và in phiếu xuất kho."
   },
-  {
-    id: 'DL005',
-    code: 'DL-BN-001',
-    name: 'Tổng Đại Lý Thiết Bị Kinh Bắc',
-    shortName: 'Kinh Bắc Corp',
-    taxId: '2300456123',
-    phone: '0222.3811.900',
-    email: 'contact@kinhbac-corp.vn',
-    address: 'KCN Tiên Sơn, Huyện Tiên Du',
-    province: 'Bắc Ninh',
-    region: 'Miền Bắc',
-    tier: 'DIAMOND',
-    creditLimit: 6000000000,
-    monthlyRevenue: 5200000000,
-    debtBalance: 1500000000,
-    assignedSalesId: 'NV006', // Hoàng Kim Ngân (Sắp nghỉ việc)
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-05',
-    healthScore: 95
+  DISPATCHED: {
+    key: "DISPATCHED",
+    label: "Đã xuất",
+    badgeClass: "badge-dispatched",
+    stepIndex: 4,
+    color: "#06b6d4",
+    description: "Đã xuất kho, bàn giao đơn vị vận chuyển. KHÔNG THỂ HUỶ TRỰC TIẾP (Phải trả hàng)."
   },
-  {
-    id: 'DL006',
-    code: 'DL-DN-001',
-    name: 'Công Ty CP Phát Đạt Sông Hàn',
-    shortName: 'Sông Hàn Corp',
-    taxId: '0400987654',
-    phone: '0236.3888.666',
-    email: 'contact@songhancorp.vn',
-    address: '254 Nguyễn Văn Linh, Quận Thanh Khê',
-    province: 'Đà Nẵng',
-    region: 'Miền Trung',
-    tier: 'DIAMOND',
-    creditLimit: 5000000000,
-    monthlyRevenue: 3900000000,
-    debtBalance: 880000000,
-    assignedSalesId: 'NV003', // Lê Thu Hà
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-07',
-    healthScore: 96
+  DELIVERED: {
+    key: "DELIVERED",
+    label: "Đã giao",
+    badgeClass: "badge-delivered",
+    stepIndex: 5,
+    color: "#10b981",
+    description: "Khách hàng đã ký nhận thành công và kiểm tra biên bản bàn giao."
   },
-  {
-    id: 'DL007',
-    code: 'DL-HUE-001',
-    name: 'Doanh Nghiệp Tư Nhân Cố Đô Thương Mại',
-    shortName: 'Cố Đô Trade',
-    taxId: '3300567890',
-    phone: '0234.3821.555',
-    email: 'codo.trade@hue.vnn.vn',
-    address: '15 Hùng Vương, TP. Huế',
-    province: 'Thừa Thiên Huế',
-    region: 'Miền Trung',
-    tier: 'SILVER',
-    creditLimit: 1500000000,
-    monthlyRevenue: 1200000000,
-    debtBalance: 210000000,
-    assignedSalesId: 'NV003',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-03',
-    healthScore: 84
+  CLOSED: {
+    key: "CLOSED",
+    label: "Đóng",
+    badgeClass: "badge-closed",
+    stepIndex: 6,
+    color: "#059669",
+    description: "Đơn hàng hoàn tất đối soát tài chính, kế toán hạch toán xong."
   },
-  {
-    id: 'DL008',
-    code: 'DL-QNA-001',
-    name: 'NPP Thương Mại Miền Trung Xanh',
-    shortName: 'Miền Trung Xanh',
-    taxId: '4000345678',
-    phone: '0235.3855.444',
-    email: 'mientrungxanh@qna.vn',
-    address: '89 Phan Bội Châu, TP. Tam Kỳ',
-    province: 'Quảng Nam',
-    region: 'Miền Trung',
-    tier: 'GOLD',
-    creditLimit: 2500000000,
-    monthlyRevenue: 2100000000,
-    debtBalance: 450000000,
-    assignedSalesId: 'NV003',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-01',
-    healthScore: 89
+  CANCELLED: {
+    key: "CANCELLED",
+    label: "Đã huỷ",
+    badgeClass: "badge-cancelled",
+    stepIndex: -1,
+    color: "#ef4444",
+    description: "Đã huỷ đơn. Bắt buộc nhập lý do và hệ thống tự động giải phóng tồn giữ chỗ."
   },
-  {
-    id: 'DL009',
-    code: 'DL-KH-001',
-    name: 'Công Ty Cổ Phần Thương Mại Trầm Hương',
-    shortName: 'Trầm Hương Khánh Hòa',
-    taxId: '4200789123',
-    phone: '0258.3812.333',
-    email: 'kinhdoanh@tramhuongkhanhhoa.vn',
-    address: '68 Trần Phú, Lộc Thọ, TP. Nha Trang',
-    province: 'Khánh Hòa',
-    region: 'Miền Trung',
-    tier: 'GOLD',
-    creditLimit: 3000000000,
-    monthlyRevenue: 2800000000,
-    debtBalance: 720000000,
-    assignedSalesId: 'NV006', // Hoàng Kim Ngân (Sắp nghỉ việc)
-    status: 'ACTIVE',
-    lastContactDate: '2026-09-25',
-    healthScore: 87
-  },
-  {
-    id: 'DL010',
-    code: 'DL-GL-001',
-    name: 'Đại Lý Nông Công Nghiệp Gia Lai',
-    shortName: 'Gia Lai Agro-Tech',
-    taxId: '5900234567',
-    phone: '0269.3877.222',
-    email: 'gialaiagri@pleiku.vn',
-    address: '102 Trần Hưng Đạo, TP. Pleiku',
-    province: 'Gia Lai',
-    region: 'Tây Nguyên',
-    tier: 'SILVER',
-    creditLimit: 2000000000,
-    monthlyRevenue: 1600000000,
-    debtBalance: 490000000,
-    assignedSalesId: 'NV006', // Hoàng Kim Ngân (Sắp nghỉ việc)
-    status: 'ACTIVE',
-    lastContactDate: '2026-09-22',
-    healthScore: 80
-  },
-  {
-    id: 'DL011',
-    code: 'DL-LD-001',
-    name: 'Công Ty TNHH Lâm Đồng Ngàn Hoa',
-    shortName: 'Lâm Đồng Ngàn Hoa',
-    taxId: '5800123987',
-    phone: '0263.3822.111',
-    email: 'lienhe@lamdongnganhoa.com',
-    address: '45 Phan Đình Phùng, TP. Đà Lạt',
-    province: 'Lâm Đồng',
-    region: 'Tây Nguyên',
-    tier: 'BRONZE',
-    creditLimit: 1000000000,
-    monthlyRevenue: 950000000,
-    debtBalance: 180000000,
-    assignedSalesId: 'NV006', // Hoàng Kim Ngân (Sắp nghỉ việc)
-    status: 'ACTIVE',
-    lastContactDate: '2026-09-20',
-    healthScore: 78
-  },
-  {
-    id: 'DL012',
-    code: 'DL-HCM-001',
-    name: 'Tập Đoàn Phân Phối Toàn Thắng Sài Gòn',
-    shortName: 'Toàn Thắng Sài Gòn',
-    taxId: '0300112233',
-    phone: '028.3911.8888',
-    email: 'sales@toanthangsg.vn',
-    address: 'Tòa nhà Bitexco, Số 2 Hải Triều, Bến Nghé, Quận 1',
-    province: 'TP. Hồ Chí Minh',
-    region: 'Miền Nam',
-    tier: 'DIAMOND',
-    creditLimit: 8000000000,
-    monthlyRevenue: 6500000000,
-    debtBalance: 1800000000,
-    assignedSalesId: 'NV004', // Phạm Văn Đức
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-07',
-    healthScore: 99
-  },
-  {
-    id: 'DL013',
-    code: 'DL-HCM-002',
-    name: 'Công Ty CP Thương Mại Tân Bình Hưng Thịnh',
-    shortName: 'Tân Bình Hưng Thịnh',
-    taxId: '0300445566',
-    phone: '028.3844.5566',
-    email: 'info@tanbinhhungthinh.com',
-    address: '45 Cộng Hòa, Phường 4, Quận Tân Bình',
-    province: 'TP. Hồ Chí Minh',
-    region: 'Miền Nam',
-    tier: 'GOLD',
-    creditLimit: 4000000000,
-    monthlyRevenue: 3400000000,
-    debtBalance: 810000000,
-    assignedSalesId: 'NV004',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-05',
-    healthScore: 91
-  },
-  {
-    id: 'DL014',
-    code: 'DL-BD-001',
-    name: 'Đại Lý Công Nghiệp & Vật Tư Bình Dương',
-    shortName: 'Bình Dương Industrial',
-    taxId: '3700778899',
-    phone: '0274.3822.999',
-    email: 'contact@binhduongind.vn',
-    address: 'Đại lộ Bình Dương, TP. Thủ Dầu Một',
-    province: 'Bình Dương',
-    region: 'Miền Nam',
-    tier: 'DIAMOND',
-    creditLimit: 7000000000,
-    monthlyRevenue: 5800000000,
-    debtBalance: 1650000000,
-    assignedSalesId: 'NV004',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-06',
-    healthScore: 97
-  },
-  {
-    id: 'DL015',
-    code: 'DL-DNA-001',
-    name: 'Công Ty TNHH Thương Mại Đồng Nai Hưng Long',
-    shortName: 'Đồng Nai Hưng Long',
-    taxId: '3600129845',
-    phone: '0251.3833.456',
-    email: 'hunglong@dongnai.vn',
-    address: 'KCN Biên Hòa 2, TP. Biên Hòa',
-    province: 'Đồng Nai',
-    region: 'Miền Nam',
-    tier: 'GOLD',
-    creditLimit: 3500000000,
-    monthlyRevenue: 3200000000,
-    debtBalance: 750000000,
-    assignedSalesId: 'NV004',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-03',
-    healthScore: 90
-  },
-  {
-    id: 'DL016',
-    code: 'DL-VT-001',
-    name: 'NPP Vật Tư Hàng Hải Dầu Khí Vũng Tàu',
-    shortName: 'Vũng Tàu Maritime',
-    taxId: '3500889900',
-    phone: '0254.3855.123',
-    email: 'maritime@vungtau.vn',
-    address: '200 Thùy Vân, Phường Thắng Tam, TP. Vũng Tàu',
-    province: 'Bà Rịa - Vũng Tàu',
-    region: 'Miền Nam',
-    tier: 'SILVER',
-    creditLimit: 2000000000,
-    monthlyRevenue: 1700000000,
-    debtBalance: 420000000,
-    assignedSalesId: 'NV004',
-    status: 'ACTIVE',
-    lastContactDate: '2026-09-30',
-    healthScore: 85
-  },
-  {
-    id: 'DL017',
-    code: 'DL-CT-001',
-    name: 'Công Ty Cổ Phần Phân Phối Tây Đô Mekong',
-    shortName: 'Tây Đô Mekong',
-    taxId: '1800234567',
-    phone: '0292.3838.999',
-    email: 'taydo@mekongtrade.vn',
-    address: '135 Hòa Bình, Phường An Cư, Quận Ninh Kiều',
-    province: 'Cần Thơ',
-    region: 'Tây Nam Bộ',
-    tier: 'DIAMOND',
-    creditLimit: 5000000000,
-    monthlyRevenue: 4100000000,
-    debtBalance: 980000000,
-    assignedSalesId: 'NV005', // Vũ Thị Mai Anh
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-07',
-    healthScore: 95
-  },
-  {
-    id: 'DL018',
-    code: 'DL-AG-001',
-    name: 'Tổng Đại Lý Phù Sa An Giang',
-    shortName: 'An Giang Phù Sa',
-    taxId: '1600890123',
-    phone: '0296.3852.333',
-    email: 'phusa@angiang.vn',
-    address: '77 Trần Hưng Đạo, TP. Long Xuyên',
-    province: 'An Giang',
-    region: 'Tây Nam Bộ',
-    tier: 'GOLD',
-    creditLimit: 3000000000,
-    monthlyRevenue: 2300000000,
-    debtBalance: 510000000,
-    assignedSalesId: 'NV005',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-04',
-    healthScore: 89
-  },
-  {
-    id: 'DL019',
-    code: 'DL-KG-001',
-    name: 'Doanh Nghiệp Tư Nhân Kiên Giang Biển Tây',
-    shortName: 'Kiên Giang Biển Tây',
-    taxId: '1700678910',
-    phone: '0297.3861.444',
-    email: 'bientay@kiengiang.vn',
-    address: '50 Nguyễn Trung Trực, TP. Rạch Giá',
-    province: 'Kiên Giang',
-    region: 'Tây Nam Bộ',
-    tier: 'SILVER',
-    creditLimit: 2000000000,
-    monthlyRevenue: 1500000000,
-    debtBalance: 390000000,
-    assignedSalesId: 'NV005',
-    status: 'ACTIVE',
-    lastContactDate: '2026-09-29',
-    healthScore: 83
-  },
-  {
-    id: 'DL020',
-    code: 'DL-TG-001',
-    name: 'Công Ty TM & DV Tiền Giang Sông Tiền',
-    shortName: 'Tiền Giang Trade',
-    taxId: '1200345678',
-    phone: '0273.3872.555',
-    email: 'songtien@tiengiang.vn',
-    address: '22 Ấp Bắc, Phường 5, TP. Mỹ Tho',
-    province: 'Tiền Giang',
-    region: 'Tây Nam Bộ',
-    tier: 'SILVER',
-    creditLimit: 2200000000,
-    monthlyRevenue: 1800000000,
-    debtBalance: 480000000,
-    assignedSalesId: 'NV005',
-    status: 'ACTIVE',
-    lastContactDate: '2026-10-02',
-    healthScore: 86
-  },
-  // Các đại lý CHƯA PHÂN CÔNG (Unassigned) để Quản lý test gán trực tiếp
-  {
-    id: 'DL021',
-    code: 'DL-TH-001',
-    name: 'Công Ty TM Lam Sơn Thịnh Vượng',
-    shortName: 'Lam Sơn Thịnh Vượng',
-    taxId: '2800567123',
-    phone: '0237.3852.111',
-    email: 'lamson@thanhhoa.vn',
-    address: '180 Bà Triệu, Phường Đông Thọ, TP. Thanh Hóa',
-    province: 'Thanh Hóa',
-    region: 'Miền Bắc',
-    tier: 'BRONZE',
-    creditLimit: 1000000000,
-    monthlyRevenue: 800000000,
-    debtBalance: 120000000,
-    assignedSalesId: null, // ⚠️ CHƯA PHÂN CÔNG
-    status: 'PENDING_ASSIGN',
-    lastContactDate: '2026-09-15',
-    healthScore: 70
-  },
-  {
-    id: 'DL022',
-    code: 'DL-NA-001',
-    name: 'Tổng NPP Sông Lam Xứ Nghệ',
-    shortName: 'Sông Lam Nghệ An',
-    taxId: '2900891234',
-    phone: '0238.3844.222',
-    email: 'songlam@nghean.vn',
-    address: '45 Quang Trung, TP. Vinh',
-    province: 'Nghệ An',
-    region: 'Miền Bắc',
-    tier: 'SILVER',
-    creditLimit: 1800000000,
-    monthlyRevenue: 1300000000,
-    debtBalance: 280000000,
-    assignedSalesId: null, // ⚠️ CHƯA PHÂN CÔNG
-    status: 'PENDING_ASSIGN',
-    lastContactDate: '2026-09-18',
-    healthScore: 75
-  },
-  {
-    id: 'DL023',
-    code: 'DL-CM-001',
-    name: 'Đại Lý Cung Ứng Đất Mũi Cà Mau',
-    shortName: 'Đất Mũi Cà Mau',
-    taxId: '2000456789',
-    phone: '0290.3831.666',
-    email: 'datmui@camau.vn',
-    address: '32 Ngô Quyền, Phường 2, TP. Cà Mau',
-    province: 'Cà Mau',
-    region: 'Tây Nam Bộ',
-    tier: 'BRONZE',
-    creditLimit: 1000000000,
-    monthlyRevenue: 750000000,
-    debtBalance: 110000000,
-    assignedSalesId: null, // ⚠️ CHƯA PHÂN CÔNG
-    status: 'PENDING_ASSIGN',
-    lastContactDate: '2026-09-10',
-    healthScore: 68
+  RETURN_PROCESSING: {
+    key: "RETURN_PROCESSING",
+    label: "Đang trả hàng (RMA)",
+    badgeClass: "badge-returned",
+    stepIndex: -2,
+    color: "#d97706",
+    description: "Đơn đã xuất bị phát sinh sự cố, chuyển sang đường xử lý trả hàng hoàn kho."
   }
-];
+};
 
-export const INITIAL_HANDOVERS = [
+const INITIAL_ORDERS = [
   {
-    id: 'HO001',
-    code: 'HO-202609-001',
-    timestamp: '2026-09-15T09:30:00.000Z',
-    effectiveDate: '2026-09-16',
-    transferredById: 'NV001',
-    transferredByName: 'Nguyễn Hồng Vĩnh',
-    fromEmployeeId: 'NV008', // Nhân sự cũ đã nghỉ
-    fromEmployeeName: 'Bùi Anh Tuấn (Cựu NVKD)',
-    toEmployeeId: 'NV002',
-    toEmployeeName: 'Trần Minh Quang',
-    agencyIds: ['DL001', 'DL002'],
-    agenciesSummary: [
-      { code: 'DL-HN-001', name: 'Công Ty Cổ Phần Thương Mại Hà Thành', region: 'Miền Bắc', province: 'Hà Nội', tier: 'DIAMOND', monthlyRevenue: 4850000000, debtBalance: 1200000000 },
-      { code: 'DL-HN-002', name: 'Công Ty TNHH Phân Phối Thăng Long', region: 'Miền Bắc', province: 'Hà Nội', tier: 'GOLD', monthlyRevenue: 2500000000, debtBalance: 650000000 }
+    id: "ORD-2026-0891",
+    code: "SO-891",
+    createdAt: "2026-10-16 09:15",
+    updatedAt: "2026-10-16 11:30",
+    salesRep: {
+      id: "SALES-01",
+      name: "Trần Minh Quân",
+      email: "quan.tm@techcorp.vn",
+      phone: "0912.888.777"
+    },
+    customer: {
+      name: "Công ty Cổ phần Công nghệ DigiViet",
+      contact: "Anh Phạm Hoàng Long (Giám đốc CNTT)",
+      phone: "0908.123.456",
+      email: "long.ph@digiviet.com.vn",
+      address: "Tầng 8, Tòa nhà Bitexco, Q.1, TP. Hồ Chí Minh"
+    },
+    items: [
+      {
+        productId: "PROD-001",
+        sku: "LAP-DELL-XPS15",
+        name: "Dell XPS 15 9530 (i7-13700H, 32GB, 1TB RTX 4060)",
+        unitPrice: 48500000,
+        quantity: 2,
+        reserved: true,
+        binLocation: "Kệ A1-Tầng 2 (Kho Thủ Đức)"
+      },
+      {
+        productId: "PROD-003",
+        sku: "MOU-LOGI-MXM3S",
+        name: "Chuột không dây Logitech MX Master 3S Quiet (Graphite)",
+        unitPrice: 2450000,
+        quantity: 2,
+        reserved: true,
+        binLocation: "Kệ C2-Tầng 3 (Kho Thủ Đức)"
+      }
     ],
-    totalRevenue: 7350000000,
-    totalDebt: 1850000000,
-    reason: 'RESIGNATION', // Nhân viên nghỉ việc
-    reasonText: 'Nhân viên Bùi Anh Tuấn thôi việc chuyển công tác',
-    notes: 'Đã hoàn tất kiểm kê công nợ, đối chiếu hợp đồng ký quỹ 2026. Bàn giao danh bạ 12 đầu mối liên hệ.',
-    status: 'COMPLETED'
+    status: "PICKING", // Đang soạn hàng - Rất phù hợp để test xem kho & huỷ nhả tồn
+    warehouse: {
+      name: "Kho Tổng Thủ Đức (Khu Công nghệ Cao)",
+      operatorName: "Lê Văn Hùng (Mã kho NV-302)",
+      binSummary: "Kệ A1-T2 & C2-T3",
+      pickProgress: "2 / 2 sản phẩm đang đóng gói carton",
+      dispatchNoteNumber: "PK-2026-0891"
+    },
+    paymentMethod: "Chuyển khoản công nợ 30 ngày",
+    notes: "Giao giờ hành chính, gọi trước 30 phút để anh Long xếp chỗ nhận hàng",
+    cancellation: null,
+    returnOrder: null,
+    history: [
+      {
+        time: "2026-10-16 09:15",
+        actor: "Trần Minh Quân (Sales)",
+        action: "Tạo đơn hàng nháp",
+        detail: "Khởi tạo đơn hàng từ báo giá BG-2026-442"
+      },
+      {
+        time: "2026-10-16 09:40",
+        actor: "Trần Minh Quân (Sales)",
+        action: "Gửi phê duyệt chiết khấu",
+        detail: "Áp dụng chiết khấu 3% theo chính sách khách hàng thân thiết B2B"
+      },
+      {
+        time: "2026-10-16 10:15",
+        actor: "Nguyễn Tuấn Kiệt (Sales Manager)",
+        action: "Phê duyệt đơn hàng",
+        detail: "Duyệt chiết khấu. Hệ thống tự động kích hoạt GIỮ CHỖ TỒN KHO cho 2 Laptop & 2 Chuột."
+      },
+      {
+        time: "2026-10-16 11:30",
+        actor: "Lê Văn Hùng (Thủ kho)",
+        action: "Tiếp nhận soạn hàng",
+        detail: "Đã in phiếu nhặt hàng (Pick List) và bắt đầu kiểm tra ngoại quan sản phẩm tại Kệ A1-T2."
+      }
+    ]
   },
   {
-    id: 'HO002',
-    code: 'HO-202608-002',
-    timestamp: '2026-08-20T14:15:00.000Z',
-    effectiveDate: '2026-08-25',
-    transferredById: 'NV001',
-    transferredByName: 'Nguyễn Hồng Vĩnh',
-    fromEmployeeId: 'NV003',
-    fromEmployeeName: 'Lê Thu Hà',
-    toEmployeeId: 'NV004',
-    toEmployeeName: 'Phạm Văn Đức',
-    agencyIds: ['DL016'],
-    agenciesSummary: [
-      { code: 'DL-VT-001', name: 'NPP Vật Tư Hàng Hải Dầu Khí Vũng Tàu', region: 'Miền Nam', province: 'Bà Rịa - Vũng Tàu', tier: 'SILVER', monthlyRevenue: 1700000000, debtBalance: 420000000 }
+    id: "ORD-2026-0888",
+    code: "SO-888",
+    createdAt: "2026-10-15 14:00",
+    updatedAt: "2026-10-16 08:30",
+    salesRep: {
+      id: "SALES-01",
+      name: "Trần Minh Quân",
+      email: "quan.tm@techcorp.vn",
+      phone: "0912.888.777"
+    },
+    customer: {
+      name: "Viện Thiết Kế & Truyền Thông Sáng Tạo F-Studio",
+      contact: "Chị Mai Phương Thảo",
+      phone: "0934.567.890",
+      email: "thao.mp@fstudio.design",
+      address: "128 Nguyễn Đình Chiểu, P. Đa Kao, Quận 1, TP. HCM"
+    },
+    items: [
+      {
+        productId: "PROD-002",
+        sku: "DISP-LG-34WN80C",
+        name: "Màn hình cong LG UltraWide 34WN80C-B 34 inch IPS HDR10",
+        unitPrice: 13900000,
+        quantity: 3,
+        reserved: false, // đã xuất nên trừ thẳng vào tồn, không còn giữ chỗ
+        binLocation: "Kệ B3-Tầng 1 (Kho Thủ Đức)"
+      }
     ],
-    totalRevenue: 1700000000,
-    totalDebt: 420000000,
-    reason: 'RESTRUCTURING', // Tái cơ cấu thị trường
-    reasonText: 'Quy hoạch lại địa bàn miền Đông Nam Bộ tập trung về cụm TP.HCM',
-    notes: 'Chuyển giao đại lý Vũng Tàu về cụm Đông Nam Bộ do NVKD Phạm Văn Đức chăm sóc nhằm tối ưu chi phí đi lại.',
-    status: 'COMPLETED'
+    status: "DISPATCHED", // Đã xuất - ĐỂ TEST LUẬT "ĐÃ XUẤT KHO THÌ KHÔNG ĐƯỢC HUỶ, PHẢI TRẢ HÀNG"
+    warehouse: {
+      name: "Kho Tổng Thủ Đức (Khu Công nghệ Cao)",
+      operatorName: "Lê Văn Hùng (Mã kho NV-302)",
+      binSummary: "Kệ B3-T1",
+      pickProgress: "Đã đóng pallet bọc xốp cẩn thận",
+      dispatchNoteNumber: "XK-2026-0045"
+    },
+    carrier: {
+      name: "Giao Hàng Tiết Kiệm B2B",
+      trackingCode: "GHTK-B2B-998877",
+      driverPhone: "0987.333.222 (Tài xế Nguyễn Văn Ba)"
+    },
+    paymentMethod: "Thanh toán ngay qua Thẻ tín dụng Doanh nghiệp",
+    notes: "Hàng giá trị cao và dễ vỡ, yêu cầu xe tải chuyên dụng có bửng nâng hạ",
+    cancellation: null,
+    returnOrder: null,
+    history: [
+      {
+        time: "2026-10-15 14:00",
+        actor: "Trần Minh Quân (Sales)",
+        action: "Tạo đơn hàng",
+        detail: "Tạo đơn hàng màn hình chuyên đồ hoạ"
+      },
+      {
+        time: "2026-10-15 14:30",
+        actor: "Nguyễn Tuấn Kiệt (Sales Manager)",
+        action: "Phê duyệt đơn hàng",
+        detail: "Duyệt nhanh. Giữ chỗ 3 Màn hình LG 34 inch."
+      },
+      {
+        time: "2026-10-15 16:00",
+        actor: "Lê Văn Hùng (Thủ kho)",
+        action: "Hoàn tất soạn hàng",
+        detail: "Kiểm tra tem bảo hành chính hãng và niêm phong thùng."
+      },
+      {
+        time: "2026-10-16 08:30",
+        actor: "Lê Văn Hùng (Thủ kho)",
+        action: "Xác nhận xuất kho",
+        detail: "Xuất kho thành công theo Phiếu XK-2026-0045. Trừ 3 cái vào tồn vật lý. Bàn giao xe GHTK."
+      }
+    ]
+  },
+  {
+    id: "ORD-2026-0895",
+    code: "SO-895",
+    createdAt: "2026-10-16 10:45",
+    updatedAt: "2026-10-16 10:45",
+    salesRep: {
+      id: "SALES-01",
+      name: "Trần Minh Quân",
+      email: "quan.tm@techcorp.vn",
+      phone: "0912.888.777"
+    },
+    customer: {
+      name: "Tập đoàn Đầu tư An Phú Gia",
+      contact: "Trần Minh Tuấn (Phòng Mua hàng)",
+      phone: "0919.888.999",
+      email: "tuan.tm@anphugia.vn",
+      address: "Tòa nhà IPC, 1489 Nguyễn Văn Linh, Quận 7, TP. HCM"
+    },
+    items: [
+      {
+        productId: "PROD-005",
+        sku: "CHAIR-HERMAN-AERON",
+        name: "Ghế công thái học Herman Miller Aeron Remastered (Size B)",
+        unitPrice: 36500000,
+        quantity: 2,
+        reserved: false,
+        binLocation: "Khu Vực Hàng Cồng Kềnh (Zone D)"
+      }
+    ],
+    status: "DRAFT", // Nháp
+    warehouse: {
+      name: "Kho Tổng Thủ Đức",
+      operatorName: "Chờ điều phối",
+      binSummary: "Zone D",
+      pickProgress: "Chưa phân công",
+      dispatchNoteNumber: null
+    },
+    paymentMethod: "Chuyển khoản 100% trước khi giao",
+    notes: "Khách đang cân nhắc thêm phiên bản màu xám Mineral",
+    cancellation: null,
+    returnOrder: null,
+    history: [
+      {
+        time: "2026-10-16 10:45",
+        actor: "Trần Minh Quân (Sales)",
+        action: "Tạo đơn nháp",
+        detail: "Khởi tạo đơn hàng sơ bộ chờ xác nhận màu sắc"
+      }
+    ]
+  },
+  {
+    id: "ORD-2026-0870",
+    code: "SO-870",
+    createdAt: "2026-10-14 11:20",
+    updatedAt: "2026-10-14 15:45",
+    salesRep: {
+      id: "SALES-01",
+      name: "Trần Minh Quân",
+      email: "quan.tm@techcorp.vn",
+      phone: "0912.888.777"
+    },
+    customer: {
+      name: "Startup Fintech AlphaPay",
+      contact: "Vũ Hải Đăng (Tech Lead)",
+      phone: "0977.112.233",
+      email: "dang.vu@alphapay.io",
+      address: "Saigon Hi-Tech Park, TP. Thủ Đức, TP. HCM"
+    },
+    items: [
+      {
+        productId: "PROD-004",
+        sku: "KB-KEYCH-K8PRO",
+        name: "Bàn phím cơ không dây Keychron K8 Pro RGB Hotswap",
+        unitPrice: 2890000,
+        quantity: 5,
+        reserved: false,
+        binLocation: "Kệ C2-Tầng 1 (Kho Thủ Đức)"
+      }
+    ],
+    status: "CANCELLED", // Đã huỷ mẫu - Để giảng viên xem lại vết huỷ và nhả tồn
+    warehouse: {
+      name: "Kho Tổng Thủ Đức",
+      operatorName: "Hệ thống tự động",
+      binSummary: "Kệ C2-T1",
+      pickProgress: "Đã giải phóng 5 chiếc giữ chỗ",
+      dispatchNoteNumber: null
+    },
+    paymentMethod: "Chuyển khoản",
+    notes: "Đơn mua trang bị cho nhân sự mới quý 4",
+    cancellation: {
+      cancelledAt: "2026-10-14 15:45",
+      cancelledBy: "Trần Minh Quân (Sales)",
+      reasonCategory: "Khách hàng thay đổi kế hoạch / ngân sách",
+      detailedReason: "Khách hoãn tuyển dụng quý 4 nên yêu cầu huỷ đơn để chờ ngân sách năm sau. Đã thông báo khách và hoàn trả tồn kho.",
+      inventoryReleased: true,
+      releasedQuantities: [
+        { sku: "KB-KEYCH-K8PRO", qty: 5 }
+      ]
+    },
+    returnOrder: null,
+    history: [
+      {
+        time: "2026-10-14 11:20",
+        actor: "Trần Minh Quân (Sales)",
+        action: "Tạo đơn hàng",
+        detail: "Tạo đơn 5 phím cơ Keychron"
+      },
+      {
+        time: "2026-10-14 13:10",
+        actor: "Nguyễn Tuấn Kiệt (Sales Manager)",
+        action: "Phê duyệt đơn hàng",
+        detail: "Đã duyệt và giữ chỗ 5 phím cơ tại Kệ C2-T1."
+      },
+      {
+        time: "2026-10-14 15:45",
+        actor: "Trần Minh Quân (Sales)",
+        action: "Huỷ đơn hàng & Giải phóng tồn kho",
+        detail: "Lý do: Khách hàng hoãn kế hoạch mua sắm. Hệ thống tự động nhả 5 chiếc đang giữ chỗ về tồn khả dụng."
+      }
+    ]
+  },
+  {
+    id: "ORD-2026-0865",
+    code: "SO-865",
+    createdAt: "2026-10-13 08:30",
+    updatedAt: "2026-10-15 16:30",
+    salesRep: {
+      id: "SALES-01",
+      name: "Trần Minh Quân",
+      email: "quan.tm@techcorp.vn",
+      phone: "0912.888.777"
+    },
+    customer: {
+      name: "Trường Quốc Tế Gateway Academy",
+      contact: "Cô Nguyễn Hồng Hạnh",
+      phone: "0903.445.667",
+      email: "hanh.nh@gateway.edu.vn",
+      address: "Khu Đô Thị Sala, TP. Thủ Đức, TP. HCM"
+    },
+    items: [
+      {
+        productId: "PROD-001",
+        sku: "LAP-DELL-XPS15",
+        name: "Dell XPS 15 9530 (i7-13700H, 32GB, 1TB RTX 4060)",
+        unitPrice: 48500000,
+        quantity: 1,
+        reserved: false,
+        binLocation: "Kệ A1-Tầng 2 (Kho Thủ Đức)"
+      }
+    ],
+    status: "DELIVERED", // Đã giao thành công
+    warehouse: {
+      name: "Kho Tổng Thủ Đức",
+      operatorName: "Lê Văn Hùng (Thủ kho)",
+      binSummary: "Kệ A1-T2",
+      pickProgress: "Hoàn tất bàn giao",
+      dispatchNoteNumber: "XK-2026-0038"
+    },
+    carrier: {
+      name: "Ahamove Tải 1 Tấn",
+      trackingCode: "AHA-554412",
+      driverPhone: "0918.222.111"
+    },
+    paymentMethod: "Chuyển khoản",
+    notes: "Phòng tin học - Lầu 3",
+    cancellation: null,
+    returnOrder: null,
+    history: [
+      {
+        time: "2026-10-13 08:30",
+        actor: "Trần Minh Quân (Sales)",
+        action: "Tạo đơn",
+        detail: "Đơn mua bổ sung cho giáo viên đồ hoạ"
+      },
+      {
+        time: "2026-10-13 10:00",
+        actor: "Nguyễn Tuấn Kiệt (Manager)",
+        action: "Duyệt đơn",
+        detail: "Duyệt đơn hàng và giữ chỗ tồn"
+      },
+      {
+        time: "2026-10-14 09:00",
+        actor: "Lê Văn Hùng (Thủ kho)",
+        action: "Xuất kho",
+        detail: "Xuất kho phiếu XK-2026-0038"
+      },
+      {
+        time: "2026-10-15 16:30",
+        actor: "Ahamove (Đơn vị vận chuyển)",
+        action: "Giao hàng thành công",
+        detail: "Cô Hạnh đã ký biên bản bàn giao đầy đủ phụ kiện"
+      }
+    ]
   }
 ];
 
-export const INITIAL_AUDIT_LOGS = [
+// Lịch sử biến động tồn kho (Stock Movement Audit Logs)
+const INITIAL_STOCK_LOGS = [
   {
-    id: 'LOG001',
-    timestamp: '2026-10-06T10:15:00.000Z',
-    actorName: 'Nguyễn Hồng Vĩnh',
-    actorRole: 'Quản Lý Kinh Doanh',
-    action: 'SINGLE_ASSIGN',
-    targetAgencyCode: 'DL-HN-001',
-    targetAgencyName: 'Công Ty Cổ Phần Thương Mại Hà Thành',
-    oldAssignee: 'Chưa phân công',
-    newAssignee: 'Trần Minh Quang',
-    notes: 'Phân công NVKD chính phụ trách định kỳ Q4/2026'
+    id: "LOG-1001",
+    timestamp: "2026-10-16 10:15",
+    sku: "LAP-DELL-XPS15",
+    orderCode: "SO-891",
+    type: "RESERVE", // Giữ chỗ
+    quantityDelta: 2,
+    operator: "Hệ thống (Trigger: Duyệt đơn SO-891)",
+    note: "Tăng giữ chỗ từ 5 -> 7. Tồn khả dụng giảm tương ứng."
   },
   {
-    id: 'LOG002',
-    timestamp: '2026-09-15T09:30:00.000Z',
-    actorName: 'Nguyễn Hồng Vĩnh',
-    actorRole: 'Quản Lý Kinh Doanh',
-    action: 'BULK_HANDOVER',
-    code: 'HO-202609-001',
-    notes: 'Chuyển giao hàng loạt 2 đại lý từ Bùi Anh Tuấn sang Trần Minh Quang do nghỉ việc'
+    id: "LOG-1002",
+    timestamp: "2026-10-16 10:15",
+    sku: "MOU-LOGI-MXM3S",
+    orderCode: "SO-891",
+    type: "RESERVE",
+    quantityDelta: 2,
+    operator: "Hệ thống (Trigger: Duyệt đơn SO-891)",
+    note: "Tăng giữ chỗ từ 10 -> 12. Tồn khả dụng giảm tương ứng."
+  },
+  {
+    id: "LOG-1003",
+    timestamp: "2026-10-16 08:30",
+    sku: "DISP-LG-34WN80C",
+    orderCode: "SO-888",
+    type: "DISPATCH_DEDUCT", // Xuất kho trừ tồn thực
+    quantityDelta: -3,
+    operator: "Lê Văn Hùng (Thủ kho - Phiếu XK-2026-0045)",
+    note: "Xuất kho giao khách. Trừ trực tiếp vào tồn thực tế: 21 -> 18. Giải phóng giữ chỗ 3."
+  },
+  {
+    id: "LOG-1004",
+    timestamp: "2026-10-14 15:45",
+    sku: "KB-KEYCH-K8PRO",
+    orderCode: "SO-870",
+    type: "RELEASE_CANCEL", // Huỷ đơn nhả tồn
+    quantityDelta: -5,
+    operator: "Hệ thống (Trigger: Huỷ đơn SO-870 bởi Sales)",
+    note: "Huỷ đơn SO-870. Giải phóng 5 tồn giữ chỗ về tồn khả dụng ngay lập tức."
   }
 ];
