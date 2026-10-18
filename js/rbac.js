@@ -1,65 +1,78 @@
 /**
- * DISTRICARE CRM - Phân Quyền & Kiểm Soát Truy Cập Dữ Liệu (RBAC & Row-Level Security)
- * Phục vụ tiêu chí:
- * 1. Quản lý kinh doanh: Toàn quyền cấu hình, phân công, chuyển giao, xem mọi đại lý & log.
- * 2. Nhân viên kinh doanh: Bảo mật hàng (RLS) - chỉ nhìn thấy đại lý mình phụ trách.
+ * RBAC (Role-Based Access Control) Module
+ * Đáp ứng yêu cầu nghiệp vụ:
+ * "Nhân viên kinh doanh chỉ thấy đơn của đại lý mình phụ trách"
+ * "Quản lý kinh doanh xem toàn bộ tình hình bán hàng công ty"
  */
 
-export const ROLES = {
-  MANAGER: 'MANAGER',
-  SALES_REP: 'SALES_REP'
-};
+import { USERS, AGENTS } from './mockData.js';
 
-export const PERMISSIONS = {
-  VIEW_ALL_AGENCIES: 'VIEW_ALL_AGENCIES',
-  ASSIGN_PRIMARY_REP: 'ASSIGN_PRIMARY_REP',
-  EXECUTE_BULK_HANDOVER: 'EXECUTE_BULK_HANDOVER',
-  VIEW_AUDIT_LOGS: 'VIEW_AUDIT_LOGS',
-  VIEW_WORKLOAD_ANALYTICS: 'VIEW_WORKLOAD_ANALYTICS',
-  EXPORT_HANDOVER_DOCUMENT: 'EXPORT_HANDOVER_DOCUMENT',
-  UPDATE_AGENCY_NOTES: 'UPDATE_AGENCY_NOTES'
-};
-
-const ROLE_PERMISSIONS = {
-  [ROLES.MANAGER]: [
-    PERMISSIONS.VIEW_ALL_AGENCIES,
-    PERMISSIONS.ASSIGN_PRIMARY_REP,
-    PERMISSIONS.EXECUTE_BULK_HANDOVER,
-    PERMISSIONS.VIEW_AUDIT_LOGS,
-    PERMISSIONS.VIEW_WORKLOAD_ANALYTICS,
-    PERMISSIONS.EXPORT_HANDOVER_DOCUMENT,
-    PERMISSIONS.UPDATE_AGENCY_NOTES
-  ],
-  [ROLES.SALES_REP]: [
-    PERMISSIONS.EXPORT_HANDOVER_DOCUMENT,
-    PERMISSIONS.UPDATE_AGENCY_NOTES
-  ]
-};
-
-export class RBACService {
-  static hasPermission(user, permission) {
-    if (!user || !user.role) return false;
-    const permissions = ROLE_PERMISSIONS[user.role] || [];
-    return permissions.includes(permission);
+class RBACService {
+  constructor() {
+    // Mặc định đăng nhập với vai trò Quản lý kinh doanh để thấy toàn bộ màn hình
+    this.currentUser = USERS[0];
+    this.listeners = [];
   }
 
-  static getSecurityContextDescription(user) {
-    if (user.role === ROLES.MANAGER) {
-      return {
-        mode: 'MANAGER_ALL_ACCESS',
-        badgeClass: 'badge-manager',
-        title: 'Toàn Quyền Quản Lý (Full Access)',
-        description: 'Bạn đang đăng nhập với tư cách Quản lý kinh doanh. Bạn có toàn quyền xem tất cả đại lý toàn quốc, gán nhân viên phụ trách chính, thực hiện chuyển giao hàng loạt và xem nhật ký kiểm toán.',
-        icon: 'shield-check'
-      };
-    } else {
-      return {
-        mode: 'ROW_LEVEL_SECURITY',
-        badgeClass: 'badge-rep',
-        title: 'Bảo Mật Hàng (Row-Level Security Active)',
-        description: `Bạn đang xem với quyền Nhân viên kinh doanh [${user.name}]. Hệ thống tự động cô lập dữ liệu (Data Isolation): Chỉ hiển thị các đại lý do chính bạn phụ trách chính. Các tính năng điều chuyển cấu hình quản trị được ẩn đi.`,
-        icon: 'lock-closed'
-      };
+  getCurrentUser() {
+    return this.currentUser;
+  }
+
+  isManager() {
+    return this.currentUser.role === 'manager';
+  }
+
+  setCurrentUserById(userId) {
+    const user = USERS.find(u => u.id === userId);
+    if (user) {
+      this.currentUser = user;
+      this.notifyListeners();
     }
   }
+
+  /**
+   * Lấy danh sách ID các đại lý mà user hiện tại được phép truy cập
+   */
+  getAllowedAgentIds() {
+    if (this.isManager()) {
+      return AGENTS.map(a => a.id);
+    }
+    return this.currentUser.assignedAgents || [];
+  }
+
+  /**
+   * Lấy danh sách đối tượng đại lý hợp lệ cho user hiện tại
+   */
+  getAllowedAgents() {
+    const allowedIds = this.getAllowedAgentIds();
+    return AGENTS.filter(a => allowedIds.includes(a.id));
+  }
+
+  /**
+   * Kiểm tra một đơn hàng có thuộc quyền xem của user hiện tại không
+   */
+  canAccessOrder(order) {
+    if (this.isManager()) return true;
+    const allowedIds = this.getAllowedAgentIds();
+    return allowedIds.includes(order.agentId);
+  }
+
+  /**
+   * Lọc tập đơn hàng theo quyền RBAC cơ bản trước khi áp dụng các bộ lọc UI
+   */
+  filterAccessibleOrders(orders) {
+    if (this.isManager()) return orders;
+    const allowedIds = new Set(this.getAllowedAgentIds());
+    return orders.filter(order => allowedIds.has(order.agentId));
+  }
+
+  onUserChange(callback) {
+    this.listeners.push(callback);
+  }
+
+  notifyListeners() {
+    this.listeners.forEach(cb => cb(this.currentUser));
+  }
 }
+
+export const rbacService = new RBACService();
