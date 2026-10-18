@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS OMS // Quản Lý Vòng Đời & Huỷ Đơn Hàng Tự Động Nhả Tồn Kho (SCRUM-86)</title>
+  <meta name="description" content="Hệ thống Quản lý Vòng đời Đơn hàng (OMS) và Tồn kho Kho bãi (WMS) chuẩn Doanh nghiệp. Theo dõi 7 bước vòng đời real-time, huỷ đơn tự động nhả tồn đang giữ chỗ, kiểm soát chặn huỷ đơn đã xuất kho và quy trình trả hàng RMA.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+</head>
+<body>
+
+  <!-- APP HEADER -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-section">
+        <div class="brand-logo">
+          <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        </div>
+        <div>
+          <div class="brand-title">
+            NEXUS OMS
+            <span class="brand-tag">Enterprise WMS Core</span>
+          </div>
+          <div class="brand-sub">Hệ Thống Quản Lý Vòng Đời Đơn Hàng & Điều Phối Kho Bãi</div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Role Simulator Switcher -->
+        <div class="role-badge-box">
+          <div class="role-avatar">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          </div>
+          <div class="role-info">
+            <div class="role-name" id="currentRoleName">Trần Minh Quân</div>
+            <div class="role-title" id="currentRoleTitle">Nhân viên kinh doanh (Sales)</div>
+          </div>
+          <select class="role-select" id="activeRoleSelect" title="Chuyển đổi góc nhìn vai trò để test luồng">
+            <option value="SALES_REP" selected>💼 Nhân viên Sales (Tạo & Huỷ đơn)</option>
+            <option value="SALES_MGR">🛡️ Quản lý (Duyệt đơn & Giữ chỗ)</option>
+            <option value="WAREHOUSE">📦 Thủ kho (Soạn hàng & Xuất kho)</option>
+            <option value="CARRIER">🚚 Đơn vị vận chuyển (Giao nhận)</option>
+          </select>
+        </div>
+
+        <button class="btn btn-outline" id="btnOpenInventoryModal" style="color: white; border-color: rgba(255,255,255,0.25);">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Ma Trận Tồn Kho & Giữ Chỗ
+        </button>
+
+        <button class="btn btn-primary" id="btnNewOrderModal">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Tạo Đơn Hàng Mới
+        </button>
+
+        <button class="btn btn-outline" id="btnResetDemo" title="Khôi phục lại dữ liệu test mẫu ban đầu" style="color: #94a3b8; border-color: rgba(255,255,255,0.15);">
+          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Reset Demo
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT -->
+  <main class="main-wrapper">
+
+    <!-- REQUIREMENT GUIDANCE HERO FOR INSTRUCTOR & EVALUATORS -->
+    <section class="requirement-hero">
+      <div class="hero-top">
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+          <span class="ticket-tag">SCRUM-86 // SCRUM-13</span>
+          <span style="font-size: 0.78rem; color: #94a3b8;">User Story Phân Hệ Bán Hàng & Kho Vận</span>
+        </div>
+        <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #6ee7b7; padding: 2px 8px; border-radius: 4px; font-weight: 700;">
+          Chuẩn Kiến Trúc Finite State Machine (FSM)
+        </span>
+      </div>
+
+      <div class="hero-user-story">
+        <svg width="22" height="22" fill="none" stroke="#60a5fa" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>"Là Nhân viên kinh doanh, tôi muốn theo dõi vòng đời và huỷ đơn hàng, để biết đơn của mình đang nằm ở khâu nào mà không phải gọi hỏi kho."</span>
+      </div>
+
+      <div class="hero-rule-cards">
+        <div class="rule-pill">
+          <div class="rule-pill-icon rule-icon-flow">1</div>
+          <div class="rule-pill-content">
+            <h4>Vòng Đời 7 Giai Đoạn & WMS Live</h4>
+            <p>Nháp → Chờ duyệt → Đã duyệt → Đang soạn hàng → Đã xuất → Đã giao → Đóng. Giám sát chính xác vị trí kệ, mã kiểm đếm kho real-time.</p>
+          </div>
+        </div>
+
+        <div class="rule-pill">
+          <div class="rule-pill-icon rule-icon-cancel">2</div>
+          <div class="rule-pill-content">
+            <h4>Huỷ Đơn & Tự Động Nhả Tồn Giữ Chỗ</h4>
+            <p>Huỷ bắt buộc nhập danh mục & lý do chi tiết. Hệ thống kích hoạt Trigger tự động hoàn trả số lượng đang giữ chỗ (Reserved) về khả dụng.</p>
+          </div>
+        </div>
+
+        <div class="rule-pill">
+          <div class="rule-pill-icon rule-icon-return">3</div>
+          <div class="rule-pill-content">
+            <h4>Khoá Huỷ Đơn Đã Xuất & Đường Trả Hàng (RMA)</h4>
+            <p>Đơn đã xuất kho tuyệt đối không cho huỷ trực tiếp. Hệ thống chuyển hướng tự động sang tạo Biên bản Trả Hàng Hoàn Kho (RMA Flow).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI METRIC CARDS -->
+    <section class="kpi-grid">
+      <div class="kpi-card kpi-total">
+        <div class="kpi-info">
+          <span>Tổng Đơn Quản Lý</span>
+          <div class="kpi-value" id="kpiTotalOrders">0</div>
+        </div>
+        <div class="kpi-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-warehouse">
+        <div class="kpi-info">
+          <span>Kho Đang Xử Lý</span>
+          <div class="kpi-value" id="kpiWarehouseCount">0</div>
+        </div>
+        <div class="kpi-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-reserved">
+        <div class="kpi-info">
+          <span>Tồn Đang Giữ Chỗ</span>
+          <div class="kpi-value" id="kpiReservedStock">0 món</div>
+        </div>
+        <div class="kpi-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-dispatched">
+        <div class="kpi-info">
+          <span>Đã Xuất Kho / Giao</span>
+          <div class="kpi-value" id="kpiDispatchedCount">0</div>
+        </div>
+        <div class="kpi-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-cancelled">
+        <div class="kpi-info">
+          <span>Đã Huỷ & Nhả Tồn</span>
+          <div class="kpi-value" id="kpiCancelledCount">0</div>
+        </div>
+        <div class="kpi-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-returns">
+        <div class="kpi-info">
+          <span>Xử Lý Trả Hàng (RMA)</span>
+          <div class="kpi-value" id="kpiReturnsCount">0</div>
+        </div>
+        <div class="kpi-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- WORKSPACE (MASTER / DETAIL) -->
+    <div class="workspace-container">
+      
+      <!-- LEFT PANEL: ORDERS LIST & FILTERS -->
+      <aside class="orders-panel">
+        <div class="panel-header">
+          <div class="panel-title-row">
+            <span class="panel-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+              Danh Sách Đơn Hàng
+            </span>
+            <span class="order-count-badge" id="orderListCountBadge">0 đơn</span>
+          </div>
+
+          <!-- Search input -->
+          <div class="search-box">
+            <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" id="orderSearchInput" placeholder="Tìm theo mã SO, tên khách hàng, SĐT...">
+          </div>
+
+          <!-- Horizontal Filter Tabs -->
+          <div class="filter-tabs">
+            <button class="tab-btn active" data-status="ALL">Tất cả</button>
+            <button class="tab-btn" data-status="DRAFT">Nháp</button>
+            <button class="tab-btn" data-status="PENDING_APPROVAL">Chờ duyệt</button>
+            <button class="tab-btn" data-status="APPROVED">Đã duyệt</button>
+            <button class="tab-btn" data-status="PICKING">Đang soạn hàng</button>
+            <button class="tab-btn" data-status="DISPATCHED">Đã xuất kho</button>
+            <button class="tab-btn" data-status="DELIVERED">Đã giao</button>
+            <button class="tab-btn" data-status="CANCELLED">Đã huỷ</button>
+            <button class="tab-btn" data-status="RETURN_PROCESSING">Trả hàng (RMA)</button>
+          </div>
+        </div>
+
+        <!-- Orders Scroll Area -->
+        <div class="orders-list-scroll" id="ordersListContainer">
+          <!-- Dynamic Order Cards inserted by app.js -->
+        </div>
+      </aside>
+
+      <!-- RIGHT PANEL: DETAILED WORKSPACE & REAL-TIME TRACKER -->
+      <section class="detail-panel" id="orderDetailContainer">
+        <!-- Dynamic Order Detail Content rendered by app.js -->
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- ===================================================================
+       MODAL: HUỶ ĐƠN HÀNG (STRICT VALIDATION & AUTO STOCK ROLLBACK)
+       =================================================================== -->
+  <div class="modal-backdrop" id="cancelOrderModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" style="color: #dc2626;">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          Xác Nhận Huỷ Đơn Hàng & Nhả Tồn Kho
+        </div>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+
+      <form id="cancelOrderForm">
+        <div class="modal-body">
+          <input type="hidden" id="cancelOrderIdInput">
+          
+          <div class="info-callout">
+            <div>
+              <p>Mã đơn hàng huỷ: <strong id="cancelModalOrderCode" style="font-family: var(--font-mono); font-size: 1rem; color: #1e3a8a;">SO-XXX</strong></p>
+              <p style="margin-top: 4px; font-size: 0.76rem; color: #3b82f6;">Hành động này sẽ được ghi nhận vào Nhật ký Kiểm toán (Audit Trail) của toàn hệ thống.</p>
+            </div>
+          </div>
+
+          <div id="cancelModalReservedNotice" class="warning-callout" style="display: none;">
+            <!-- Dynamic notice for reserved stock auto release -->
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Danh mục lý do huỷ đơn</label>
+            <select class="form-select" id="cancelReasonCategory" required>
+              <option value="">-- Vui lòng chọn lý do --</option>
+              <option value="Khách hàng thay đổi kế hoạch / ngân sách">Khách hàng thay đổi kế hoạch / ngân sách</option>
+              <option value="Khách hàng tìm được nhà cung cấp khác / giá tốt hơn">Khách hàng tìm được nhà cung cấp khác / giá tốt hơn</option>
+              <option value="Sai thông tin sản phẩm hoặc đơn giá báo giá">Sai thông tin sản phẩm hoặc đơn giá báo giá</option>
+              <option value="Tiến độ kho không đáp ứng được yêu cầu giao gấp của khách">Tiến độ kho không đáp ứng được yêu cầu giao gấp của khách</option>
+              <option value="Tạo trùng lặp đơn hàng (Duplicate order)">Tạo trùng lặp đơn hàng (Duplicate order)</option>
+              <option value="Khác (Ghi rõ chi tiết bên dưới)">Khác (Ghi rõ chi tiết bên dưới)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Lý do chi tiết & Giải trình nghiệp vụ</label>
+            <textarea class="form-textarea" id="cancelDetailedReason" rows="3" placeholder="Nhập lý do chi tiết từ khách hàng (tối thiểu 8 ký tự để ban giám đốc đối soát)..." required></textarea>
+            <span class="form-help">Bắt buộc theo quy định kiểm soát nội bộ. Tồn kho giữ chỗ sẽ tự động được hoàn về ngay sau khi xác nhận.</span>
+          </div>
+
+          <div class="form-group" style="margin-top: 0.5rem;">
+            <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #0f172a;">
+              <input type="checkbox" id="cancelCommitCheckbox" style="margin-top: 2px;" required>
+              <span>Tôi xác nhận đơn hàng chưa xuất kho và đồng ý để hệ thống TỰ ĐỘNG NHẢ TỒN ĐANG GIỮ CHỖ về kho khả dụng.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline btn-modal-cancel">Đóng</button>
+          <button type="submit" class="btn btn-danger">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Xác Nhận Huỷ & Nhả Tồn Kho
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       MODAL: KHỞI TẠO TRẢ HÀNG (RMA - RETURN MERCHANDISE)
+       =================================================================== -->
+  <div class="modal-backdrop" id="returnOrderModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" style="color: #d97706;">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+          Khởi Tạo Yêu Cầu Trả Hàng (RMA Ticket)
+        </div>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+
+      <form id="returnOrderForm">
+        <div class="modal-body">
+          <input type="hidden" id="returnOrderIdInput">
+
+          <div class="warning-callout">
+            <div>
+              <strong>Quy tắc nghiệp vụ:</strong> Đơn <span id="returnModalOrderCode" style="font-family: var(--font-mono); font-weight: 700;">SO-XXX</span> đã xuất kho và bàn giao vận chuyển, do đó không thể huỷ trực tiếp. Phiếu này sẽ kích hoạt quy trình thu hồi hàng hoá và điều phối thủ kho nhập lại kho sau khi kiểm định.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Lý do phát sinh trả hàng</label>
+            <select class="form-select" id="returnReasonCategory" required>
+              <option value="">-- Chọn lý do hoàn trả --</option>
+              <option value="Khách từ chối nhận hàng khi shipper giao đến">Khách từ chối nhận hàng khi shipper giao đến</option>
+              <option value="Hàng bị móp méo / nứt vỡ trong quá trình vận chuyển">Hàng bị móp méo / nứt vỡ trong quá trình vận chuyển</option>
+              <option value="Giao sai chủng loại / SKU so với đơn đặt hàng">Giao sai chủng loại / SKU so với đơn đặt hàng</option>
+              <option value="Khách yêu cầu nâng cấp đổi sang model cao cấp hơn">Khách yêu cầu nâng cấp đổi sang model cao cấp hơn</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Tình trạng niêm phong / Ngoại quan</label>
+            <select class="form-select" id="returnCondition" required>
+              <option value="Nguyên seal thùng, chưa mở nắp hộp">Nguyên seal thùng, chưa mở nắp hộp</option>
+              <option value="Đã mở hộp kiểm tra nhưng chưa kích hoạt máy">Đã mở hộp kiểm tra nhưng chưa kích hoạt máy</option>
+              <option value="Thùng carton bị rách / móp méo bao bì bên ngoài">Thùng carton bị rách / móp méo bao bì bên ngoài</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Ghi chú điều phối thu hồi hàng</label>
+            <textarea class="form-textarea" id="returnDetailedReason" rows="3" placeholder="Nhập ghi chú cho đơn vị vận chuyển và thủ kho tiếp nhận..." required></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline btn-modal-cancel">Huỷ</button>
+          <button type="submit" class="btn btn-warning">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Tạo Phiếu Trả Hàng (RMA)
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       MODAL: MA TRẬN TỒN KHO & NHẬT KÝ BIẾN ĐỘNG KHO (WMS MATRIX)
+       =================================================================== -->
+  <div class="modal-backdrop" id="inventoryModal">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Ma Trận Tồn Kho & Nhật Ký Kiểm Toán (Inventory Audit Matrix)
+        </div>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="info-callout">
+          <div>
+            <strong>Công thức hạch toán tồn kho:</strong><br>
+            <code>Khả Dụng Bán (Available) = Tồn Kho Vật Lý (Physical) - Đang Giữ Chỗ (Reserved)</code>.<br>
+            Khi duyệt đơn: <em>Reserved tăng</em>, <em>Available giảm</em>. Khi huỷ đơn: <em>Reserved lập tức được nhả trả về Available!</em>
+          </div>
+        </div>
+
+        <h4 style="font-size: 0.88rem; font-weight: 700; color: var(--navy-900); margin-top: 0.5rem;">
+          1. Bảng Cân Đối Tồn Kho Hiện Tại (Kho Tổng Thủ Đức)
+        </h4>
+        <div class="table-responsive">
+          <table class="table-items">
+            <thead>
+              <tr>
+                <th>Mã SKU</th>
+                <th>Tên Sản Phẩm</th>
+                <th>Vị Trí Kệ</th>
+                <th style="text-align: right;">Tồn Vật Lý</th>
+                <th style="text-align: right; color: #d97706;">Đang Giữ Chỗ</th>
+                <th style="text-align: right; color: #059669;">Khả Dụng Bán</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTableBody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <h4 style="font-size: 0.88rem; font-weight: 700; color: var(--navy-900); margin-top: 1rem;">
+          2. Nhật Ký Biến Động Tồn Kho & Trigger Tự Động (Stock Movement Logs)
+        </h4>
+        <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+          <table class="table-items">
+            <thead>
+              <tr>
+                <th>Thời Gian</th>
+                <th>Mã SKU</th>
+                <th>Loại Giao Dịch</th>
+                <th>Người Thực Hiện</th>
+                <th>Ghi Chú Nghiệp Vụ</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryLogsBody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline btn-modal-cancel">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       MODAL: TẠO ĐƠN HÀNG MỚI (CHO SALES TEST TỪ A-Z)
+       =================================================================== -->
+  <div class="modal-backdrop" id="newOrderModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Tạo Đơn Hàng Mới (Sales Order)
+        </div>
+        <button class="modal-close-btn">&times;</button>
+      </div>
+
+      <form id="newOrderForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label required">Tên Khách Hàng / Doanh Nghiệp</label>
+            <input type="text" class="form-input" id="newCustName" placeholder="Vd: Công ty Cổ phần Công nghệ EcoGreen" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+              <label class="form-label">Người đại diện liên hệ</label>
+              <input type="text" class="form-input" id="newCustContact" placeholder="Vd: Anh Trần Văn Hùng">
+            </div>
+            <div class="form-group">
+              <label class="form-label required">Số điện thoại</label>
+              <input type="text" class="form-input" id="newCustPhone" placeholder="09xx.xxx.xxx" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Địa chỉ giao hàng</label>
+            <input type="text" class="form-input" id="newCustAddress" placeholder="Số nhà, Đường, Phường, Quận, Thành phố..." required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Chọn Sản phẩm (Hiển thị tồn khả dụng)</label>
+            <select class="form-select" id="newOrderProductSelect" required>
+              <!-- Loaded dynamically -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label required">Số lượng đặt mua</label>
+            <input type="number" class="form-input" id="newOrderQuantity" min="1" max="50" value="1" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Ghi chú giao nhận</label>
+            <textarea class="form-textarea" id="newOrderNotes" rows="2" placeholder="Ghi chú thêm về giờ giao, hóa đơn..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline btn-modal-cancel">Huỷ</button>
+          <button type="submit" class="btn btn-primary">Tạo Đơn Hàng Nháp</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- SCRIPTS -->
+  <script src="js/data.js"></script>
+  <script src="js/inventory.js"></script>
+  <script src="js/state-machine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
