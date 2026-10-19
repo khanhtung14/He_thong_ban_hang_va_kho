@@ -44,6 +44,7 @@ export interface ApprovalListProps {
   onApprove: (item: ApprovalItem) => void;
   onReject: (item: ApprovalItem) => void;
   onViewDetail?: (item: ApprovalItem) => void;
+  onViewPriceList?: (priceListId: number) => void;
   onViewAll?: () => void;
   loading?: boolean;
 }
@@ -53,6 +54,7 @@ export const ApprovalList: React.FC<ApprovalListProps> = ({
   onApprove,
   onReject,
   onViewDetail,
+  onViewPriceList,
   onViewAll,
   loading = false,
 }) => {
@@ -175,13 +177,21 @@ export const ApprovalList: React.FC<ApprovalListProps> = ({
                       strong
                       style={{
                         fontSize: 14,
-                        color: item.orderId && onViewDetail ? "#1d4ed8" : "#262626",
+                        color:
+                          (item.orderId && onViewDetail) || (item.priceListId && onViewPriceList)
+                            ? "#1d4ed8"
+                            : "#262626",
                         display: "block",
-                        cursor: item.orderId && onViewDetail ? "pointer" : "default",
+                        cursor:
+                          (item.orderId && onViewDetail) || (item.priceListId && onViewPriceList)
+                            ? "pointer"
+                            : "default",
                       }}
                       onClick={() => {
                         if (item.orderId && onViewDetail) {
                           onViewDetail(item);
+                        } else if (item.priceListId && onViewPriceList) {
+                          onViewPriceList(item.priceListId);
                         }
                       }}
                     >
@@ -256,6 +266,24 @@ export const ApprovalList: React.FC<ApprovalListProps> = ({
                       }}
                     >
                       Xem chi tiết
+                    </Button>
+                  )}
+
+                  {item.priceListId && onViewPriceList && (
+                    <Button
+                      size="small"
+                      icon={<EyeOutlined />}
+                      onClick={() => onViewPriceList(item.priceListId!)}
+                      style={{
+                        borderRadius: 6,
+                        fontSize: 12,
+                        color: "#2563eb",
+                        borderColor: "#bfdbfe",
+                        backgroundColor: "#eff6ff",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Xem & Điều chỉnh bảng giá
                     </Button>
                   )}
 

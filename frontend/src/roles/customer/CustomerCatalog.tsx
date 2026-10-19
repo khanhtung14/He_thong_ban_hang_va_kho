@@ -708,7 +708,7 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onOrderSuccess
                 <ShoppingCartOutlined />
               </div>
             </Badge>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0, flexWrap: "wrap" }}>
               <span
                 style={{
                   color: "#ffffff",
@@ -717,8 +717,13 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onOrderSuccess
                   whiteSpace: "nowrap",
                 }}
               >
-                {formatMoney(rawCartSubtotal)}
+                {formatMoney(orderTotal)}
               </span>
+              {simulation?.discountAmount && simulation.discountAmount > 0 ? (
+                <Tag color="success" style={{ margin: 0, fontSize: 11, padding: "0 6px", borderRadius: 4, fontWeight: 600 }}>
+                  Giảm {formatMoney(simulation.discountAmount)}
+                </Tag>
+              ) : null}
               <span
                 style={{
                   color: "#94a3b8",
@@ -793,21 +798,87 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onOrderSuccess
         }}
         footer={
           <div style={{ padding: "4px 0" }}>
-            {/* Dòng 1: Tóm tắt tổng tiền */}
+            {/* Khối tóm tắt tính tiền chiết khấu & giá cuối */}
             <div
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
-                marginBottom: 8,
+                backgroundColor: "#ffffff",
+                borderRadius: 10,
+                padding: "10px 12px",
+                marginBottom: 10,
+                border: "1px solid #e2e8f0",
               }}
             >
-              <Text type="secondary" style={{ fontSize: 13, whiteSpace: "nowrap" }}>
-                Tổng thanh toán dự kiến:
-              </Text>
-              <Text strong style={{ fontSize: 18, color: "#2563eb", whiteSpace: "nowrap" }}>
-                {formatMoney(orderTotal)}
-              </Text>
+              {/* Dòng 1: Tiền hàng tạm tính */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: 13,
+                  color: "#64748b",
+                  marginBottom: 6,
+                }}
+              >
+                <span>Tiền hàng tạm tính:</span>
+                <span style={{ fontWeight: 600, color: "#1e293b" }}>
+                  {formatMoney(simulation?.subTotal ?? rawCartSubtotal)}
+                </span>
+              </div>
+
+              {/* Dòng 2: Số tiền chiết khấu sản lượng */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: 13,
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ color: simulation?.discountAmount && simulation.discountAmount > 0 ? "#059669" : "#64748b" }}>
+                  Chiết khấu sản lượng:
+                </span>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    color: simulation?.discountAmount && simulation.discountAmount > 0 ? "#059669" : "#64748b",
+                  }}
+                >
+                  {simulation?.discountAmount && simulation.discountAmount > 0
+                    ? `-${formatMoney(simulation.discountAmount)}`
+                    : "0 ₫"}
+                </span>
+              </div>
+
+              <div style={{ height: 1, backgroundColor: "#f1f5f9", margin: "6px 0 8px 0" }} />
+
+              {/* Dòng 3: Giá cuối cùng sau chiết khấu */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                    Tổng thanh toán:
+                  </div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                    (Đã áp dụng chiết khấu)
+                  </div>
+                </div>
+                <Text
+                  strong
+                  style={{
+                    fontSize: 19,
+                    color: simulation?.discountAmount && simulation.discountAmount > 0 ? "#059669" : "#2563eb",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {formatMoney(orderTotal)}
+                </Text>
+              </div>
             </div>
 
             {/* Dòng 2: Cụm nút hành động thân thiện cả mobile và desktop */}
@@ -848,6 +919,24 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onOrderSuccess
         }
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Banner thông báo chiết khấu nếu có */}
+          {simulation?.discountAmount && simulation.discountAmount > 0 ? (
+            <Alert
+              type="success"
+              showIcon
+              message={
+                <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                  Đơn hàng của bạn được chiết khấu tổng cộng{" "}
+                  <strong style={{ color: "#059669" }}>
+                    {formatMoney(simulation.discountAmount)}
+                  </strong>{" "}
+                  theo chính sách sản lượng!
+                </div>
+              }
+              style={{ borderRadius: 10, border: "1px solid #a7f3d0" }}
+            />
+          ) : null}
+
           {/* Khối 1: Danh sách mặt hàng đã chọn */}
           <Card
             size="small"
@@ -858,22 +947,38 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onOrderSuccess
             {cart.map((item) => {
               const p = item.product;
               const price = p.sale_price ?? p.basePrice ?? 0;
-              const lineTotal = price * item.quantity;
+              const rawLineTotal = price * item.quantity;
               const avail = p.available_quantity ?? p.available_qty ?? p.stock_available ?? 9999;
+
+              const itemSim = simulation?.itemsValidation?.find(
+                (v) => (v.productId && v.productId === p.id) || (v.sku && p.sku && v.sku.toUpperCase() === p.sku.toUpperCase())
+              );
+              const discAmount = itemSim?.discountAmount ?? 0;
+              const discPercent = itemSim?.discountPercent ?? 0;
+              const finalLineTotal = itemSim?.lineTotal ?? (rawLineTotal - discAmount);
+              const hasDiscount = discAmount > 0;
+              const appliedPolicy = itemSim?.appliedPolicyName;
 
               return (
                 <div
                   key={p.id}
                   style={{
-                    padding: "8px 0",
+                    padding: "10px 0",
                     borderBottom: "1px solid #f1f5f9",
                   }}
                 >
-                  {/* Hàng 1: Tên sản phẩm + Nút xoá */}
+                  {/* Hàng 1: Tên sản phẩm + SKU + Nút xoá */}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                    <Text strong style={{ fontSize: 13, color: "#1e293b", lineHeight: 1.35, flex: 1 }}>
-                      {p.name}
-                    </Text>
+                    <div style={{ flex: 1 }}>
+                      <Text strong style={{ fontSize: 13, color: "#1e293b", lineHeight: 1.35 }}>
+                        {p.name}
+                      </Text>
+                      {p.sku && (
+                        <div style={{ fontSize: 11, color: "#64748b", fontFamily: "monospace", marginTop: 2 }}>
+                          SKU: {p.sku}
+                        </div>
+                      )}
+                    </div>
                     <Button
                       type="text"
                       danger
@@ -884,7 +989,7 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onOrderSuccess
                     />
                   </div>
 
-                  {/* Hàng 2: Đơn giá, Bộ đếm số lượng, Thành tiền */}
+                  {/* Hàng 2: Đơn giá, Bộ đếm số lượng */}
                   <div
                     style={{
                       display: "flex",
@@ -897,48 +1002,114 @@ export const CustomerCatalog: React.FC<CustomerCatalogProps> = ({ onOrderSuccess
                       {formatMoney(price)} / {p.unit || p.baseUnit || "Cái"}
                     </span>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        backgroundColor: "#f1f5f9",
+                        borderRadius: 6,
+                        padding: 2,
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<MinusOutlined style={{ fontSize: 10 }} />}
+                        onClick={() => handleUpdateQuantity(p.id, item.quantity - 1)}
+                        style={{ width: 24, height: 24, padding: 0 }}
+                      />
+                      <span
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          backgroundColor: "#f1f5f9",
-                          borderRadius: 6,
-                          padding: 2,
-                          border: "1px solid #e2e8f0",
+                          padding: "0 6px",
+                          fontWeight: 600,
+                          fontSize: 12,
+                          minWidth: 20,
+                          textAlign: "center",
                         }}
                       >
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<MinusOutlined style={{ fontSize: 10 }} />}
-                          onClick={() => handleUpdateQuantity(p.id, item.quantity - 1)}
-                          style={{ width: 24, height: 24, padding: 0 }}
-                        />
-                        <span
-                          style={{
-                            padding: "0 6px",
-                            fontWeight: 600,
-                            fontSize: 12,
-                            minWidth: 20,
-                            textAlign: "center",
-                          }}
-                        >
-                          {item.quantity}
-                        </span>
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<PlusOutlined style={{ fontSize: 10 }} />}
-                          disabled={item.quantity >= avail}
-                          onClick={() => handleUpdateQuantity(p.id, item.quantity + 1)}
-                          style={{ width: 24, height: 24, padding: 0 }}
-                        />
-                      </div>
+                        {item.quantity}
+                      </span>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<PlusOutlined style={{ fontSize: 10 }} />}
+                        disabled={item.quantity >= avail}
+                        onClick={() => handleUpdateQuantity(p.id, item.quantity + 1)}
+                        style={{ width: 24, height: 24, padding: 0 }}
+                      />
+                    </div>
+                  </div>
 
-                      <Text strong style={{ color: "#0f172a", fontSize: 13, minWidth: 70, textAlign: "right" }}>
-                        {formatMoney(lineTotal)}
-                      </Text>
+                  {/* Hàng 3: Chiết khấu và Giá cuối hiển thị sau chiết khấu */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginTop: 8,
+                      paddingTop: 6,
+                      borderTop: "1px dashed #f1f5f9",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div>
+                      {hasDiscount ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                          <Tag
+                            color="success"
+                            style={{
+                              margin: 0,
+                              fontSize: 11,
+                              borderRadius: 4,
+                              fontWeight: 600,
+                            }}
+                          >
+                            Chiết khấu: -{formatMoney(discAmount)} {discPercent > 0 ? `(-${discPercent}%)` : ""}
+                          </Tag>
+                          {appliedPolicy && (
+                            <span style={{ fontSize: 11, color: "#059669", fontStyle: "italic" }}>
+                              ({appliedPolicy})
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: "#94a3b8", fontSize: 11 }}>
+                          Tạm tính: {formatMoney(rawLineTotal)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ textAlign: "right" }}>
+                      {hasDiscount ? (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                          <span
+                            style={{
+                              textDecoration: "line-through",
+                              color: "#94a3b8",
+                              fontSize: 11,
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {formatMoney(rawLineTotal)}
+                          </span>
+                          <span style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                            Giá cuối:{" "}
+                            <strong style={{ color: "#059669", fontSize: 14 }}>
+                              {formatMoney(finalLineTotal)}
+                            </strong>
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <span style={{ fontSize: 11, color: "#64748b", marginRight: 4 }}>
+                            Thành tiền:
+                          </span>
+                          <Text strong style={{ color: "#0f172a", fontSize: 13 }}>
+                            {formatMoney(finalLineTotal)}
+                          </Text>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

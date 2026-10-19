@@ -35,6 +35,7 @@ import {
   createOrder,
   updateOrder,
   fetchDealerPurchaseHistory,
+  calculateBestDiscount,
   type CustomerItem,
   type DeliveryAddressItem,
   type OrderItemInput,
@@ -77,6 +78,11 @@ interface OrderItemRow extends OrderItemInput {
   key: string;
   unit?: string;
   available_quantity?: number;
+  discount_percent?: number;
+  discount_amount?: number;
+  applied_policy_name?: string;
+  line_subtotal?: number;
+  line_total?: number;
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
@@ -591,12 +597,93 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     message.success(`Đã thêm ${historyItems.length} mặt hàng thường mua vào đơn hàng!`);
   };
 
+  // Tự động tính toán chiết khấu sản lượng theo bậc nấc (Best Deal Rule)
+  useEffect(() => {
+    let isCancelled = false;
+    const itemsKey = items.map((i) => `${i.sku}_${i.quantity}_${i.unit_price}`).join(",");
+
+    const runDiscountCalculation = async () => {
+      let hasChange = false;
+      const updated = await Promise.all(
+        items.map(async (it) => {
+          if (!it.sku || (it.quantity || 0) <= 0) {
+            const lineSub = (it.quantity || 0) * (it.unit_price || 0);
+            return {
+              ...it,
+              discount_percent: 0,
+              discount_amount: 0,
+              applied_policy_name: undefined,
+              line_subtotal: lineSub,
+              line_total: lineSub,
+            };
+          }
+          try {
+            const disc = await calculateBestDiscount({
+              sku: it.sku,
+              quantity: it.quantity,
+              base_price: it.unit_price || 0,
+            });
+            const lineSub = it.quantity * (it.unit_price || 0);
+            const discAmt = Number(disc.discount_amount || 0);
+            const discPct = disc.discount_type === "PERCENTAGE"
+              ? Number(disc.discount_value || 0)
+              : (lineSub > 0 ? (discAmt / lineSub) * 100 : 0);
+            const policyName = disc.policy_name || undefined;
+            const lineTot = Math.max(0, lineSub - discAmt);
+
+            if (
+              it.discount_amount !== discAmt ||
+              it.line_total !== lineTot ||
+              it.applied_policy_name !== policyName
+            ) {
+              hasChange = true;
+            }
+
+            return {
+              ...it,
+              discount_percent: discPct,
+              discount_amount: discAmt,
+              applied_policy_name: policyName,
+              line_subtotal: lineSub,
+              line_total: lineTot,
+            };
+          } catch {
+            const lineSub = (it.quantity || 0) * (it.unit_price || 0);
+            return {
+              ...it,
+              discount_percent: 0,
+              discount_amount: 0,
+              applied_policy_name: undefined,
+              line_subtotal: lineSub,
+              line_total: lineSub,
+            };
+          }
+        })
+      );
+
+      if (!isCancelled && hasChange) {
+        setItems(updated);
+      }
+    };
+
+    const timer = setTimeout(runDiscountCalculation, 250);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [items.map((i) => `${i.sku}_${i.quantity}_${i.unit_price}`).join(",")]);
+
   const selectedAddress = deliveryAddresses.find((a) => a.id === selectedAddressId);
-  // Tính toán tổng giá trị đơn tự động theo thời gian thực
-  const totalAmount = items.reduce(
+  // Tính toán tiền hàng tạm tính, tổng chiết khấu và tổng thanh toán
+  const subtotalAmount = items.reduce(
     (sum, it) => sum + (it.quantity || 0) * (it.unit_price || 0),
     0
   );
+  const totalDiscount = items.reduce(
+    (sum, it) => sum + (it.discount_amount || 0),
+    0
+  );
+  const totalAmount = Math.max(0, subtotalAmount - totalDiscount);
   const isCustomerLocked = selectedCustomer?.is_locked;
 
   // Xác nhận tạo đơn hàng
@@ -847,15 +934,48 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       ),
     },
     {
+      title: "CHIẾT KHẤU",
+      dataIndex: "discount_amount",
+      key: "discount",
+      width: 130,
+      align: "center",
+      render: (val: number | undefined, r) => {
+        if (!r.sku) return <span style={{ color: "#94a3b8" }}>—</span>;
+        if (!val || val <= 0) {
+          return <span style={{ color: "#94a3b8" }}>0 ₫</span>;
+        }
+        return (
+          <Tooltip title={r.applied_policy_name ? `Chính sách: ${r.applied_policy_name}` : "Chiết khấu sản lượng đạt bậc"}>
+            <Tag color="success" style={{ fontWeight: 600, borderRadius: 4, cursor: "pointer", margin: 0 }}>
+              {r.discount_percent && r.discount_percent > 0 ? `${r.discount_percent}% ` : ""}
+              (-{val.toLocaleString("vi-VN")} ₫)
+            </Tag>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: "THÀNH TIỀN (₫)",
       key: "subtotal",
-      width: 110,
+      width: 125,
       align: "right",
-      render: (_, r) => (
-        <Text strong style={{ color: "#047857", whiteSpace: "nowrap" }}>
-          {((r.quantity || 0) * (r.unit_price || 0)).toLocaleString("vi-VN")} ₫
-        </Text>
-      ),
+      render: (_, r) => {
+        const lineSub = (r.quantity || 0) * (r.unit_price || 0);
+        const lineTot = r.line_total !== undefined ? r.line_total : Math.max(0, lineSub - (r.discount_amount || 0));
+        const hasDisc = (r.discount_amount || 0) > 0;
+        return (
+          <div style={{ textAlign: "right" }}>
+            <Text strong style={{ color: "#047857", whiteSpace: "nowrap", fontSize: 13 }}>
+              {lineTot.toLocaleString("vi-VN")} ₫
+            </Text>
+            {hasDisc && (
+              <div style={{ textDecoration: "line-through", color: "#94a3b8", fontSize: 11 }}>
+                {lineSub.toLocaleString("vi-VN")} ₫
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: "XÓA",
@@ -1228,17 +1348,35 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
                       display: "flex",
                       justifyContent: "flex-end",
                       marginTop: 10,
-                      padding: "8px 16px",
-                      backgroundColor: "#f1f5f9",
+                      padding: "10px 16px",
+                      backgroundColor: "#f8fafc",
+                      border: "1px solid #e2e8f0",
                       borderRadius: 8,
+                      gap: 24,
+                      alignItems: "center",
+                      flexWrap: "wrap",
                     }}
                   >
-                    <Text style={{ fontSize: 15 }}>
-                      Tổng giá trị đơn:{" "}
-                      <Text strong style={{ color: "#047857", fontSize: 17 }}>
+                    <div>
+                      <span style={{ fontSize: 13, color: "#64748b" }}>Tiền hàng tạm tính: </span>
+                      <strong style={{ fontSize: 14, color: "#334155" }}>
+                        {subtotalAmount.toLocaleString("vi-VN")} ₫
+                      </strong>
+                    </div>
+                    {totalDiscount > 0 && (
+                      <div>
+                        <span style={{ fontSize: 13, color: "#16a34a" }}>Chiết khấu sản lượng: </span>
+                        <strong style={{ fontSize: 14, color: "#16a34a" }}>
+                          -{totalDiscount.toLocaleString("vi-VN")} ₫
+                        </strong>
+                      </div>
+                    )}
+                    <div style={{ borderLeft: "1px solid #cbd5e1", paddingLeft: 16 }}>
+                      <span style={{ fontSize: 14, color: "#1e293b", fontWeight: 500 }}>Tổng thanh toán: </span>
+                      <strong style={{ color: "#047857", fontSize: 18 }}>
                         {totalAmount.toLocaleString("vi-VN")} ₫
-                      </Text>
-                    </Text>
+                      </strong>
+                    </div>
                   </div>
                 </div>
 

@@ -30,8 +30,8 @@ class CustomerGroup(str, Enum):
 
 class PriceLine(BaseModel):
     sku: str = Field(min_length=1, max_length=80)
-    sale_price: int = Field(ge=0)
-    floor_price: int = Field(ge=0)
+    sale_price: float = Field(ge=0)
+    floor_price: float = Field(ge=0)
 
     @model_validator(mode="after")
     def floor_not_above_sale(self):
@@ -97,11 +97,28 @@ def _load_price_list(db: Session, price_list_id: int) -> PriceList | None:
     ).scalar_one_or_none()
 
 
-def _save_lines(price_list: PriceList, lines: list[PriceLine]) -> None:
-    price_list.items = [
-        PriceListItem(sku=line.sku, sale_price=line.sale_price, floor_price=line.floor_price)
-        for line in lines
-    ]
+def _save_lines(db: Session, price_list: PriceList, lines: list[PriceLine]) -> None:
+    if price_list.id:
+        db.query(PriceListItem).filter(PriceListItem.price_list_id == price_list.id).delete()
+        db.flush()
+
+    items = []
+    for line in lines:
+        prod = db.query(Product).filter(
+            (Product.sku == line.sku) | (func.upper(Product.sku) == line.sku.upper())
+        ).first()
+        prod_id = prod.id if prod else None
+        item = PriceListItem(
+            price_list_id=price_list.id,
+            sku=line.sku.strip().upper(),
+            product_id=prod_id,
+            sale_price=float(line.sale_price),
+            floor_price=float(line.floor_price),
+        )
+        items.append(item)
+    price_list.items = items
+    db.flush()
+
 
 
 def resolve_effective_price(
@@ -169,14 +186,14 @@ def create_price_list(
         end_date=payload.end_date,
         published=False,
     )
-    _save_lines(row, payload.items)
+    _save_lines(db, row, payload.items)
     db.add(row)
     db.commit()
     return _serialize(_load_price_list(db, row.id))
 
 
 @router.put("/{price_list_id}", response_model=PriceListView)
-def update_draft(
+def update_price_list(
     price_list_id: int,
     payload: PriceListCreate,
     db: Session = Depends(get_db),
@@ -185,13 +202,33 @@ def update_draft(
     row = _load_price_list(db, price_list_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy bảng giá.")
-    if row.published:
-        raise HTTPException(status_code=409, detail="Bảng giá đã phát hành không thể sửa; hãy tạo phiên bản mới.")
     row.code = payload.code
     row.customer_group = payload.customer_group.value
     row.start_date = payload.start_date
     row.end_date = payload.end_date
-    _save_lines(row, payload.items)
+    _save_lines(db, row, payload.items)
+
+    if row.published:
+        try:
+            from app.services.price_history_service import record_price_history
+            for item in row.items:
+                prod = db.query(Product).filter((Product.sku == item.sku) | (Product.id == item.product_id)).first()
+                if prod:
+                    old_p = prod.base_price
+                    new_p = float(item.sale_price)
+                    record_price_history(
+                        db,
+                        product_id=prod.id,
+                        old_price=old_p,
+                        new_price=new_p,
+                        changed_by=_user.username,
+                        note=f"Điều chỉnh bảng giá {row.code} v{row.version} ({row.customer_group})",
+                    )
+                    prod._suppress_auto_price_history = True
+                    prod.base_price = new_p
+        except Exception:
+            pass
+
     db.commit()
     return _serialize(_load_price_list(db, row.id))
 

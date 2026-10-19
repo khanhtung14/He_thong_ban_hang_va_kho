@@ -123,7 +123,58 @@ export const createPriceList = async (payload: {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Không thể tạo bảng giá mới.");
+    let msg = "Không thể tạo bảng giá mới.";
+    if (typeof err.detail === "string") {
+      msg = err.detail;
+    } else if (Array.isArray(err.detail)) {
+      msg = err.detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ");
+    } else if (err.message) {
+      msg = err.message;
+    }
+    throw new Error(msg);
+  }
+  return res.json();
+};
+
+export const fetchPriceListDetail = async (
+  priceListId: number,
+): Promise<PriceListItem> => {
+  const headers = getAuthHeaders();
+  const res = await fetch(`/api/v1/price-lists/${priceListId}`, { headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải chi tiết bảng giá.");
+  }
+  return res.json();
+};
+
+export const updatePriceList = async (
+  priceListId: number,
+  payload: {
+    code: string;
+    customer_group: string;
+    start_date: string;
+    end_date: string;
+    items: PriceListLine[];
+  },
+): Promise<PriceListItem> => {
+  const headers = getAuthHeaders();
+  const res = await fetch(`/api/v1/price-lists/${priceListId}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    let msg = "Không thể cập nhật bảng giá.";
+    if (typeof err.detail === "string") {
+      msg = err.detail;
+    } else if (Array.isArray(err.detail)) {
+      msg = err.detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ");
+    } else if (err.message) {
+      msg = err.message;
+    }
+    throw new Error(msg);
   }
   return res.json();
 };
@@ -157,6 +208,7 @@ export interface Product {
   manageByLot?: boolean;
   minStock?: number;
   basePrice?: number | null;
+  sale_price?: number | null;
   costPrice?: number | null;
   status?: string;
   imageUrl?: string | null;
@@ -164,15 +216,11 @@ export interface Product {
 
 // Hàm gọi API lấy danh sách sản phẩm từ backend
 export async function getProducts(): Promise<Product[]> {
-  const token =
-    localStorage.getItem("token") || sessionStorage.getItem("token");
+  const headers = getAuthHeaders();
 
   const response = await fetch("/api/v1/products", {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -1017,12 +1065,18 @@ export interface SimulateOrderPayload {
 export interface OrderSimulateItemValidation {
   productId?: number;
   sku?: string;
+  productName?: string;
   requestedQty: number;
   availableQty: number;
   isAvailable: boolean;
   unitPrice: number;
   floorPrice?: number;
   isBelowFloorPrice?: boolean;
+  discountPercent?: number;
+  discountAmount?: number;
+  lineSubtotal?: number;
+  lineTotal?: number;
+  appliedPolicyName?: string;
 }
 
 export interface OrderSimulateResponseData {
@@ -1093,5 +1147,39 @@ export async function fetchCategoriesList(): Promise<Array<{ id: number; name: s
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.data)) return data.data;
   return [];
+}
+
+export interface CalculateDiscountResult {
+  sku: string;
+  product_name: string;
+  quantity: number;
+  base_price: number;
+  discount_per_unit: number;
+  discount_amount: number;
+  final_unit_price: number;
+  final_total: number;
+  policy_id?: number | null;
+  policy_name?: string | null;
+  discount_type?: string | null;
+  discount_value?: number;
+  tier_id?: number | null;
+}
+
+export async function calculateBestDiscount(payload: {
+  sku: string;
+  quantity: number;
+  base_price?: number;
+}): Promise<CalculateDiscountResult> {
+  const res = await authenticatedFetch("/api/v1/discounts/calculate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tính chiết khấu sản phẩm.");
+  }
+  const json = await res.json();
+  return json.data || json;
 }
 

@@ -252,6 +252,40 @@ def migrate_pricing_schema():
         except Exception:
             pass
 
+    # Đảm bảo cột product_id trong price_list_items cho phép NULL trên SQLite
+    if inspector.has_table("price_list_items"):
+        try:
+            cols = inspector.get_columns("price_list_items")
+            prod_col = next((c for c in cols if c["name"] == "product_id"), None)
+            if prod_col and not prod_col.get("nullable", True):
+                with engine.begin() as conn:
+                    conn.execute(text("PRAGMA foreign_keys=OFF;"))
+                    conn.execute(text("""
+                        CREATE TABLE price_list_items_temp (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            price_list_id INTEGER NOT NULL,
+                            product_id INTEGER,
+                            sale_price FLOAT NOT NULL,
+                            floor_price FLOAT NOT NULL,
+                            sku VARCHAR(80) NOT NULL DEFAULT '',
+                            FOREIGN KEY (price_list_id) REFERENCES price_lists(id) ON DELETE CASCADE,
+                            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+                            CONSTRAINT uq_price_list_items_list_sku UNIQUE (price_list_id, sku)
+                        );
+                    """))
+                    conn.execute(text("""
+                        INSERT INTO price_list_items_temp (id, price_list_id, product_id, sale_price, floor_price, sku)
+                        SELECT id, price_list_id, product_id, sale_price, floor_price, coalesce(sku, '')
+                        FROM price_list_items;
+                    """))
+                    conn.execute(text("DROP TABLE price_list_items;"))
+                    conn.execute(text("ALTER TABLE price_list_items_temp RENAME TO price_list_items;"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_price_list_items_sku ON price_list_items (sku);"))
+                    conn.execute(text("PRAGMA foreign_keys=ON;"))
+        except Exception:
+            pass
+
+
     # Tự động đồng bộ các tài khoản người dùng có vai trò đại lý vào bảng customers
     try:
         from app.services.customer_sync_service import sync_all_dealer_users

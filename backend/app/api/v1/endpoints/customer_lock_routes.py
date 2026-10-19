@@ -51,6 +51,7 @@ try:
         _inventory_lock,
     )
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
+    from app.api.v1.endpoints.discount_policy_routes import calculate_best_discount
     from app.api.v1.endpoints.rbac import (
         PERM_CUSTOMERS_LOCK,
         PERM_ORDERS_CREATE,
@@ -331,6 +332,11 @@ class OrderItemResponse(BaseModel):
     available_qty: Optional[float] = None
     availableQty: Optional[float] = None
     is_partially_delivered: bool = False
+    discount_percent: Optional[float] = 0.0
+    discount_amount: Optional[float] = 0.0
+    line_subtotal: Optional[float] = None
+    line_total: Optional[float] = None
+    applied_policy_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -347,6 +353,8 @@ class OrderResponse(BaseModel):
     delivery_point_name: Optional[str] = None
     expected_delivery_date: Optional[Union[date, str, datetime]] = None
     status: OrderStatus
+    subtotal_amount: Optional[float] = None
+    discount_amount: Optional[float] = 0.0
     total_amount: float
     note: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -372,6 +380,10 @@ class PortalOrderItemResponse(BaseModel):
     delivered_quantity: Optional[int] = None
     actual_quantity: Optional[int] = None
     unit_price: float = 0.0
+    discount_percent: Optional[float] = 0.0
+    discount_amount: Optional[float] = 0.0
+    line_subtotal: Optional[float] = None
+    line_total: Optional[float] = None
     total_price: float = 0.0
     subtotal: Optional[float] = None
     is_partially_delivered: bool = False
@@ -386,6 +398,8 @@ class PortalOrderDetailResponse(BaseModel):
     customer_name: Optional[str] = None
     created_at: Optional[datetime] = None
     expected_delivery_date: Optional[Union[date, str, datetime]] = None
+    subtotal_amount: Optional[float] = None
+    discount_amount: Optional[float] = 0.0
     total_amount: float = 0.0
     status: str
     delivery_point_name: Optional[str] = None
@@ -513,6 +527,10 @@ def _build_full_order_response(order: Order, db: Session, cust: Optional[Custome
             tot_p = ord_qty * it_db.unit_price
         it_res.total_price = float(tot_p)
         it_res.subtotal = float(tot_p)
+        it_res.line_total = float(tot_p)
+        it_res.discount_percent = float(getattr(it_db, "discount_percent", 0.0) or 0.0)
+        it_res.discount_amount = float(getattr(it_db, "discount_amount", 0.0) or 0.0)
+        it_res.line_subtotal = float(getattr(it_db, "line_subtotal", None) or (ord_qty * it_db.unit_price))
 
         item_is_partial = bool(is_delivering_or_delivered and (deliv_qty < ord_qty))
         it_res.is_partially_delivered = item_is_partial
@@ -520,6 +538,8 @@ def _build_full_order_response(order: Order, db: Session, cust: Optional[Custome
             any_partially_delivered = True
 
     resp.is_partially_delivered = any_partially_delivered
+    resp.subtotal_amount = float(getattr(order, "subtotal_amount", None) or order.total_amount)
+    resp.discount_amount = float(getattr(order, "discount_amount", 0.0) or 0.0)
     return resp
 
 
@@ -1606,6 +1626,7 @@ def simulate_order(
     serving_wh = get_customer_serving_warehouse(db, customer.id, payload.warehouse_id)
     items_validation = []
     sub_total = 0.0
+    total_discount = 0.0
 
     for it in payload.items:
         sku = (it.sku or "").strip().upper()
@@ -1632,7 +1653,16 @@ def simulate_order(
         avail = stock_info["available_qty"]
         is_available = it.quantity <= avail
 
-        sub_total += it.quantity * actual_price
+        # S3-01: Tính toán chiết khấu sản lượng tốt nhất theo Best Deal Rule
+        disc = calculate_best_discount(sku=sku, quantity=it.quantity, base_price=actual_price, db=db)
+        disc_amount = float(disc.get("discount_amount") or 0.0)
+        disc_percent = float(disc.get("discount_percent") or 0.0)
+        line_subtotal = it.quantity * actual_price
+        line_total = max(0.0, line_subtotal - disc_amount)
+
+        sub_total += line_subtotal
+        total_discount += disc_amount
+
         items_validation.append({
             "productId": prod.id if prod else it.product_id,
             "sku": sku,
@@ -1647,13 +1677,18 @@ def simulate_order(
             "isAvailable": is_available,
             "unitPrice": actual_price,
             "floorPrice": floor_price,
-            "discountPercent": 0.0,
+            "discountPercent": disc_percent,
+            "discountAmount": disc_amount,
+            "lineSubtotal": line_subtotal,
+            "lineTotal": line_total,
+            "appliedPolicyName": disc.get("applied_policy_name"),
             "isBelowFloorPrice": is_below_floor,
         })
 
+    grand_total = max(0.0, sub_total - total_discount)
     current_debt = float(getattr(customer, "current_debt", 0.0) or 0.0)
     credit_limit = float(getattr(customer, "credit_limit", 0.0) or 0.0)
-    debt_after = current_debt + sub_total
+    debt_after = current_debt + grand_total
     is_exceeded = credit_limit > 0 and debt_after > credit_limit
 
     return {
@@ -1661,9 +1696,9 @@ def simulate_order(
         "code": 200,
         "data": {
             "subTotal": sub_total,
-            "discountAmount": 0.0,
+            "discountAmount": total_discount,
             "taxAmount": 0.0,
-            "grandTotal": sub_total,
+            "grandTotal": grand_total,
             "currentDebt": current_debt,
             "creditLimit": credit_limit,
             "debtAfterOrder": debt_after,
@@ -1812,6 +1847,12 @@ def create_order(
                     db.flush()
                     product_id = new_prod.id
 
+            disc = calculate_best_discount(sku=sku, quantity=requested.quantity, base_price=actual_price, db=db)
+            disc_amount = float(disc.get("discount_amount") or 0.0)
+            disc_percent = float(disc.get("discount_percent") or 0.0)
+            line_subtotal = float(requested.quantity * actual_price)
+            line_total = max(0.0, line_subtotal - disc_amount)
+
             resolved_items.append({
                 "product_id": product_id,
                 "sku": sku,
@@ -1821,9 +1862,16 @@ def create_order(
                 "floor_price": floor_price,
                 "price_list_id": price_list_id,
                 "available_qty": avail,
+                "discount_percent": disc_percent,
+                "discount_amount": disc_amount,
+                "applied_policy_name": disc.get("applied_policy_name"),
+                "line_subtotal": line_subtotal,
+                "line_total": line_total,
             })
 
-        total_amount = sum(item["quantity"] * item["unit_price"] for item in resolved_items)
+        subtotal_amount = sum(item["line_subtotal"] for item in resolved_items)
+        total_discount = sum(item["discount_amount"] for item in resolved_items)
+        total_amount = max(0.0, subtotal_amount - total_discount)
 
         # Gắn thông tin người tạo đơn từ session nhân viên hiện tại
         actor_user = None
@@ -1899,6 +1947,8 @@ def create_order(
             created_by_id=actor_user.id if actor_user else None,
             delivery_address_id=chosen_address_id,
             status=order_status,
+            subtotal_amount=subtotal_amount,
+            discount_amount=total_discount,
             total_amount=total_amount,
             note=payload.note,
             approval_reason=approval_reason,
@@ -1917,6 +1967,10 @@ def create_order(
                 floor_price=it["floor_price"],
                 price_list_id=it["price_list_id"],
                 available_qty=it.get("available_qty"),
+                discount_percent=it.get("discount_percent") or 0.0,
+                discount_amount=it.get("discount_amount") or 0.0,
+                line_subtotal=it.get("line_subtotal") or 0.0,
+                line_total=it.get("line_total") or 0.0,
             ))
 
         db.commit()
@@ -2662,47 +2716,66 @@ def update_order(
                 db.flush()
                 product_id = new_prod.id
 
-        resolved_items.append({
-            "product_id": product_id,
-            "sku": sku,
-            "product_name": requested.product_name or (db_product.name if db_product else (product.get("name") if product else sku)),
-            "quantity": requested.quantity,
-            "unit_price": actual_price,
-            "floor_price": floor_price,
-            "price_list_id": price_list_id,
-        })
+            disc = calculate_best_discount(sku=sku, quantity=requested.quantity, base_price=actual_price, db=db)
+            disc_amount = float(disc.get("discount_amount") or 0.0)
+            disc_percent = float(disc.get("discount_percent") or 0.0)
+            line_subtotal = float(requested.quantity * actual_price)
+            line_total = max(0.0, line_subtotal - disc_amount)
 
-    total_amount = sum(it["quantity"] * it["unit_price"] for it in resolved_items)
+            resolved_items.append({
+                "product_id": product_id,
+                "sku": sku,
+                "product_name": requested.product_name or (db_product.name if db_product else (product.get("name") if product else sku)),
+                "quantity": requested.quantity,
+                "unit_price": actual_price,
+                "floor_price": floor_price,
+                "price_list_id": price_list_id,
+                "discount_percent": disc_percent,
+                "discount_amount": disc_amount,
+                "applied_policy_name": disc.get("applied_policy_name"),
+                "line_subtotal": line_subtotal,
+                "line_total": line_total,
+            })
 
-    order.customer_id = customer.id
-    order.delivery_address_id = chosen_address_id
-    order.total_amount = total_amount
-    order.note = payload.note
-    if payload.submit_for_approval or payload.status in (OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"):
-        order.status = OrderStatus.PENDING_APPROVAL
-    if approval_lines:
-        order.approval_reason = "; ".join(approval_lines)
-    elif order.status == OrderStatus.PENDING_APPROVAL and not order.approval_reason:
-        order.approval_reason = payload.note or "Chờ Quản lý kinh doanh phê duyệt"
+        subtotal_amount = sum(it["line_subtotal"] for it in resolved_items)
+        total_discount = sum(it["discount_amount"] for it in resolved_items)
+        total_amount = max(0.0, subtotal_amount - total_discount)
 
-    # Xóa các dòng hàng cũ và thêm dòng hàng mới
-    for old_it in list(order.items):
-        db.delete(old_it)
-    db.flush()
+        order.customer_id = customer.id
+        order.delivery_address_id = chosen_address_id
+        order.subtotal_amount = subtotal_amount
+        order.discount_amount = total_discount
+        order.total_amount = total_amount
+        order.note = payload.note
+        if payload.submit_for_approval or payload.status in (OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"):
+            order.status = OrderStatus.PENDING_APPROVAL
+        if approval_lines:
+            order.approval_reason = "; ".join(approval_lines)
+        elif order.status == OrderStatus.PENDING_APPROVAL and not order.approval_reason:
+            order.approval_reason = payload.note or "Chờ Quản lý kinh doanh phê duyệt"
 
-    for it in resolved_items:
-        db.add(OrderItem(
-            order_id=order.id,
-            product_id=it.get("product_id"),
-            sku=it["sku"],
-            product_name=it["product_name"],
-            quantity=it["quantity"],
-            unit_price=it["unit_price"],
-            floor_price=it["floor_price"],
-            price_list_id=it["price_list_id"],
-        ))
+        # Xóa các dòng hàng cũ và thêm dòng hàng mới
+        for old_it in list(order.items):
+            db.delete(old_it)
+        db.flush()
 
-    db.commit()
+        for it in resolved_items:
+            db.add(OrderItem(
+                order_id=order.id,
+                product_id=it.get("product_id"),
+                sku=it["sku"],
+                product_name=it["product_name"],
+                quantity=it["quantity"],
+                unit_price=it["unit_price"],
+                floor_price=it["floor_price"],
+                price_list_id=it["price_list_id"],
+                discount_percent=it.get("discount_percent") or 0.0,
+                discount_amount=it.get("discount_amount") or 0.0,
+                line_subtotal=it.get("line_subtotal") or 0.0,
+                line_total=it.get("line_total") or 0.0,
+            ))
+
+        db.commit()
     db.refresh(order)
 
     return _build_full_order_response(order, db, customer)

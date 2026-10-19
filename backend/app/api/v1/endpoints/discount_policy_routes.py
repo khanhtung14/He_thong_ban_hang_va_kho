@@ -386,12 +386,19 @@ def calculate_best_discount(
 
     matching_policies: List[DiscountPolicy] = []
     for policy in query.all():
-        p_target_type = (policy.target_type or policy.scope or "SKU").strip().upper()
-        p_target_id = (policy.target_id or "").strip()
+        p_target_type = str(policy.target_type or policy.scope or "SKU").strip().upper()
+        p_target_id = str(policy.target_id if policy.target_id is not None else "").strip()
 
+        is_match = False
         if p_target_type == "SKU" and p_target_id.upper() == clean_sku:
-            matching_policies.append(policy)
-        elif p_target_type == "CATEGORY" and category_id_str and p_target_id == category_id_str:
+            is_match = True
+        elif p_target_type == "PRODUCT":
+            if p_target_id.upper() == clean_sku or (product and str(product.id) == p_target_id):
+                is_match = True
+        elif p_target_type == "CATEGORY" and category_id_str and p_target_id == str(category_id_str):
+            is_match = True
+
+        if is_match:
             matching_policies.append(policy)
 
     best_discount_per_unit = 0.0
@@ -421,6 +428,17 @@ def calculate_best_discount(
     final_unit_price = max(0.0, round(effective_base_price - best_discount_per_unit, 2))
     final_total = round(final_unit_price * qty, 2)
 
+    tier_val = getattr(best_tier, "discount_value", None) if best_tier else 0.0
+    if tier_val is None and best_tier:
+        tier_val = getattr(best_tier, "discount_percent", 0.0) or 0.0
+
+    calculated_percent = 0.0
+    if best_policy and best_tier:
+        if (best_policy.discount_type or "PERCENTAGE").strip().upper() == "PERCENTAGE":
+            calculated_percent = float(tier_val or 0.0)
+        elif effective_base_price * qty > 0:
+            calculated_percent = round((total_discount / (effective_base_price * qty)) * 100, 1)
+
     return {
         "sku": clean_sku,
         "product_name": product_name,
@@ -428,12 +446,14 @@ def calculate_best_discount(
         "base_price": effective_base_price,
         "discount_per_unit": round(best_discount_per_unit, 2),
         "discount_amount": total_discount,
+        "discount_percent": calculated_percent,
         "final_unit_price": final_unit_price,
         "final_total": final_total,
         "policy_id": best_policy.id if best_policy else None,
         "policy_name": best_policy.name if best_policy else None,
+        "applied_policy_name": best_policy.name if best_policy else None,
         "discount_type": best_policy.discount_type if best_policy else None,
-        "discount_value": best_tier.discount_value if best_tier else 0.0,
+        "discount_value": tier_val,
         "tier_id": best_tier.id if best_tier else None,
     }
 

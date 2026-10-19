@@ -81,6 +81,12 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
       icon: "percentage",
     },
     {
+      id: "manager-pricing",
+      title: "Bảng giá",
+      path: "/manager/pricing",
+      icon: "tag",
+    },
+    {
       id: "reports",
       title: "Báo cáo doanh số & KPI",
       path: "/manager/reports",
@@ -145,17 +151,33 @@ export const SalesManagerSidebar: React.FC<SidebarProps> = ({
     }
   }
 
-  // Lọc bỏ các mục không dùng (Bảng giá, Quản lý nhóm hàng cũ, Nhập sản phẩm Excel, Khách hàng / Đại lý cũ) và deduplicate
+  // Đảm bảo mục "Bảng giá" luôn luôn có mặt trong menu của Sales Manager
+  const hasPricing = baseItems.some(
+    (item) => item.path === "/manager/pricing" || item.id === "manager-pricing"
+  );
+  if (!hasPricing) {
+    const insertIdx = baseItems.findIndex(
+      (item) => item.path === "/manager/discounts"
+    );
+    const pricingItem: MenuItem = {
+      id: "manager-pricing",
+      title: "Bảng giá",
+      path: "/manager/pricing",
+      icon: "tag",
+    };
+    if (insertIdx !== -1) {
+      baseItems.splice(insertIdx + 1, 0, pricingItem);
+    } else {
+      baseItems.push(pricingItem);
+    }
+  }
+
+  // Lọc bỏ các mục không dùng (Quản lý nhóm hàng cũ, Nhập sản phẩm Excel, Khách hàng / Đại lý cũ) và deduplicate
   const filteredItems = baseItems
     .filter(
       (item) =>
         item.title !== "Quản lý nhóm hàng" &&
         item.id !== "category-management" &&
-        item.id !== "pricing" &&
-        item.id !== "manager-pricing" &&
-        item.path !== "/manager/pricing" &&
-        item.title !== "Bảng giá" &&
-        item.title !== "Chính sách giá & Chiết khấu" &&
         item.path !== "/manager/products/import" &&
         item.id !== "excel-import" &&
         item.title !== "Nhập sản phẩm (Excel)" &&

@@ -1,11 +1,17 @@
 import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import React, { useEffect, useState, useCallback } from "react";
-import { Layout, Button, Space, Typography, Alert, message } from "antd";
+import { Layout, Button, Space, Typography, Alert, message, Table, Tag, Tooltip } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import {
   FileExcelOutlined,
   PlusOutlined,
   SmileOutlined,
+  TagOutlined,
+  EditOutlined,
+  CheckCircleOutlined,
+  EyeOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 
 // Các components Ant Design
@@ -15,6 +21,7 @@ import StatCard from "../../components/StatCard";
 import ApprovalList, { type ApprovalItem } from "./ApprovalList";
 import TerritoryProgress from "./TerritoryProgress";
 import CreatePriceListModal from "./CreatePriceListModal";
+import PriceListDetailModal from "./PriceListDetailModal";
 import ExportReportModal from "./ExportReportModal";
 import CategoryManagement from "./CategoryManagement";
 import SalesAssignmentManager from "./SalesAssignmentManager";
@@ -69,6 +76,7 @@ export const SalesManagerDashboard: React.FC = () => {
       if (window.location.pathname === "/manager/reports") return "/manager/reports";
 
       if (window.location.pathname === "/manager/orders/approval") return "/manager/orders/approval";
+      if (window.location.pathname === "/manager/pricing") return "/manager/pricing";
       if (window.location.pathname === "/manager/customers") return "/manager/customers";
     }
     return "/manager/dashboard";
@@ -93,6 +101,15 @@ export const SalesManagerDashboard: React.FC = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<OrderResponseItem | null>(null);
   const [selectedOrderIdForDetail, setSelectedOrderIdForDetail] = useState<number | null>(null);
+
+  // Trạng thái modal xem chi tiết & điều chỉnh bảng giá
+  const [isPriceListDetailModalOpen, setIsPriceListDetailModalOpen] = useState(false);
+  const [selectedPriceListId, setSelectedPriceListId] = useState<number | null>(null);
+
+  const handleViewPriceList = (id: number) => {
+    setSelectedPriceListId(id);
+    setIsPriceListDetailModalOpen(true);
+  };
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
@@ -180,17 +197,13 @@ export const SalesManagerDashboard: React.FC = () => {
 
       // 4. Menu điều hướng
       if (navItems.status === "fulfilled" && navItems.value.length > 0) {
-        // Lọc bỏ route admin, loại bỏ "Quản lý nhóm hàng" và "Bảng giá"
+        // Lọc bỏ route admin, loại bỏ "Quản lý nhóm hàng" cũ
         const backendNavItems = navItems.value
           .filter(
             (m: any) =>
               !m.path.startsWith("/admin/") &&
               m.title !== "Quản lý nhóm hàng" &&
               m.id !== "category-management" &&
-              m.id !== "pricing" &&
-              m.id !== "manager-pricing" &&
-              m.path !== "/manager/pricing" &&
-              m.title !== "Bảng giá" &&
               m.path !== "/manager/products/import" &&
               m.id !== "excel-import" &&
               m.title !== "Nhập sản phẩm (Excel)"
@@ -210,6 +223,12 @@ export const SalesManagerDashboard: React.FC = () => {
         );
         const hasProductsMenu = backendNavItems.some(
           (m: any) => m.path === "/manager/products" || m.id === "manager-products"
+        );
+        const hasPricingMenu = backendNavItems.some(
+          (m: any) => m.path === "/manager/pricing" || m.id === "manager-pricing"
+        );
+        const hasDiscountsMenu = backendNavItems.some(
+          (m: any) => m.path === "/manager/discounts" || m.id === "manager-discounts"
         );
 
         const rawMenuItems = [
@@ -250,17 +269,31 @@ export const SalesManagerDashboard: React.FC = () => {
                   icon: "appstore",
                 },
               ]),
+          ...(hasDiscountsMenu
+            ? []
+            : [
+                {
+                  id: "manager-discounts",
+                  title: "Chính sách chiết khấu",
+                  path: "/manager/discounts",
+                  icon: "percentage",
+                },
+              ]),
+          ...(hasPricingMenu
+            ? []
+            : [
+                {
+                  id: "manager-pricing",
+                  title: "Bảng giá",
+                  path: "/manager/pricing",
+                  icon: "tag",
+                },
+              ]),
           {
             id: "manager-customers",
             title: "Đại lý & Địa bàn",
             path: "/manager/customers",
             icon: "customers",
-          },
-          {
-            id: "manager-products",
-            title: "Danh mục sản phẩm",
-            path: "/manager/products",
-            icon: "boxes-stacked",
           },
           {
             id: "reports",
@@ -487,8 +520,10 @@ export const SalesManagerDashboard: React.FC = () => {
             setCurrentPath("/manager/orders/approval");
             window.history.pushState({}, "", "/manager/orders/approval");
             window.scrollTo({ top: 0, behavior: "smooth" });
-            // } else if (path === "/manager/pricing") {
-            //   setIsCreateModalOpen(true);
+          } else if (path === "/manager/pricing") {
+            setCurrentPath("/manager/pricing");
+            window.history.pushState({}, "", "/manager/pricing");
+            window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (path === "/manager/reports") {
             setCurrentPath("/manager/reports");
             window.history.pushState({}, "", "/manager/reports");
@@ -571,6 +606,177 @@ export const SalesManagerDashboard: React.FC = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <DiscountPolicyManagement />
             </div>
+          ) : currentPath === "/manager/pricing" ? (
+            /* TAB: QUẢN LÝ BẢNG GIÁ NIÊM YẾT */
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <Title level={3} style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                    <TagOutlined style={{ color: "#2563eb" }} />
+                    Quản lý Bảng giá Niêm yết
+                  </Title>
+                  <Text type="secondary">
+                    Quản lý các bảng giá bán và giá sàn áp dụng cho từng nhóm khách hàng đại lý ({priceLists.length} bảng giá).
+                  </Text>
+                </div>
+                <Space>
+                  <Button icon={<ReloadOutlined />} onClick={loadDashboardData} loading={loading}>
+                    Làm mới
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => setIsCreateModalOpen(true)}
+                    style={{ backgroundColor: "#2563eb", borderRadius: 6 }}
+                  >
+                    Tạo bảng giá mới
+                  </Button>
+                </Space>
+              </div>
+
+              <Table
+                dataSource={priceLists}
+                rowKey="id"
+                bordered
+                loading={loading}
+                pagination={{ pageSize: 10 }}
+                columns={[
+                  {
+                    title: "MÃ BẢNG GIÁ",
+                    dataIndex: "code",
+                    key: "code",
+                    width: 190,
+                    render: (code: string, record: PriceListItem) => (
+                      <Tooltip title="Bấm để xem chi tiết và điều chỉnh bảng giá">
+                        <Button
+                          type="link"
+                          onClick={() => handleViewPriceList(record.id)}
+                          style={{
+                            fontWeight: 700,
+                            padding: 0,
+                            height: "auto",
+                            fontSize: 14,
+                            color: "#1d4ed8",
+                          }}
+                        >
+                          {code}
+                        </Button>
+                      </Tooltip>
+                    ),
+                  },
+                  {
+                    title: "PHIÊN BẢN",
+                    dataIndex: "version",
+                    key: "version",
+                    width: 100,
+                    align: "center",
+                    render: (ver: number) => <Tag color="blue">v{ver || 1}</Tag>,
+                  },
+                  {
+                    title: "NHÓM KHÁCH HÀNG",
+                    dataIndex: "customer_group",
+                    key: "customer_group",
+                    width: 170,
+                    render: (group: string) => {
+                      const text =
+                        group === "DEALER_LEVEL_1"
+                          ? "Đại lý Cấp 1"
+                          : group === "DEALER_LEVEL_2"
+                          ? "Đại lý Cấp 2"
+                          : group === "RETAIL"
+                          ? "Khách lẻ / Bán buôn"
+                          : group;
+                      return <Tag color="geekblue" style={{ fontWeight: 600 }}>{text}</Tag>;
+                    },
+                  },
+                  {
+                    title: "THỜI HẠN HIỆU LỰC",
+                    key: "period",
+                    width: 220,
+                    render: (_, r: PriceListItem) => (
+                      <Text style={{ fontSize: 13 }}>
+                        {r.start_date || "—"} đến {r.end_date || "—"}
+                      </Text>
+                    ),
+                  },
+                  {
+                    title: "SỐ LƯỢNG SKU",
+                    key: "items_count",
+                    width: 130,
+                    align: "center",
+                    render: (_, r: PriceListItem) => (
+                      <Tag color="cyan" style={{ fontWeight: 600 }}>
+                        {r.items?.length || 0} SKUs
+                      </Tag>
+                    ),
+                  },
+                  {
+                    title: "TRẠNG THÁI",
+                    dataIndex: "published",
+                    key: "published",
+                    width: 140,
+                    align: "center",
+                    render: (pub: boolean) =>
+                      pub ? (
+                        <Tag color="success" style={{ fontWeight: 700 }}>
+                          ĐÃ PHÁT HÀNH
+                        </Tag>
+                      ) : (
+                        <Tag color="warning" style={{ fontWeight: 700 }}>
+                          BẢN NHÁP
+                        </Tag>
+                      ),
+                  },
+                  {
+                    title: "THAO TÁC",
+                    key: "action",
+                    width: 180,
+                    align: "center",
+                    render: (_, r: PriceListItem) => (
+                      <Space size="small">
+                        <Button
+                          size="small"
+                          type="default"
+                          icon={<EditOutlined />}
+                          onClick={() => handleViewPriceList(r.id)}
+                          style={{
+                            borderRadius: 6,
+                            borderColor: "#bfdbfe",
+                            color: "#2563eb",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Chi tiết & Sửa
+                        </Button>
+                        {!r.published && (
+                          <Button
+                            size="small"
+                            type="primary"
+                            icon={<CheckCircleOutlined />}
+                            onClick={async () => {
+                              try {
+                                await publishPriceList(r.id);
+                                message.success(`Phát hành bảng giá ${r.code} thành công!`);
+                                loadDashboardData();
+                              } catch (err: any) {
+                                message.error(err.message || "Không thể phát hành bảng giá.");
+                              }
+                            }}
+                            style={{
+                              backgroundColor: "#16a34a",
+                              borderColor: "#16a34a",
+                              borderRadius: 6,
+                            }}
+                          >
+                            Phát hành
+                          </Button>
+                        )}
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+            </div>
           ) : currentPath === "/manager/orders/approval" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -591,6 +797,7 @@ export const SalesManagerDashboard: React.FC = () => {
                 onApprove={handleApprove}
                 onReject={handleReject}
                 onViewDetail={handleViewOrderDetail}
+                onViewPriceList={handleViewPriceList}
                 onViewAll={() =>
                   message.info(
                     `Tổng cộng ${approvals.length} yêu cầu đang chờ bạn xử lý`,
@@ -756,6 +963,7 @@ export const SalesManagerDashboard: React.FC = () => {
                     onApprove={handleApprove}
                     onReject={handleReject}
                     onViewDetail={handleViewOrderDetail}
+                    onViewPriceList={handleViewPriceList}
                     onViewAll={() =>
                       message.info(
                         `Tổng cộng ${approvals.length} yêu cầu đang chờ bạn xử lý`,
@@ -817,6 +1025,22 @@ export const SalesManagerDashboard: React.FC = () => {
         }}
         onApprove={handleApproveFromModal}
         onReject={handleRejectFromModal}
+      />
+
+      {/* Modal Xem chi tiết & Điều chỉnh Bảng giá */}
+      <PriceListDetailModal
+        isOpen={isPriceListDetailModalOpen}
+        priceListId={selectedPriceListId}
+        onClose={() => {
+          setIsPriceListDetailModalOpen(false);
+          setSelectedPriceListId(null);
+        }}
+        onUpdated={() => {
+          loadDashboardData();
+        }}
+        onPublished={() => {
+          loadDashboardData();
+        }}
       />
     </Layout>
   );

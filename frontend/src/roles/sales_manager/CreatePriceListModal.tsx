@@ -19,6 +19,7 @@ import {
   DeleteOutlined,
   FileProtectOutlined,
   LockOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
@@ -85,14 +86,37 @@ export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
     setSubmitting(true);
 
     const [startDate, endDate] = values.validityRange || [];
+    if (!startDate || !endDate) {
+      setErrorMsg("Vui lòng chọn đầy đủ thời gian hiệu lực (từ ngày - đến ngày)!");
+      setSubmitting(false);
+      return;
+    }
+
+    const validItems = (values.items || []).filter(
+      (item: any) => item && item.sku && item.sku.trim()
+    );
+
+    if (validItems.length === 0) {
+      setErrorMsg("Vui lòng thêm ít nhất một dòng sản phẩm hợp lệ vào bảng giá!");
+      setSubmitting(false);
+      return;
+    }
+
+    // Kiểm tra trùng lặp SKU
+    const skuList = validItems.map((item: any) => item.sku.trim().toUpperCase());
+    if (new Set(skuList).size !== skuList.length) {
+      setErrorMsg("Mỗi mã SKU chỉ được xuất hiện một lần trong cùng bảng giá!");
+      setSubmitting(false);
+      return;
+    }
 
     const payload = {
-      code: values.code ? values.code.trim().toUpperCase() : "",
+      code: values.code ? values.code.trim().toUpperCase() : generatePriceListCode(),
       customer_group: values.customer_group,
-      start_date: startDate ? dayjs(startDate).format("YYYY-MM-DD") : null,
-      end_date: endDate ? dayjs(endDate).format("YYYY-MM-DD") : null,
-      items: (values.items || []).map((item: any) => ({
-        sku: item.sku,
+      start_date: dayjs(startDate).format("YYYY-MM-DD"),
+      end_date: dayjs(endDate).format("YYYY-MM-DD"),
+      items: validItems.map((item: any) => ({
+        sku: item.sku.trim().toUpperCase(),
         sale_price: Number(item.sale_price || 0),
         floor_price: Number(item.floor_price || 0),
       })),
@@ -189,18 +213,25 @@ export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
             gap: "0 16px",
           }}
         >
-          {/* Ô Mã bảng giá tự động sinh, chỉ đọc (readOnly) */}
+          {/* Ô Mã bảng giá tự động sinh hoặc tùy chỉnh */}
           <Form.Item
             name="code"
-            label="Mã bảng giá (Tự động)"
+            label="Mã bảng giá"
             rules={[{ required: true, message: "Mã bảng giá là bắt buộc!" }]}
           >
             <Input
-              readOnly
+              placeholder="VD: PL-20261019-1001"
               prefix={<LockOutlined style={{ color: "#8c8c8c" }} />}
+              suffix={
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ReloadOutlined style={{ fontSize: 12, color: "#1677ff" }} />}
+                  onClick={() => form.setFieldValue("code", generatePriceListCode())}
+                  title="Tạo mã ngẫu nhiên mới"
+                />
+              }
               style={{
-                backgroundColor: "#f5f5f5",
-                cursor: "not-allowed",
                 fontWeight: 600,
                 color: "#1677ff",
               }}
@@ -295,6 +326,19 @@ export const CreatePriceListModal: React.FC<CreatePriceListModalProps> = ({
                         optionFilterProp="label"
                         loading={loadingProducts}
                         options={productOptions}
+                        onChange={(selectedSku) => {
+                          const prod = products.find((p) => p.sku === selectedSku);
+                          if (prod) {
+                            const defaultPrice = prod.sale_price ?? prod.basePrice;
+                            if (defaultPrice) {
+                              const currentSale = form.getFieldValue(["items", name, "sale_price"]);
+                              if (!currentSale) {
+                                form.setFieldValue(["items", name, "sale_price"], Number(defaultPrice));
+                                form.setFieldValue(["items", name, "floor_price"], Math.round(Number(defaultPrice) * 0.9));
+                              }
+                            }
+                          }
+                        }}
                       />
                     </Form.Item>
 
