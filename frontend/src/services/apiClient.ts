@@ -128,9 +128,18 @@ export const createPriceList = async (payload: {
   return res.json();
 };
 
+export interface NavigationMenuItem {
+  key?: string;
+  label?: string;
+  path?: string;
+  icon?: string;
+  children?: NavigationMenuItem[];
+  [key: string]: unknown;
+}
+
 export const fetchNavigationMenu = async (
   role = "SALES_MANAGER",
-): Promise<any[]> => {
+): Promise<NavigationMenuItem[]> => {
   try {
     const headers = getAuthHeaders();
     const res = await fetch(
@@ -302,10 +311,13 @@ export async function deleteSupplier(
     const err = await res.json().catch(() => ({}));
     const errorMsg =
       err.detail || "Không thể xóa nhà cung cấp do ràng buộc hệ thống.";
-    const error = new Error(errorMsg);
+    const error = new Error(errorMsg) as Error & {
+      status?: number;
+      hasReceiptsConstraint?: boolean;
+    };
     // Gắn thêm HTTP status code để frontend nhận diện mã lỗi 400
-    (error as any).status = res.status;
-    (error as any).hasReceiptsConstraint = res.status === 400;
+    error.status = res.status;
+    error.hasReceiptsConstraint = res.status === 400;
     throw error;
   }
 
@@ -604,10 +616,26 @@ export interface OrderItemView {
   actual_quantity?: number;
   unit_price: number;
   floor_price?: number | null;
+  discount_percent?: number;
+  discount_amount?: number;
+  line_subtotal?: number;
+  line_total?: number;
   available_qty?: number | null;
   total_price?: number;
   subtotal?: number;
   is_partially_delivered?: boolean;
+}
+
+export interface OrderDeliveryAddress {
+  id?: number;
+  customer_id?: number;
+  receiver_name?: string;
+  receiverName?: string;
+  phone?: string;
+  address?: string;
+  is_default?: boolean;
+  isDefault?: boolean;
+  note?: string | null;
 }
 
 export interface OrderResponseItem {
@@ -615,12 +643,14 @@ export interface OrderResponseItem {
   order_code: string;
   customer_id: number;
   customer_name?: string;
+  subtotal_amount?: number;
+  discount_amount?: number;
   total_amount: number;
   status: string;
   warning_type?: string | null;
   delivery_address_id?: number | null;
   delivery_point_name?: string | null;
-  delivery_address?: any;
+  delivery_address?: OrderDeliveryAddress | null;
   warehouse_id?: number | null;
   warehouse_name?: string | null;
   has_warning?: boolean;
@@ -803,6 +833,30 @@ export async function fetchReorderItems(
   return res.json();
 }
 
+
+export interface OrderClonePayload {
+  delivery_address_id?: number | null;
+  deliveryAddressId?: number | null;
+  desired_delivery_date?: string | null;
+  desiredDeliveryDate?: string | null;
+  note?: string | null;
+}
+
+export async function cloneOrder(
+  orderId: number,
+  payload?: OrderClonePayload,
+): Promise<OrderResponseItem> {
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}/clone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: payload ? JSON.stringify(payload) : "{}",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể sao chép đơn hàng.");
+  }
+  return res.json();
+}
 
 export async function createOrder(
   payload: CreateOrderPayload,

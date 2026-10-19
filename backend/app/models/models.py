@@ -441,6 +441,12 @@ class Customer(Base):
     warning_threshold_percent: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
     warning_threshold: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
 
+    # Cờ cảnh báo nợ tự động (SCRUM-42)
+    is_debt_flagged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    debt_flag_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    debt_flagged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    oldest_debt_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     max_debt_amount = synonym("credit_limit")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -608,6 +614,9 @@ class OrderStatus(str, Enum):
     PENDING_APPROVAL = "PENDING_APPROVAL"
     APPROVED = "APPROVED"
     PROCESSING = "PROCESSING"
+    DISPATCHED = "DISPATCHED"
+    PARTIALLY_DELIVERED = "PARTIALLY_DELIVERED"
+    DELIVERED = "DELIVERED"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
@@ -639,10 +648,17 @@ class Order(Base):
     )
     warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
 
+    # Giữ chỗ tồn kho & Nợ hàng (SCRUM-32 & SCRUM-46)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reservation_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_stock_reserved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    has_backorder: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     customer: Mapped[Customer] = relationship(back_populates="orders")
     warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[warehouse_id])
     delivery_address: Mapped[Optional[DeliveryAddress]] = relationship()
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    dispatches: Mapped[List["Dispatch"]] = relationship("Dispatch", back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderItem(Base):
@@ -821,18 +837,43 @@ class PickList(Base):
 class Dispatch(Base):
     __tablename__ = "dispatches"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    pick_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("pick_lists.id", ondelete="SET NULL"))
+    dispatch_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True, index=True, nullable=True)
+    pick_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("pick_lists.id", ondelete="SET NULL"), nullable=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
-    status: Mapped[str] = mapped_column(String(30), default="SHIPPED")
+    warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="DRAFT", nullable=False)
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    order: Mapped[Optional["Order"]] = relationship("Order", back_populates="dispatches")
+    items: Mapped[List["DispatchItem"]] = relationship("DispatchItem", back_populates="dispatch", cascade="all, delete-orphan")
+    warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse")
+    created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
+    confirmed_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[confirmed_by_id])
 
 
 class DispatchItem(Base):
     __tablename__ = "dispatch_items"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     dispatch_id: Mapped[int] = mapped_column(ForeignKey("dispatches.id", ondelete="CASCADE"), nullable=False)
+    order_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("order_items.id", ondelete="SET NULL"), nullable=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
-    lot_number: Mapped[Optional[str]] = mapped_column(String(100))
+    sku: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    product_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    unit_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    lot_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    requested_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     actual_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    missing_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    dispatch: Mapped[Optional["Dispatch"]] = relationship("Dispatch", back_populates="items")
+    product: Mapped[Optional["Product"]] = relationship("Product")
+    order_item: Mapped[Optional["OrderItem"]] = relationship("OrderItem")
 
 
 class DeliveryTrip(Base):

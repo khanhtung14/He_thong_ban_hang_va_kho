@@ -27,6 +27,8 @@ import {
   Alert,
   Spin,
   Empty,
+  Radio,
+  Badge,
 } from "antd";
 import {
   EditOutlined,
@@ -39,6 +41,8 @@ import {
   CheckCircleOutlined,
   WarningOutlined,
   ExclamationCircleOutlined,
+  SyncOutlined,
+  FlagOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { authenticatedFetch, getCurrentUserRole } from "../../services/sessionService";
@@ -60,6 +64,9 @@ interface AgencyCreditInfo {
   warning_threshold_percent: number;
   usage_percent: number;
   is_locked?: boolean;
+  is_debt_flagged?: boolean;
+  debt_flag_reason?: string;
+  oldest_debt_days?: number;
 }
 
 interface CreditLimitLog {
@@ -110,6 +117,10 @@ const CreditLimitManager: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyData, setHistoryData] = useState<CreditLimitLog[]>([]);
 
+  // SCRUM-42: Quản lý chính sách cảnh báo & khóa bán tự động
+  const [debtPolicy, setDebtPolicy] = useState<string>("BLOCK");
+  const [evaluatingDebt, setEvaluatingDebt] = useState<boolean>(false);
+
   // Kiểm tra quyền: Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền sửa
   const userRole = (getCurrentUserRole() || "").trim().toUpperCase().replace(/[ -]/g, "_");
   const canEditCreditLimit = [
@@ -119,6 +130,60 @@ const CreditLimitManager: React.FC = () => {
     "QUAN_LY_KINH_DOANH",
     "SALESMANAGER",
   ].includes(userRole);
+
+  const loadDebtPolicy = useCallback(async () => {
+    try {
+      const res = await authenticatedFetch("/api/v1/accounting/debt-config");
+      if (res.ok) {
+        const json = await res.json();
+        setDebtPolicy(json.policy || "BLOCK");
+      }
+    } catch (err) {
+      console.error("Lỗi tải chính sách công nợ:", err);
+    }
+  }, []);
+
+  const handlePolicyChange = async (newPolicy: string) => {
+    try {
+      const res = await authenticatedFetch(`/api/v1/accounting/debt-config?policy=${newPolicy}`, {
+        method: "PUT",
+      });
+      if (res.ok) {
+        setDebtPolicy(newPolicy);
+        message.success(
+          `Đã đổi chính sách xử lý vi phạm: ${
+            newPolicy === "BLOCK" ? "Chặn tạo đơn mới (BLOCK)" : "Chuyển sang cần duyệt (REQUIRE_APPROVAL)"
+          }`
+        );
+      } else {
+        message.error("Không thể cập nhật chính sách!");
+      }
+    } catch {
+      message.error("Lỗi kết nối khi cập nhật chính sách!");
+    }
+  };
+
+  const handleEvaluateAllDebts = async () => {
+    setEvaluatingDebt(true);
+    try {
+      const res = await authenticatedFetch("/api/v1/accounting/debt/evaluate-all", {
+        method: "POST",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        message.success(
+          `Đã hoàn thành đánh giá lại toàn bộ đại lý! Đã phát hiện & gắn cờ ${json.flagged_agencies_count || 0} đại lý vi phạm.`
+        );
+        loadAgencies();
+      } else {
+        message.error("Không thể đánh giá lại công nợ!");
+      }
+    } catch {
+      message.error("Lỗi kết nối khi chạy tác vụ đánh giá lại!");
+    } finally {
+      setEvaluatingDebt(false);
+    }
+  };
 
   // ── Load danh sách đại lý ──
 
@@ -148,6 +213,9 @@ const CreditLimitManager: React.FC = () => {
           warning_threshold_percent: warningPct,
           usage_percent: usagePct,
           is_locked: c.is_locked ?? false,
+          is_debt_flagged: c.is_debt_flagged ?? false,
+          debt_flag_reason: c.debt_flag_reason ?? "",
+          oldest_debt_days: c.oldest_debt_days ?? 0,
         };
       });
       setAgencies(mapped);
@@ -161,7 +229,8 @@ const CreditLimitManager: React.FC = () => {
 
   useEffect(() => {
     loadAgencies();
-  }, [loadAgencies]);
+    loadDebtPolicy();
+  }, [loadAgencies, loadDebtPolicy]);
 
   // ── Mở modal cập nhật hạn mức (DebtLimitForm) ──
 
@@ -291,6 +360,21 @@ const CreditLimitManager: React.FC = () => {
         </div>
       ),
       sorter: (a: AgencyCreditInfo, b: AgencyCreditInfo) => a.current_debt - b.current_debt,
+    },
+    {
+      title: "Cảnh báo nợ (SCRUM-42)",
+      key: "debt_flag",
+      width: 180,
+      render: (_: any, record: AgencyCreditInfo) =>
+        record.is_debt_flagged ? (
+          <Tag color="error" icon={<ExclamationCircleOutlined />}>
+            {record.debt_flag_reason || "Cảnh báo nợ"}
+          </Tag>
+        ) : (
+          <Tag color="success" icon={<CheckCircleOutlined />}>
+            Bình thường
+          </Tag>
+        ),
     },
     {
       title: "Trạng thái",
@@ -455,6 +539,61 @@ const CreditLimitManager: React.FC = () => {
           description="Chỉ Kế toán công nợ và Quản lý kinh doanh mới có quyền khai báo và thay đổi hạn mức công nợ. Bạn đang ở chế độ xem và tra cứu lịch sử."
         />
       )}
+
+      {/* SCRUM-42: Hệ thống tự cảnh báo & khóa bán theo công nợ */}
+      <Card
+        style={{
+          marginBottom: 16,
+          borderRadius: 12,
+          background: "#f8fafc",
+          border: "1px solid #cbd5e1",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <Space direction="vertical" size={2}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <FlagOutlined style={{ color: "#ef4444", fontSize: 18 }} />
+              <Text strong style={{ fontSize: 15, color: "#1e293b" }}>
+                Cơ chế Tự động Cảnh báo & Khóa bán theo Công nợ (SCRUM-42)
+              </Text>
+              {agencies.filter((a) => a.is_debt_flagged).length > 0 && (
+                <Tag color="error">
+                  {agencies.filter((a) => a.is_debt_flagged).length} đại lý vi phạm
+                </Tag>
+              )}
+            </div>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Hệ thống tự động phát hiện vượt hạn mức hoặc có khoản quá hạn. Tác vụ định kỳ chạy mỗi ngày 1 lần và tự động kích hoạt sau mỗi lần ghi nhận thu tiền.
+            </Text>
+          </Space>
+
+          <Space size={16} wrap>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Text strong style={{ fontSize: 13 }}>Xử lý khi vi phạm:</Text>
+              <Radio.Group
+                value={debtPolicy}
+                onChange={(e) => handlePolicyChange(e.target.value)}
+                disabled={!canEditCreditLimit}
+                buttonStyle="solid"
+                size="small"
+              >
+                <Radio.Button value="BLOCK">Chặn tạo đơn mới (BLOCK)</Radio.Button>
+                <Radio.Button value="REQUIRE_APPROVAL">Chuyển sang cần duyệt</Radio.Button>
+              </Radio.Group>
+            </div>
+
+            <Button
+              type="primary"
+              icon={<SyncOutlined />}
+              onClick={handleEvaluateAllDebts}
+              loading={evaluatingDebt}
+              style={{ background: "#2563eb", borderRadius: 8 }}
+            >
+              Chạy quét & đánh giá lại toàn bộ
+            </Button>
+          </Space>
+        </div>
+      </Card>
 
       {/* Filters */}
       <Card

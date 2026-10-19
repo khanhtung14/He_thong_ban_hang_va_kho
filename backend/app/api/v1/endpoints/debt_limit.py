@@ -244,7 +244,7 @@ def _execute_debt_limit_update(
     old_days = int(getattr(customer, "max_debt_days", 0) or getattr(customer, "max_due_days", 0) or 0)
 
     # Chặn lưu khi không có thay đổi dữ liệu (tránh rác audit log)
-    if float(amount_val) == old_amount and int(days_val) == old_days:
+    if float(amount_val) == old_amount and days_val == old_days:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Không có thay đổi nào so với hạn mức hiện tại.",
@@ -256,8 +256,8 @@ def _execute_debt_limit_update(
     try:
         # Cập nhật thông tin đại lý
         customer.credit_limit = float(amount_val)
-        customer.max_debt_days = int(days_val)
-        customer.max_due_days = int(days_val)
+        customer.max_debt_days = days_val
+        customer.max_due_days = days_val
         customer.warning_threshold_percent = float(warning_val)
         customer.warning_threshold = float(warning_val)
 
@@ -267,7 +267,7 @@ def _execute_debt_limit_update(
             old_credit_limit=old_amount,
             new_credit_limit=float(amount_val),
             old_max_debt_days=old_days,
-            new_max_debt_days=int(days_val),
+            new_max_debt_days=days_val,
             reason=clean_reason,
             changed_by_user_id=getattr(user, "id", None),
             changed_by_name=actor_display,
@@ -484,3 +484,203 @@ def get_agency_debt_limit_history_alias(
 ):
     """Alias cho /api/v1/customers/{customer_id}/credit-limit/history."""
     return get_customer_debt_limit_history(customer_id=agency_id, limit=limit, db=db, user=user)
+
+
+# ===========================================================================
+# SCRUM-42: Hệ thống tự cảnh báo & khóa bán theo công nợ
+# ===========================================================================
+
+# Cấu hình chính sách xử lý đơn mới khi đại lý bị gắn cờ: BLOCK hoặc REQUIRE_APPROVAL
+_DEBT_POLICY: Dict[str, str] = {"action": "BLOCK"}
+
+
+def get_debt_policy() -> Dict[str, str]:
+    return _DEBT_POLICY
+
+
+def set_debt_policy(action: str) -> Dict[str, str]:
+    normalized = action.strip().upper()
+    if normalized not in ("BLOCK", "REQUIRE_APPROVAL"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chính sách chỉ chấp nhận 'BLOCK' (chặn đơn mới) hoặc 'REQUIRE_APPROVAL' (chuyển sang cần duyệt).",
+        )
+    _DEBT_POLICY["action"] = normalized
+    return _DEBT_POLICY
+
+
+def evaluate_customer_debt_status(db: Session, customer_id: int) -> Dict[str, Any]:
+    """Đánh giá trạng thái công nợ của một đại lý (SCRUM-42).
+    - Vượt hạn mức tiền nợ (current_debt > credit_limit).
+    - Hoặc có khoản nợ quá số ngày cho phép (oldest_debt_days > max_debt_days).
+    => Tự động gắn cờ is_debt_flagged = True kèm lý do.
+    """
+    customer = db.get(Customer, customer_id)
+    if not customer:
+        return {"error": "Không tìm thấy đại lý"}
+
+    credit_limit = float(getattr(customer, "credit_limit", 0.0) or 0.0)
+    current_debt = float(getattr(customer, "current_debt", 0.0) or 0.0)
+    max_debt_days = int(getattr(customer, "max_debt_days", None) or getattr(customer, "max_due_days", None) or 0)
+    oldest_debt_days = int(getattr(customer, "oldest_debt_days", 0) or getattr(customer, "overdue_days", 0) or 0)
+
+    exceeded_amount = (credit_limit > 0) and (current_debt > credit_limit)
+    exceeded_days = (max_debt_days > 0) and (oldest_debt_days > max_debt_days)
+
+    reasons = []
+    if exceeded_amount:
+        reasons.append(f"Vượt hạn mức nợ ({current_debt:,.0f} > {credit_limit:,.0f} VND)")
+    if exceeded_days:
+        reasons.append(f"Quá hạn số ngày nợ ({oldest_debt_days} ngày > {max_debt_days} ngày)")
+
+    was_flagged = getattr(customer, "is_debt_flagged", False)
+
+    if exceeded_amount or exceeded_days:
+        customer.is_debt_flagged = True
+        customer.debt_flag_reason = "; ".join(reasons)
+        customer.debt_flagged_at = datetime.now(timezone.utc)
+        if _DEBT_POLICY.get("action") == "BLOCK":
+            customer.is_locked = True
+            customer.lock_reason = customer.debt_flag_reason
+    else:
+        # Nếu đã trả nợ hoặc không còn vi phạm hạn mức -> gỡ cờ
+        if was_flagged:
+            customer.is_debt_flagged = False
+            customer.debt_flag_reason = None
+            customer.debt_flagged_at = None
+            if customer.is_locked and ("Vượt hạn mức" in (customer.lock_reason or "") or "Quá hạn" in (customer.lock_reason or "")):
+                customer.is_locked = False
+                customer.lock_reason = None
+
+    db.flush()
+    return {
+        "customer_id": customer.id,
+        "customer_code": customer.code,
+        "customer_name": customer.name,
+        "is_debt_flagged": customer.is_debt_flagged,
+        "debt_flag_reason": customer.debt_flag_reason,
+        "current_debt": current_debt,
+        "credit_limit": credit_limit,
+        "oldest_debt_days": oldest_debt_days,
+        "max_debt_days": max_debt_days,
+    }
+
+
+def evaluate_all_customers_debt_status(db: Session) -> Dict[str, Any]:
+    """Đánh giá lại toàn bộ đại lý đang hoạt động (chạy định kỳ hàng ngày hoặc sau khi thu tiền)."""
+    customers = db.query(Customer).filter(Customer.is_active == True).all()
+    flagged_count = 0
+    clean_count = 0
+    results = []
+
+    for cust in customers:
+        res = evaluate_customer_debt_status(db, cust.id)
+        if res.get("is_debt_flagged"):
+            flagged_count += 1
+        else:
+            clean_count += 1
+        results.append(res)
+
+    db.commit()
+    return {
+        "total_evaluated": len(customers),
+        "flagged_count": flagged_count,
+        "clean_count": clean_count,
+        "results": results,
+    }
+
+
+class DebtPolicyRequest(BaseModel):
+    action: str = Field(..., description="'BLOCK' hoặc 'REQUIRE_APPROVAL'")
+
+
+@router.get("/accounting/debt-config")
+def get_debt_config(
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Accountant", "Sales Manager", "Admin")),
+):
+    """Lấy cấu hình chính sách khi đại lý bị gắn cờ công nợ (SCRUM-42)."""
+    return {
+        "success": True,
+        "code": 200,
+        "data": get_debt_policy(),
+    }
+
+
+@router.put("/accounting/debt-config")
+def update_debt_config(
+    payload: DebtPolicyRequest,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Accountant", "Admin")),
+):
+    """Cập nhật chính sách xử lý đơn khi đại lý bị gắn cờ nợ: BLOCK hoặc REQUIRE_APPROVAL."""
+    updated = set_debt_policy(payload.action)
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Đã cập nhật chính sách công nợ sang '{updated['action']}'.",
+        "data": updated,
+    }
+
+
+@router.post("/accounting/debt/evaluate-all")
+def trigger_evaluate_all_debts(
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Accountant", "Sales Manager", "Admin")),
+):
+    """Kích hoạt tác vụ đánh giá lại công nợ toàn bộ đại lý (chạy mỗi ngày một lần hoặc theo nhu cầu)."""
+    res = evaluate_all_customers_debt_status(db)
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Đã hoàn thành đánh giá lại {res['total_evaluated']} đại lý. Số đại lý bị gắn cờ: {res['flagged_count']}.",
+        "data": res,
+    }
+
+
+@router.post("/accounting/debt/evaluate/{customer_id}")
+def trigger_evaluate_customer_debt(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Accountant", "Sales Manager", "Admin")),
+):
+    """Đánh giá lại công nợ cho một đại lý cụ thể."""
+    res = evaluate_customer_debt_status(db, customer_id)
+    db.commit()
+    return {
+        "success": True,
+        "code": 200,
+        "data": res,
+    }
+
+
+@router.get("/accounting/debt-flagged-agencies")
+def get_debt_flagged_agencies(
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Accountant", "Sales Manager", "Admin")),
+):
+    """Danh sách các đại lý đang bị gắn cờ cảnh báo công nợ."""
+    customers = db.query(Customer).filter(Customer.is_debt_flagged == True).all()
+    results = [
+        {
+            "id": c.id,
+            "code": c.code,
+            "name": c.name,
+            "phone": c.phone,
+            "current_debt": float(c.current_debt or 0.0),
+            "credit_limit": float(c.credit_limit or 0.0),
+            "max_debt_days": int(getattr(c, "max_debt_days", 0) or 0),
+            "oldest_debt_days": int(getattr(c, "oldest_debt_days", 0) or 0),
+            "is_debt_flagged": c.is_debt_flagged,
+            "debt_flag_reason": c.debt_flag_reason,
+            "debt_flagged_at": c.debt_flagged_at.isoformat() if c.debt_flagged_at else None,
+            "is_locked": c.is_locked,
+        }
+        for c in customers
+    ]
+    return {
+        "success": True,
+        "code": 200,
+        "total": len(results),
+        "data": results,
+    }

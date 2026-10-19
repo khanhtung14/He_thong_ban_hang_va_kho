@@ -9,6 +9,7 @@ from datetime import datetime
 from app.api.v1.endpoints.rbac import (
     AuthenticatedUser,
     require_permissions,
+    require_roles,
     normalize_role,
 )
 from app.core.database import get_db
@@ -17,8 +18,12 @@ from app.models.models import (
     WarehouseTransfer, WarehouseTransferItem,
     WarehouseAudit, WarehouseAuditItem,
     Inventory, Product, Warehouse, InventoryLot,
-    Territory, Role
+    Territory, Role,
+    Order, OrderItem, OrderStatus, Customer, User,
+    Dispatch, DispatchItem, RoleCode,
 )
+from app.services.inventory_service import _inventory_lock, calculate_available_qty
+import uuid
 
 router = APIRouter(prefix="/api/v1/warehouse", tags=["Warehouse"])
 warehouses_router = APIRouter(prefix="/api/v1/warehouses", tags=["Warehouses Directory"])
@@ -130,7 +135,7 @@ def _format_warehouse(w: Warehouse) -> dict:
         "code": w.code,
         "name": w.name,
         "address": w.address or "",
-        "is_active": bool(w.is_active),
+        "is_active": w.is_active,
     }
 
 
@@ -495,4 +500,450 @@ def get_roles(
             }
             for r in roles
         ],
+    }
+
+
+# =============================================================
+# SCRUM-46: Xác nhận xuất kho & xử lý giao thiếu (nợ hàng)
+# =============================================================
+
+class CreateDispatchItemInput(BaseModel):
+    order_item_id: int
+    actual_qty: int = Field(ge=0, description="Số lượng thực xuất kho")
+
+
+class CreateDispatchInput(BaseModel):
+    order_id: int
+    warehouse_id: Optional[int] = None
+    note: Optional[str] = None
+    items: List[CreateDispatchItemInput] = []
+
+
+class UpdateDispatchInput(BaseModel):
+    note: Optional[str] = None
+    items: Optional[List[CreateDispatchItemInput]] = None
+
+
+@router.get("/orders/ready-to-dispatch")
+def get_orders_ready_to_dispatch(
+    warehouse_id: Optional[int] = Query(None, description="Lọc theo kho xuất"),
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "Warehouse Manager", "WH Manager", "Admin")),
+):
+    """Danh sách đơn hàng sẵn sàng xuất kho (APPROVED hoặc PARTIALLY_DELIVERED)."""
+    query = db.query(Order).filter(
+        Order.status.in_([OrderStatus.APPROVED, OrderStatus.PARTIALLY_DELIVERED])
+    )
+    if warehouse_id:
+        query = query.filter(Order.warehouse_id == warehouse_id)
+
+    orders = query.order_by(Order.id.desc()).all()
+    results = []
+    for ord_obj in orders:
+        cust = db.get(Customer, ord_obj.customer_id)
+        wh = db.get(Warehouse, ord_obj.warehouse_id) if ord_obj.warehouse_id else None
+        items_data = []
+        for it in ord_obj.items:
+            deliv = getattr(it, "quantity_delivered", 0) or 0
+            remaining = max(0, it.quantity - deliv)
+            items_data.append({
+                "order_item_id": it.id,
+                "product_id": it.product_id,
+                "sku": it.sku,
+                "product_name": it.product_name,
+                "ordered_quantity": it.quantity,
+                "quantity_delivered": deliv,
+                "remaining_quantity": remaining,
+                "unit_price": float(it.unit_price or 0.0),
+            })
+        results.append({
+            "order_id": ord_obj.id,
+            "order_code": ord_obj.order_code,
+            "customer_id": ord_obj.customer_id,
+            "customer_name": cust.name if cust else None,
+            "customer_code": cust.code if cust else None,
+            "customer_phone": cust.phone if cust else None,
+            "warehouse_id": ord_obj.warehouse_id,
+            "warehouse_name": wh.name if wh else None,
+            "status": ord_obj.status.value if hasattr(ord_obj.status, "value") else str(ord_obj.status),
+            "has_backorder": getattr(ord_obj, "has_backorder", False),
+            "created_at": ord_obj.created_at.isoformat() if ord_obj.created_at else None,
+            "items": items_data,
+        })
+
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Lấy danh sách {len(results)} đơn hàng đủ điều kiện xuất kho.",
+        "data": results,
+    }
+
+
+@router.get("/orders/backorders")
+def get_backorder_orders(
+    warehouse_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "Warehouse Manager", "WH Manager", "Admin", "Sales Manager")),
+):
+    """Danh sách các đơn hàng còn nợ hàng (SCRUM-46), hiển thị riêng để xử lý giao ở lượt sau."""
+    query = db.query(Order).filter(
+        (Order.has_backorder == True) | (Order.status == OrderStatus.PARTIALLY_DELIVERED)
+    )
+    if warehouse_id:
+        query = query.filter(Order.warehouse_id == warehouse_id)
+
+    orders = query.order_by(Order.id.desc()).all()
+    results = []
+    for ord_obj in orders:
+        cust = db.get(Customer, ord_obj.customer_id)
+        wh = db.get(Warehouse, ord_obj.warehouse_id) if ord_obj.warehouse_id else None
+        backorder_items = []
+        for it in ord_obj.items:
+            deliv = getattr(it, "quantity_delivered", 0) or 0
+            missing = max(0, it.quantity - deliv)
+            if missing > 0:
+                backorder_items.append({
+                    "order_item_id": it.id,
+                    "product_id": it.product_id,
+                    "sku": it.sku,
+                    "product_name": it.product_name,
+                    "ordered_quantity": it.quantity,
+                    "delivered_quantity": deliv,
+                    "backorder_quantity": missing,
+                })
+        results.append({
+            "order_id": ord_obj.id,
+            "order_code": ord_obj.order_code,
+            "customer_id": ord_obj.customer_id,
+            "customer_name": cust.name if cust else None,
+            "customer_code": cust.code if cust else None,
+            "customer_phone": cust.phone if cust else None,
+            "warehouse_id": ord_obj.warehouse_id,
+            "warehouse_name": wh.name if wh else None,
+            "status": ord_obj.status.value if hasattr(ord_obj.status, "value") else str(ord_obj.status),
+            "created_at": ord_obj.created_at.isoformat() if ord_obj.created_at else None,
+            "backorder_items": backorder_items,
+        })
+
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Lấy danh sách {len(results)} đơn hàng nợ hàng.",
+        "data": results,
+    }
+
+
+@router.post("/dispatches", status_code=status.HTTP_201_CREATED)
+def create_dispatch_note(
+    data: CreateDispatchInput,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "Warehouse Manager", "WH Manager", "Admin")),
+):
+    """Tạo phiếu xuất kho mới cho đơn hàng (SCRUM-46)."""
+    order = db.get(Order, data.order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
+
+    if order.status not in (OrderStatus.APPROVED, OrderStatus.PARTIALLY_DELIVERED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Đơn hàng đang ở trạng thái '{order.status}', không thể tạo phiếu xuất!",
+        )
+
+    wh_id = data.warehouse_id or order.warehouse_id or 1
+    today_str = datetime.now().strftime("%Y%m%d")
+    unique_suffix = uuid.uuid4().hex[:4].upper()
+    dispatch_code = f"DSP-{today_str}-{unique_suffix}"
+
+    dispatch = Dispatch(
+        dispatch_code=dispatch_code,
+        order_id=order.id,
+        warehouse_id=wh_id,
+        created_by_id=getattr(user, "id", None),
+        is_confirmed=False,
+        note=data.note,
+    )
+    db.add(dispatch)
+    db.flush()
+
+    order_items_map = {it.id: it for it in order.items}
+    for item_input in data.items:
+        ord_item = order_items_map.get(item_input.order_item_id)
+        if not ord_item:
+            continue
+        deliv = getattr(ord_item, "quantity_delivered", 0) or 0
+        rem = max(0, ord_item.quantity - deliv)
+        req_qty = min(rem, ord_item.quantity)
+        act_qty = min(item_input.actual_qty, rem)
+        miss_qty = max(0, req_qty - act_qty)
+
+        disp_item = DispatchItem(
+            dispatch_id=dispatch.id,
+            order_item_id=ord_item.id,
+            product_id=ord_item.product_id,
+            sku=ord_item.sku,
+            requested_qty=req_qty,
+            actual_qty=act_qty,
+            missing_qty=miss_qty,
+        )
+        db.add(disp_item)
+
+    db.commit()
+    db.refresh(dispatch)
+
+    return {
+        "success": True,
+        "code": 201,
+        "message": f"Tạo phiếu xuất {dispatch.dispatch_code} thành công.",
+        "data": {
+            "id": dispatch.id,
+            "dispatch_code": dispatch.dispatch_code,
+            "order_id": dispatch.order_id,
+            "warehouse_id": dispatch.warehouse_id,
+            "is_confirmed": dispatch.is_confirmed,
+            "note": dispatch.note,
+            "created_at": dispatch.created_at.isoformat() if dispatch.created_at else None,
+        },
+    }
+
+
+@router.post("/dispatches/{dispatch_id}/confirm")
+def confirm_dispatch_note(
+    dispatch_id: int,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "Warehouse Manager", "WH Manager", "Admin")),
+):
+    """Xác nhận xuất kho (SCRUM-46):
+    - Chuyển tồn giữ chỗ (reserved_qty) thành xuất thực (physical_qty giảm tương ứng).
+    - Cập nhật số lượng đã xuất (quantity_delivered) cho từng dòng hàng.
+    - Nếu xuất thiếu: ghi nhận nợ hàng (has_backorder = True, status = PARTIALLY_DELIVERED).
+    - Nếu xuất đủ: cập nhật đơn thành DELIVERED / DISPATCHED, has_backorder = False.
+    - Khóa phiếu xuất (is_confirmed = True, không sửa được sau khi xác nhận).
+    """
+    dispatch = db.get(Dispatch, dispatch_id)
+    if not dispatch:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiếu xuất kho!")
+
+    if dispatch.is_confirmed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phiếu xuất đã xác nhận không sửa được.",
+        )
+
+    order = db.get(Order, dispatch.order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng tương ứng với phiếu xuất!")
+
+    wh_id = dispatch.warehouse_id or order.warehouse_id or 1
+
+    with _inventory_lock:
+        for disp_item in dispatch.items:
+            act_qty = disp_item.actual_qty
+            if act_qty <= 0:
+                continue
+
+            # 1. Trừ tồn thực và giải phóng tồn giữ chỗ tương ứng
+            if disp_item.product_id:
+                inv = db.query(Inventory).filter(
+                    Inventory.product_id == disp_item.product_id,
+                    Inventory.warehouse_id == wh_id,
+                ).first()
+                if inv:
+                    inv.physical_qty = max(0.0, inv.physical_qty - act_qty)
+                    inv.reserved_qty = max(0.0, inv.reserved_qty - act_qty)
+                    inv.available_qty = calculate_available_qty(inv.physical_qty, inv.reserved_qty)
+                    db.flush()
+
+            # 2. Cập nhật số lượng đã giao trên OrderItem
+            if disp_item.order_item_id:
+                ord_item = db.get(OrderItem, disp_item.order_item_id)
+                if ord_item:
+                    cur_deliv = getattr(ord_item, "quantity_delivered", 0) or 0
+                    ord_item.quantity_delivered = int(cur_deliv + act_qty)
+                    db.flush()
+
+        # 3. Đánh giá trạng thái hoàn thành của toàn bộ đơn hàng
+        any_missing = False
+        for it in order.items:
+            deliv = getattr(it, "quantity_delivered", 0) or 0
+            if deliv < it.quantity:
+                any_missing = True
+                break
+
+        if any_missing:
+            order.status = OrderStatus.PARTIALLY_DELIVERED
+            order.has_backorder = True
+        else:
+            order.status = OrderStatus.DELIVERED
+            order.has_backorder = False
+
+        # 4. Khóa phiếu xuất đã xác nhận
+        dispatch.is_confirmed = True
+        dispatch.confirmed_at = datetime.now()
+        db.commit()
+
+    conf_at = dispatch.confirmed_at
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Xác nhận xuất kho phiếu {dispatch.dispatch_code} thành công.",
+        "data": {
+            "dispatch_id": dispatch.id,
+            "dispatch_code": dispatch.dispatch_code,
+            "is_confirmed": dispatch.is_confirmed,
+            "confirmed_at": conf_at.isoformat() if conf_at is not None else None,
+            "order_id": order.id,
+            "order_code": order.order_code,
+            "order_status": order.status.value if hasattr(order.status, "value") else str(order.status),
+            "has_backorder": order.has_backorder,
+        },
+    }
+
+
+@router.put("/dispatches/{dispatch_id}")
+def update_dispatch_note(
+    dispatch_id: int,
+    data: UpdateDispatchInput,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "Warehouse Manager", "WH Manager", "Admin")),
+):
+    """Chỉnh sửa phiếu xuất kho chưa xác nhận. Nếu đã xác nhận -> Chặn sửa (SCRUM-46)."""
+    dispatch = db.get(Dispatch, dispatch_id)
+    if not dispatch:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiếu xuất kho!")
+
+    if dispatch.is_confirmed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phiếu xuất đã xác nhận không sửa được.",
+        )
+
+    if data.note is not None:
+        dispatch.note = data.note
+
+    if data.items is not None:
+        item_map = {it.order_item_id: it for it in dispatch.items}
+        for item_input in data.items:
+            existing_item = item_map.get(item_input.order_item_id)
+            if existing_item:
+                existing_item.actual_qty = item_input.actual_qty
+                existing_item.missing_qty = max(0, existing_item.requested_qty - item_input.actual_qty)
+
+    db.commit()
+    db.refresh(dispatch)
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Cập nhật phiếu xuất {dispatch.dispatch_code} thành công.",
+        "data": {"id": dispatch.id, "dispatch_code": dispatch.dispatch_code},
+    }
+
+
+@router.delete("/dispatches/{dispatch_id}")
+def delete_dispatch_note(
+    dispatch_id: int,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "Warehouse Manager", "WH Manager", "Admin")),
+):
+    """Xóa phiếu xuất kho chưa xác nhận. Nếu đã xác nhận -> Chặn xóa (SCRUM-46)."""
+    dispatch = db.get(Dispatch, dispatch_id)
+    if not dispatch:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiếu xuất kho!")
+
+    if dispatch.is_confirmed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phiếu xuất đã xác nhận không sửa được.",
+        )
+
+    db.delete(dispatch)
+    db.commit()
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Đã xóa phiếu xuất {dispatch.dispatch_code} thành công.",
+    }
+
+
+@router.get("/dispatches")
+def list_dispatches(
+    order_id: Optional[int] = Query(None),
+    is_confirmed: Optional[bool] = Query(None),
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "Warehouse Manager", "WH Manager", "Admin")),
+):
+    """Lấy danh sách các phiếu xuất kho."""
+    query = db.query(Dispatch)
+    if order_id:
+        query = query.filter(Dispatch.order_id == order_id)
+    if is_confirmed is not None:
+        query = query.filter(Dispatch.is_confirmed == is_confirmed)
+
+    dispatches = query.order_by(Dispatch.id.desc()).all()
+    results = []
+    for d in dispatches:
+        ord_obj = db.get(Order, d.order_id)
+        cust = db.get(Customer, ord_obj.customer_id) if ord_obj else None
+        results.append({
+            "id": d.id,
+            "dispatch_code": d.dispatch_code,
+            "order_id": d.order_id,
+            "order_code": ord_obj.order_code if ord_obj else None,
+            "customer_name": cust.name if cust else None,
+            "warehouse_id": d.warehouse_id,
+            "is_confirmed": d.is_confirmed,
+            "confirmed_at": d.confirmed_at.isoformat() if d.confirmed_at else None,
+            "note": d.note,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "items_count": len(d.items),
+        })
+
+    return {
+        "success": True,
+        "code": 200,
+        "data": results,
+    }
+
+
+@router.get("/dispatches/{dispatch_id}")
+def get_dispatch_detail(
+    dispatch_id: int,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "Warehouse Manager", "WH Manager", "Admin")),
+):
+    """Chi tiết phiếu xuất kho kèm danh sách mặt hàng thực xuất và nợ hàng."""
+    d = db.get(Dispatch, dispatch_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiếu xuất kho!")
+
+    ord_obj = db.get(Order, d.order_id)
+    cust = db.get(Customer, ord_obj.customer_id) if ord_obj else None
+    items_data = []
+    for it in d.items:
+        items_data.append({
+            "id": it.id,
+            "order_item_id": it.order_item_id,
+            "product_id": it.product_id,
+            "sku": it.sku,
+            "requested_qty": it.requested_qty,
+            "actual_qty": it.actual_qty,
+            "missing_qty": it.missing_qty,
+        })
+
+    return {
+        "success": True,
+        "code": 200,
+        "data": {
+            "id": d.id,
+            "dispatch_code": d.dispatch_code,
+            "order_id": d.order_id,
+            "order_code": ord_obj.order_code if ord_obj else None,
+            "customer_name": cust.name if cust else None,
+            "warehouse_id": d.warehouse_id,
+            "is_confirmed": d.is_confirmed,
+            "confirmed_at": d.confirmed_at.isoformat() if d.confirmed_at else None,
+            "note": d.note,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "items": items_data,
+        },
     }

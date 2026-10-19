@@ -11,17 +11,26 @@ Yêu cầu nghiệp vụ:
 from __future__ import annotations
 
 import re
+import sys
 import uuid
 from datetime import date, datetime, timezone
-from typing import Any, List, Optional, Union
+from decimal import Decimal
+from pathlib import Path
+from typing import Any, List, Optional, Union, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+# Ensure backend and project root are in sys.path
+_BACKEND_DIR = Path(__file__).resolve().parents[4]
+_ROOT_DIR = _BACKEND_DIR.parent
+for _p in (str(_BACKEND_DIR), str(_ROOT_DIR)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, selectinload
 
 PHONE_REGEX = re.compile(r"^0[1235789]\d{8}$")
-from sqlalchemy.orm import selectinload
-from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
 
 try:
     from app.core.database import get_db
@@ -40,14 +49,15 @@ try:
         Territory,
         User,
         Warehouse,
-        Inventory,
     )
     from app.services.inventory_service import (
-        calculate_available_qty,
         get_customer_serving_warehouse,
         get_available_stock_info,
         reserve_stock_atomic,
         release_reserved_stock,
+        reserve_order_stock_transactional,
+        release_order_stock_transactional,
+        auto_release_expired_reservations,
         _inventory_lock,
     )
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
@@ -62,9 +72,10 @@ try:
         require_permissions,
         require_roles,
     )
+    from app.api.v1.endpoints.products import MOCK_PRODUCTS
 except ImportError:  # pragma: no cover
-    from app.core.database import get_db
-    from app.models.models import (
+    from src.backend.database import get_db
+    from src.backend.models import (
         Customer,
         CustomerDebt,
         CustomerHandoverHistory,
@@ -73,13 +84,37 @@ except ImportError:  # pragma: no cover
         Order,
         OrderItem,
         OrderStatus,
+        Product,
         Role,
         RoleCode,
         Territory,
         User,
+        Warehouse,
     )
-    from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
-    from app.api.v1.endpoints.rbac import (
+    try:
+        from app.services.inventory_service import (
+            get_customer_serving_warehouse,
+            get_available_stock_info,
+            reserve_stock_atomic,
+            release_reserved_stock,
+            reserve_order_stock_transactional,
+            release_order_stock_transactional,
+            auto_release_expired_reservations,
+            _inventory_lock,
+        )
+    except ImportError:
+        from backend.app.services.inventory_service import (
+            get_customer_serving_warehouse,
+            get_available_stock_info,
+            reserve_stock_atomic,
+            release_reserved_stock,
+            reserve_order_stock_transactional,
+            release_order_stock_transactional,
+            auto_release_expired_reservations,
+            _inventory_lock,
+        )
+    from src.backend.price_lists import CustomerGroup, resolve_effective_price
+    from src.backend.rbac import (
         PERM_CUSTOMERS_LOCK,
         PERM_ORDERS_CREATE,
         AuthenticatedUser,
@@ -90,8 +125,10 @@ except ImportError:  # pragma: no cover
         require_permissions,
         require_roles,
     )
-
-from app.api.v1.endpoints.products import MOCK_PRODUCTS
+    try:
+        from src.backend.products import MOCK_PRODUCTS
+    except ImportError:
+        MOCK_PRODUCTS = {}
 
 router = APIRouter(prefix="/api/v1", tags=["Customers & Orders (SCRUM-85)"])
 
@@ -328,6 +365,10 @@ class OrderItemResponse(BaseModel):
     subtotal: Optional[float] = None
     floor_price: Optional[float] = None
     price_list_id: Optional[int] = None
+    discount_percent: Optional[float] = 0.0
+    discount_amount: Optional[float] = 0.0
+    line_subtotal: Optional[float] = None
+    line_total: Optional[float] = None
     available_qty: Optional[float] = None
     availableQty: Optional[float] = None
     is_partially_delivered: bool = False
@@ -346,8 +387,11 @@ class OrderResponse(BaseModel):
     delivery_address: Optional[Union[DeliveryAddressBriefResponse, str, dict]] = None
     delivery_point_name: Optional[str] = None
     expected_delivery_date: Optional[Union[date, str, datetime]] = None
+    desired_delivery_date: Optional[Union[date, str, datetime]] = None
     status: OrderStatus
     total_amount: float
+    subtotal_amount: Optional[float] = 0.0
+    discount_amount: Optional[float] = 0.0
     note: Optional[str] = None
     created_at: Optional[datetime] = None
     is_partially_delivered: bool = False
@@ -419,6 +463,14 @@ class OrderSimulateRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 
+class OrderCloneRequest(BaseModel):
+    delivery_address_id: Optional[int] = Field(default=None, alias="deliveryAddressId", description="Điểm giao hàng mới nếu muốn thay đổi")
+    desired_delivery_date: Optional[Union[date, str]] = Field(default=None, alias="desiredDeliveryDate", description="Ngày giao hàng mong muốn mới")
+    note: Optional[str] = Field(default=None, max_length=2000, description="Ghi chú đơn hàng mới")
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+
 # ---------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------
@@ -469,6 +521,7 @@ def _build_full_order_response(order: Order, db: Session, cust: Optional[Custome
 
     exp_date = getattr(order, "expected_delivery_date", None) or getattr(order, "desired_delivery_date", None)
     resp.expected_delivery_date = exp_date
+    resp.desired_delivery_date = getattr(order, "desired_delivery_date", None)
 
     status_str = (str(order.status.value if hasattr(order.status, "value") else order.status)).upper()
     is_delivering_or_delivered = status_str in ("SHIPPING", "IN_TRANSIT", "DELIVERED", "COMPLETED", "PROCESSING")
@@ -486,7 +539,7 @@ def _build_full_order_response(order: Order, db: Session, cust: Optional[Custome
         it_res.unit = unit_str
         it_res.unit_name = unit_str
 
-        ord_qty = int(it_db.quantity)
+        ord_qty = it_db.quantity
         it_res.ordered_quantity = ord_qty
 
         deliv_qty = getattr(it_db, "quantity_delivered", None)
@@ -513,12 +566,18 @@ def _build_full_order_response(order: Order, db: Session, cust: Optional[Custome
             tot_p = ord_qty * it_db.unit_price
         it_res.total_price = float(tot_p)
         it_res.subtotal = float(tot_p)
+        it_res.discount_percent = float(getattr(it_db, "discount_percent", 0.0) or 0.0)
+        it_res.discount_amount = float(getattr(it_db, "discount_amount", 0.0) or 0.0)
+        it_res.line_subtotal = float(getattr(it_db, "line_subtotal", None) or (ord_qty * it_db.unit_price))
+        it_res.line_total = float(getattr(it_db, "line_total", None) or (it_res.line_subtotal - it_res.discount_amount))
 
-        item_is_partial = bool(is_delivering_or_delivered and (deliv_qty < ord_qty))
+        item_is_partial = is_delivering_or_delivered and (deliv_qty < ord_qty)
         it_res.is_partially_delivered = item_is_partial
         if item_is_partial:
             any_partially_delivered = True
 
+    resp.subtotal_amount = float(getattr(order, "subtotal_amount", 0.0) or 0.0)
+    resp.discount_amount = float(getattr(order, "discount_amount", 0.0) or 0.0)
     resp.is_partially_delivered = any_partially_delivered
     return resp
 
@@ -554,7 +613,7 @@ def list_customers(
     page: Optional[int] = Query(None, description="Trang (1-indexed)"),
     limit: Optional[int] = Query(None, description="Số lượng bản ghi mỗi trang"),
     page_size: Optional[int] = Query(None, alias="pageSize", description="Số lượng bản ghi mỗi trang"),
-    response: Response = None,
+    response: Response = cast(Any, None),
     db: Session = Depends(get_db),
     current_user: Optional[AuthenticatedUser] = Depends(_get_optional_authenticated_user),
     user: Optional[AuthenticatedUser] = None,
@@ -706,8 +765,8 @@ def list_customers(
         res.maxDueDays = res.max_debt_days
         res.warning_threshold_percent = float(getattr(c, "warning_threshold_percent", 80.0) or 80.0)
         res.warning_threshold = float(getattr(c, "warning_threshold", 80.0) or 80.0)
-        res.sales_rep_name = rep_names.get(c.sales_rep_id)
-        res.territory_name = territory_names.get(c.territory_id)
+        res.sales_rep_name = rep_names.get(c.sales_rep_id) if c.sales_rep_id is not None else None
+        res.territory_name = territory_names.get(c.territory_id) if c.territory_id is not None else None
         res.phone = getattr(c, "phone", None) or (delivery_map[c.id].phone if c.id in delivery_map else None)
         if c.id in delivery_map:
             res.address = delivery_map[c.id].address
@@ -780,7 +839,7 @@ def create_customer(
     # 3. Kiểm tra số điện thoại bắt buộc và định dạng (SCRUM-62)
     clean_phone = None
     if payload.phone is not None:
-        clean_phone = str(payload.phone).strip()
+        clean_phone = payload.phone.strip()
         if not clean_phone:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -830,7 +889,7 @@ def create_customer(
         territory_id=effective_territory_id,
         customer_group=group_str,
         credit_limit=float(payload.credit_limit or 0.0),
-        max_due_days=int(payload.max_due_days or 0),
+        max_due_days=payload.max_due_days or 0,
         warning_threshold_percent=float(payload.warning_threshold_percent or 80.0),
         is_active=True,
         is_locked=False,
@@ -1193,7 +1252,7 @@ def update_customer_credit_limit(
 
     # Chặn lưu khi không có thay đổi dữ liệu (tránh rác audit log)
     new_limit_val = float(payload.new_credit_limit)
-    new_days_val = int(payload.new_max_debt_days)
+    new_days_val = payload.new_max_debt_days
     new_credit_limit = new_limit_val
     new_max_debt_days = new_days_val
     if new_limit_val == old_credit_limit and new_days_val == old_max_debt_days:
@@ -1704,6 +1763,23 @@ def create_order(
             ),
         )
 
+    # SCRUM-42: Đánh giá trạng thái nợ của đại lý theo cấu hình (BLOCK hoặc REQUIRE_APPROVAL)
+    try:
+        from app.api.v1.endpoints.debt_limit import evaluate_customer_debt_status, get_debt_policy
+        evaluate_customer_debt_status(db, customer.id)
+        if getattr(customer, "is_debt_flagged", False):
+            policy = get_debt_policy()
+            if policy.get("action") == "BLOCK":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Đại lý '{customer.name}' ({customer.code}) đang bị cảnh báo công nợ "
+                        f"({customer.debt_flag_reason}), hệ thống tự động khóa/chặn tạo đơn mới theo cấu hình!"
+                    ),
+                )
+    except ImportError:
+        pass
+
     serving_wh = get_customer_serving_warehouse(db, customer.id, payload.warehouse_id)
 
     with _inventory_lock:
@@ -1825,6 +1901,10 @@ def create_order(
 
         total_amount = sum(item["quantity"] * item["unit_price"] for item in resolved_items)
 
+        # SCRUM-42: Nếu đại lý bị gắn cờ nợ và chính sách cho phép đặt hàng cần duyệt -> bắt buộc phê duyệt
+        if getattr(customer, "is_debt_flagged", False):
+            approval_lines.append(f"Cảnh báo công nợ: {customer.debt_flag_reason}")
+
         # Gắn thông tin người tạo đơn từ session nhân viên hiện tại
         actor_user = None
         if getattr(user, "id", None):
@@ -1902,6 +1982,7 @@ def create_order(
             total_amount=total_amount,
             note=payload.note,
             approval_reason=approval_reason,
+            is_stock_reserved=True,
         )
         db.add(new_order)
         db.flush()
@@ -2029,7 +2110,7 @@ def _build_portal_order_dict(order: Order, db: Session, customer: Optional[Custo
     has_partially_delivered = False
 
     for it in (order.items or []):
-        ord_qty = int(it.quantity or 0)
+        ord_qty = it.quantity or 0
         deliv_qty = getattr(it, "quantity_delivered", None)
         if deliv_qty is None:
             deliv_qty = getattr(it, "delivered_quantity", None)
@@ -2049,7 +2130,7 @@ def _build_portal_order_dict(order: Order, db: Session, customer: Optional[Custo
 
         unit_price = float(it.unit_price or 0.0)
         total_price = float(getattr(it, "line_total", None) or (ord_qty * unit_price))
-        item_is_partial = bool(is_delivering_or_delivered and (deliv_qty is not None and deliv_qty < ord_qty))
+        item_is_partial = is_delivering_or_delivered and (deliv_qty is not None and deliv_qty < ord_qty)
         if item_is_partial:
             has_partially_delivered = True
 
@@ -2285,7 +2366,7 @@ def prepare_order_reorder(
             elif getattr(prod, "is_active", True) is False:
                 is_discontinued = True
 
-        if is_discontinued:
+        if is_discontinued or prod is None:
             removed_items.append({
                 "product_id": prod.id if prod else it.product_id,
                 "sku": sku or (prod.sku if prod else "UNKNOWN"),
@@ -2296,26 +2377,30 @@ def prepare_order_reorder(
             })
             continue
 
+        prod_sku = prod.sku or sku or ""
+        prod_name = prod.name or prod_sku
+        prod_base_price: float = float(prod.base_price or 0.0) if prod.base_price is not None else 0.0
+
         # Sản phẩm còn kinh doanh: tính lại đơn giá theo Bảng giá hiện hành
         cust_group = getattr(customer, "customer_group", None) or "DEFAULT"
-        effective = resolve_effective_price(db, prod.sku, cust_group)
+        effective = resolve_effective_price(db, prod_sku, cust_group)
         if not effective and cust_group != "DEFAULT":
-            effective = resolve_effective_price(db, prod.sku, "DEFAULT")
+            effective = resolve_effective_price(db, prod_sku, "DEFAULT")
         current_price = (
             float(effective["sale_price"])
             if effective and effective.get("sale_price") is not None
-            else (float(prod.base_price) if prod.base_price is not None and prod.base_price > 0 else float(it.unit_price))
+            else (prod_base_price if prod_base_price > 0 else float(it.unit_price))
         )
         floor_price = float(effective["floor_price"]) if effective and effective.get("floor_price") is not None else None
 
         # Kiểm tra tồn kho khả dụng
-        stock_info = get_available_stock_info(db, prod.sku, wh_id)
+        stock_info = get_available_stock_info(db, prod_sku, wh_id)
         avail = float(stock_info.get("available_qty", 0.0) or 0.0)
 
         items.append({
             "product_id": prod.id,
-            "sku": prod.sku,
-            "product_name": prod.name,
+            "sku": prod_sku,
+            "product_name": prod_name,
             "unit": getattr(prod, "base_unit", "Cái") or "Cái",
             "quantity": it.quantity,
             "unit_price": current_price,
@@ -2399,6 +2484,9 @@ def approve_below_floor_order(
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
     if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL):
         raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt.")
+
+    # SCRUM-32: Giữ chỗ tồn kho nguyên tử trong cùng giao dịch khi đơn được duyệt
+    reserve_order_stock_transactional(db, order)
     order.status = OrderStatus.APPROVED
     db.commit()
     customer = db.get(Customer, order.customer_id)
@@ -2425,10 +2513,8 @@ def reject_below_floor_order(
     rejection_note = f"Từ chối: {payload.reason.strip()}"
     order.approval_reason = f"{order.approval_reason}; {rejection_note}" if order.approval_reason else rejection_note
 
-    wh_id = getattr(order, "warehouse_id", None) or 1
-    for it in order.items:
-        if it.sku:
-            release_reserved_stock(db, it.sku, wh_id, it.quantity)
+    # SCRUM-32: Tự động nhả tồn giữ chỗ khi từ chối đơn
+    release_order_stock_transactional(db, order)
     db.commit()
     customer = db.get(Customer, order.customer_id)
     return _build_full_order_response(order, db, customer)
@@ -2455,17 +2541,18 @@ def update_order_status(
     """Cập nhật trạng thái đơn hàng dở dang.
     
     Theo SCRUM-85: Đơn đang dở của đại lý bị khóa VẪN XỬ LÝ TIẾP ĐƯỢC nhưng có cảnh báo.
-    Theo SCRUM-10: Nếu hủy đơn (CANCELLED), giải phóng tồn đang giữ chỗ (Reserved Stock).
+    Theo SCRUM-32:
+      - Khi chuyển sang APPROVED: Giữ chỗ tồn kho nguyên tử.
+      - Khi chuyển sang CANCELLED hoặc REJECTED: Tự động giải phóng tồn đang giữ chỗ.
     """
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
 
-    if new_status == OrderStatus.CANCELLED and order.status != OrderStatus.CANCELLED:
-        wh_id = getattr(order, "warehouse_id", None) or 1
-        for it in order.items:
-            if it.sku:
-                release_reserved_stock(db, it.sku, wh_id, it.quantity)
+    if new_status == OrderStatus.APPROVED and order.status != OrderStatus.APPROVED:
+        reserve_order_stock_transactional(db, order)
+    elif new_status == OrderStatus.CANCELLED and order.status != OrderStatus.CANCELLED:
+        release_order_stock_transactional(db, order)
 
     order.status = new_status
     db.commit()
@@ -2506,6 +2593,254 @@ def submit_order_for_approval(
     db.refresh(order)
 
     return _build_full_order_response(order, db, customer)
+
+
+@router.post("/orders/{order_id}/clone", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+def clone_order(
+    order_id: int,
+    payload: Optional[OrderCloneRequest] = Body(None),
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
+):
+    """
+    SCRUM-16 (S4-09): Sao chép một đơn cũ thành đơn mới cho Nhân viên kinh doanh & Đại lý.
+
+    Tiêu chí nghiệp vụ:
+    1. Sao chép toàn bộ dòng hàng của đơn đã chọn.
+    2. Giá và chiết khấu được áp lại theo bảng giá & chính sách hiện hành, không kế thừa giá cũ.
+    3. Bản sao luôn bắt đầu ở trạng thái Nháp (OrderStatus.DRAFT).
+    4. Kiểm tra quyền sở hữu / phạm vi phụ trách: Sales Rep chỉ được sao chép đơn của đại lý mình phụ trách hoặc đơn do mình tạo.
+    5. Kiểm tra trạng thái khóa đại lý (SCRUM-85): Chặn sao chép nếu đại lý bị khóa giao dịch.
+    """
+    source_order = db.execute(
+        select(Order)
+        .options(selectinload(Order.items), selectinload(Order.delivery_address))
+        .where(Order.id == order_id)
+    ).scalar_one_or_none()
+    if not source_order:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng cần sao chép!")
+
+    if not source_order.items:
+        raise HTTPException(status_code=400, detail="Đơn hàng gốc không có dòng sản phẩm nào để sao chép.")
+
+    customer = db.get(Customer, source_order.customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Không tìm thấy thông tin đại lý của đơn hàng!")
+
+    # SCRUM-85: Chặn tạo đơn mới / sao chép đơn nếu đại lý bị khóa
+    if customer.is_locked:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Đại lý '{customer.name}' ({customer.code}) đã bị khóa giao dịch, "
+                f"không thể sao chép / tạo đơn hàng mới! Lý do: {customer.lock_reason or 'Không xác định'}."
+            ),
+        )
+
+    # Xác thực người dùng thực hiện thao tác
+    actor_user = None
+    if getattr(user, "id", None):
+        actor_user = db.get(User, user.id)
+    if not actor_user and user.username:
+        actor_user = (
+            db.query(User)
+            .filter(
+                or_(
+                    func.lower(User.username) == user.username.lower(),
+                    func.lower(User.email) == user.username.lower(),
+                    func.lower(User.full_name) == user.username.lower(),
+                )
+            )
+            .first()
+        )
+    if not actor_user and getattr(user, "full_name", None):
+        actor_user = (
+            db.query(User)
+            .filter(func.lower(User.full_name) == user.full_name.lower())
+            .first()
+        )
+
+    # Phân quyền truy cập (RBAC)
+    norm_role = normalize_role(user.role) or (user.role or "").strip().lower()
+    if norm_role in (RoleCode.CUSTOMER.value, "customer", "đại lý"):
+        user_cust = _resolve_customer_for_user(db, user)
+        if not user_cust or user_cust.id != source_order.customer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền truy cập hoặc sao chép đơn hàng của đại lý khác.",
+            )
+    elif norm_role in (RoleCode.SALES_REP.value, "sales rep", "sales_rep", "sales"):
+        is_authorized = False
+        if actor_user:
+            if source_order.created_by_id == actor_user.id:
+                is_authorized = True
+            elif customer.sales_rep_id == actor_user.id or getattr(customer, "assigned_sales_id", None) == actor_user.id:
+                is_authorized = True
+            elif customer.territory_id and hasattr(actor_user, "territories") and actor_user.territories:
+                territory_ids = [t.id for t in actor_user.territories]
+                if customer.territory_id in territory_ids:
+                    is_authorized = True
+        if not is_authorized:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền sao chép đơn hàng ngoài phạm vi đại lý phụ trách.",
+            )
+
+    # Xác định điểm giao hàng
+    chosen_address_id: Optional[int] = None
+    if payload and payload.delivery_address_id:
+        addr = db.get(DeliveryAddress, payload.delivery_address_id)
+        if not addr or addr.customer_id != customer.id:
+            raise HTTPException(status_code=400, detail="Điểm giao hàng không hợp lệ hoặc không thuộc đại lý!")
+        chosen_address_id = addr.id
+    elif source_order.delivery_address_id:
+        addr = db.get(DeliveryAddress, source_order.delivery_address_id)
+        if addr and addr.customer_id == customer.id:
+            chosen_address_id = addr.id
+
+    if not chosen_address_id:
+        default_addr = (
+            db.query(DeliveryAddress)
+            .filter(DeliveryAddress.customer_id == customer.id, DeliveryAddress.is_default == True)
+            .first()
+        )
+        if not default_addr:
+            default_addr = db.query(DeliveryAddress).filter(DeliveryAddress.customer_id == customer.id).first()
+        if default_addr:
+            chosen_address_id = default_addr.id
+
+    # Xác định kho phục vụ
+    serving_wh = get_customer_serving_warehouse(db, customer.id, source_order.warehouse_id)
+    wh_id = serving_wh.id if serving_wh else (source_order.warehouse_id or 1)
+
+    # Động cơ chiết khấu
+    try:
+        from app.api.v1.endpoints.discount_policy_routes import calculate_best_discount
+    except ImportError:
+        def calculate_best_discount(**kwargs):
+            return {"discount_amount": 0.0}
+
+    # Sao chép toàn bộ dòng hàng & Áp lại đơn giá / chiết khấu hiện hành
+    cloned_items: List[OrderItem] = []
+    total_subtotal = Decimal("0")
+    total_discount = Decimal("0")
+
+    for it in source_order.items:
+        sku = (it.sku or "").strip().upper()
+        prod = None
+        if it.product_id:
+            prod = db.get(Product, it.product_id)
+        if not prod and sku:
+            prod = db.query(Product).filter(func.upper(Product.sku) == sku).first()
+
+        cust_group = getattr(customer, "customer_group", None) or "DEFAULT"
+        effective = resolve_effective_price(db, sku, cust_group)
+        if not effective and cust_group != "DEFAULT":
+            effective = resolve_effective_price(db, sku, "DEFAULT")
+
+        factor = float(getattr(it, "conversion_factor", 1.0) or 1.0)
+        if effective and effective.get("sale_price") is not None:
+            unit_price = float(effective["sale_price"])
+            floor_price = float(effective["floor_price"]) if effective.get("floor_price") is not None else None
+            price_list_id = effective.get("price_list_id")
+        elif prod and prod.base_price is not None and prod.base_price > 0:
+            unit_price = round(float(prod.base_price) * factor, 2)
+            floor_price = None
+            price_list_id = None
+        else:
+            mock_p = MOCK_PRODUCTS.get(sku)
+            unit_price = float(mock_p.get("sale_price", 0.0)) if mock_p else 0.0
+            floor_price = None
+            price_list_id = None
+
+        qty = it.quantity
+        line_subtotal = round(unit_price * qty, 2)
+
+        # Tính toán lại chiết khấu tốt nhất theo sản lượng hiện hành
+        disc_data = calculate_best_discount(sku=sku, quantity=qty, base_price=unit_price, db=db)
+        item_discount_amount = float(disc_data.get("discount_amount", 0.0) or 0.0)
+        line_total = max(0.0, round(line_subtotal - item_discount_amount, 2))
+        discount_percent = round((item_discount_amount / line_subtotal) * 100, 2) if line_subtotal > 0 else 0.0
+
+        # Tra cứu tồn khả dụng hiện tại
+        stock_info = get_available_stock_info(db, sku, wh_id)
+        avail_qty = float(stock_info.get("available_qty", 0.0) or 0.0)
+
+        cloned_items.append(
+            OrderItem(
+                product_id=prod.id if prod else it.product_id,
+                sku=sku or (prod.sku if prod else "UNKNOWN"),
+                product_name=prod.name if prod else (it.product_name or sku),
+                unit_id=it.unit_id,
+                unit_name=it.unit_name or (prod.base_unit if prod else "Cái"),
+                conversion_factor=factor,
+                quantity=qty,
+                unit_price=unit_price,
+                floor_price=floor_price,
+                price_list_id=price_list_id,
+                discount_percent=discount_percent,
+                line_subtotal=line_subtotal,
+                discount_amount=item_discount_amount,
+                line_total=line_total,
+                available_qty=avail_qty,
+            )
+        )
+        total_subtotal += Decimal(str(line_subtotal))
+        total_discount += Decimal(str(item_discount_amount))
+
+    # Sinh mã đơn hàng mới
+    count_today = db.query(func.count(Order.id)).scalar() or 0
+    unique_suffix = uuid.uuid4().hex[:4].upper()
+    order_code = f"ORD-{datetime.now().strftime('%Y%m%d')}-{count_today + 1:04d}-{unique_suffix}"
+
+    note_text = (
+        payload.note.strip()
+        if payload and payload.note
+        else f"Sao chép từ đơn hàng #{source_order.order_code}"
+    )
+
+    desired_date: Optional[date] = None
+    raw_date = None
+    if payload and payload.desired_delivery_date:
+        raw_date = payload.desired_delivery_date
+    elif source_order.desired_delivery_date:
+        raw_date = source_order.desired_delivery_date
+
+    if raw_date:
+        if isinstance(raw_date, datetime):
+            desired_date = raw_date.date()
+        elif isinstance(raw_date, date):
+            desired_date = raw_date
+        elif isinstance(raw_date, str):
+            clean_str = raw_date.strip().split("T")[0]
+            try:
+                desired_date = date.fromisoformat(clean_str)
+            except ValueError:
+                desired_date = None
+
+    final_total = max(0.0, float(total_subtotal - total_discount))
+
+    # Bản sao luôn bắt đầu ở trạng thái Nháp (OrderStatus.DRAFT)
+    new_order = Order(
+        order_code=order_code,
+        customer_id=customer.id,
+        warehouse_id=wh_id,
+        created_by_id=actor_user.id if actor_user else source_order.created_by_id,
+        delivery_address_id=chosen_address_id,
+        desired_delivery_date=desired_date,
+        status=OrderStatus.DRAFT,
+        subtotal_amount=float(total_subtotal),
+        discount_amount=float(total_discount),
+        total_amount=final_total,
+        note=note_text,
+        items=cloned_items,
+    )
+
+    db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
+
+    return _build_full_order_response(new_order, db, customer)
 
 
 @router.put("/orders/{order_id}", response_model=OrderResponse)
@@ -2650,18 +2985,16 @@ def cancel_order(
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
 ):
-    """Hủy đơn hàng (cho phép khi đơn ở trạng thái DRAFT hoặc PENDING_APPROVAL)."""
+    """Hủy đơn hàng (cho phép khi đơn ở trạng thái DRAFT, PENDING_APPROVAL, PENDING hoặc APPROVED)."""
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
 
-    if order.status not in (OrderStatus.DRAFT, OrderStatus.PENDING_APPROVAL, OrderStatus.PENDING):
-        raise HTTPException(status_code=400, detail="Chỉ có thể hủy đơn hàng ở trạng thái Bản nháp hoặc Chờ duyệt!")
+    if order.status not in (OrderStatus.DRAFT, OrderStatus.PENDING_APPROVAL, OrderStatus.PENDING, OrderStatus.APPROVED):
+        raise HTTPException(status_code=400, detail="Chỉ có thể hủy đơn hàng ở trạng thái Bản nháp, Chờ duyệt hoặc Đã duyệt!")
 
-    wh_id = getattr(order, "warehouse_id", None) or 1
-    for it in order.items:
-        if it.sku:
-            release_reserved_stock(db, it.sku, wh_id, it.quantity)
+    # SCRUM-32: Tự động giải phóng tồn đang giữ chỗ khi hủy đơn
+    release_order_stock_transactional(db, order)
 
     order.status = OrderStatus.CANCELLED
     order.approval_reason = f"Hủy đơn bởi người tạo: {user.full_name or user.username}"
@@ -2670,6 +3003,21 @@ def cancel_order(
 
     customer = db.get(Customer, order.customer_id)
     return _build_full_order_response(order, db, customer)
+
+
+@router.post("/orders/release-expired-reservations")
+def trigger_release_expired_reservations(
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse Manager", "Admin", "Sales Manager")),
+):
+    """Quét và tự động giải phóng tồn giữ chỗ cho các đơn hàng đã duyệt quá hạn (SCRUM-32)."""
+    released_ids = auto_release_expired_reservations(db)
+    return {
+        "success": True,
+        "released_order_ids": released_ids,
+        "count": len(released_ids),
+        "message": f"Đã giải phóng thành công {len(released_ids)} đơn hàng quá hạn giữ chỗ tồn kho.",
+    }
 
 
 @router.delete("/orders/{order_id}")

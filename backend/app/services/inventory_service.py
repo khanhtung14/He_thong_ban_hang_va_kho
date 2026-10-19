@@ -12,11 +12,13 @@ Concurrency & Race Condition Protection:
 from __future__ import annotations
 
 import threading
-from typing import Optional, Tuple, Dict, Any
+from datetime import datetime, timezone, timedelta
+from typing import Optional, Tuple, Dict, Any, List
+from fastapi import HTTPException, status
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
-from app.models.models import Customer, Inventory, Order, OrderItem, Product, Warehouse, Territory
+from app.models.models import Customer, Inventory, Order, OrderItem, OrderStatus, Product, Warehouse, Territory
 from app.api.v1.endpoints.products import MOCK_PRODUCTS
 
 _inventory_lock = threading.RLock()
@@ -200,3 +202,124 @@ def release_reserved_stock(
                 inv.reserved_qty = max(0.0, inv.reserved_qty - quantity)
                 inv.available_qty = calculate_available_qty(inv.physical_qty, inv.reserved_qty)
                 db.flush()
+
+
+def reserve_order_stock_transactional(db: Session, order: Order, hold_hours: int = 48) -> None:
+    """Giữ chỗ tồn kho cho toàn bộ đơn hàng trong cùng một giao dịch nguyên tử (SCRUM-32).
+
+    Quy tắc nghiệp vụ:
+    - Nếu đơn đã giữ chỗ trước đó (is_stock_reserved=True), không giữ chỗ lặp.
+    - Duyệt qua từng dòng hàng (OrderItem).
+    - Kiểm tra tồn khả dụng của TẤT CẢ các sản phẩm trước.
+    - Nếu bất kỳ sản phẩm nào thiếu hàng hoặc xảy ra lỗi: hủy toàn bộ (rollback), không có sản phẩm nào bị giữ chỗ dở dang.
+    - Nếu đủ hàng: tăng reserved_qty, giảm available_qty tương ứng, ghi nhận is_stock_reserved=True.
+    """
+    if getattr(order, "is_stock_reserved", False):
+        return
+
+    wh_id = getattr(order, "warehouse_id", None) or 1
+    items_to_reserve = [it for it in order.items if it.sku and it.quantity > 0]
+    if not items_to_reserve:
+        order.is_stock_reserved = True
+        return
+
+    with _inventory_lock:
+        # Bước 1: Kiểm tra trước tính sẵn sàng của tất cả các dòng hàng
+        insufficient_items = []
+        for it in items_to_reserve:
+            if not it.sku:
+                continue
+            sku = it.sku.strip().upper()
+            info = get_available_stock_info(db, sku, wh_id, for_update=True)
+            avail = info["available_qty"]
+            if it.quantity > avail:
+                insufficient_items.append({
+                    "sku": sku,
+                    "product_name": it.product_name or sku,
+                    "requested": it.quantity,
+                    "available": max(0, int(avail)),
+                })
+
+        if insufficient_items:
+            details_str = ", ".join(
+                [f"{it['product_name']} ({it['sku']}): cần {it['requested']}, chỉ còn {it['available']}"
+                 for it in insufficient_items]
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Không thể duyệt đơn: Tồn khả dụng không đủ để giữ chỗ cho ({details_str}). Toàn bộ giao dịch đã được hoàn lại."
+            )
+
+        # Bước 2: Thực hiện giữ chỗ nguyên tử cho từng sản phẩm
+        reserved_so_far = []
+        try:
+            for it in items_to_reserve:
+                if not it.sku:
+                    continue
+                sku = it.sku.strip().upper()
+                success, avail, max_allowed, _ = reserve_stock_atomic(db, sku, wh_id, it.quantity)
+                if not success:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Lỗi khi giữ chỗ cho sản phẩm {sku}."
+                    )
+                reserved_so_far.append((sku, it.quantity))
+        except Exception as exc:
+            # Rollback bất kỳ item nào đã lỡ giữ chỗ trong đợt này
+            for sku, qty in reserved_so_far:
+                release_reserved_stock(db, sku, wh_id, qty)
+            if isinstance(exc, HTTPException):
+                raise exc
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Lỗi trong giao dịch giữ chỗ tồn kho: {str(exc)}. Đã hoàn lại toàn bộ."
+            )
+
+        order.is_stock_reserved = True
+        order.approved_at = datetime.now(timezone.utc)
+        order.reservation_expires_at = datetime.now(timezone.utc) + timedelta(hours=hold_hours)
+        db.flush()
+
+
+def release_order_stock_transactional(db: Session, order: Order) -> None:
+    """Giải phóng toàn bộ tồn đang giữ chỗ của đơn hàng (SCRUM-32)."""
+    wh_id = getattr(order, "warehouse_id", None) or 1
+    with _inventory_lock:
+        if getattr(order, "is_stock_reserved", True):
+            for it in order.items:
+                if it.sku and it.quantity > 0:
+                    delivered = getattr(it, "quantity_delivered", 0) or 0
+                    remaining = max(0, it.quantity - delivered)
+                    if remaining > 0:
+                        release_reserved_stock(db, it.sku.strip().upper(), wh_id, remaining)
+            order.is_stock_reserved = False
+            db.flush()
+
+
+def auto_release_expired_reservations(db: Session) -> List[int]:
+    """Quét và tự động giải phóng tồn giữ chỗ cho các đơn hàng đã duyệt quá hạn (SCRUM-32).
+    Trả về danh sách order_id đã được giải phóng.
+    """
+    now = datetime.now(timezone.utc)
+    expired_orders = (
+        db.query(Order)
+        .filter(
+            Order.status == OrderStatus.APPROVED,
+            Order.is_stock_reserved == True,
+            Order.reservation_expires_at != None,
+            Order.reservation_expires_at <= now,
+        )
+        .all()
+    )
+    released_ids = []
+    for order in expired_orders:
+        release_order_stock_transactional(db, order)
+        order.status = OrderStatus.CANCELLED
+        order.approval_reason = (
+            f"{order.approval_reason or ''}; Hủy tự động do quá hạn giữ chỗ tồn kho"
+        ).strip("; ")
+        db.add(order)
+        released_ids.append(order.id)
+    if released_ids:
+        db.commit()
+    return released_ids

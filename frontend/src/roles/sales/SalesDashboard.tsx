@@ -3,13 +3,8 @@ import {
   Layout,
   Card,
   Table,
-  Input,
   Tag,
   Typography,
-  Row,
-  Col,
-  Statistic,
-  Alert,
   Button,
   Space,
   Tooltip,
@@ -20,10 +15,6 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import {
-  SearchOutlined,
-  ShopOutlined,
-  CheckCircleOutlined,
-  DollarOutlined,
   EnvironmentOutlined,
   ShoppingOutlined,
   PlusOutlined,
@@ -32,6 +23,7 @@ import {
   EditOutlined,
   CloseCircleOutlined,
   EyeOutlined,
+  CopyOutlined,
 } from "@ant-design/icons";
 
 // Modals
@@ -55,6 +47,7 @@ import {
   fetchOrders,
   submitOrderForApproval,
   cancelOrder,
+  cloneOrder,
   type UserProfile,
   type CustomerItem,
   type OrderResponseItem,
@@ -79,11 +72,11 @@ export const SalesDashboard: React.FC = () => {
   });
 
   const [selectedKey, setSelectedKey] = useState("customers");
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [orders, setOrders] = useState<OrderResponseItem[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const search = "";
 
   // Trạng thái modal
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -99,6 +92,27 @@ export const SalesDashboard: React.FC = () => {
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<OrderResponseItem | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [submittingOrderId, setSubmittingOrderId] = useState<number | null>(null);
+  const [cloningOrderId, setCloningOrderId] = useState<number | null>(null);
+
+  const handleCloneOrder = async (order: OrderResponseItem) => {
+    setCloningOrderId(order.id);
+    try {
+      const cloned = await cloneOrder(order.id);
+      message.success(
+        `Đã sao chép đơn ${order.order_code} thành công! Đơn nháp mới (${cloned.order_code}) đã được tạo với giá và chiết khấu hiện hành.`
+      );
+      await loadOrders();
+      if (isDetailModalOpen) {
+        setIsDetailModalOpen(false);
+      }
+      handleEditOrder(cloned);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Sao chép đơn hàng thất bại.";
+      message.error(errorMsg);
+    } finally {
+      setCloningOrderId(null);
+    }
+  };
 
   const formatDateTime = (dt?: string | null) => {
     if (!dt) return "-";
@@ -117,8 +131,9 @@ export const SalesDashboard: React.FC = () => {
       await submitOrderForApproval(orderId);
       message.success("Đã gửi duyệt đơn hàng thành công!");
       loadOrders();
-    } catch (err: any) {
-      message.error(err.message || "Gửi duyệt đơn hàng thất bại.");
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Gửi duyệt đơn hàng thất bại.";
+      message.error(errorMsg);
     } finally {
       setSubmittingOrderId(null);
     }
@@ -136,8 +151,9 @@ export const SalesDashboard: React.FC = () => {
       await cancelOrder(orderId);
       message.success("Đã hủy đơn hàng thành công!");
       loadOrders();
-    } catch (err: any) {
-      message.error(err.message || "Hủy đơn hàng thất bại.");
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Hủy đơn hàng thất bại.";
+      message.error(errorMsg);
     }
   };
 
@@ -185,6 +201,7 @@ export const SalesDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProfileData();
     loadMyCustomers();
     if (selectedKey === "orders") {
@@ -211,117 +228,11 @@ export const SalesDashboard: React.FC = () => {
     setIsCreateOrderModalOpen(true);
   };
 
-  const totalDebt = customers.reduce((sum, c) => sum + (c.current_debt || 0), 0);
-  const activeCount = customers.filter((c) => !c.is_locked).length;
-
-  const handleOpenAddressModal = (cust: CustomerItem) => {
-    setSelectedCustomerForAddress(cust);
-    setIsAddressModalOpen(true);
-  };
-
   const handleOpenCreateOrderModal = (cust?: CustomerItem) => {
     setSelectedCustomerForOrder(cust || null);
     setSelectedOrderForEdit(null);
     setIsCreateOrderModalOpen(true);
   };
-
-  const customerColumns: ColumnsType<CustomerItem> = [
-    {
-      title: "MÃ ĐẠI LÝ",
-      dataIndex: "code",
-      key: "code",
-      width: 110,
-      render: (code: string) => <Text strong style={{ color: "#1e40af" }}>{code}</Text>,
-    },
-    {
-      title: "TÊN ĐẠI LÝ",
-      dataIndex: "name",
-      key: "name",
-      render: (name: string, record) => (
-        <div>
-          <div style={{ fontWeight: 600 }}>{name}</div>
-          {record.phone && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              SĐT: {record.phone}
-            </Text>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: "PHÂN CẤP ĐẠI LÝ",
-      dataIndex: "customer_group",
-      key: "customer_group",
-      width: 140,
-      render: (grp: string) => {
-        const color =
-          grp === "DEALER_LEVEL_1" ? "blue" : grp === "DEALER_LEVEL_2" ? "cyan" : "default";
-        const label =
-          grp === "DEALER_LEVEL_1" ? "Đại lý Cấp 1" : grp === "DEALER_LEVEL_2" ? "Đại lý Cấp 2" : "Khách lẻ";
-        return <Tag color={color}>{label}</Tag>;
-      },
-    },
-    {
-      title: "HẠN MỨC CÔNG NỢ",
-      dataIndex: "debt_limit",
-      key: "debt_limit",
-      width: 150,
-      render: (limit) => formatMoney(limit),
-    },
-    {
-      title: "DƯ NỢ HIỆN TẠI",
-      dataIndex: "current_debt",
-      key: "current_debt",
-      width: 150,
-      render: (debt) => (
-        <span style={{ color: debt > 0 ? "#dc2626" : "#16a34a", fontWeight: 600 }}>
-          {formatMoney(debt)}
-        </span>
-      ),
-    },
-    {
-      title: "TRẠNG THÁI GIAO DỊCH",
-      key: "is_locked",
-      width: 170,
-      render: (_, r) => (
-        <Tag color={r.is_locked ? "error" : "success"}>
-          {r.is_locked ? `Bị khóa (${r.lock_reason || "Chặn nợ"})` : "Đang giao dịch"}
-        </Tag>
-      ),
-    },
-    {
-      title: "ĐIỂM GIAO & LÊN ĐƠN (SCRUM-20)",
-      key: "action",
-      width: 220,
-      align: "center",
-      render: (_, r) => (
-        <Space size="small">
-          <Tooltip title="Khai báo & quản lý các điểm giao hàng cho đại lý">
-            <Button
-              size="small"
-              icon={<EnvironmentOutlined />}
-              onClick={() => handleOpenAddressModal(r)}
-              style={{ color: "#2563eb", borderColor: "#93c5fd" }}
-            >
-              Điểm giao
-            </Button>
-          </Tooltip>
-          <Tooltip title={r.is_locked ? "Đại lý bị khóa không thể tạo đơn" : "Tạo đơn hàng mới cho đại lý"}>
-            <Button
-              type="primary"
-              size="small"
-              icon={<ShoppingOutlined />}
-              disabled={r.is_locked}
-              onClick={() => handleOpenCreateOrderModal(r)}
-              style={{ backgroundColor: r.is_locked ? undefined : "#16a34a", borderColor: r.is_locked ? undefined : "#16a34a" }}
-            >
-              Lên đơn
-            </Button>
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
 
   const orderColumns: ColumnsType<OrderResponseItem> = [
     {
@@ -407,7 +318,7 @@ export const SalesDashboard: React.FC = () => {
     {
       title: "THAO TÁC",
       key: "actions",
-      width: 120,
+      width: 190,
       align: "center",
       render: (_, r) => {
         const isDraft = r.status === "DRAFT";
@@ -441,6 +352,25 @@ export const SalesDashboard: React.FC = () => {
                 Sửa
               </Button>
 
+              <Tooltip title="Sao chép thành đơn nháp mới">
+                <Popconfirm
+                  title="Sao chép đơn hàng"
+                  description={`Sao chép toàn bộ dòng hàng của đơn ${r.order_code} thành đơn mới ở trạng thái Nháp?`}
+                  onConfirm={() => handleCloneOrder(r)}
+                  okText="Sao chép"
+                  cancelText="Hủy"
+                >
+                  <Button
+                    size="small"
+                    icon={<CopyOutlined />}
+                    loading={cloningOrderId === r.id}
+                    style={{ color: "#059669", borderColor: "#a7f3d0", fontSize: 12 }}
+                  >
+                    Sao chép
+                  </Button>
+                </Popconfirm>
+              </Tooltip>
+
               <Popconfirm
                 title="Xác nhận hủy đơn hàng"
                 description={`Bạn có chắc chắn muốn hủy đơn hàng nháp ${r.order_code}?`}
@@ -463,14 +393,32 @@ export const SalesDashboard: React.FC = () => {
         }
 
         return (
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handleViewOrderDetail(r)}
-            style={{ color: "#2563eb", borderColor: "#bfdbfe", fontSize: 12 }}
-          >
-            Xem chi tiết
-          </Button>
+          <Space size={4} wrap style={{ justifyContent: "center" }}>
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewOrderDetail(r)}
+              style={{ color: "#2563eb", borderColor: "#bfdbfe", fontSize: 12 }}
+            >
+              Xem chi tiết
+            </Button>
+            <Popconfirm
+              title="Sao chép đơn hàng"
+              description={`Sao chép toàn bộ dòng hàng của đơn ${r.order_code} thành đơn mới ở trạng thái Nháp với đơn giá & chiết khấu hiện hành?`}
+              onConfirm={() => handleCloneOrder(r)}
+              okText="Sao chép"
+              cancelText="Hủy"
+            >
+              <Button
+                size="small"
+                icon={<CopyOutlined />}
+                loading={cloningOrderId === r.id}
+                style={{ color: "#059669", borderColor: "#a7f3d0", fontSize: 12 }}
+              >
+                Sao chép
+              </Button>
+            </Popconfirm>
+          </Space>
         );
       },
     },
@@ -653,7 +601,7 @@ export const SalesDashboard: React.FC = () => {
           setSelectedOrderForEdit(null);
         }}
         customers={customers}
-        preselectedCustomerId={selectedCustomerForOrder?.id || null}
+        preselectedCustomerId={selectedCustomerForOrder?.id ?? preselectedCustomerId ?? null}
         editingOrder={selectedOrderForEdit}
         onOrderCreated={() => {
           if (selectedKey === "orders") {
@@ -675,6 +623,23 @@ export const SalesDashboard: React.FC = () => {
         }
         width={800}
         footer={[
+          <Popconfirm
+            key="clone"
+            title="Sao chép đơn hàng"
+            description={`Sao chép toàn bộ dòng hàng của đơn ${selectedOrderForDetail?.order_code} thành đơn mới ở trạng thái Nháp với giá hiện hành?`}
+            onConfirm={() => selectedOrderForDetail && handleCloneOrder(selectedOrderForDetail)}
+            okText="Sao chép"
+            cancelText="Hủy"
+          >
+            <Button
+              key="btn-clone"
+              icon={<CopyOutlined />}
+              loading={cloningOrderId === selectedOrderForDetail?.id}
+              style={{ color: "#059669", borderColor: "#a7f3d0" }}
+            >
+              Sao chép đơn này
+            </Button>
+          </Popconfirm>,
           <Button key="close" type="primary" onClick={() => setIsDetailModalOpen(false)}>
             Đóng
           </Button>,
@@ -790,7 +755,7 @@ export const SalesDashboard: React.FC = () => {
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        onProfileUpdated={(updated: any) => {
+        onProfileUpdated={(updated: UserProfile) => {
           setProfile(updated);
           localStorage.setItem("user", JSON.stringify(updated));
         }}

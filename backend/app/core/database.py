@@ -74,6 +74,8 @@ def migrate_pricing_schema():
         DiscountPolicy,
         DiscountTier,
         CreditLimitLog,
+        Dispatch,
+        DispatchItem,
     )
 
     target_tables = cast(
@@ -88,6 +90,8 @@ def migrate_pricing_schema():
             DiscountPolicy.__table__,
             DiscountTier.__table__,
             CreditLimitLog.__table__,
+            Dispatch.__table__,
+            DispatchItem.__table__,
         ],
     )
     Base.metadata.create_all(
@@ -119,6 +123,10 @@ def migrate_pricing_schema():
             "current_debt": "FLOAT NOT NULL DEFAULT 0.0",
             "warning_threshold_percent": "FLOAT NOT NULL DEFAULT 80.0",
             "warning_threshold": "FLOAT NOT NULL DEFAULT 80.0",
+            "is_debt_flagged": "BOOLEAN NOT NULL DEFAULT 0",
+            "debt_flag_reason": "VARCHAR(255) NULL",
+            "debt_flagged_at": "DATETIME NULL",
+            "oldest_debt_days": "INTEGER NOT NULL DEFAULT 0",
         },
         "suppliers": {
             "contact_person": "VARCHAR(100) NULL",
@@ -135,6 +143,32 @@ def migrate_pricing_schema():
             "expected_delivery_date": "DATE NULL",
             "warehouse_id": "INTEGER NULL",
             "delivery_address_id": "INTEGER NULL",
+            "approved_at": "DATETIME NULL",
+            "reservation_expires_at": "DATETIME NULL",
+            "is_stock_reserved": "BOOLEAN NOT NULL DEFAULT 0",
+            "has_backorder": "BOOLEAN NOT NULL DEFAULT 0",
+        },
+        "dispatches": {
+            "dispatch_code": "VARCHAR(50) NULL",
+            "warehouse_id": "INTEGER NULL",
+            "created_by_id": "INTEGER NULL",
+            "status": "VARCHAR(30) NOT NULL DEFAULT 'DRAFT'",
+            "is_confirmed": "BOOLEAN NOT NULL DEFAULT 0",
+            "confirmed_at": "DATETIME NULL",
+            "confirmed_by_id": "INTEGER NULL",
+            "note": "TEXT NULL",
+            "created_at": "DATETIME NULL",
+            "updated_at": "DATETIME NULL",
+        },
+        "dispatch_items": {
+            "order_item_id": "INTEGER NULL",
+            "sku": "VARCHAR(50) NULL",
+            "product_name": "VARCHAR(255) NULL",
+            "unit_name": "VARCHAR(50) NULL",
+            "lot_number": "VARCHAR(100) NULL",
+            "requested_qty": "FLOAT NOT NULL DEFAULT 0.0",
+            "actual_qty": "FLOAT NOT NULL DEFAULT 0.0",
+            "missing_qty": "FLOAT NOT NULL DEFAULT 0.0",
         },
         "order_items": {
             "floor_price": "INTEGER NULL",
