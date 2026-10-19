@@ -88,8 +88,11 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
 
   return (
     <Sider
+      breakpoint="lg"
+      collapsedWidth="0"
       width={250}
       theme="light"
+      className="customer-sider-responsive"
       style={{
         height: "100vh",
         position: "sticky",
@@ -98,6 +101,7 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
         borderRight: "1px solid #f0f0f0",
         display: "flex",
         flexDirection: "column",
+        zIndex: 1005,
       }}
     >
       {/* Brand Header */}

@@ -6,6 +6,7 @@ import ProfileModal from "../../components/ProfileModal";
 import { CustomerSidebar } from "../../components/Sidebar/CustomerSidebar";
 import { CustomerHeader } from "../../components/Header/CustomerHeader";
 import { CustomerOrders } from "./CustomerOrders";
+import { CustomerCatalog } from "./CustomerCatalog";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -130,7 +131,7 @@ export const CustomerDashboard: React.FC = () => {
 
         <Content
           style={{
-            padding: "24px 32px",
+            padding: "clamp(12px, 2.5vw, 24px)",
             maxWidth: 1400,
             width: "100%",
             margin: "0 auto",
@@ -139,22 +140,7 @@ export const CustomerDashboard: React.FC = () => {
           {selectedKey === "orders" || selectedKey === "dashboard" ? (
             <CustomerOrders onNavigateToProducts={() => handleSelectKey("catalog")} />
           ) : selectedKey === "catalog" ? (
-            <Card
-              style={{
-                borderRadius: 14,
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-                backgroundColor: "#ffffff",
-                padding: "24px",
-              }}
-            >
-              <Title level={4} style={{ color: "#1e293b", marginTop: 0 }}>
-                Đặt hàng / Danh mục sản phẩm
-              </Title>
-              <Text type="secondary">
-                Tính năng đặt hàng trực tiếp từ cổng đại lý đang được cập nhật. Bạn có thể theo dõi tiến độ các đơn hàng đã đặt tại mục "Đơn hàng của tôi".
-              </Text>
-            </Card>
+            <CustomerCatalog onOrderSuccess={() => handleSelectKey("orders")} />
           ) : (
             <CustomerOrders onNavigateToProducts={() => handleSelectKey("catalog")} />
           )}

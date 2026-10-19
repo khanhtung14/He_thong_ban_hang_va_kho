@@ -16,6 +16,8 @@ import {
   Radio,
   Steps,
   message,
+  Tooltip,
+  Pagination,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -34,6 +36,7 @@ import {
   CalendarOutlined,
   SearchOutlined,
   WarningOutlined,
+  RightOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
@@ -78,6 +81,18 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
   const [selectedProductIds, setSelectedProductIds] = useState<React.Key[]>([]);
   const [reorderNote, setReorderNote] = useState<string>("");
 
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    return typeof window !== "undefined" && window.innerWidth < 768;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const loadOrders = useCallback(async () => {
     setLoading(true);
     try {
@@ -108,7 +123,7 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
     try {
       const raw = String(dt).trim();
       const utcStr = raw.endsWith("Z") || raw.includes("+") ? raw : `${raw}Z`;
-      return dayjs(utcStr).format("HH:mm DD/MM/YYYY");
+      return dayjs(utcStr).format(isMobile ? "DD/MM HH:mm" : "HH:mm DD/MM/YYYY");
     } catch {
       return dt;
     }
@@ -128,9 +143,143 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
     return `${val.toLocaleString("vi-VN")} ₫`;
   };
 
-  // Tag trạng thái trực quan theo yêu cầu
+  // State phân trang trên mobile
+  const [mobilePage, setMobilePage] = useState<number>(1);
+  const mobilePageSize = 10;
+
+  useEffect(() => {
+    setMobilePage(1);
+  }, [searchKeyword, statusFilter]);
+
+  // Tag trạng thái cho dạng thẻ Mobile (gọn gàng, rõ ràng)
+  const renderCardStatusTag = (status: string) => {
+    const s = (status || "").toUpperCase();
+    switch (s) {
+      case "DRAFT":
+        return <Tag color="default" style={{ margin: 0, borderRadius: 6, fontWeight: 500, fontSize: 12 }}>Đơn nháp</Tag>;
+      case "PENDING":
+      case "PENDING_APPROVAL":
+        return (
+          <Tag color="gold" icon={<ClockCircleOutlined />} style={{ margin: 0, borderRadius: 6, fontWeight: 500, fontSize: 12 }}>
+            Chờ duyệt
+          </Tag>
+        );
+      case "APPROVED":
+        return (
+          <Tag color="cyan" icon={<CheckCircleOutlined />} style={{ margin: 0, borderRadius: 6, fontWeight: 500, fontSize: 12 }}>
+            Đã duyệt
+          </Tag>
+        );
+      case "PROCESSING":
+        return (
+          <Tag color="blue" icon={<SyncOutlined spin />} style={{ margin: 0, borderRadius: 6, fontWeight: 500, fontSize: 12 }}>
+            Đang xử lý
+          </Tag>
+        );
+      case "SHIPPING":
+      case "IN_TRANSIT":
+        return (
+          <Tag color="processing" icon={<CarOutlined />} style={{ margin: 0, borderRadius: 6, fontWeight: 500, fontSize: 12 }}>
+            Đang giao
+          </Tag>
+        );
+      case "COMPLETED":
+      case "DELIVERED":
+        return (
+          <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0, borderRadius: 6, fontWeight: 500, fontSize: 12 }}>
+            Hoàn tất
+          </Tag>
+        );
+      case "CANCELLED":
+      case "REJECTED":
+        return (
+          <Tag color="default" icon={<CloseCircleOutlined />} style={{ margin: 0, borderRadius: 6, fontWeight: 500, fontSize: 12 }}>
+            Đã hủy
+          </Tag>
+        );
+      default:
+        return <Tag color="default" style={{ margin: 0, borderRadius: 6, fontSize: 12 }}>{status}</Tag>;
+    }
+  };
+
+  // Tag trạng thái trực quan: Trên mobile chỉ hiện ký hiệu icon kèm Tooltip; Trên desktop hiện đầy đủ icon + chữ
   const renderStatusTag = (status: string) => {
     const s = (status || "").toUpperCase();
+
+    if (isMobile) {
+      switch (s) {
+        case "DRAFT":
+          return (
+            <Tooltip title="Đơn nháp" trigger={["click", "hover"]}>
+              <Tag color="default" style={{ margin: 0, padding: "2px 7px", borderRadius: 6, cursor: "pointer" }}>
+                <ClockCircleOutlined style={{ fontSize: 13 }} />
+              </Tag>
+            </Tooltip>
+          );
+        case "PENDING":
+        case "PENDING_APPROVAL":
+          return (
+            <Tooltip title="Chờ duyệt" trigger={["click", "hover"]}>
+              <Tag color="gold" style={{ margin: 0, padding: "2px 7px", borderRadius: 6, cursor: "pointer" }}>
+                <ClockCircleOutlined style={{ fontSize: 13 }} />
+              </Tag>
+            </Tooltip>
+          );
+        case "APPROVED":
+          return (
+            <Tooltip title="Đã duyệt" trigger={["click", "hover"]}>
+              <Tag color="cyan" style={{ margin: 0, padding: "2px 7px", borderRadius: 6, cursor: "pointer" }}>
+                <CheckCircleOutlined style={{ fontSize: 13 }} />
+              </Tag>
+            </Tooltip>
+          );
+        case "PROCESSING":
+          return (
+            <Tooltip title="Đang xử lý" trigger={["click", "hover"]}>
+              <Tag color="blue" style={{ margin: 0, padding: "2px 7px", borderRadius: 6, cursor: "pointer" }}>
+                <SyncOutlined spin style={{ fontSize: 13 }} />
+              </Tag>
+            </Tooltip>
+          );
+        case "SHIPPING":
+        case "IN_TRANSIT":
+          return (
+            <Tooltip title="Đang giao" trigger={["click", "hover"]}>
+              <Tag color="processing" style={{ margin: 0, padding: "2px 7px", borderRadius: 6, cursor: "pointer" }}>
+                <CarOutlined style={{ fontSize: 13 }} />
+              </Tag>
+            </Tooltip>
+          );
+        case "COMPLETED":
+        case "DELIVERED":
+          return (
+            <Tooltip title="Hoàn tất" trigger={["click", "hover"]}>
+              <Tag color="success" style={{ margin: 0, padding: "2px 7px", borderRadius: 6, cursor: "pointer" }}>
+                <CheckCircleOutlined style={{ fontSize: 13 }} />
+              </Tag>
+            </Tooltip>
+          );
+        case "CANCELLED":
+        case "REJECTED":
+          return (
+            <Tooltip title="Đã hủy" trigger={["click", "hover"]}>
+              <Tag color="default" style={{ margin: 0, padding: "2px 7px", borderRadius: 6, cursor: "pointer" }}>
+                <CloseCircleOutlined style={{ fontSize: 13 }} />
+              </Tag>
+            </Tooltip>
+          );
+        default:
+          return (
+            <Tooltip title={status} trigger={["click", "hover"]}>
+              <Tag color="default" style={{ margin: 0, padding: "2px 7px", borderRadius: 6, cursor: "pointer" }}>
+                {status.slice(0, 2).toUpperCase()}
+              </Tag>
+            </Tooltip>
+          );
+      }
+    }
+
+    // Trên Desktop: hiển thị tag đầy đủ
     switch (s) {
       case "DRAFT":
         return <Tag color="default">Đơn nháp</Tag>;
@@ -307,99 +456,167 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
     });
   }, [orders, searchKeyword, statusFilter]);
 
-  // Cột bảng danh sách đơn hàng
-  const columns: ColumnsType<OrderResponseItem> = [
-    {
-      title: "MÃ ĐƠN",
-      dataIndex: "order_code",
-      key: "order_code",
-      width: 170,
-      render: (code: string, record) => (
-        <Space orientation="vertical" size={2}>
-          <Text
-            strong
-            style={{ color: "#2563eb", fontSize: 14, cursor: "pointer" }}
-            onClick={() => handleOpenDetail(record)}
-          >
-            {code}
+  // Dữ liệu phân trang cho danh sách thẻ Mobile
+  const paginatedOrders = useMemo(() => {
+    const start = (mobilePage - 1) * mobilePageSize;
+    return filteredOrders.slice(start, start + mobilePageSize);
+  }, [filteredOrders, mobilePage, mobilePageSize]);
+
+  // Cột bảng danh sách đơn hàng (Tự động thu gọn chỉ hiện ký hiệu trên Mobile)
+  const columns: ColumnsType<OrderResponseItem> = useMemo(
+    () => [
+      {
+        title: "MÃ ĐƠN",
+        dataIndex: "order_code",
+        key: "order_code",
+        width: isMobile ? 125 : 170,
+        render: (code: string, record) => (
+          <Space orientation="vertical" size={2}>
+            <Text
+              strong
+              style={{ color: "#2563eb", fontSize: isMobile ? 13 : 14, cursor: "pointer" }}
+              onClick={() => handleOpenDetail(record)}
+            >
+              {code}
+            </Text>
+            {record.is_partially_delivered && (
+              <Tag
+                color="orange"
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "0 4px",
+                  lineHeight: "16px",
+                  margin: 0,
+                }}
+              >
+                Thiếu SP
+              </Tag>
+            )}
+          </Space>
+        ),
+      },
+      {
+        title: "NGÀY ĐẶT",
+        dataIndex: "created_at",
+        key: "created_at",
+        width: isMobile ? 110 : 160,
+        render: (dt: string) => (
+          <span style={{ color: "#475569", fontSize: isMobile ? 12 : 13 }}>
+            {formatDateTime(dt)}
+          </span>
+        ),
+      },
+      {
+        title: "NGÀY GIAO DỰ KIẾN",
+        dataIndex: "expected_delivery_date",
+        key: "expected_delivery_date",
+        width: isMobile ? 120 : 170,
+        render: (dateStr: string) => (
+          <Space size={4} style={{ color: "#334155", fontSize: isMobile ? 12 : 13 }}>
+            <CalendarOutlined style={{ color: "#64748b" }} />
+            <span>{formatDateOnly(dateStr)}</span>
+          </Space>
+        ),
+      },
+      {
+        title: "TỔNG TIỀN",
+        dataIndex: "total_amount",
+        key: "total_amount",
+        width: isMobile ? 115 : 170,
+        align: "right",
+        render: (amount: number) => (
+          <Text strong style={{ color: "#0f172a", fontSize: isMobile ? 13 : 15 }}>
+            {formatMoney(amount)}
           </Text>
-          {record.is_partially_delivered && (
-            <Tag color="orange" style={{ fontSize: 11, fontWeight: 600, padding: "0 6px", lineHeight: "18px" }}>
-              Giao thiếu SP
-            </Tag>
-          )}
-        </Space>
-      ),
-    },
-    {
-      title: "NGÀY ĐẶT",
-      dataIndex: "created_at",
-      key: "created_at",
-      width: 160,
-      render: (dt: string) => (
-        <span style={{ color: "#475569", fontSize: 13 }}>{formatDateTime(dt)}</span>
-      ),
-    },
-    {
-      title: "NGÀY GIAO DỰ KIẾN",
-      dataIndex: "expected_delivery_date",
-      key: "expected_delivery_date",
-      width: 170,
-      render: (dateStr: string) => (
-        <Space size={6} style={{ color: "#334155", fontSize: 13 }}>
-          <CalendarOutlined style={{ color: "#64748b" }} />
-          <span>{formatDateOnly(dateStr)}</span>
-        </Space>
-      ),
-    },
-    {
-      title: "TỔNG TIỀN",
-      dataIndex: "total_amount",
-      key: "total_amount",
-      width: 170,
-      align: "right",
-      render: (amount: number) => (
-        <Text strong style={{ color: "#0f172a", fontSize: 15 }}>
-          {formatMoney(amount)}
-        </Text>
-      ),
-    },
-    {
-      title: "TRẠNG THÁI",
-      dataIndex: "status",
-      key: "status",
-      width: 150,
-      align: "center",
-      render: (status: string) => renderStatusTag(status),
-    },
-    {
-      title: "THAO TÁC",
-      key: "action",
-      width: 220,
-      align: "center",
-      render: (_, record) => (
-        <Space size={4}>
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            style={{ fontWeight: 500, color: "#2563eb", padding: "4px 8px" }}
-            onClick={() => handleOpenDetail(record)}
-          >
-            Xem chi tiết
-          </Button>
-          <Button
-            type="link"
-            icon={<RedoOutlined />}
-            style={{ fontWeight: 500, color: "#059669", padding: "4px 8px" }}
-            loading={reorderLoadingId === record.id}
-            onClick={() => handleStartReorder(record.id)}
-          >
-            Đặt lại đơn
-          </Button>
-        </Space>
-      ),
-    },
-  ];
+        ),
+      },
+      {
+        title: isMobile ? "T.THÁI" : "TRẠNG THÁI",
+        dataIndex: "status",
+        key: "status",
+        width: isMobile ? 65 : 150,
+        align: "center",
+        render: (status: string) => renderStatusTag(status),
+      },
+      {
+        title: isMobile ? "T.TÁC" : "THAO TÁC",
+        key: "action",
+        width: isMobile ? 85 : 220,
+        align: "center",
+        render: (_, record) => {
+          if (isMobile) {
+            return (
+              <Space size={6} style={{ justifyContent: "center" }}>
+                <Tooltip title="Xem chi tiết đơn" trigger={["click", "hover"]}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EyeOutlined style={{ fontSize: 15, color: "#2563eb" }} />}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      padding: 0,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#eff6ff",
+                      borderRadius: 6,
+                      border: "1px solid #bfdbfe",
+                    }}
+                    onClick={() => handleOpenDetail(record)}
+                  />
+                </Tooltip>
+                <Tooltip title="Đặt lại đơn này" trigger={["click", "hover"]}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<RedoOutlined style={{ fontSize: 14, color: "#059669" }} />}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      padding: 0,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#f0fdf4",
+                      borderRadius: 6,
+                      border: "1px solid #bbf7d0",
+                    }}
+                    loading={reorderLoadingId === record.id}
+                    onClick={() => handleStartReorder(record.id)}
+                  />
+                </Tooltip>
+              </Space>
+            );
+          }
+
+          return (
+            <Space size={4}>
+              <Button
+                type="link"
+                icon={<EyeOutlined />}
+                style={{ fontWeight: 500, color: "#2563eb", padding: "4px 8px" }}
+                onClick={() => handleOpenDetail(record)}
+              >
+                Xem chi tiết
+              </Button>
+              <Button
+                type="link"
+                icon={<RedoOutlined />}
+                style={{ fontWeight: 500, color: "#059669", padding: "4px 8px" }}
+                loading={reorderLoadingId === record.id}
+                onClick={() => handleStartReorder(record.id)}
+              >
+                Đặt lại đơn
+              </Button>
+            </Space>
+          );
+        },
+      },
+    ],
+    [isMobile, reorderLoadingId]
+  );
 
   // Cột bảng sản phẩm chi tiết trong Modal
   const modalItemColumns: ColumnsType<OrderItemView> = [
@@ -693,16 +910,16 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
         </div>
       </Card>
 
-      {/* 3. Nội dung bảng hoặc Empty state */}
+      {/* 3. Nội dung bảng hoặc Empty state (Dạng Thẻ trên Mobile, Dạng Bảng trên Desktop) */}
       <Card
         style={{
           borderRadius: 14,
-          border: "1px solid #e2e8f0",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-          backgroundColor: "#ffffff",
+          border: isMobile ? "none" : "1px solid #e2e8f0",
+          boxShadow: isMobile ? "none" : "0 2px 8px rgba(0, 0, 0, 0.04)",
+          backgroundColor: isMobile ? "transparent" : "#ffffff",
           overflow: "hidden",
         }}
-        styles={{ body: { padding: orders.length === 0 && !loading ? 40 : 0 } }}
+        styles={{ body: { padding: isMobile ? 0 : (orders.length === 0 && !loading ? 40 : 0) } }}
       >
         {loading ? (
           <div style={{ padding: "60px 0", textAlign: "center" }}>
@@ -766,6 +983,120 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
               </Button>
             </Empty>
           </div>
+        ) : isMobile ? (
+          /* Giao diện Dạng Thẻ tối ưu cho điện thoại: Bấm vào thẻ để xem chi tiết (không cần nút thao tác) */
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {paginatedOrders.map((ord) => (
+              <div
+                key={ord.id}
+                onClick={() => handleOpenDetail(ord)}
+                style={{
+                  backgroundColor: "#ffffff",
+                  borderRadius: 12,
+                  border: "1px solid #e2e8f0",
+                  padding: "12px 14px",
+                  boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {/* Dòng 1: Mã đơn & Trạng thái */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: "#2563eb" }}>
+                      {ord.order_code}
+                    </span>
+                    {ord.is_partially_delivered && (
+                      <Tag
+                        color="orange"
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          padding: "0 4px",
+                          margin: 0,
+                          lineHeight: "16px",
+                        }}
+                      >
+                        Thiếu SP
+                      </Tag>
+                    )}
+                  </div>
+                  {renderCardStatusTag(ord.status)}
+                </div>
+
+                {/* Dòng 2: Ngày đặt & Ngày giao */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: 12,
+                    color: "#64748b",
+                    marginBottom: 6,
+                  }}
+                >
+                  <span>
+                    <ClockCircleOutlined style={{ marginRight: 4, color: "#94a3b8" }} />
+                    {formatDateTime(ord.created_at)}
+                  </span>
+                  {ord.expected_delivery_date ? (
+                    <span>
+                      <CalendarOutlined style={{ marginRight: 4, color: "#94a3b8" }} />
+                      Giao: {formatDateOnly(ord.expected_delivery_date)}
+                    </span>
+                  ) : null}
+                </div>
+
+                <Divider style={{ margin: "6px 0 8px 0" }} />
+
+                {/* Dòng 3: Tổng tiền & Mũi tên xem chi tiết (Không cần nút thao tác) */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <span style={{ fontSize: 11, color: "#94a3b8", display: "block" }}>
+                      Tổng thanh toán
+                    </span>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+                      {formatMoney(ord.total_amount)}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      color: "#2563eb",
+                      fontSize: 12,
+                      fontWeight: 500,
+                    }}
+                  >
+                    <span>Chi tiết</span>
+                    <RightOutlined style={{ fontSize: 11 }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Phân trang trên mobile */}
+            {filteredOrders.length > mobilePageSize && (
+              <div style={{ display: "flex", justifyContent: "center", padding: "10px 0" }}>
+                <Pagination
+                  size="small"
+                  current={mobilePage}
+                  pageSize={mobilePageSize}
+                  total={filteredOrders.length}
+                  onChange={(p) => setMobilePage(p)}
+                  showSizeChanger={false}
+                />
+              </div>
+            )}
+          </div>
         ) : (
           <Table<OrderResponseItem>
             columns={columns}
@@ -792,30 +1123,25 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
         width={920}
         styles={{
           body: {
-            height: "calc(88vh - 110px)",
-            maxHeight: 680,
-            minHeight: 460,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            padding: "16px 20px 10px",
+            maxHeight: isMobile ? "calc(88vh - 90px)" : 680,
+            minHeight: isMobile ? 320 : 460,
+            overflowY: "auto",
+            padding: isMobile ? "12px 14px 16px" : "16px 20px 10px",
           },
         }}
         footer={[
           <Button
-            key="close"
-            onClick={() => {
-              setIsDetailModalOpen(false);
-              setSelectedOrder(null);
-            }}
-          >
-            Đóng
-          </Button>,
-          <Button
             key="reorder"
             type="primary"
             icon={<RedoOutlined />}
-            style={{ backgroundColor: "#059669", borderColor: "#059669", fontWeight: 600 }}
+            style={{
+              backgroundColor: "#059669",
+              borderColor: "#059669",
+              fontWeight: 600,
+              height: 40,
+              borderRadius: 8,
+              width: "100%",
+            }}
             loading={reorderLoadingId === selectedOrder?.id}
             onClick={() => {
               if (selectedOrder) {
@@ -830,7 +1156,7 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <ShoppingOutlined style={{ color: "#2563eb", fontSize: 20 }} />
             <div>
-              <span style={{ fontWeight: 700, fontSize: 17, color: "#1e293b" }}>
+              <span style={{ fontWeight: 700, fontSize: isMobile ? 15 : 17, color: "#1e293b" }}>
                 Chi tiết đơn hàng #{selectedOrder?.order_code}
               </span>
             </div>
@@ -838,36 +1164,139 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
         }
       >
         {detailLoading ? (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ padding: "40px 0", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Spin tip="Đang tải dữ liệu chi tiết đơn hàng..." />
           </div>
         ) : selectedOrder && (
-          <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 10, overflow: "hidden" }}>
-            {/* Timeline / Stepper trạng thái đơn */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Timeline / Stepper trạng thái đơn (Nằm ngang chuẩn Mobile, từ đơn siêu gọn không bao giờ đè chữ) */}
             <div
               style={{
                 background: "#f8fafc",
-                borderRadius: 8,
-                padding: "10px 16px",
+                borderRadius: 10,
+                padding: "10px 10px 12px",
                 border: "1px solid #e2e8f0",
-                flexShrink: 0,
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 8 }}>
-                TIẾN ĐỘ XỬ LÝ ĐƠN HÀNG:
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#475569",
+                  marginBottom: 10,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span>TIẾN ĐỘ XỬ LÝ:</span>
+                <span style={{ fontWeight: 700, color: stepperInfo.status === "error" ? "#ef4444" : "#2563eb" }}>
+                  {stepperInfo.text}
+                </span>
               </div>
-              <Steps
-                current={stepperInfo.current}
-                status={stepperInfo.status}
-                size="small"
-                items={[
-                  { title: "Đặt đơn" },
-                  { title: "Duyệt đơn" },
-                  { title: "Xuất kho" },
-                  { title: "Đang giao" },
-                  { title: "Hoàn tất" },
-                ]}
-              />
+
+              {/* Thanh Stepper nằm ngang tùy biến chuẩn mobile, từ đơn cách nhau rộng rãi */}
+              <div style={{ position: "relative", padding: "0 4px" }}>
+                {/* Đường nối ngang */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    left: "10%",
+                    right: "10%",
+                    height: 2,
+                    backgroundColor: "#e2e8f0",
+                    zIndex: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      backgroundColor: stepperInfo.status === "error" ? "#ef4444" : "#2563eb",
+                      width: `${Math.min(100, (stepperInfo.current / 4) * 100)}%`,
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+
+                {/* 5 Bước nằm ngang đều đặn với nhãn từ đơn cực ngắn */}
+                <div style={{ display: "flex", justifyContent: "space-between", position: "relative", zIndex: 1 }}>
+                  {[
+                    { title: "Tạo", index: 0 },
+                    { title: "Duyệt", index: 1 },
+                    { title: "Kho", index: 2 },
+                    { title: "Giao", index: 3 },
+                    { title: "Xong", index: 4 },
+                  ].map((step) => {
+                    const isPassed = stepperInfo.current > step.index;
+                    const isCurrent = stepperInfo.current === step.index;
+                    const isError = isCurrent && stepperInfo.status === "error";
+
+                    return (
+                      <div
+                        key={step.index}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          width: `${100 / 5}%`,
+                        }}
+                      >
+                        {/* Vòng tròn số / dấu check */}
+                        <div
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: "50%",
+                            backgroundColor: isError
+                              ? "#ef4444"
+                              : isCurrent
+                              ? "#2563eb"
+                              : isPassed
+                              ? "#10b981"
+                              : "#e2e8f0",
+                            color: isCurrent || isPassed || isError ? "#ffffff" : "#64748b",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            marginBottom: 4,
+                            boxShadow: isCurrent ? "0 0 0 3px rgba(37, 99, 235, 0.2)" : undefined,
+                          }}
+                        >
+                          {isPassed ? (
+                            <CheckOutlined style={{ fontSize: 9 }} />
+                          ) : isError ? (
+                            <CloseCircleOutlined style={{ fontSize: 9 }} />
+                          ) : (
+                            step.index + 1
+                          )}
+                        </div>
+
+                        {/* Tên bước từ đơn siêu ngắn, đảm bảo khoảng cách giữa các chữ rộng rãi */}
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: isCurrent ? 700 : 500,
+                            color: isError
+                              ? "#ef4444"
+                              : isCurrent
+                              ? "#1d4ed8"
+                              : isPassed
+                              ? "#0f172a"
+                              : "#94a3b8",
+                            whiteSpace: "nowrap",
+                            textAlign: "center",
+                          }}
+                        >
+                          {step.title}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Cảnh báo Giao thiếu sản phẩm nếu có */}
@@ -877,108 +1306,279 @@ export const CustomerOrders: React.FC<CustomerOrdersProps> = ({
                 showIcon
                 icon={<WarningOutlined style={{ color: "#d97706" }} />}
                 message={
-                  <span style={{ fontWeight: 600, color: "#92400e", fontSize: 13 }}>
+                  <span style={{ fontWeight: 600, color: "#92400e", fontSize: isMobile ? 12 : 13 }}>
                     Thông báo: Đơn hàng được giao một phần
                   </span>
                 }
                 description={
-                  <span style={{ fontSize: 12, color: "#78350f" }}>
+                  <span style={{ fontSize: isMobile ? 11 : 12, color: "#78350f" }}>
                     Một số mặt hàng thực tế được giao ít hơn số lượng đặt do điều kiện kho bãi. Quý đại lý vui lòng đối chiếu số lượng thực giao chi tiết bên dưới.
                   </span>
                 }
-                style={{ borderRadius: 6, border: "1px solid #fde68a", backgroundColor: "#fffbeb", padding: "6px 12px", flexShrink: 0 }}
+                style={{ borderRadius: 6, border: "1px solid #fde68a", backgroundColor: "#fffbeb", padding: "6px 10px" }}
               />
             )}
 
-            {/* Thông tin đơn hàng & giao nhận (Gọn gàng trong 3 cột) */}
-            <Descriptions
-              bordered
-              size="small"
-              column={{ xs: 1, sm: 3 }}
-              style={{ flexShrink: 0 }}
-            >
-              <Descriptions.Item label="Mã đơn hàng">
-                <Text strong style={{ color: "#2563eb", fontSize: 13 }}>
-                  {selectedOrder.order_code}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Trạng thái">
-                {renderStatusTag(selectedOrder.status)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngày đặt hàng">
-                {formatDateTime(selectedOrder.created_at)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngày giao dự kiến">
-                <Space size={4}>
-                  <CalendarOutlined style={{ color: "#2563eb" }} />
-                  <Text strong>{formatDateOnly(selectedOrder.expected_delivery_date)}</Text>
-                </Space>
-              </Descriptions.Item>
-              <Descriptions.Item label="Điểm giao hàng">
-                <Text strong>{selectedOrder.delivery_point_name || "Địa chỉ mặc định"}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Tổng thanh toán">
-                <Text strong style={{ color: "#059669", fontSize: 15 }}>
-                  {formatMoney(selectedOrder.total_amount)}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Địa chỉ nhận" span={selectedOrder.note ? 2 : 3}>
-                <Space align="start" size={6}>
-                  <EnvironmentOutlined style={{ color: "#ef4444", marginTop: 3 }} />
-                  <span style={{ fontSize: 12 }}>
+            {/* Thông tin đơn hàng & giao nhận (Tối ưu riêng cho Mobile hiển thị trọn vẹn 100%, không bị khuất) */}
+            {isMobile ? (
+              <div
+                style={{
+                  backgroundColor: "#f8fafc",
+                  borderRadius: 10,
+                  border: "1px solid #e2e8f0",
+                  padding: "10px 12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>Mã đơn hàng:</span>
+                  <Text strong style={{ color: "#2563eb", fontSize: 13 }}>{selectedOrder.order_code}</Text>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>Trạng thái:</span>
+                  {renderCardStatusTag(selectedOrder.status)}
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>Ngày đặt hàng:</span>
+                  <span style={{ fontSize: 12, color: "#334155" }}>{formatDateTime(selectedOrder.created_at)}</span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>Ngày giao dự kiến:</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#2563eb" }}>
+                    <CalendarOutlined style={{ marginRight: 4 }} />
+                    {formatDateOnly(selectedOrder.expected_delivery_date)}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                  <span style={{ fontSize: 12, color: "#64748b", flexShrink: 0 }}>Điểm nhận hàng:</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, textAlign: "right", color: "#1e293b" }}>
+                    {selectedOrder.delivery_point_name || "Địa chỉ mặc định"}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                  <span style={{ fontSize: 12, color: "#64748b", flexShrink: 0 }}>Địa chỉ giao:</span>
+                  <span style={{ fontSize: 12, color: "#475569", textAlign: "right", wordBreak: "break-word" }}>
+                    <EnvironmentOutlined style={{ color: "#ef4444", marginRight: 4 }} />
                     {typeof selectedOrder.delivery_address === "string"
                       ? selectedOrder.delivery_address
                       : selectedOrder.delivery_address?.address || "Chưa có địa chỉ"}
                   </span>
-                </Space>
-              </Descriptions.Item>
-              {selectedOrder.note && (
-                <Descriptions.Item label="Ghi chú" span={1}>
-                  <span style={{ fontSize: 12 }}>{selectedOrder.note}</span>
-                </Descriptions.Item>
-              )}
-            </Descriptions>
+                </div>
 
-            {/* Bảng sản phẩm chi tiết - Tự động co giãn theo chiều cao và chỉ cuộn trong bảng */}
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", marginTop: 2 }}>
+                {selectedOrder.note && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                    <span style={{ fontSize: 12, color: "#64748b", flexShrink: 0 }}>Ghi chú:</span>
+                    <span style={{ fontSize: 12, color: "#475569", textAlign: "right" }}>{selectedOrder.note}</span>
+                  </div>
+                )}
+
+                <Divider style={{ margin: "4px 0" }} />
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>Tổng thanh toán:</span>
+                  <Text strong style={{ color: "#059669", fontSize: 16 }}>{formatMoney(selectedOrder.total_amount)}</Text>
+                </div>
+              </div>
+            ) : (
+              <Descriptions
+                bordered
+                size="small"
+                column={{ xs: 1, sm: 3 }}
+                style={{ flexShrink: 0 }}
+              >
+                <Descriptions.Item label="Mã đơn hàng">
+                  <Text strong style={{ color: "#2563eb", fontSize: 13 }}>
+                    {selectedOrder.order_code}
+                  </Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Trạng thái">
+                  {renderCardStatusTag(selectedOrder.status)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày đặt hàng">
+                  {formatDateTime(selectedOrder.created_at)}
+                </Descriptions.Item>
+                <Descriptions.Item label="Ngày giao dự kiến">
+                  <Space size={4}>
+                    <CalendarOutlined style={{ color: "#2563eb" }} />
+                    <Text strong>{formatDateOnly(selectedOrder.expected_delivery_date)}</Text>
+                  </Space>
+                </Descriptions.Item>
+                <Descriptions.Item label="Điểm giao hàng">
+                  <Text strong>{selectedOrder.delivery_point_name || "Địa chỉ mặc định"}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Tổng thanh toán">
+                  <Text strong style={{ color: "#059669", fontSize: 15 }}>
+                    {formatMoney(selectedOrder.total_amount)}
+                  </Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Địa chỉ nhận" span={selectedOrder.note ? 2 : 3}>
+                  <Space align="start" size={6}>
+                    <EnvironmentOutlined style={{ color: "#ef4444", marginTop: 3 }} />
+                    <span style={{ fontSize: 12 }}>
+                      {typeof selectedOrder.delivery_address === "string"
+                        ? selectedOrder.delivery_address
+                        : selectedOrder.delivery_address?.address || "Chưa có địa chỉ"}
+                    </span>
+                  </Space>
+                </Descriptions.Item>
+                {selectedOrder.note && (
+                  <Descriptions.Item label="Ghi chú" span={1}>
+                    <span style={{ fontSize: 12 }}>{selectedOrder.note}</span>
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+            )}
+
+            {/* Danh sách sản phẩm chi tiết - Dạng thẻ trên Mobile, Bảng trên Desktop */}
+            <div style={{ display: "flex", flexDirection: "column", marginTop: 4 }}>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   marginBottom: 6,
-                  flexShrink: 0,
                 }}
               >
-                <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 14 }}>
+                <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 13 }}>
                   Danh sách sản phẩm trong đơn ({selectedOrder.items?.length || 0})
                 </div>
                 {selectedOrder.is_partially_delivered && (
-                  <Tag color="error" style={{ fontWeight: 600, fontSize: 11 }}>
+                  <Tag color="error" style={{ fontWeight: 600, fontSize: 10, margin: 0 }}>
                     Có mặt hàng giao thiếu
                   </Tag>
                 )}
               </div>
 
-              <div
-                style={{
-                  flex: 1,
-                  minHeight: 0,
-                  overflowY: "auto",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 8,
-                  backgroundColor: "#ffffff",
-                }}
-              >
-                <Table<OrderItemView>
-                  columns={modalItemColumns}
-                  dataSource={selectedOrder.items || []}
-                  rowKey={(r, idx) => r.id || idx || 0}
-                  pagination={false}
-                  size="small"
-                  sticky
-                  locale={{ emptyText: "Không có thông tin chi tiết sản phẩm" }}
-                />
+              <div>
+                {isMobile ? (
+                  /* Danh sách sản phẩm dạng THẺ trên điện thoại di động */
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {(!selectedOrder.items || selectedOrder.items.length === 0) ? (
+                      <div style={{ textAlign: "center", padding: "20px 0", color: "#94a3b8", fontSize: 13 }}>
+                        Không có thông tin chi tiết sản phẩm
+                      </div>
+                    ) : (
+                      selectedOrder.items.map((r, idx) => {
+                        const ordered = r.ordered_quantity !== undefined ? r.ordered_quantity : r.quantity;
+                        const delivered =
+                          r.delivered_quantity !== undefined && r.delivered_quantity !== null
+                            ? r.delivered_quantity
+                            : r.actual_quantity !== undefined && r.actual_quantity !== null
+                            ? r.actual_quantity
+                            : ordered;
+                        const isShort = r.is_partially_delivered || delivered < ordered;
+                        const missing = ordered - delivered;
+                        const total = r.total_price !== undefined ? r.total_price : (r.subtotal !== undefined ? r.subtotal : r.quantity * r.unit_price);
+
+                        const orderStatus = (selectedOrder?.status || "").toUpperCase();
+                        const isDeliveredOrDelivering = [
+                          "SHIPPING",
+                          "IN_TRANSIT",
+                          "DELIVERED",
+                          "COMPLETED",
+                          "PROCESSING",
+                        ].includes(orderStatus);
+
+                        return (
+                          <div
+                            key={r.id || idx}
+                            style={{
+                              backgroundColor: "#ffffff",
+                              borderRadius: 10,
+                              border: "1px solid #e2e8f0",
+                              padding: "10px 12px",
+                              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.03)",
+                            }}
+                          >
+                            {/* Dòng 1: Tên sản phẩm & Thành tiền */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b", lineHeight: 1.3 }}>
+                                  {r.product_name}
+                                </div>
+                                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                                  <Tag color="blue" style={{ fontSize: 10, padding: "0 4px", lineHeight: "16px", margin: 0 }}>
+                                    {r.sku || "-"}
+                                  </Tag>
+                                  <span style={{ marginLeft: 6 }}>
+                                    {formatMoney(r.unit_price)} / {r.unit || r.unit_name || "Cái"}
+                                  </span>
+                                </div>
+                              </div>
+                              <Text strong style={{ color: "#2563eb", fontSize: 14, whiteSpace: "nowrap" }}>
+                                {formatMoney(total)}
+                              </Text>
+                            </div>
+
+                            {/* Dòng 2: Số lượng đặt và Số lượng thực giao */}
+                            <div
+                              style={{
+                                marginTop: 8,
+                                paddingTop: 6,
+                                borderTop: "1px dashed #f1f5f9",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                fontSize: 12,
+                              }}
+                            >
+                              <span style={{ color: "#475569" }}>
+                                SL đặt: <strong style={{ color: "#1e293b" }}>{ordered.toLocaleString("vi-VN")}</strong>
+                              </span>
+
+                              <div>
+                                {!isDeliveredOrDelivering ? (
+                                  <Tag color="default" style={{ margin: 0, fontSize: 10, borderRadius: 4 }}>
+                                    Chờ xuất kho
+                                  </Tag>
+                                ) : isShort ? (
+                                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                    <span style={{ color: "#ea580c", fontWeight: 700 }}>
+                                      Giao: {delivered.toLocaleString("vi-VN")}
+                                    </span>
+                                    <Tag color="error" style={{ margin: 0, fontSize: 10, padding: "0 4px", lineHeight: "16px" }}>
+                                      Thiếu {missing}
+                                    </Tag>
+                                  </div>
+                                ) : (
+                                  <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                                    Thực giao: {delivered.toLocaleString("vi-VN")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 8,
+                      overflowY: "auto",
+                      maxHeight: 280,
+                    }}
+                  >
+                    <Table<OrderItemView>
+                      columns={modalItemColumns}
+                      dataSource={selectedOrder.items || []}
+                      rowKey={(r, idx) => r.id || idx || 0}
+                      pagination={false}
+                      size="small"
+                      sticky
+                      locale={{ emptyText: "Không có thông tin chi tiết sản phẩm" }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

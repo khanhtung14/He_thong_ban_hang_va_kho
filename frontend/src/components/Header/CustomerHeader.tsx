@@ -8,6 +8,7 @@ import {
   Space,
   Typography,
   Button,
+  Tooltip,
 } from "antd";
 import type { MenuProps } from "antd";
 import {
@@ -90,6 +91,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
 
   return (
     <Header
+      className="customer-header-responsive"
       style={{
         position: "sticky",
         top: 0,
@@ -106,16 +108,26 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
       }}
     >
       <Space align="center">
-        <Tag
-          icon={<CheckCircleTwoTone twoToneColor="#52c41a" />}
-          color="success"
-          style={{ padding: "4px 10px", borderRadius: 12, fontSize: 13 }}
-        >
-          Hệ thống hoạt động bình thường
-        </Tag>
+        <Tooltip title="Hệ thống hoạt động bình thường">
+          <Tag
+            icon={<CheckCircleTwoTone twoToneColor="#52c41a" />}
+            color="success"
+            style={{
+              padding: "4px 8px",
+              borderRadius: 12,
+              fontSize: 13,
+              margin: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <span className="system-status-text">Hệ thống hoạt động bình thường</span>
+          </Tag>
+        </Tooltip>
       </Space>
 
-      <Space size="large" align="center">
+      <Space size="middle" align="center">
         <Badge count={notificationCount} size="small" offset={[-2, 4]}>
           <Button
             type="text"
@@ -133,6 +145,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
           <Space style={{ cursor: "pointer", userSelect: "none" }} size="small">
             <ProfileAvatar editable={false} size={36} initials={initials} avatarUrl={avatarUrl} />
             <div
+              className="user-profile-names"
               style={{
                 display: "flex",
                 flexDirection: "column",

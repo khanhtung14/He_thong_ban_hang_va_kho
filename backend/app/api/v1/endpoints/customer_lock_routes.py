@@ -1651,8 +1651,8 @@ def simulate_order(
             "isBelowFloorPrice": is_below_floor,
         })
 
-    current_debt = 0.0
-    credit_limit = customer.credit_limit
+    current_debt = float(getattr(customer, "current_debt", 0.0) or 0.0)
+    credit_limit = float(getattr(customer, "credit_limit", 0.0) or 0.0)
     debt_after = current_debt + sub_total
     is_exceeded = credit_limit > 0 and debt_after > credit_limit
 
@@ -1879,7 +1879,7 @@ def create_order(
             if default_addr:
                 chosen_address_id = default_addr.id
 
-        if payload.submit_for_approval or payload.status in [OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"]:
+        if is_customer_account or payload.submit_for_approval or payload.status in [OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"]:
             order_status = OrderStatus.PENDING_APPROVAL
         elif approval_lines:
             order_status = OrderStatus.PENDING
@@ -2088,6 +2088,70 @@ def _build_portal_order_dict(order: Order, db: Session, customer: Optional[Custo
         "approval_reason": getattr(order, "approval_reason", None),
         "is_partially_delivered": has_partially_delivered,
         "items": items_res,
+    }
+
+
+@router.get("/portal/customer-profile")
+@router.get("/portal/customer")
+@router.get("/customer/profile")
+def get_portal_customer_profile(
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Lấy thông tin chi tiết đại lý của chính tài khoản đang đăng nhập."""
+    customer = _resolve_customer_for_user(db, user)
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tài khoản của bạn chưa được liên kết với hồ sơ đại lý nào.",
+        )
+    serving_wh = get_customer_serving_warehouse(db, customer.id, customer.warehouse_id)
+    delivery_addresses = (
+        db.query(DeliveryAddress)
+        .filter(DeliveryAddress.customer_id == customer.id)
+        .order_by(DeliveryAddress.is_default.desc(), DeliveryAddress.id.asc())
+        .all()
+    )
+    current_debt = float(getattr(customer, "current_debt", 0.0) or 0.0)
+    credit_limit = float(getattr(customer, "credit_limit", 0.0) or 0.0)
+    available_credit = max(0.0, credit_limit - current_debt)
+
+    return {
+        "success": True,
+        "customer": {
+            "id": customer.id,
+            "code": customer.code,
+            "name": customer.name,
+            "phone": customer.phone,
+            "email": customer.email,
+            "address": customer.address,
+            "customer_group": customer.customer_group,
+            "credit_limit": credit_limit,
+            "creditLimit": credit_limit,
+            "current_debt": current_debt,
+            "currentDebt": current_debt,
+            "available_credit": available_credit,
+            "availableCredit": available_credit,
+            "is_locked": customer.is_locked,
+            "isLocked": customer.is_locked,
+            "lock_reason": customer.lock_reason,
+            "lockReason": customer.lock_reason,
+            "warehouse_id": serving_wh.id if serving_wh else 1,
+            "warehouse_name": serving_wh.name if serving_wh else "Kho Tổng",
+            "delivery_addresses": [
+                {
+                    "id": addr.id,
+                    "receiver_name": addr.receiver_name,
+                    "receiverName": addr.receiver_name,
+                    "phone": addr.phone,
+                    "address": addr.address,
+                    "is_default": addr.is_default,
+                    "isDefault": addr.is_default,
+                    "note": addr.note,
+                }
+                for addr in delivery_addresses
+            ],
+        }
     }
 
 

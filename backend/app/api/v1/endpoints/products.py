@@ -903,8 +903,43 @@ def list_products(
                 "available_qty": float(row[3] or 0.0),
             }
 
+        is_customer = normalize_role(user.role) == RoleCode.CUSTOMER.value
+        customer_record = None
+        has_group_price_list = False
+        if is_customer:
+            try:
+                from app.api.v1.endpoints.customer_lock_routes import _resolve_customer_for_user
+                from app.api.v1.endpoints.price_lists import resolve_effective_price, PriceList
+                customer_record = _resolve_customer_for_user(db, user)
+                if customer_record:
+                    pl_count = db.query(PriceList).filter(
+                        PriceList.customer_group == customer_record.customer_group,
+                        PriceList.published.is_(True),
+                    ).count()
+                    has_group_price_list = pl_count > 0
+            except Exception:
+                pass
+
         products_list = []
         for p in products:
+            if is_customer:
+                p_status = (p.status or "ACTIVE").upper()
+                if p_status != "ACTIVE":
+                    continue
+                effective_price = None
+                if customer_record:
+                    try:
+                        from app.api.v1.endpoints.price_lists import resolve_effective_price
+                        effective_price = resolve_effective_price(db, p.sku, customer_record.customer_group)
+                    except Exception:
+                        effective_price = None
+                if has_group_price_list and not effective_price:
+                    # Đại lý chỉ thấy sản phẩm và giá thuộc nhóm khách hàng của mình
+                    continue
+                sale_price_val = float(effective_price["sale_price"]) if effective_price else float(p.base_price or 0.0)
+            else:
+                sale_price_val = p.base_price
+
             stk = inv_data.get(p.id)
             if stk:
                 avail_qty = max(0.0, stk["available_qty"])
@@ -927,8 +962,8 @@ def list_products(
                 "unit": p.base_unit,
                 "manageByLot": p.manage_by_lot,
                 "minStock": p.min_stock,
-                "basePrice": p.base_price,
-                "sale_price": p.base_price,
+                "basePrice": sale_price_val,
+                "sale_price": sale_price_val,
                 "costPrice": p.cost_price,
                 "cost_price": p.cost_price,
                 "margin": f"{round(((p.base_price - p.cost_price) / p.base_price * 100), 1)}%"

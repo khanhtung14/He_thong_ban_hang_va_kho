@@ -4420,16 +4420,10 @@ export interface components {
              * @default 0
              */
             quantity: number;
-            /**
-             * Delivered Quantity
-             * @default 0
-             */
-            delivered_quantity: number;
-            /**
-             * Actual Quantity
-             * @default 0
-             */
-            actual_quantity: number;
+            /** Delivered Quantity */
+            delivered_quantity?: number | null;
+            /** Actual Quantity */
+            actual_quantity?: number | null;
             /**
              * Unit Price
              * @default 0

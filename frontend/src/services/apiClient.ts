@@ -938,3 +938,160 @@ export async function fetchDealerPurchaseHistory(
   return res.json();
 }
 
+// -------------------------------------------------------------
+// Customer Portal Ordering Interfaces & Services
+// -------------------------------------------------------------
+
+export interface PortalDeliveryAddress {
+  id: number;
+  receiver_name: string;
+  receiverName?: string;
+  phone: string;
+  address: string;
+  is_default: boolean;
+  isDefault?: boolean;
+  note?: string;
+}
+
+export interface PortalCustomerInfo {
+  id: number;
+  code: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  customer_group: string;
+  customerGroup?: string;
+  credit_limit: number;
+  creditLimit?: number;
+  current_debt: number;
+  currentDebt?: number;
+  available_credit: number;
+  availableCredit?: number;
+  is_locked: boolean;
+  isLocked?: boolean;
+  lock_reason?: string;
+  lockReason?: string;
+  warehouse_id: number;
+  warehouse_name: string;
+  delivery_addresses: PortalDeliveryAddress[];
+}
+
+export interface PortalProductItem {
+  id: number;
+  sku: string;
+  name: string;
+  category_id?: number | null;
+  categoryId?: number | null;
+  category?: string | null;
+  baseUnit?: string;
+  unit?: string;
+  basePrice?: number;
+  sale_price?: number;
+  costPrice?: number;
+  cost_price?: number;
+  status?: string;
+  imageUrl?: string | null;
+  available_quantity?: number;
+  available_qty?: number;
+  stock_available?: number;
+}
+
+export interface SimulateOrderPayloadItem {
+  product_id?: number;
+  productId?: number;
+  sku?: string;
+  quantity: number;
+  unit_price?: number;
+  unitPrice?: number;
+}
+
+export interface SimulateOrderPayload {
+  customer_id: number;
+  customerId?: number;
+  warehouse_id?: number;
+  warehouseId?: number;
+  items: SimulateOrderPayloadItem[];
+}
+
+export interface OrderSimulateItemValidation {
+  productId?: number;
+  sku?: string;
+  requestedQty: number;
+  availableQty: number;
+  isAvailable: boolean;
+  unitPrice: number;
+  floorPrice?: number;
+  isBelowFloorPrice?: boolean;
+}
+
+export interface OrderSimulateResponseData {
+  subTotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  grandTotal: number;
+  currentDebt: number;
+  creditLimit: number;
+  debtAfterOrder: number;
+  isCreditLimitExceeded: boolean;
+  warehouseId?: number;
+  warehouseName?: string;
+  itemsValidation?: OrderSimulateItemValidation[];
+}
+
+export async function fetchPortalCustomerProfile(): Promise<PortalCustomerInfo> {
+  const res = await authenticatedFetch("/api/v1/portal/customer");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải thông tin đại lý.");
+  }
+  const json = await res.json();
+  return json.customer || json;
+}
+
+export async function fetchCustomerProducts(params?: {
+  keyword?: string;
+  categoryId?: number;
+}): Promise<PortalProductItem[]> {
+  const query = new URLSearchParams();
+  if (params?.keyword) query.set("keyword", params.keyword);
+  if (params?.categoryId) query.set("categoryId", String(params.categoryId));
+
+  const url = `/api/v1/products${query.toString() ? `?${query.toString()}` : ""}`;
+  const res = await authenticatedFetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách sản phẩm.");
+  }
+  const data = await res.json();
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.data)) return data.data;
+  if (data && Array.isArray(data.items)) return data.items;
+  return [];
+}
+
+export async function simulateOrder(
+  payload: SimulateOrderPayload
+): Promise<OrderSimulateResponseData> {
+  const res = await authenticatedFetch("/api/v1/orders/simulate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tính toán đơn hàng.");
+  }
+  const json = await res.json();
+  return json.data || json;
+}
+
+export async function fetchCategoriesList(): Promise<Array<{ id: number; name: string; code?: string }>> {
+  const res = await authenticatedFetch("/api/v1/categories");
+  if (!res.ok) return [];
+  const data = await res.json().catch(() => []);
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.data)) return data.data;
+  return [];
+}
+
