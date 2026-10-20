@@ -159,7 +159,7 @@ export const updatePriceList = async (
   },
 ): Promise<PriceListItem> => {
   const headers = getAuthHeaders();
-  const res = await fetch(`/api/v1/price-lists/${priceListId}`, {
+  const res = await fetch(`/api/v1/price-lists/${priceListId}?allow_adjustment=true`, {
     method: "PUT",
     headers,
     body: JSON.stringify(payload),

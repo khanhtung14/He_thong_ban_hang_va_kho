@@ -867,9 +867,20 @@ class Payment(Base):
     __tablename__ = "payments"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    sales_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     payment_method: Mapped[str] = mapped_column(String(50), nullable=False)
     payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    receipt_image: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="PENDING_SUBMISSION", nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    confirmed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmation_note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    customer: Mapped[Optional["Customer"]] = relationship("Customer", foreign_keys=[customer_id])
+    sales_rep: Mapped[Optional["User"]] = relationship("User", foreign_keys=[sales_id])
+    confirmed_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[confirmed_by_id])
 
 
 class InvoicePayment(Base):
