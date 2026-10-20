@@ -1,8 +1,10 @@
 """MySQL engine and SQLAlchemy session factory."""
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Dict, List, cast
 
 from dotenv import load_dotenv
 from sqlalchemy import Table, create_engine, inspect, text
@@ -77,7 +79,7 @@ def migrate_pricing_schema():
     )
 
     target_tables = cast(
-        list[Table],
+        List[Table],
         [
             PriceList.__table__,
             PriceListItem.__table__,
@@ -177,6 +179,16 @@ def migrate_pricing_schema():
             "min_quantity": "INTEGER NOT NULL DEFAULT 1",
             "max_quantity": "INTEGER NULL",
             "discount_value": "FLOAT NOT NULL DEFAULT 0.0",
+        },
+        "dispatches": {
+            "override_reason": "VARCHAR(255) NULL",
+            "created_at": "DATETIME NULL",
+        },
+        "dispatch_items": {
+            "override_reason": "VARCHAR(255) NULL",
+        },
+        "pick_lists": {
+            "created_at": "DATETIME NULL",
         },
     }
     for table_name, columns_to_add in additions.items():

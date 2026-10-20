@@ -202,6 +202,8 @@ def update_price_list(
     row = _load_price_list(db, price_list_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy bảng giá.")
+    if row.published:
+        raise HTTPException(status_code=409, detail="Bảng giá đã phát hành không thể sửa; hãy tạo phiên bản mới.")
     row.code = payload.code
     row.customer_group = payload.customer_group.value
     row.start_date = payload.start_date
