@@ -74,6 +74,14 @@ def migrate_pricing_schema():
         DiscountPolicy,
         DiscountTier,
         CreditLimitLog,
+        InventoryLog,
+        ImportDetail,
+        ExportDetail,
+        TransferDetail,
+        AdjustmentDetail,
+        WarehouseLocation,
+        PickList,
+        PickListDetail,
     )
 
     target_tables = cast(
@@ -88,6 +96,14 @@ def migrate_pricing_schema():
             DiscountPolicy.__table__,
             DiscountTier.__table__,
             CreditLimitLog.__table__,
+            InventoryLog.__table__,
+            ImportDetail.__table__,
+            ExportDetail.__table__,
+            TransferDetail.__table__,
+            AdjustmentDetail.__table__,
+            WarehouseLocation.__table__,
+            PickList.__table__,
+            PickListDetail.__table__,
         ],
     )
     Base.metadata.create_all(
@@ -97,6 +113,17 @@ def migrate_pricing_schema():
     )
     inspector = inspect(engine)
     additions = {
+        "pick_lists": {
+            "code": "VARCHAR(50) NOT NULL DEFAULT ''",
+            "warehouse_id": "INTEGER NULL",
+            "order_ids": "TEXT NULL",
+            "total_items": "INTEGER NOT NULL DEFAULT 0",
+            "total_required_qty": "FLOAT NOT NULL DEFAULT 0.0",
+            "total_actual_qty": "FLOAT NOT NULL DEFAULT 0.0",
+            "note": "TEXT NULL",
+            "created_at": "DATETIME NULL",
+            "updated_at": "DATETIME NULL",
+        },
         "customers": {
             "user_id": "INTEGER NULL",
             "customer_group": "VARCHAR(30) NOT NULL DEFAULT 'RETAIL'",
@@ -324,3 +351,52 @@ def migrate_sales_order_draft_schema():
                     connection.execute(
                         text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
                     )
+
+    try:
+        seed_default_warehouse_locations()
+    except Exception:
+        pass
+
+
+def seed_default_warehouse_locations(db = None) -> None:
+    """Seed initial warehouse locations (Bins) and map to products if table is empty."""
+    close_db = False
+    if db is None:
+        db = SessionLocal()
+        close_db = True
+
+    try:
+        from app.models.models import WarehouseLocation, Warehouse, Product
+        if db.query(WarehouseLocation).count() == 0:
+            wh = db.query(Warehouse).first()
+            wh_id = wh.id if wh else 1
+            products = db.query(Product).order_by(Product.id.asc()).all()
+
+            locations = []
+            seq = 1
+            for aisle in ["A", "B", "C"]:
+                for rack in ["01", "02"]:
+                    for shelf in ["01", "02"]:
+                        code = f"{aisle}-{rack}-{shelf}"
+                        prod_id = products[seq - 1].id if seq - 1 < len(products) else None
+                        loc = WarehouseLocation(
+                            warehouse_id=wh_id,
+                            code=code,
+                            aisle=aisle,
+                            rack=rack,
+                            shelf=shelf,
+                            bin="01",
+                            pick_sequence=seq,
+                            product_id=prod_id,
+                            is_active=True,
+                        )
+                        locations.append(loc)
+                        seq += 1
+            db.add_all(locations)
+            db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        if close_db:
+            db.close()
+

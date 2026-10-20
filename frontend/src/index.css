@@ -350,4 +350,63 @@ button {
   }
 }
 
+/* 10. Pick List & Batch Picking Mobile-First Design Tokens */
+.picklist-mobile-container {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding-bottom: 96px;
+}
+
+.picklist-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1.5px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease-in-out;
+}
+
+.picklist-card:hover {
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.picklist-card.completed {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.picklist-card.shortage {
+  border-color: #fca5a5;
+  background: #fffafa;
+}
+
+.touch-btn {
+  min-height: 44px;
+  border-radius: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease, background-color 0.15s ease;
+}
+
+.touch-btn:active {
+  transform: scale(0.97);
+}
+
+.location-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1px solid #c7d2fe;
+}
+
 
