@@ -74,6 +74,11 @@ def migrate_pricing_schema():
         DiscountPolicy,
         DiscountTier,
         CreditLimitLog,
+        InventoryLog,
+        ImportDetail,
+        ExportDetail,
+        TransferDetail,
+        AdjustmentDetail,
     )
 
     target_tables = cast(
@@ -88,6 +93,11 @@ def migrate_pricing_schema():
             DiscountPolicy.__table__,
             DiscountTier.__table__,
             CreditLimitLog.__table__,
+            InventoryLog.__table__,
+            ImportDetail.__table__,
+            ExportDetail.__table__,
+            TransferDetail.__table__,
+            AdjustmentDetail.__table__,
         ],
     )
     Base.metadata.create_all(

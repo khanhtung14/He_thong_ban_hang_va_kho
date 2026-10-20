@@ -976,3 +976,63 @@
 - **Phân quyền:** Accountant, Sales Manager
 - **Query Params:** `salesRepId`, `regionId`
 - **Response Data:** Báo cáo tổng hợp nợ xấu và nợ quá hạn theo từng nhân viên phụ trách.
+
+---
+
+### TÍNH NĂNG: THẺ KHO HÀNG HÓA (STOCK CARD / INVENTORY CARD)
+
+#### `GET /api/inventory-cards/{product_id}` & `GET /api/v1/inventory-cards/{product_id}`
+- **Chức năng:** Xem lịch sử thẻ kho của một sản phẩm (toàn bộ các phát sinh nhập, xuất, chuyển kho, điều chỉnh kiểm kê theo thời gian tăng dần).
+- **Phân quyền:** Warehouse, WH Manager, Sales Manager, Admin
+- **Path Params:** `product_id` (ID hoặc mã SKU sản phẩm)
+- **Query Params:**
+  - `warehouse_id` (integer, optional): Lọc theo mã kho hàng cụ thể
+  - `start_date` (string, optional): Từ ngày (YYYY-MM-DD hoặc ISO datetime)
+  - `end_date` (string, optional): Đến ngày (YYYY-MM-DD hoặc ISO datetime)
+- **Response Data (200 OK):**
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "Lấy thông tin thẻ kho thành công.",
+  "data": {
+    "product": {
+      "id": 1,
+      "sku": "SKU-BEV-001",
+      "name": "Nước ngọt Coca-Cola 320ml",
+      "baseUnit": "Lon"
+    },
+    "warehouse": {
+      "id": 1,
+      "name": "Kho Tổng Hà Nội",
+      "code": "WH-HN-01"
+    },
+    "filter": {
+      "warehouseId": 1,
+      "startDate": "2026-10-01",
+      "endDate": "2026-10-31"
+    },
+    "openingBalance": 100.0,
+    "totalIn": 50.0,
+    "totalOut": 30.0,
+    "closingBalance": 120.0,
+    "items": [
+      {
+        "id": "receipt-1-1",
+        "date": "2026-10-05 09:30:00",
+        "transactionType": "NHAP",
+        "transactionTypeLabel": "Nhập kho",
+        "documentId": 1,
+        "documentCode": "PN-00001",
+        "documentType": "RECEIPT",
+        "documentUrl": "/warehouse/receiving?receipt_id=1",
+        "warehouseId": 1,
+        "changeQuantity": 50.0,
+        "balanceAfter": 150.0,
+        "note": "Nhập kho theo phiếu PN-00001"
+      }
+    ]
+  }
+}
+```
+

@@ -7,6 +7,7 @@ import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSi
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
 import SupplierManagement from "./SupplierManagement";
+import InventoryCardView from "../../components/InventoryCardView";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -30,6 +31,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       if (p === "/warehouse/inventory") return "unit-conversion";
       if (p === "/warehouse/receiving") return "inbound";
       if (p === "/warehouse/picking") return "outbound";
+      if (p === "/warehouse/inventory-card") return "inventory-card";
     }
     return "suppliers";
   });
@@ -73,6 +75,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       else if (p === "/warehouse/inventory") setSelectedKey("unit-conversion");
       else if (p === "/warehouse/receiving") setSelectedKey("inbound");
       else if (p === "/warehouse/picking") setSelectedKey("outbound");
+      else if (p === "/warehouse/inventory-card") setSelectedKey("inventory-card");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -114,6 +117,8 @@ export const WarehouseStaffDashboard: React.FC = () => {
             window.history.pushState({}, "", "/warehouse/receiving");
           } else if (key === "outbound") {
             window.history.pushState({}, "", "/warehouse/picking");
+          } else if (key === "inventory-card") {
+            window.history.pushState({}, "", "/warehouse/inventory-card");
           } else {
             window.history.pushState({}, "", "/warehouse/inventory");
           }
@@ -149,6 +154,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
           {selectedKey === "outbound" && (
             <div>Giao diện Thực hiện Xuất kho</div>
           )}
+          {selectedKey === "inventory-card" && <InventoryCardView />}
           {selectedKey === "stocktake-exec" && (
             <div>Giao diện Đếm hàng kiểm kê</div>
           )}
