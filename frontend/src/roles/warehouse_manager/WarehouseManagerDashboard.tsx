@@ -5,6 +5,7 @@ import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import { WarehouseManagerSidebar } from "../../components/Sidebar/WarehouseManagerSidebar";
 import { WarehouseManagerHeader } from "../../components/Header/WarehouseManagerHeader";
+import { InventoryAdjustmentManagement } from "./InventoryAdjustmentManagement";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -21,7 +22,14 @@ export const WarehouseManagerDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [selectedKey, setSelectedKey] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname;
+      if (p === "/warehouse/adjustments") return "adjustments";
+      if (p === "/warehouse/stock-cards") return "stock-cards";
+    }
+    return "adjustments";
+  });
   const [, setLoading] = useState(false);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -43,17 +51,33 @@ export const WarehouseManagerDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadProfileData();
+    const timer = setTimeout(() => {
+      void loadProfileData();
+    }, 0);
 
-    const handleProfileSync = () => loadProfileData();
+    const handleProfileSync = () => {
+      void loadProfileData();
+    };
     window.addEventListener("profile-updated", handleProfileSync);
     window.addEventListener("storage", handleProfileSync);
 
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("profile-updated", handleProfileSync);
       window.removeEventListener("storage", handleProfileSync);
     };
   }, [loadProfileData]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname;
+      if (p === "/warehouse/adjustments") setSelectedKey("adjustments");
+      else if (p === "/warehouse/stock-cards") setSelectedKey("stock-cards");
+      else if (p === "/warehouse/dashboard") setSelectedKey("dashboard");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   return (
     <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
@@ -81,7 +105,16 @@ export const WarehouseManagerDashboard: React.FC = () => {
 
       <WarehouseManagerSidebar
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
+        onSelect={(key) => {
+          setSelectedKey(key);
+          if (key === "adjustments") {
+            window.history.pushState({}, "", "/warehouse/adjustments");
+          } else if (key === "stock-cards") {
+            window.history.pushState({}, "", "/warehouse/stock-cards");
+          } else {
+            window.history.pushState({}, "", "/warehouse/dashboard");
+          }
+        }}
         onLogout={logout}
       />
 
@@ -104,14 +137,50 @@ export const WarehouseManagerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung quản lý duyệt kho */}
+          {selectedKey === "adjustments" && (
+            <InventoryAdjustmentManagement
+              currentUser={profile}
+              initialTab="adjustments"
+            />
+          )}
+          {selectedKey === "stock-cards" && (
+            <InventoryAdjustmentManagement
+              currentUser={profile}
+              initialTab="stock-cards"
+            />
+          )}
+          {selectedKey === "dashboard" && (
+            <InventoryAdjustmentManagement
+              currentUser={profile}
+              initialTab="adjustments"
+            />
+          )}
+          {selectedKey !== "adjustments" &&
+            selectedKey !== "stock-cards" &&
+            selectedKey !== "dashboard" && (
+              <div
+                style={{
+                  background: "#ffffff",
+                  padding: 32,
+                  borderRadius: 12,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                }}
+              >
+                <h3 style={{ margin: 0, color: "#1e293b" }}>
+                  Mục đang được phát triển
+                </h3>
+                <p style={{ color: "#64748b", marginTop: 8 }}>
+                  Vui lòng chọn mục &quot;Phiếu điều chỉnh tồn kho&quot; hoặc &quot;Thẻ kho&quot; trên thanh điều hướng bên trái.
+                </p>
+              </div>
+            )}
         </Content>
       </Layout>
 
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        onProfileUpdated={(updated: any) => {
+        onProfileUpdated={(updated: UserProfile) => {
           setProfile(updated);
           localStorage.setItem("user", JSON.stringify(updated));
         }}

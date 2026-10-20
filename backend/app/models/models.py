@@ -731,11 +731,20 @@ class InventoryTransaction(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    transaction_type: Mapped[str] = mapped_column(String(3), nullable=False)
+    transaction_type: Mapped[str] = mapped_column(String(10), nullable=False)
     unit_name: Mapped[str] = mapped_column(String(100), nullable=False)
     input_quantity: Mapped[float] = mapped_column(Float, nullable=False)
     conversion_rate_snapshot: Mapped[float] = mapped_column(Float, nullable=False)
     base_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    lot_number: Mapped[Optional[str]] = mapped_column(String(100))
+    document_type: Mapped[Optional[str]] = mapped_column(String(50))
+    document_id: Mapped[Optional[int]] = mapped_column(Integer)
+    document_no: Mapped[Optional[str]] = mapped_column(String(50))
+    before_qty: Mapped[Optional[float]] = mapped_column(Float)
+    after_qty: Mapped[Optional[float]] = mapped_column(Float)
+    loss_value: Mapped[Optional[float]] = mapped_column(Float)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    created_by_id: Mapped[Optional[int]] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False
     )
@@ -917,9 +926,23 @@ class CreditNote(Base):
 class InventoryAdjustment(Base):
     __tablename__ = "inventory_adjustments"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[Optional[str]] = mapped_column(String(50), unique=True, index=True)
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False)
-    reason: Mapped[Text] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(30), default="PENDING")
+    reason: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="PENDING", nullable=False)
+    loss_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False)
+    approved_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    approval_note: Mapped[Optional[str]] = mapped_column(Text)
+    reject_reason: Mapped[Optional[str]] = mapped_column(Text)
+
+    warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse")
+    created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
+    approved_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[approved_by_id])
+    items: Mapped[List["InventoryAdjustmentItem"]] = relationship("InventoryAdjustmentItem", back_populates="adjustment", cascade="all, delete-orphan")
 
 
 class InventoryAdjustmentItem(Base):
@@ -929,6 +952,14 @@ class InventoryAdjustmentItem(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
     lot_number: Mapped[Optional[str]] = mapped_column(String(100))
     adjust_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    unit_cost_snapshot: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    loss_value: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    system_qty: Mapped[Optional[float]] = mapped_column(Float)
+    after_qty: Mapped[Optional[float]] = mapped_column(Float)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+
+    adjustment: Mapped["InventoryAdjustment"] = relationship("InventoryAdjustment", back_populates="items")
+    product: Mapped[Optional["Product"]] = relationship("Product")
 
 
 class SalesTarget(Base):

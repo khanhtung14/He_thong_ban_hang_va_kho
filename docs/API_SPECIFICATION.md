@@ -916,24 +916,52 @@
 - **Response Data:** Chứng từ điều chỉnh giảm trừ công nợ đại lý.
 
 #### `POST /inventory/adjustments`
-- **Story:** S8-03
-- **Phân quyền:** WH Manager
+- **Story:** SCRUM-66 (S8-03)
+- **Phân quyền:** WH Manager, Warehouse
 - **Request Body:**
 ```json
 {
+  "code": "ADJ-20261020-001",
   "warehouseId": 1,
   "reason": "DAMAGED",
+  "lossValue": 700000.0,
+  "note": "Vỡ lon khi bốc dỡ",
   "items": [
-    {"productId": 101, "lotNumber": "LOT261009", "adjustQty": -2, "note": "Vỡ hỏng khi bốc dỡ"}
+    {
+      "productId": 101,
+      "lotNumber": "LOT261009",
+      "adjustQty": -2,
+      "unitCost": 350000.0,
+      "lossValue": 700000.0,
+      "note": "Vỡ hỏng khi bốc dỡ"
+    }
   ]
 }
 ```
-- **Response Data:** Phiếu điều chỉnh tồn hàng hỏng/hết hạn chờ phê duyệt.
+- **Response Data:** Phiếu điều chỉnh tồn hàng hỏng/mất/hết hạn chờ phê duyệt.
+
+#### `GET /inventory/adjustments`
+- **Story:** SCRUM-66
+- **Phân quyền:** WH Manager, Warehouse, Accountant, Admin
+- **Query Params:** `warehouseId`, `status`, `reason`, `fromDate`, `toDate`, `page`, `limit`
+- **Response Data:** Danh sách phiếu điều chỉnh kèm phân trang và bộ lọc.
+
+#### `GET /inventory/adjustments/{id}`
+- **Story:** SCRUM-66
+- **Phân quyền:** WH Manager, Warehouse, Accountant, Admin
+- **Response Data:** Chi tiết phiếu điều chỉnh gồm thông tin các dòng hàng, người lập, người duyệt, trạng thái và giá trị tổn thất.
 
 #### `POST /inventory/adjustments/{id}/approve`
-- **Story:** S8-03
+- **Story:** SCRUM-66 (S8-03)
 - **Phân quyền:** WH Manager
+- **Request Body:** `{"note": "Đồng ý xử lý hủy hàng hỏng"}`
 - **Response Data:** Duyệt phiếu điều chỉnh, hạch toán giảm trừ tồn thực tế khỏi thẻ kho.
+
+#### `POST /inventory/adjustments/{id}/reject`
+- **Story:** SCRUM-66
+- **Phân quyền:** WH Manager
+- **Request Body:** `{"reason": "Sai lệch thực tế kiểm đếm, không chấp thuận hủy"}`
+- **Response Data:** Từ chối phiếu điều chỉnh tồn kho, lưu lý do từ chối.
 
 ---
 

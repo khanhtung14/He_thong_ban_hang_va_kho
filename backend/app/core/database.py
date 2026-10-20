@@ -61,8 +61,9 @@ def init_db():
         seed_default_roles(db)
 
 
-def migrate_pricing_schema():
+def migrate_pricing_schema(target_engine=None):
     """Create price-list tables and add pricing/approval fields to existing DBs."""
+    active_engine = target_engine or engine
     from app.models.models import (
         Base,
         PriceList,
@@ -74,6 +75,9 @@ def migrate_pricing_schema():
         DiscountPolicy,
         DiscountTier,
         CreditLimitLog,
+        InventoryAdjustment,
+        InventoryAdjustmentItem,
+        InventoryTransaction,
     )
 
     target_tables = cast(
@@ -88,14 +92,17 @@ def migrate_pricing_schema():
             DiscountPolicy.__table__,
             DiscountTier.__table__,
             CreditLimitLog.__table__,
+            InventoryAdjustment.__table__,
+            InventoryAdjustmentItem.__table__,
+            InventoryTransaction.__table__,
         ],
     )
     Base.metadata.create_all(
-        bind=engine,
+        bind=active_engine,
         tables=target_tables,
         checkfirst=True,
     )
-    inspector = inspect(engine)
+    inspector = inspect(active_engine)
     additions = {
         "customers": {
             "user_id": "INTEGER NULL",
@@ -178,6 +185,35 @@ def migrate_pricing_schema():
             "max_quantity": "INTEGER NULL",
             "discount_value": "FLOAT NOT NULL DEFAULT 0.0",
         },
+        "inventory_adjustments": {
+            "code": "VARCHAR(50) NULL",
+            "loss_value": "FLOAT NOT NULL DEFAULT 0.0",
+            "note": "TEXT NULL",
+            "created_by_id": "INTEGER NULL",
+            "created_at": "DATETIME NULL",
+            "approved_by_id": "INTEGER NULL",
+            "approved_at": "DATETIME NULL",
+            "approval_note": "TEXT NULL",
+            "reject_reason": "TEXT NULL",
+        },
+        "inventory_adjustment_items": {
+            "unit_cost_snapshot": "FLOAT NOT NULL DEFAULT 0.0",
+            "loss_value": "FLOAT NOT NULL DEFAULT 0.0",
+            "system_qty": "FLOAT NULL",
+            "after_qty": "FLOAT NULL",
+            "note": "TEXT NULL",
+        },
+        "inventory_transactions": {
+            "lot_number": "VARCHAR(100) NULL",
+            "document_type": "VARCHAR(50) NULL",
+            "document_id": "INTEGER NULL",
+            "document_no": "VARCHAR(50) NULL",
+            "before_qty": "FLOAT NULL",
+            "after_qty": "FLOAT NULL",
+            "loss_value": "FLOAT NULL",
+            "note": "TEXT NULL",
+            "created_by_id": "INTEGER NULL",
+        },
     }
     for table_name, columns_to_add in additions.items():
         if not inspector.has_table(table_name):
@@ -185,14 +221,21 @@ def migrate_pricing_schema():
         existing = {column["name"] for column in inspector.get_columns(table_name)}
         missing = [(name, definition) for name, definition in columns_to_add.items() if name not in existing]
         if missing:
-            with engine.begin() as connection:
+            with active_engine.begin() as connection:
                 for name, definition in missing:
                     connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}"))
+
+    if inspector.has_table("inventory_adjustments"):
+        try:
+            with active_engine.begin() as connection:
+                connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_inventory_adjustments_code ON inventory_adjustments(code);"))
+        except Exception:
+            pass
 
     # Backfill phone từ delivery_addresses nếu cột customers.phone đang rỗng
     if inspector.has_table("customers") and inspector.has_table("delivery_addresses"):
         try:
-            with engine.begin() as connection:
+            with active_engine.begin() as connection:
                 connection.execute(text("""
                     UPDATE customers
                     SET phone = (

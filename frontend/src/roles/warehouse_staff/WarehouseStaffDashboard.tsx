@@ -7,6 +7,7 @@ import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSi
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
 import SupplierManagement from "./SupplierManagement";
+import { InventoryAdjustmentManagement } from "../warehouse_manager/InventoryAdjustmentManagement";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -30,6 +31,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       if (p === "/warehouse/inventory") return "unit-conversion";
       if (p === "/warehouse/receiving") return "inbound";
       if (p === "/warehouse/picking") return "outbound";
+      if (p === "/warehouse/adjustments") return "adjustments";
     }
     return "suppliers";
   });
@@ -54,13 +56,18 @@ export const WarehouseStaffDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadProfileData();
+    const timer = setTimeout(() => {
+      void loadProfileData();
+    }, 0);
 
-    const handleProfileSync = () => loadProfileData();
+    const handleProfileSync = () => {
+      void loadProfileData();
+    };
     window.addEventListener("profile-updated", handleProfileSync);
     window.addEventListener("storage", handleProfileSync);
 
     return () => {
+      clearTimeout(timer);
       window.removeEventListener("profile-updated", handleProfileSync);
       window.removeEventListener("storage", handleProfileSync);
     };
@@ -73,6 +80,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       else if (p === "/warehouse/inventory") setSelectedKey("unit-conversion");
       else if (p === "/warehouse/receiving") setSelectedKey("inbound");
       else if (p === "/warehouse/picking") setSelectedKey("outbound");
+      else if (p === "/warehouse/adjustments") setSelectedKey("adjustments");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -114,6 +122,8 @@ export const WarehouseStaffDashboard: React.FC = () => {
             window.history.pushState({}, "", "/warehouse/receiving");
           } else if (key === "outbound") {
             window.history.pushState({}, "", "/warehouse/picking");
+          } else if (key === "adjustments") {
+            window.history.pushState({}, "", "/warehouse/adjustments");
           } else {
             window.history.pushState({}, "", "/warehouse/inventory");
           }
@@ -142,6 +152,9 @@ export const WarehouseStaffDashboard: React.FC = () => {
         >
           {selectedKey === "suppliers" && <SupplierManagement />}
           {selectedKey === "unit-conversion" && <UnitConversionManager />}
+          {selectedKey === "adjustments" && (
+            <InventoryAdjustmentManagement currentUser={profile} />
+          )}
 
           {/* Các tab khác */}
           {selectedKey === "scan" && <div>Giao diện quét mã Barcode / QR</div>}
@@ -161,7 +174,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        onProfileUpdated={(updated: any) => {
+        onProfileUpdated={(updated: UserProfile) => {
           setProfile(updated);
           localStorage.setItem("user", JSON.stringify(updated));
         }}

@@ -9,8 +9,8 @@ import {
   EnvironmentOutlined,
   LogoutOutlined,
   SwapOutlined,
-  ShopOutlined,
   TruckOutlined,
+  FileProtectOutlined,
 } from "@ant-design/icons";
 import BrandLogo from "../BrandLogo";
 
@@ -61,6 +61,11 @@ export const WarehouseStaffSidebar: React.FC<WarehouseStaffSidebarProps> = ({
           key: "unit-conversion", // <-- Key mới cho chức năng này
           icon: <SwapOutlined />,
           label: "Đơn vị tính & Quy đổi",
+        },
+        {
+          key: "adjustments",
+          icon: <FileProtectOutlined />,
+          label: "Phiếu điều chỉnh tồn",
         },
         {
           key: "stocktake-exec",
