@@ -33,6 +33,7 @@ const roleWorkspacePaths = [
   "/warehouse/receiving",
   "/warehouse/inventory",
   "/warehouse/suppliers",
+  "/warehouse/transfers",
   "/warehouse/dashboard",
   "/accounting/debt-book",
   "/accounting/invoices",

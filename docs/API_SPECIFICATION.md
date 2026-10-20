@@ -726,16 +726,106 @@
 ```
 - **Response Data:** Phiếu nhập kho đã ghi sổ, tăng `physicalQty` và cập nhật giá vốn.
 
-#### `POST /warehouse/transfers`
-- **Story:** S5-07
-- **Phân quyền:** Warehouse, WH Manager
-- **Request Body:** `{"fromWarehouseId": 1, "toWarehouseId": 2, "transferDate": "2026-10-10", "items": [{"productId": 101, "lotNumber": "LOT261009", "quantity": 100}]}`
-- **Response Data:** Phiếu chuyển kho nội bộ (hàng đưa vào trạng thái Đang luân chuyển).
+#### `POST /api/internal-transfers`
+- **Story:** S5-07 (Quản lý luân chuyển hàng hóa nội bộ)
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Mô tả:** Tạo phiếu chuyển hàng nội bộ từ kho gửi đến kho nhận. Trừ tồn kho tại kho xuất phát, hàng chuyển sang trạng thái "Đang trên đường" (IN_TRANSIT). Tuyệt đối CHƯA ĐƯỢC cộng tồn kho cho kho đến.
+- **Request Body:**
+```json
+{
+  "from_warehouse_id": 1,
+  "to_warehouse_id": 2,
+  "items": [
+    {
+      "product_id": 101,
+      "quantity_sent": 50.0
+    }
+  ]
+}
+```
+- **Response Data (201 Created):**
+```json
+{
+  "success": true,
+  "code": 201,
+  "message": "Tạo phiếu luân chuyển nội bộ thành công. Hàng đang trong trạng thái vận chuyển.",
+  "data": {
+    "id": 1,
+    "from_warehouse_id": 1,
+    "from_warehouse_name": "Kho Tổng Hà Nội",
+    "to_warehouse_id": 2,
+    "to_warehouse_name": "Kho Chi nhánh TP. Hồ Chí Minh",
+    "status": "IN_TRANSIT",
+    "created_at": "2026-10-20T08:30:00Z",
+    "details": [
+      {
+        "id": 1,
+        "transfer_id": 1,
+        "product_id": 101,
+        "product_sku": "SUA-VINAMILK-100",
+        "product_name": "Sữa tươi tiệt trùng Vinamilk 100ml",
+        "quantity_sent": 50.0,
+        "quantity_received": null,
+        "discrepancy_reason": null
+      }
+    ]
+  }
+}
+```
 
-#### `PATCH /warehouse/transfers/{id}/receive`
+#### `POST /api/internal-transfers/{id}/confirm`
+- **Story:** S5-07 (Quản lý luân chuyển hàng hóa nội bộ)
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Mô tả:** Thủ kho nhận xác nhận nhận hàng. Nếu có chênh lệch số lượng thực nhận so với số gửi, bắt buộc phải có `discrepancy_reason` (Lý do chênh lệch). Khi xác nhận thành công, trạng thái chuyển sang COMPLETED và tồn kho tại kho đích mới được cộng.
+- **Request Body:**
+```json
+{
+  "items": [
+    {
+      "product_id": 101,
+      "quantity_received": 48.0,
+      "discrepancy_reason": "Vỡ 2 hộp trong quá trình bốc xếp xe tải"
+    }
+  ]
+}
+```
+- **Response Data (200 OK):**
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "Xác nhận nhận hàng chuyển kho thành công. Đã cập nhật tồn kho kho đến.",
+  "data": {
+    "id": 1,
+    "from_warehouse_id": 1,
+    "to_warehouse_id": 2,
+    "status": "COMPLETED",
+    "created_at": "2026-10-20T08:30:00Z",
+    "details": [
+      {
+        "id": 1,
+        "transfer_id": 1,
+        "product_id": 101,
+        "quantity_sent": 50.0,
+        "quantity_received": 48.0,
+        "discrepancy_reason": "Vỡ 2 hộp trong quá trình bốc xếp xe tải"
+      }
+    ]
+  }
+}
+```
+
+#### `GET /api/internal-transfers`
 - **Story:** S5-07
-- **Phân quyền:** Warehouse
-- **Response Data:** Xác nhận nhận hàng chuyển kho, tăng tồn kho đích.
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Query Params:** `status` (IN_TRANSIT, COMPLETED, CANCELLED), `warehouse_id` (int)
+- **Response Data (200 OK):** Danh sách phiếu luân chuyển kèm chi tiết.
+
+#### `GET /api/internal-transfers/{id}`
+- **Story:** S5-07
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Response Data (200 OK):** Chi tiết một phiếu luân chuyển.
+
 
 #### `POST /warehouse/audits`
 - **Story:** S5-08

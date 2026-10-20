@@ -793,6 +793,38 @@ class WarehouseTransferItem(Base):
     quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
+class InternalTransfer(Base):
+    __tablename__ = "internal_transfers"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    from_warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False)
+    to_warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="IN_TRANSIT", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    from_warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[from_warehouse_id])
+    to_warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[to_warehouse_id])
+    details: Mapped[List["InternalTransferDetail"]] = relationship("InternalTransferDetail", back_populates="transfer", cascade="all, delete-orphan")
+
+
+class InternalTransferDetail(Base):
+    __tablename__ = "internal_transfer_details"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    transfer_id: Mapped[int] = mapped_column(ForeignKey("internal_transfers.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    quantity_sent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    quantity_received: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    discrepancy_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    transfer: Mapped["InternalTransfer"] = relationship("InternalTransfer", back_populates="details")
+    product: Mapped[Optional["Product"]] = relationship("Product")
+
+
+InternalTransfers = InternalTransfer
+InternalTransferDetails = InternalTransferDetail
+
+
 class WarehouseAudit(Base):
     __tablename__ = "warehouse_audits"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
