@@ -5,6 +5,7 @@ import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import { WarehouseManagerSidebar } from "../../components/Sidebar/WarehouseManagerSidebar";
 import { WarehouseManagerHeader } from "../../components/Header/WarehouseManagerHeader";
+import InventoryCardView from "../../components/InventoryCardView";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -104,7 +105,12 @@ export const WarehouseManagerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung quản lý duyệt kho */}
+          {selectedKey === "inventory-card" && <InventoryCardView />}
+          {selectedKey !== "inventory-card" && (
+            <div>
+              {/* Nội dung quản lý duyệt kho */}
+            </div>
+          )}
         </Content>
       </Layout>
 

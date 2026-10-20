@@ -938,3 +938,77 @@ class SalesTarget(Base):
     month: Mapped[int] = mapped_column(Integer, nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     target_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+
+# --- Thẻ kho & Lịch sử biến động tồn kho (Stock Card / Inventory Card) ---
+class InventoryLog(Base):
+    __tablename__ = "inventory_logs"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False, index=True)
+    document_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    document_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    document_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True) # RECEIPT, DISPATCH, TRANSFER, ADJUSTMENT
+    transaction_type: Mapped[str] = mapped_column(String(30), nullable=False) # NHAP, XUAT, CHUYEN_XUAT, CHUYEN_NHAP, DIEU_CHINH
+    change_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    balance_after: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False)
+
+
+class ImportDetail(Base):
+    __tablename__ = "import_details"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    document_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    document_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False)
+
+
+class ExportDetail(Base):
+    __tablename__ = "export_details"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    document_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    document_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False)
+
+
+class TransferDetail(Base):
+    __tablename__ = "transfer_details"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    from_warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    to_warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    document_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    document_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False)
+
+
+class AdjustmentDetail(Base):
+    __tablename__ = "adjustment_details"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    document_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    document_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    adjust_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), nullable=False)
+
+
+# Tương thích tên số nhiều / camelCase
+ImportDetails = ImportDetail
+ExportDetails = ExportDetail
+TransferDetails = TransferDetail
+AdjustmentDetails = AdjustmentDetail
+InventoryLogs = InventoryLog
+
