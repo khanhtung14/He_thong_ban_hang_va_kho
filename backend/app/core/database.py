@@ -74,6 +74,8 @@ def migrate_pricing_schema():
         DiscountPolicy,
         DiscountTier,
         CreditLimitLog,
+        ProductBatch,
+        BatchOverrideLog,
     )
 
     target_tables = cast(
@@ -88,6 +90,8 @@ def migrate_pricing_schema():
             DiscountPolicy.__table__,
             DiscountTier.__table__,
             CreditLimitLog.__table__,
+            ProductBatch.__table__,
+            BatchOverrideLog.__table__,
         ],
     )
     Base.metadata.create_all(
@@ -177,6 +181,9 @@ def migrate_pricing_schema():
             "min_quantity": "INTEGER NOT NULL DEFAULT 1",
             "max_quantity": "INTEGER NULL",
             "discount_value": "FLOAT NOT NULL DEFAULT 0.0",
+        },
+        "products": {
+            "is_batch_managed": "BOOLEAN NOT NULL DEFAULT 0",
         },
     }
     for table_name, columns_to_add in additions.items():

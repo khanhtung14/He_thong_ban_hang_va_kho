@@ -5,6 +5,8 @@ import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import { WarehouseManagerSidebar } from "../../components/Sidebar/WarehouseManagerSidebar";
 import { WarehouseManagerHeader } from "../../components/Header/WarehouseManagerHeader";
+import BatchManagementTable from "../../components/BatchManagementTable";
+import OutboundDispatchForm from "../../components/OutboundDispatchForm";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -104,7 +106,12 @@ export const WarehouseManagerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung quản lý duyệt kho */}
+          {["dashboard", "inventory", "threshold-alerts"].includes(selectedKey) && (
+            <BatchManagementTable />
+          )}
+          {selectedKey === "approvals" && (
+            <OutboundDispatchForm />
+          )}
         </Content>
       </Layout>
 

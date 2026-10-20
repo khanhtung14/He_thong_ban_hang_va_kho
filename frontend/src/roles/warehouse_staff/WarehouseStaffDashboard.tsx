@@ -7,6 +7,8 @@ import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSi
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
 import SupplierManagement from "./SupplierManagement";
+import OutboundDispatchForm from "../../components/OutboundDispatchForm";
+import BatchManagementTable from "../../components/BatchManagementTable";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -30,6 +32,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       if (p === "/warehouse/inventory") return "unit-conversion";
       if (p === "/warehouse/receiving") return "inbound";
       if (p === "/warehouse/picking") return "outbound";
+      if (p === "/warehouse/batches") return "batches";
     }
     return "suppliers";
   });
@@ -73,6 +76,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       else if (p === "/warehouse/inventory") setSelectedKey("unit-conversion");
       else if (p === "/warehouse/receiving") setSelectedKey("inbound");
       else if (p === "/warehouse/picking") setSelectedKey("outbound");
+      else if (p === "/warehouse/batches") setSelectedKey("batches");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -114,6 +118,8 @@ export const WarehouseStaffDashboard: React.FC = () => {
             window.history.pushState({}, "", "/warehouse/receiving");
           } else if (key === "outbound") {
             window.history.pushState({}, "", "/warehouse/picking");
+          } else if (key === "batches") {
+            window.history.pushState({}, "", "/warehouse/batches");
           } else {
             window.history.pushState({}, "", "/warehouse/inventory");
           }
@@ -143,12 +149,11 @@ export const WarehouseStaffDashboard: React.FC = () => {
           {selectedKey === "suppliers" && <SupplierManagement />}
           {selectedKey === "unit-conversion" && <UnitConversionManager />}
 
-          {/* Các tab khác */}
+          {/* Các tab nghiệp vụ */}
           {selectedKey === "scan" && <div>Giao diện quét mã Barcode / QR</div>}
           {selectedKey === "inbound" && <div>Giao diện Thực hiện Nhập kho</div>}
-          {selectedKey === "outbound" && (
-            <div>Giao diện Thực hiện Xuất kho</div>
-          )}
+          {selectedKey === "outbound" && <OutboundDispatchForm />}
+          {selectedKey === "batches" && <BatchManagementTable />}
           {selectedKey === "stocktake-exec" && (
             <div>Giao diện Đếm hàng kiểm kê</div>
           )}
