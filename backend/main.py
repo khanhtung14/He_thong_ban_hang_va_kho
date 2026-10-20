@@ -225,6 +225,7 @@ app.include_router(dealer_history_router)
 try:
     from app.api.v1.endpoints.warehouse import (
         router as warehouse_router,
+        compat_router as warehouse_compat_router,
         warehouses_router,
         territories_router,
         roles_router,
@@ -235,6 +236,7 @@ try:
     from app.api.v1.endpoints.payments import router as payments_router
     from app.api.v1.endpoints.returns import router as returns_router
     app.include_router(warehouse_router)
+    app.include_router(warehouse_compat_router)
     app.include_router(warehouses_router)
     app.include_router(territories_router)
     app.include_router(roles_router)

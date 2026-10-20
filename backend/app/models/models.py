@@ -816,6 +816,9 @@ class PickList(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="PENDING")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    order: Mapped[Optional["Order"]] = relationship("Order", foreign_keys=[order_id])
 
 
 class Dispatch(Base):
@@ -824,6 +827,12 @@ class Dispatch(Base):
     pick_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("pick_lists.id", ondelete="SET NULL"))
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="SHIPPED")
+    override_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    order: Mapped[Optional["Order"]] = relationship("Order", foreign_keys=[order_id])
+    pick_list: Mapped[Optional[PickList]] = relationship("PickList", foreign_keys=[pick_list_id])
+    items: Mapped[List["DispatchItem"]] = relationship("DispatchItem", back_populates="dispatch", cascade="all, delete-orphan")
 
 
 class DispatchItem(Base):
@@ -833,6 +842,10 @@ class DispatchItem(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
     lot_number: Mapped[Optional[str]] = mapped_column(String(100))
     actual_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    override_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    dispatch: Mapped[Optional[Dispatch]] = relationship("Dispatch", back_populates="items")
+    product: Mapped[Optional["Product"]] = relationship("Product", foreign_keys=[product_id])
 
 
 class DeliveryTrip(Base):
