@@ -234,6 +234,12 @@ try:
     from app.api.v1.endpoints.invoices import router as invoices_router
     from app.api.v1.endpoints.payments import router as payments_router
     from app.api.v1.endpoints.returns import router as returns_router
+    from app.api.v1.endpoints.sales_targets import (
+        router as sales_targets_router,
+        compat_router as sales_targets_compat_router,
+        direct_router as sales_targets_direct_router,
+        direct_compat_router as sales_targets_direct_compat_router,
+    )
     app.include_router(warehouse_router)
     app.include_router(warehouses_router)
     app.include_router(territories_router)
@@ -244,6 +250,10 @@ try:
     app.include_router(invoices_router)
     app.include_router(payments_router)
     app.include_router(returns_router)
+    app.include_router(sales_targets_router)
+    app.include_router(sales_targets_compat_router)
+    app.include_router(sales_targets_direct_router)
+    app.include_router(sales_targets_direct_compat_router)
 except ModuleNotFoundError:
     pass
 

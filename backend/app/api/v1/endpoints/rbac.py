@@ -89,6 +89,8 @@ PERM_DEBT_RECONCILE = "debt:reconcile"
 PERM_INVOICE_MANAGE = "invoice:manage"
 PERM_PAYMENT_RECORD = "payment:record"
 PERM_CUSTOMERS_LOCK = "customers:lock"  # SCRUM-85: Quyá»n khÃ³a/má»Ÿ khÃ³a giao dá»‹ch Ä‘áº¡i lÃ½
+PERM_TARGETS_MANAGE = "targets:manage"
+PERM_TARGETS_VIEW = "targets:view"
 PERM_SYSTEM_ADMIN = "system:admin"
 
 
@@ -106,6 +108,8 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PERM_ORDERS_CREATE,
         PERM_ORDERS_VIEW_ASSIGNED,
         PERM_DEBT_VIEW_ASSIGNED,
+        PERM_PAYMENT_RECORD,
+        PERM_TARGETS_VIEW,
         # TUYá»†T Äá»I KHÃ”NG cÃ³ PERM_INVENTORY_ADJUST
         # TUYá»†T Äá»I KHÃ”NG cÃ³ PERM_PRODUCTS_VIEW_FINANCIALS
     },
@@ -119,6 +123,8 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PERM_ORDERS_APPROVE,
         PERM_ORDERS_VIEW_ALL,
         PERM_DEBT_VIEW_ALL,
+        PERM_TARGETS_MANAGE,
+        PERM_TARGETS_VIEW,
     },
     RoleCode.WAREHOUSE.value: {
         PERM_PRODUCTS_VIEW,
@@ -170,6 +176,8 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
         PERM_INVOICE_MANAGE,
         PERM_PAYMENT_RECORD,
         PERM_CUSTOMERS_LOCK,
+        PERM_TARGETS_MANAGE,
+        PERM_TARGETS_VIEW,
     },
 }
 

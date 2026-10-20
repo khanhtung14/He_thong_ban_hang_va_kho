@@ -196,12 +196,15 @@ def create_price_list(
 def update_price_list(
     price_list_id: int,
     payload: PriceListCreate,
+    allow_adjustment: bool = Query(False, description="Cho phép điều chỉnh bảng giá đã phát hành"),
     db: Session = Depends(get_db),
     _user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
 ):
     row = _load_price_list(db, price_list_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Không tìm thấy bảng giá.")
+    if row.published and not allow_adjustment:
+        raise HTTPException(status_code=409, detail="Bảng giá đã phát hành không thể sửa; hãy tạo phiên bản mới.")
     row.code = payload.code
     row.customer_group = payload.customer_group.value
     row.start_date = payload.start_date

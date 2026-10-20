@@ -938,3 +938,46 @@ class SalesTarget(Base):
     month: Mapped[int] = mapped_column(Integer, nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     target_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    territory_id: Mapped[Optional[int]] = mapped_column(ForeignKey("territories.id", ondelete="SET NULL"), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    sales_rep: Mapped[Optional["User"]] = relationship("User", foreign_keys=[sales_rep_id])
+    territory: Mapped[Optional["Territory"]] = relationship("Territory", foreign_keys=[territory_id])
+    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
+    audit_logs: Mapped[List["TargetAuditLog"]] = relationship(
+        back_populates="target", cascade="all, delete-orphan", order_by="TargetAuditLog.id.desc()"
+    )
+
+    @property
+    def staff_id(self) -> int:
+        return self.sales_rep_id
+
+    @staff_id.setter
+    def staff_id(self, val: int):
+        self.sales_rep_id = val
+
+    @property
+    def period(self) -> str:
+        return f"{self.year:04d}-{self.month:02d}"
+
+
+class TargetAuditLog(Base):
+    __tablename__ = "target_audit_logs"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    target_id: Mapped[int] = mapped_column(ForeignKey("sales_targets.id", ondelete="CASCADE"), nullable=False)
+    changed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    old_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    new_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    target: Mapped["SalesTarget"] = relationship(back_populates="audit_logs")
+    changed_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[changed_by_id])
+
