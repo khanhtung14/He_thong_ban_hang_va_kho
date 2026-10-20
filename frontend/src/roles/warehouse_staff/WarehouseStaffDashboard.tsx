@@ -7,6 +7,7 @@ import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSi
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
 import SupplierManagement from "./SupplierManagement";
+import InboundReceiptsIndex from "../../pages/InboundReceipts";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -28,7 +29,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       const p = window.location.pathname;
       if (p === "/warehouse/suppliers") return "suppliers";
       if (p === "/warehouse/inventory") return "unit-conversion";
-      if (p === "/warehouse/receiving") return "inbound";
+      if (p === "/warehouse/receiving" || p === "/inbound-receipts") return "inbound";
       if (p === "/warehouse/picking") return "outbound";
     }
     return "suppliers";
@@ -71,7 +72,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       const p = window.location.pathname;
       if (p === "/warehouse/suppliers") setSelectedKey("suppliers");
       else if (p === "/warehouse/inventory") setSelectedKey("unit-conversion");
-      else if (p === "/warehouse/receiving") setSelectedKey("inbound");
+      else if (p === "/warehouse/receiving" || p === "/inbound-receipts") setSelectedKey("inbound");
       else if (p === "/warehouse/picking") setSelectedKey("outbound");
     };
     window.addEventListener("popstate", handlePopState);
@@ -111,7 +112,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
           } else if (key === "unit-conversion") {
             window.history.pushState({}, "", "/warehouse/inventory");
           } else if (key === "inbound") {
-            window.history.pushState({}, "", "/warehouse/receiving");
+            window.history.pushState({}, "", "/inbound-receipts");
           } else if (key === "outbound") {
             window.history.pushState({}, "", "/warehouse/picking");
           } else {
@@ -145,7 +146,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
 
           {/* Các tab khác */}
           {selectedKey === "scan" && <div>Giao diện quét mã Barcode / QR</div>}
-          {selectedKey === "inbound" && <div>Giao diện Thực hiện Nhập kho</div>}
+          {selectedKey === "inbound" && <InboundReceiptsIndex />}
           {selectedKey === "outbound" && (
             <div>Giao diện Thực hiện Xuất kho</div>
           )}

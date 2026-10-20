@@ -11,9 +11,27 @@ from src.backend.schemas.sales import (
     LastOrderItemResponse,
     LastOrderGroupResponse,
 )
+from src.backend.schemas.inbound_receipt import (
+    InboundReceiptDetailBase,
+    InboundReceiptDetailCreate,
+    InboundReceiptDetailResponse,
+    InboundReceiptBase,
+    InboundReceiptCreate,
+    InboundReceiptUpdate,
+    InboundReceiptResponse,
+    InboundReceiptListResponse,
+)
 
 __all__ = [
     "PurchaseHistoryItemResponse",
     "LastOrderItemResponse",
     "LastOrderGroupResponse",
+    "InboundReceiptDetailBase",
+    "InboundReceiptDetailCreate",
+    "InboundReceiptDetailResponse",
+    "InboundReceiptBase",
+    "InboundReceiptCreate",
+    "InboundReceiptUpdate",
+    "InboundReceiptResponse",
+    "InboundReceiptListResponse",
 ]

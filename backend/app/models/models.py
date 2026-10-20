@@ -185,6 +185,11 @@ class Permission(Base):
     roles: Mapped[List[Role]] = relationship(secondary=role_permissions, back_populates="permissions")
 
 
+class StorageLevel(str, Enum):
+    ZONE = "ZONE"
+    RACK = "RACK"
+
+
 class Warehouse(Base):
     __tablename__ = "warehouses"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -192,6 +197,50 @@ class Warehouse(Base):
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     address: Mapped[Optional[str]] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    locations: Mapped[List["StorageLocation"]] = relationship(
+        "StorageLocation",
+        back_populates="warehouse",
+        cascade="all, delete-orphan",
+    )
+
+
+class StorageLocation(Base):
+    __tablename__ = "storage_locations"
+    __table_args__ = (
+        UniqueConstraint("warehouse_id", "code", name="uq_storage_locations_warehouse_code"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    warehouse_id: Mapped[int] = mapped_column(
+        ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    level: Mapped[StorageLevel] = mapped_column(
+        SqlEnum(StorageLevel, native_enum=False, length=20),
+        nullable=False,
+    )
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="SET NULL"), nullable=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    warehouse: Mapped["Warehouse"] = relationship("Warehouse", back_populates="locations")
+    parent: Mapped[Optional["StorageLocation"]] = relationship(
+        "StorageLocation",
+        remote_side=lambda: [StorageLocation.id],
+        back_populates="children",
+    )
+    children: Mapped[List["StorageLocation"]] = relationship(
+        "StorageLocation",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+    )
 
 
 class Territory(Base):

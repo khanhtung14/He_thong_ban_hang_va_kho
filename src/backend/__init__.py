@@ -34,7 +34,7 @@ from . import (
     users_service,
 )
 
-app = main_module.app
+app = getattr(main_module, "app", None)
 
 # Register all modules into sys.modules
 sys.modules["src.backend.database"] = database

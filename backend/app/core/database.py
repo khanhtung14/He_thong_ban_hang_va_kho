@@ -290,3 +290,24 @@ def migrate_sales_order_draft_schema():
                     connection.execute(
                         text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
                     )
+
+
+def migrate_inbound_receipt_schema():
+    """Ensure tables for StorageLocation, InboundReceipt, InboundReceiptDetail, and LocationInventory exist."""
+    from app.models.models import Base, StorageLocation
+    from src.backend.models.inbound_receipt import InboundReceipt, InboundReceiptDetail, LocationInventory
+
+    target_tables = cast(
+        list[Table],
+        [
+            StorageLocation.__table__,
+            InboundReceipt.__table__,
+            InboundReceiptDetail.__table__,
+            LocationInventory.__table__,
+        ],
+    )
+    Base.metadata.create_all(
+        bind=engine,
+        tables=target_tables,
+        checkfirst=True,
+    )

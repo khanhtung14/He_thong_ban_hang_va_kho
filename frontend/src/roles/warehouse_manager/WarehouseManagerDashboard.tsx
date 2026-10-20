@@ -5,6 +5,7 @@ import ChangePasswordModal from "../../components/ChangePasswordModal";
 import ProfileModal from "../../components/ProfileModal";
 import { WarehouseManagerSidebar } from "../../components/Sidebar/WarehouseManagerSidebar";
 import { WarehouseManagerHeader } from "../../components/Header/WarehouseManagerHeader";
+import InboundReceiptsIndex from "../../pages/InboundReceipts";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -21,7 +22,13 @@ export const WarehouseManagerDashboard: React.FC = () => {
     }
   });
 
-  const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [selectedKey, setSelectedKey] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname;
+      if (p === "/inbound-receipts" || p === "/warehouse/receiving") return "approvals";
+    }
+    return "dashboard";
+  });
   const [, setLoading] = useState(false);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -55,6 +62,15 @@ export const WarehouseManagerDashboard: React.FC = () => {
     };
   }, [loadProfileData]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname;
+      if (p === "/inbound-receipts" || p === "/warehouse/receiving") setSelectedKey("approvals");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   return (
     <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
       {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
@@ -81,7 +97,12 @@ export const WarehouseManagerDashboard: React.FC = () => {
 
       <WarehouseManagerSidebar
         selectedKey={selectedKey}
-        onSelect={setSelectedKey}
+        onSelect={(key) => {
+          setSelectedKey(key);
+          if (key === "approvals") {
+            window.history.pushState({}, "", "/inbound-receipts");
+          }
+        }}
         onLogout={logout}
       />
 
@@ -104,7 +125,13 @@ export const WarehouseManagerDashboard: React.FC = () => {
             margin: "0 auto",
           }}
         >
-          {/* Nội dung quản lý duyệt kho */}
+          {selectedKey === "approvals" && <InboundReceiptsIndex />}
+          {selectedKey === "dashboard" && (
+            <div style={{ padding: 24, background: "#fff", borderRadius: 8 }}>
+              <h3>Tổng quan kho vận</h3>
+              <p>Chào mừng Quản lý kho. Chọn "Duyệt lệnh Nhập / Xuất" để quản lý các phiếu nhập kho.</p>
+            </div>
+          )}
         </Content>
       </Layout>
 

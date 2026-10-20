@@ -976,3 +976,60 @@
 - **Phân quyền:** Accountant, Sales Manager
 - **Query Params:** `salesRepId`, `regionId`
 - **Response Data:** Báo cáo tổng hợp nợ xấu và nợ quá hạn theo từng nhân viên phụ trách.
+
+---
+
+### EP-05 (Bổ sung): QUẢN LÝ NHẬP KHO TỪ NHÀ CUNG CẤP (SCRUM-30)
+
+#### `GET /api/v1/inbound-receipts`
+- **Story:** SCRUM-30 (Lập phiếu nhập kho từ nhà cung cấp)
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Query Params:** `status`, `warehouse_id`, `supplier_id`, `search`, `page`, `page_size`
+- **Mục đích:** Danh sách phiếu nhập kho phân trang và lọc theo trạng thái (DRAFT, COMPLETED, CANCELLED).
+
+#### `POST /api/v1/inbound-receipts`
+- **Story:** SCRUM-30
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Mục đích:** Tạo phiếu nhập kho ở trạng thái Nháp (DRAFT).
+- **Request Body:**
+```json
+{
+  "code": "PNK-20261020-0001",
+  "supplier_id": 1,
+  "warehouse_id": 1,
+  "notes": "Nhập hàng theo hóa đơn NCC",
+  "details": [
+    {
+      "product_id": 10,
+      "batch_lot": "LOT-2026-A1",
+      "quantity": 100,
+      "storage_location_id": 2
+    }
+  ]
+}
+```
+
+#### `GET /api/v1/inbound-receipts/{id}`
+- **Story:** SCRUM-30
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Mục đích:** Xem chi tiết phiếu nhập, thông tin NCC, kho nhận, người tạo và danh sách sản phẩm theo lô/vị trí.
+
+#### `PUT /api/v1/inbound-receipts/{id}`
+- **Story:** SCRUM-30
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Mục đích:** Cập nhật thông tin phiếu nhập kho khi ở trạng thái DRAFT.
+
+#### `POST /api/v1/inbound-receipts/{id}/complete`
+- **Story:** SCRUM-30 (Chốt phiếu nhập kho)
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Mục đích:** Hoàn tất phiếu nhập kho. Chuyển trạng thái sang `COMPLETED`, tự động cộng số lượng vào bảng `inventories` (LocationInventory) theo đúng `(product_id, warehouse_id, storage_location_id, batch_lot)` và cập nhật bảng `inventory` tổng thể.
+
+#### `POST /api/v1/inbound-receipts/{id}/cancel`
+- **Story:** SCRUM-30
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Mục đích:** Hủy phiếu nhập kho (chỉ áp dụng cho phiếu chưa hoàn tất).
+
+#### `GET /api/v1/inbound-receipts/options`
+- **Story:** SCRUM-30
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Mục đích:** Lấy danh mục dữ liệu khởi tạo form (NCC, Kho, Sản phẩm, Vị trí lưu kho theo kho).

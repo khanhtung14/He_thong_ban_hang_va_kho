@@ -36,6 +36,10 @@ from app.api.v1.endpoints.discount_policy_routes import router as discounts_rout
 from app.api.v1.endpoints.sales_orders import router as sales_orders_router
 from app.api.v1.endpoints.debt_limit import router as debt_limit_router, compat_router as debt_limit_compat_router
 from app.api.v1.endpoints.dealer_history import router as dealer_history_router
+from src.backend.routers.inbound_receipts import (
+    router as inbound_receipts_router,
+    compat_router as inbound_receipts_compat_router,
+)
 
 
 
@@ -47,6 +51,11 @@ async def lifespan(app: FastAPI):
         pass
     migrate_pricing_schema()
     migrate_sales_order_draft_schema()
+    try:
+        from app.core.database import migrate_inbound_receipt_schema
+        migrate_inbound_receipt_schema()
+    except Exception:
+        pass
     try:
         from app.api.v1.endpoints.warehouse import seed_default_warehouses_and_territories
         from app.core.database import SessionLocal
@@ -222,6 +231,8 @@ app.include_router(sales_orders_router)
 app.include_router(debt_limit_router)
 app.include_router(debt_limit_compat_router)
 app.include_router(dealer_history_router)
+app.include_router(inbound_receipts_router)
+app.include_router(inbound_receipts_compat_router)
 try:
     from app.api.v1.endpoints.warehouse import (
         router as warehouse_router,
