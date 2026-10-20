@@ -1183,3 +1183,241 @@ export async function calculateBestDiscount(payload: {
   return json.data || json;
 }
 
+// ---------------------------------------------------------------------------
+// SCRUM-66: Inventory Adjustments & Stock Cards
+// ---------------------------------------------------------------------------
+
+export interface InventoryAdjustmentItemDetail {
+  id: number;
+  productId: number;
+  productName: string;
+  sku: string;
+  baseUnit: string;
+  lotNumber?: string | null;
+  adjustQty: number;
+  unitCost: number;
+  lossValue: number;
+  systemQty?: number | null;
+  afterQty?: number | null;
+  note?: string;
+}
+
+export interface InventoryAdjustmentDetail {
+  id: number;
+  code: string;
+  warehouseId: number;
+  warehouseName: string;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  lossValue: number;
+  note?: string;
+  createdById?: number | null;
+  createdByName?: string | null;
+  createdAt: string;
+  approvedById?: number | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  approvalNote?: string | null;
+  rejectReason?: string | null;
+  items: InventoryAdjustmentItemDetail[];
+}
+
+export interface CreateAdjustmentPayloadItem {
+  productId: number;
+  lotNumber?: string;
+  adjustQty: number;
+  unitCost?: number;
+  lossValue?: number;
+  note?: string;
+}
+
+export interface CreateAdjustmentPayload {
+  code?: string;
+  warehouseId: number;
+  reason: string;
+  lossValue?: number;
+  note?: string;
+  items: CreateAdjustmentPayloadItem[];
+}
+
+export interface StockCardEntry {
+  id: number;
+  date: string;
+  documentNo: string;
+  documentType: string;
+  productId: number;
+  productName: string;
+  sku: string;
+  warehouseId: number;
+  warehouseName: string;
+  lotNumber?: string | null;
+  unitName: string;
+  inQty: number;
+  outQty: number;
+  beforeQty?: number | null;
+  afterQty?: number | null;
+  lossValue?: number | null;
+  note?: string;
+}
+
+export interface AdjustmentsListResponse {
+  success: boolean;
+  code: number;
+  message: string;
+  data: InventoryAdjustmentDetail[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalRecords: number;
+    totalPages: number;
+  };
+}
+
+export interface StockCardsResponse {
+  success: boolean;
+  code: number;
+  message: string;
+  data: StockCardEntry[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalRecords: number;
+    totalPages: number;
+  };
+}
+
+export async function fetchAdjustments(params?: {
+  warehouseId?: number;
+  status?: string;
+  reason?: string;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+}): Promise<AdjustmentsListResponse> {
+  const query = new URLSearchParams();
+  if (params?.warehouseId) query.set("warehouseId", String(params.warehouseId));
+  if (params?.status) query.set("status", params.status);
+  if (params?.reason) query.set("reason", params.reason);
+  if (params?.fromDate) query.set("fromDate", params.fromDate);
+  if (params?.toDate) query.set("toDate", params.toDate);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+
+  const url = `/api/v1/inventory/adjustments${query.toString() ? `?${query.toString()}` : ""}`;
+  const res = await authenticatedFetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải danh sách phiếu điều chỉnh.");
+  }
+  return res.json();
+}
+
+export async function fetchAdjustmentDetail(
+  id: number,
+): Promise<InventoryAdjustmentDetail> {
+  const res = await authenticatedFetch(`/api/v1/inventory/adjustments/${id}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải chi tiết phiếu điều chỉnh.");
+  }
+  const json = await res.json();
+  return json.data || json;
+}
+
+export async function createAdjustment(
+  payload: CreateAdjustmentPayload,
+): Promise<InventoryAdjustmentDetail> {
+  const res = await authenticatedFetch("/api/v1/inventory/adjustments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể lập phiếu điều chỉnh tồn kho.");
+  }
+  const json = await res.json();
+  return json.data || json;
+}
+
+export async function approveAdjustment(
+  id: number,
+  note?: string,
+): Promise<InventoryAdjustmentDetail> {
+  const res = await authenticatedFetch(`/api/v1/inventory/adjustments/${id}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể phê duyệt phiếu điều chỉnh.");
+  }
+  const json = await res.json();
+  return json.data || json;
+}
+
+export async function rejectAdjustment(
+  id: number,
+  reason: string,
+): Promise<InventoryAdjustmentDetail> {
+  const res = await authenticatedFetch(`/api/v1/inventory/adjustments/${id}/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể từ chối phiếu điều chỉnh.");
+  }
+  const json = await res.json();
+  return json.data || json;
+}
+
+export async function fetchStockCards(params?: {
+  productId?: number;
+  warehouseId?: number;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+}): Promise<StockCardsResponse> {
+  const query = new URLSearchParams();
+  if (params?.productId) query.set("productId", String(params.productId));
+  if (params?.warehouseId) query.set("warehouseId", String(params.warehouseId));
+  if (params?.fromDate) query.set("fromDate", params.fromDate);
+  if (params?.toDate) query.set("toDate", params.toDate);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+
+  const url = `/api/v1/inventory/stock-cards${query.toString() ? `?${query.toString()}` : ""}`;
+  const res = await authenticatedFetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể tải thẻ kho.");
+  }
+  return res.json();
+}
+
+export async function fetchWarehousesList(): Promise<Array<{ id: number; code: string; name: string }>> {
+  const res = await authenticatedFetch("/api/v1/warehouses");
+  if (!res.ok) {
+    return [];
+  }
+  const json = await res.json();
+  return json.data || json;
+}
+
+export async function fetchLotsList(productId?: number, warehouseId?: number): Promise<Array<{ id: number; lotNumber: string; quantity: number }>> {
+  const query = new URLSearchParams();
+  if (productId) query.set("productId", String(productId));
+  if (warehouseId) query.set("warehouseId", String(warehouseId));
+  const res = await authenticatedFetch(`/api/v1/inventory/lots${query.toString() ? `?${query.toString()}` : ""}`);
+  if (!res.ok) {
+    return [];
+  }
+  const json = await res.json();
+  return json.data || json;
+}
+

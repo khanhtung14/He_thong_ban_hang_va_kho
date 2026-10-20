@@ -498,3 +498,155 @@ def create_legacy_inventory_transaction(
 ) -> InventoryTransaction:
     return _record_stock_movement(payload, user, db)
 
+
+# ---------------------------------------------------------------------------
+# SCRUM-66: Inventory Adjustments with Approval Workflow & Stock Cards
+# ---------------------------------------------------------------------------
+
+from app.services.adjustment_service import (
+    AdjustmentCreateRequest,
+    AdjustmentApproveRequest,
+    AdjustmentRejectRequest,
+    create_adjustment,
+    approve_adjustment,
+    reject_adjustment,
+    list_adjustments,
+    get_adjustment_detail,
+    get_stock_cards,
+)
+
+
+@router.post("/adjustments", status_code=status.HTTP_201_CREATED)
+def create_inventory_adjustment_endpoint(
+    payload: AdjustmentCreateRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new inventory adjustment slip (status: PENDING)."""
+    data = create_adjustment(db=db, payload=payload, user=user)
+    return {
+        "success": True,
+        "code": 201,
+        "message": "Lập phiếu điều chỉnh tồn kho thành công, đang chờ phê duyệt.",
+        "data": data,
+    }
+
+
+@router.get("/adjustments")
+def list_inventory_adjustments_endpoint(
+    warehouse_id: Optional[int] = Query(None, alias="warehouseId"),
+    warehouse_id_alt: Optional[int] = Query(None, alias="warehouse_id"),
+    status: Optional[str] = None,
+    reason: Optional[str] = None,
+    from_date: Optional[str] = Query(None, alias="fromDate"),
+    to_date: Optional[str] = Query(None, alias="toDate"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List inventory adjustments with filters and pagination."""
+    wh_id = warehouse_id if warehouse_id is not None else warehouse_id_alt
+    return list_adjustments(
+        db=db,
+        user=user,
+        warehouse_id=wh_id,
+        status_filter=status,
+        reason=reason,
+        from_date=from_date,
+        to_date=to_date,
+        page=page,
+        limit=limit,
+    )
+
+
+@router.get("/adjustments/{adjustment_id}")
+def get_inventory_adjustment_endpoint(
+    adjustment_id: int,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get full details of a specific adjustment slip."""
+    return get_adjustment_detail(db=db, adjustment_id=adjustment_id, user=user)
+
+
+@router.post("/adjustments/{adjustment_id}/approve")
+def approve_inventory_adjustment_endpoint(
+    adjustment_id: int,
+    payload: Optional[AdjustmentApproveRequest] = None,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Approve an inventory adjustment slip:
+    - WH Manager only.
+    - Creator cannot approve their own slip.
+    - Atomically updates inventory and lot quantities.
+    - Records stock transaction for stock cards.
+    """
+    data = approve_adjustment(db=db, adjustment_id=adjustment_id, payload=payload, user=user)
+    return {
+        "success": True,
+        "code": 200,
+        "message": "Phê duyệt phiếu điều chỉnh thành công, đã cập nhật tồn kho và ghi nhận thẻ kho.",
+        "data": data,
+    }
+
+
+@router.post("/adjustments/{adjustment_id}/reject")
+def reject_inventory_adjustment_endpoint(
+    adjustment_id: int,
+    payload: AdjustmentRejectRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Reject an inventory adjustment slip:
+    - WH Manager only.
+    - Creator cannot reject their own slip.
+    - Requires a non-empty rejection reason.
+    - Does NOT modify inventory.
+    """
+    data = reject_adjustment(db=db, adjustment_id=adjustment_id, payload=payload, user=user)
+    return {
+        "success": True,
+        "code": 200,
+        "message": "Từ chối phiếu điều chỉnh thành công.",
+        "data": data,
+    }
+
+
+@router.get("/stock-cards")
+def get_stock_cards_endpoint(
+    product_id: Optional[int] = Query(None, alias="productId"),
+    product_id_alt: Optional[int] = Query(None, alias="product_id"),
+    warehouse_id: Optional[int] = Query(None, alias="warehouseId"),
+    warehouse_id_alt: Optional[int] = Query(None, alias="warehouse_id"),
+    from_date: Optional[str] = Query(None, alias="fromDate"),
+    to_date: Optional[str] = Query(None, alias="toDate"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve Stock Card (Thẻ kho) showing all posted inventory movements."""
+    p_id = product_id if product_id is not None else product_id_alt
+    w_id = warehouse_id if warehouse_id is not None else warehouse_id_alt
+    return get_stock_cards(
+        db=db,
+        user=user,
+        product_id=p_id,
+        warehouse_id=w_id,
+        from_date=from_date,
+        to_date=to_date,
+        page=page,
+        limit=limit,
+    )
+
+
+# Register legacy routes for adjustments & stock cards as well
+legacy_router.add_api_route("/inventory/adjustments", create_inventory_adjustment_endpoint, methods=["POST"], status_code=201)
+legacy_router.add_api_route("/inventory/adjustments", list_inventory_adjustments_endpoint, methods=["GET"])
+legacy_router.add_api_route("/inventory/adjustments/{adjustment_id}", get_inventory_adjustment_endpoint, methods=["GET"])
+legacy_router.add_api_route("/inventory/adjustments/{adjustment_id}/approve", approve_inventory_adjustment_endpoint, methods=["POST"])
+legacy_router.add_api_route("/inventory/adjustments/{adjustment_id}/reject", reject_inventory_adjustment_endpoint, methods=["POST"])
+legacy_router.add_api_route("/inventory/stock-cards", get_stock_cards_endpoint, methods=["GET"])
+
