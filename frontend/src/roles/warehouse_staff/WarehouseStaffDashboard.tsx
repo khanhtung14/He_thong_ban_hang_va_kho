@@ -7,6 +7,7 @@ import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSi
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
 import SupplierManagement from "./SupplierManagement";
+import InternalTransferManager from "./InternalTransferManager";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -28,6 +29,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
       const p = window.location.pathname;
       if (p === "/warehouse/suppliers") return "suppliers";
       if (p === "/warehouse/inventory") return "unit-conversion";
+      if (p === "/warehouse/transfers") return "internal-transfers";
       if (p === "/warehouse/receiving") return "inbound";
       if (p === "/warehouse/picking") return "outbound";
     }
@@ -142,6 +144,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
         >
           {selectedKey === "suppliers" && <SupplierManagement />}
           {selectedKey === "unit-conversion" && <UnitConversionManager />}
+          {selectedKey === "internal-transfers" && <InternalTransferManager />}
 
           {/* Các tab khác */}
           {selectedKey === "scan" && <div>Giao diện quét mã Barcode / QR</div>}

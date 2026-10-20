@@ -58,6 +58,11 @@ export const WarehouseStaffSidebar: React.FC<WarehouseStaffSidebarProps> = ({
           label: "Thực hiện Xuất kho",
         },
         {
+          key: "internal-transfers",
+          icon: <SwapOutlined />,
+          label: "Luân chuyển nội bộ",
+        },
+        {
           key: "unit-conversion", // <-- Key mới cho chức năng này
           icon: <SwapOutlined />,
           label: "Đơn vị tính & Quy đổi",

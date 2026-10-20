@@ -247,6 +247,16 @@ try:
 except ModuleNotFoundError:
     pass
 
+try:
+    from app.api.v1.endpoints.internal_transfers import (
+        router as internal_transfers_router,
+        compat_router as internal_transfers_compat_router,
+    )
+    app.include_router(internal_transfers_router)
+    app.include_router(internal_transfers_compat_router)
+except ModuleNotFoundError:
+    pass
+
 app.include_router(avatar_router)
 
 
@@ -307,6 +317,7 @@ def admin_create_user_page():
 @app.get("/warehouse/receiving", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/warehouse/inventory", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/warehouse/suppliers", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/warehouse/transfers", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/warehouse/dashboard", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/debt-book", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/accounting/invoices", response_class=HTMLResponse, include_in_schema=False)

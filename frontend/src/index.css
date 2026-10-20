@@ -5,7 +5,7 @@
   --bg-primary: #F8FAFC;
   --bg-surface: #FFFFFF;
   --bg-surface-hover: #F1F5F9;
-  
+
   --text-primary: #0F172A;
   --text-secondary: #475569;
   --text-tertiary: #94A3B8;
@@ -40,7 +40,7 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05);
-  
+
   --shadow-accent: 0 4px 14px 0 rgba(79, 70, 229, 0.39);
 
   /* Radius */
@@ -56,7 +56,9 @@
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -67,7 +69,12 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Outfit', sans-serif;
   font-weight: 600;
   margin: 0;
@@ -80,13 +87,16 @@ h1, h2, h3, h4, h5, h6 {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: var(--radius-full);
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
@@ -103,13 +113,27 @@ button {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .animate-fade-in {
@@ -142,7 +166,8 @@ button {
   max-width: calc(100vw - 48px) !important;
   transform: none !important;
   pointer-events: none !important;
-  z-index: 2147483647 !important; /* Luôn hiển thị trên cùng mọi modal, drawer, backdrop */
+  z-index: 2147483647 !important;
+  /* Luôn hiển thị trên cùng mọi modal, drawer, backdrop */
   display: flex !important;
   flex-direction: column-reverse !important;
   align-items: flex-end !important;
@@ -187,7 +212,8 @@ button {
   position: fixed !important;
   bottom: 24px !important;
   right: 24px !important;
-  z-index: 2147483647 !important; /* Luôn trên cùng */
+  z-index: 2147483647 !important;
+  /* Luôn trên cùng */
 }
 
 /* ==========================================================================
@@ -220,12 +246,13 @@ button {
   z-index: 15 !important;
 }
 
-.ant-table-thead > tr > th,
-.ant-table-thead > tr > td {
+.ant-table-thead>tr>th,
+.ant-table-thead>tr>td {
   position: sticky !important;
   top: 0 !important;
   z-index: 15 !important;
-  background-color: #f1f5f9 !important; /* Nền xám nhạt đục để không thấy chữ bên dưới khi cuộn qua */
+  background-color: #f1f5f9 !important;
+  /* Nền xám nhạt đục để không thấy chữ bên dưới khi cuộn qua */
   color: #0f172a !important;
   font-weight: 700 !important;
   border-bottom: 2px solid #cbd5e1 !important;
@@ -233,20 +260,20 @@ button {
 }
 
 /* 4. Giữ vị trí và độ nổi cho các cột cố định trái / phải (Fixed columns) */
-.ant-table-thead > tr > th.ant-table-cell-fix-left,
-.ant-table-thead > tr > th.ant-table-cell-fix-right {
+.ant-table-thead>tr>th.ant-table-cell-fix-left,
+.ant-table-thead>tr>th.ant-table-cell-fix-right {
   z-index: 25 !important;
   background-color: #e2e8f0 !important;
 }
 
-.ant-table-tbody > tr > td.ant-table-cell-fix-left,
-.ant-table-tbody > tr > td.ant-table-cell-fix-right {
+.ant-table-tbody>tr>td.ant-table-cell-fix-left,
+.ant-table-tbody>tr>td.ant-table-cell-fix-right {
   z-index: 5 !important;
   background-color: #ffffff !important;
 }
 
-.ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
-.ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+.ant-table-tbody>tr:hover>td.ant-table-cell-fix-left,
+.ant-table-tbody>tr:hover>td.ant-table-cell-fix-right {
   background-color: #f8fafc !important;
 }
 
@@ -300,6 +327,7 @@ button {
 
 /* 9. Mobile Responsive Fixes (SCRUM Mobile Support) */
 @media (max-width: 991px) {
+
   /* Thu gọn trạng thái hệ thống: chỉ còn dấu tích trên mobile */
   .system-status-text {
     display: none !important;
@@ -349,5 +377,3 @@ button {
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15) !important;
   }
 }
-
-
