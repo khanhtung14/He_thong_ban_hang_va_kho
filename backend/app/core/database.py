@@ -1,8 +1,9 @@
+from __future__ import annotations
 """MySQL engine and SQLAlchemy session factory."""
 
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Dict, List, cast
 
 from dotenv import load_dotenv
 from sqlalchemy import Table, create_engine, inspect, text
@@ -31,8 +32,8 @@ if DATABASE_URL.startswith("sqlite:///") and not DATABASE_URL.endswith(":memory:
         elif candidate2.exists():
             DATABASE_URL = f"sqlite:///{candidate2.resolve().as_posix()}"
 
-connect_args: dict[str, Any] = {}
-engine_options: dict[str, Any] = {"pool_pre_ping": True}
+connect_args: Dict[str, Any] = {}
+engine_options: Dict[str, Any] = {"pool_pre_ping": True}
 if "sqlite" in DATABASE_URL:
     connect_args = {"check_same_thread": False}
     engine_options["connect_args"] = connect_args
@@ -77,7 +78,7 @@ def migrate_pricing_schema():
     )
 
     target_tables = cast(
-        list[Table],
+        List[Table],
         [
             PriceList.__table__,
             PriceListItem.__table__,
@@ -177,6 +178,25 @@ def migrate_pricing_schema():
             "min_quantity": "INTEGER NOT NULL DEFAULT 1",
             "max_quantity": "INTEGER NULL",
             "discount_value": "FLOAT NOT NULL DEFAULT 0.0",
+        },
+        "dispatches": {
+            "override_reason": "VARCHAR(255) NULL",
+            "created_at": "DATETIME NULL",
+        },
+        "dispatch_items": {
+            "override_reason": "VARCHAR(255) NULL",
+        },
+        "pick_lists": {
+            "created_at": "DATETIME NULL",
+        },
+        "payments": {
+            "sales_id": "INTEGER NULL",
+            "receipt_image": "VARCHAR(255) NULL",
+            "status": "VARCHAR(30) NOT NULL DEFAULT 'PENDING_SUBMISSION'",
+            "note": "VARCHAR(255) NULL",
+            "confirmed_by_id": "INTEGER NULL",
+            "confirmed_at": "DATETIME NULL",
+            "confirmation_note": "VARCHAR(255) NULL",
         },
     }
     for table_name, columns_to_add in additions.items():
