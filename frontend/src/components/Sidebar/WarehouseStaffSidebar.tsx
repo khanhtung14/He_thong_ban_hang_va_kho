@@ -11,6 +11,7 @@ import {
   SwapOutlined,
   ShopOutlined,
   TruckOutlined,
+  FieldTimeOutlined,
 } from "@ant-design/icons";
 import BrandLogo from "../BrandLogo";
 
@@ -56,6 +57,11 @@ export const WarehouseStaffSidebar: React.FC<WarehouseStaffSidebarProps> = ({
           key: "outbound",
           icon: <ExportOutlined />,
           label: "Thực hiện Xuất kho",
+        },
+        {
+          key: "batches",
+          icon: <FieldTimeOutlined />,
+          label: "Theo dõi Lô & HSD",
         },
         {
           key: "unit-conversion", // <-- Key mới cho chức năng này

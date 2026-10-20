@@ -372,6 +372,10 @@ class TransactionCreateRequest(BaseModel):
     transaction_type: Literal["IN", "OUT"]
     unit_name: str = Field(min_length=1, max_length=100)
     input_quantity: float = Field(gt=0, allow_inf_nan=False)
+    batch_id: Optional[int] = None
+    batch_number: Optional[str] = None
+    override_expired: bool = False
+    override_reason: Optional[str] = None
 
 
 class LegacyTransactionCreateRequest(BaseModel):
@@ -451,6 +455,67 @@ def _record_stock_movement(
         else:
             if stock.base_quantity < base_quantity:
                 raise HTTPException(status_code=400, detail="Không đủ tồn kho để xuất sản phẩm.")
+            
+            # Kiểm tra ràng buộc lô nếu sản phẩm có quản lý lô (AC 4)
+            prod = db.get(Product, payload.product_id)
+            if prod and (getattr(prod, "is_batch_managed", False) or getattr(prod, "manage_by_lot", False)):
+                b_id = getattr(payload, "batch_id", None)
+                b_num = getattr(payload, "batch_number", None)
+                if not b_id and not b_num:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Sản phẩm này được cấu hình 'Quản lý theo lô'. Bắt buộc phải chọn lô hàng cụ thể để xuất kho.",
+                    )
+                from app.models.models import ProductBatch, BatchOverrideLog
+                b_query = db.query(ProductBatch).filter(ProductBatch.product_id == payload.product_id)
+                if b_id:
+                    batch = b_query.filter(ProductBatch.id == b_id).first()
+                else:
+                    batch = b_query.filter(ProductBatch.batch_number == b_num.strip().upper()).first()
+                if not batch:
+                    raise HTTPException(status_code=400, detail="Lô hàng được chọn không tồn tại.")
+                if batch.remaining_quantity < base_quantity:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Lô hàng '{batch.batch_number}' chỉ còn {batch.remaining_quantity} trong kho, không đủ xuất {base_quantity}.",
+                    )
+                if batch.exp_date < date.today():
+                    ov_flag = getattr(payload, "override_expired", False)
+                    ov_reason = (getattr(payload, "override_reason", "") or "").strip()
+                    if not ov_flag or not ov_reason:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail={
+                                "code": "BATCH_EXPIRED",
+                                "requires_override": True,
+                                "message": (
+                                    f"Lô hàng '{batch.batch_number}' đã quá hạn sử dụng ({batch.exp_date}). "
+                                    f"Hệ thống chặn xuất kho! Chỉ cho phép xuất nếu có sự xác nhận 'ghi đè' (override) "
+                                    f"từ tài khoản cấp Quản lý kho và bắt buộc phải ghi kèm lý do."
+                                ),
+                                "batch_id": batch.id,
+                                "batch_number": batch.batch_number,
+                                "exp_date": str(batch.exp_date),
+                            },
+                        )
+                    user_role = normalize_role(user.role)
+                    if user_role not in {"WH Manager", "Admin", "Warehouse Manager"}:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Chỉ tài khoản cấp Quản lý kho (WH Manager / Admin) mới có thẩm quyền ghi đè xuất lô hàng quá hạn.",
+                        )
+                    override_log = BatchOverrideLog(
+                        batch_id=batch.id,
+                        product_id=batch.product_id,
+                        warehouse_id=payload.warehouse_id,
+                        quantity=base_quantity,
+                        override_reason=ov_reason,
+                        override_by_user_id=getattr(user, "id", None),
+                        override_by_name=getattr(user, "username", "Manager"),
+                    )
+                    db.add(override_log)
+                batch.remaining_quantity = max(0.0, batch.remaining_quantity - base_quantity)
+
             stock.base_quantity -= base_quantity
 
         transaction = InventoryTransaction(

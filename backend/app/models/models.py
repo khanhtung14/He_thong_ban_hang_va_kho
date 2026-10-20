@@ -271,6 +271,7 @@ class Product(Base):
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
     base_unit: Mapped[str] = mapped_column(String(20), nullable=False)
     manage_by_lot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_batch_managed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     min_stock: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     base_price: Mapped[float] = mapped_column(Float, default=0.0)
     cost_price: Mapped[float] = mapped_column(Float, default=0.0)
@@ -723,6 +724,41 @@ class InventoryLot(Base):
     mfg_date: Mapped[Optional[date]] = mapped_column(Date)
     exp_date: Mapped[Optional[date]] = mapped_column(Date)
     quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+
+class ProductBatch(Base):
+    __tablename__ = "product_batches"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    batch_number: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    mfg_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    exp_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    remaining_quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    product: Mapped[Optional["Product"]] = relationship("Product", foreign_keys=[product_id])
+    warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[warehouse_id])
+
+
+ProductBatches = ProductBatch
+
+
+class BatchOverrideLog(Base):
+    __tablename__ = "batch_override_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    batch_id: Mapped[int] = mapped_column(ForeignKey("product_batches.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    warehouse_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    override_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    override_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    override_by_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    batch: Mapped[Optional["ProductBatch"]] = relationship("ProductBatch")
 
 
 class InventoryTransaction(Base):

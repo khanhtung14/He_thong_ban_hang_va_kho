@@ -695,11 +695,78 @@
 - **Query Params:** `productId`, `warehouseId`, `fromDate`, `toDate`
 - **Response Data:** Thẻ kho liệt kê toàn bộ phát sinh: Chứng từ, Ngày tháng, Số lượng nhập, Số lượng xuất, Tồn cuối kỳ.
 
-#### `GET /inventory/lots`
+#### `GET /api/v1/inventory/batches` (hoặc `GET /inventory/lots`)
+- **Story:** S6-01 (Theo dõi lô và hạn sử dụng)
+- **Phân quyền:** Warehouse, WH Manager, Admin
+- **Query Params:** `productId` (int), `warehouseId` (int), `warningDays` (int, default: 30), `status` (EXPIRED, EXPIRING_SOON, ACTIVE, ALL)
+- **Response Data:**
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "Lấy danh sách lô hàng thành công.",
+  "warningDays": 30,
+  "data": [
+    {
+      "id": 1,
+      "productId": 101,
+      "productSku": "SUA-VINAMILK-100",
+      "productName": "Sữa tươi tiệt trùng Vinamilk 100ml",
+      "batchNumber": "LOT261009",
+      "mfgDate": "2026-08-01",
+      "expDate": "2026-11-05",
+      "remainingQuantity": 250.0,
+      "warehouseId": 1,
+      "warehouseName": "Kho Tổng Hà Nội",
+      "daysUntilExpiry": 16,
+      "isExpired": false,
+      "isExpiringSoon": true,
+      "status": "EXPIRING_SOON"
+    }
+  ]
+}
+```
+
+#### `POST /api/v1/inventory/batches`
 - **Story:** S6-01
 - **Phân quyền:** Warehouse, WH Manager
-- **Query Params:** `productId`, `warehouseId`, `isExpired`
-- **Response Data:** Danh sách lô hàng, ngày sản xuất, hạn sử dụng, số lượng tồn theo từng lô.
+- **Request Body:**
+```json
+{
+  "productId": 101,
+  "batchNumber": "LOT261009",
+  "mfgDate": "2026-08-01",
+  "expDate": "2026-11-05",
+  "remainingQuantity": 250.0,
+  "warehouseId": 1
+}
+```
+- **Response Data (201 Created):** Chi tiết lô hàng vừa tạo.
+
+#### `PATCH /api/v1/products/{id}/batch-management`
+- **Story:** S6-01 (Bật/tắt quản lý theo lô theo từng SKU)
+- **Phân quyền:** Sales Manager, WH Manager, Admin
+- **Request Body:** `{"isBatchManaged": true}`
+- **Response Data (200 OK):** Trạng thái cấu hình của sản phẩm.
+
+#### `POST /api/v1/inventory/outbound`
+- **Story:** S6-05 (Xuất kho kiểm tra hạn dùng & ghi đè Quản lý)
+- **Phân quyền:** Warehouse, WH Manager
+- **Request Body:**
+```json
+{
+  "productId": 101,
+  "warehouseId": 1,
+  "quantity": 20.0,
+  "batchId": 1,
+  "overrideExpired": false,
+  "overrideReason": null
+}
+```
+- **Lưu ý:**
+  - Nếu sản phẩm bật `is_batch_managed`: Bắt buộc phải chọn `batchId`.
+  - Nếu lô hàng quá hạn (`expDate < today`) mà không có `overrideExpired: true` và `overrideReason`: Bị chặn với HTTP 400 kèm `requires_override: true`.
+  - Nếu Quản lý kho xác nhận `overrideExpired: true` và có `overrideReason`: Cho phép xuất và lưu log đối soát.
 
 #### `POST /warehouse/receipts`
 - **Story:** S5-04

@@ -249,6 +249,21 @@ except ModuleNotFoundError:
 
 app.include_router(avatar_router)
 
+try:
+    from app.api.v1.endpoints.batch_management import (
+        router as batch_management_router,
+        compat_router as batch_management_compat_router,
+        products_batch_router,
+        products_batch_compat_router,
+    )
+    app.include_router(batch_management_router)
+    app.include_router(batch_management_compat_router)
+    app.include_router(products_batch_router)
+    app.include_router(products_batch_compat_router)
+except ModuleNotFoundError:
+    pass
+
+
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def home():
