@@ -1,59 +1,123 @@
-/* ==========================================================================
-   DISTRICARE CRM - Print Stylesheet (In Biên Bản Bàn Giao A4 Chuẩn)
-   ========================================================================== */
+/**
+ * DEDICATED @MEDIA PRINT STYLESHEET
+ * Tối ưu hóa tuyệt đối cho máy in văn phòng A4 và máy in hóa đơn nhiệt cầm tay K80
+ * Hệ thống Quản lý Bán hàng & Phân phối Doanh nghiệp NEXUS OMS (SCRUM-86 / SCRUM-15)
+ */
 
 @media print {
-  body * {
-    visibility: hidden;
-  }
-
-  .no-print {
+  /* 1. ẨN HOÀN TOÀN CÁC THÀNH PHẦN GIAO DIỆN KHÔNG LIÊN QUAN */
+  .app-header,
+  .sidebar-panel,
+  .canvas-toolbar,
+  .modal-backdrop,
+  .zoom-controller,
+  .action-stack,
+  button,
+  .btn {
     display: none !important;
   }
 
-  .modal-backdrop, #handoverDocumentModal {
-    position: static !important;
-    background: transparent !important;
-    display: block !important;
-    padding: 0 !important;
-    inset: auto !important;
-  }
-
-  .modal-dialog {
-    box-shadow: none !important;
-    border: none !important;
-    max-width: 100% !important;
+  /* 2. ĐẶT LẠI TOÀN BỘ KHUNG NHÌN VỀ CHUẨN IN */
+  html, body {
     width: 100% !important;
-    max-height: none !important;
-  }
-
-  .modal-body {
+    height: auto !important;
+    min-height: auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  .print-document-container, .print-document-container * {
-    visibility: visible !important;
-  }
-
-  .print-document-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20px;
-    background: white;
-  }
-
-  .print-sheet {
-    border: none !important;
+  .app-workspace,
+  .canvas-panel,
+  .canvas-scroll-viewport,
+  .paper-container {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+    background: transparent !important;
     box-shadow: none !important;
+  }
+
+  /* 3. ĐỊNH DẠNG TỜ IN (INVOICE SHEET) */
+  .invoice-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 auto !important;
+    border-radius: 0 !important;
+  }
+
+  /* KHỔ A4 TIÊU CHUẨN */
+  .invoice-sheet.a4-format {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
     padding: 0 !important;
   }
 
-  @page {
-    size: A4 portrait;
-    margin: 15mm;
+  /* KHỔ K80 MÁY IN NHIỆT */
+  .invoice-sheet.k80-format {
+    width: 76mm !important;
+    max-width: 76mm !important;
+    margin: 0 !important;
+    padding: 2mm !important;
   }
+
+  /* BẢO VỆ CHỐNG RÁCH TRANG IN (PAGE BREAK CONTROLS) */
+  .inv-header,
+  .inv-title-band,
+  .inv-parties-grid,
+  .inv-summary-container,
+  .inv-signatures-section,
+  .inv-terms-footer,
+  .k80-section,
+  .k80-totals,
+  .k80-sign-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .inv-table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ĐẢM BẢO MÀU SẮC ĐẬM ĐÀ, RÕ NÉT TRÊN GIẤY IN */
+  .inv-company-title,
+  .inv-main-title,
+  .party-name,
+  .product-title,
+  .grand-price,
+  .signer-name {
+    color: #000000 !important;
+  }
+
+  .inv-table th {
+    background-color: #f1f5f9 !important;
+    color: #000000 !important;
+    border-color: #94a3b8 !important;
+  }
+
+  .inv-table td {
+    border-color: #cbd5e1 !important;
+  }
+
+  /* MÃ VẠCH VÀ QR IN VECTOR SẮC NÉT */
+  .barcode-svg,
+  .qrcode-svg {
+    filter: contrast(150%);
+  }
+}
+
+/* QUY TẮC KHỔ TRANG IN */
+@page {
+  margin: 10mm 12mm;
+  size: A4 portrait;
 }
