@@ -1,0 +1,482 @@
+/**
+ * NEXUS ENTERPRISE ORDER MANAGEMENT SYSTEM (NEXUS OMS)
+ * Design System: Credit Risk Gatekeeper, Banners & AR Aging Analysis
+ * Ticket: SCRUM-86 / SCRUM-9
+ */
+
+/* ===================================================================
+   CRITICAL LOCK BANNER (TIÊU CHÍ 3 ĐỀ BÀI)
+   =================================================================== */
+.critical-lock-banner {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.25), rgba(153, 27, 27, 0.35));
+  border: 1.5px solid #ef4444;
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.critical-lock-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  bottom: 0;
+  background: #ef4444;
+}
+
+.banner-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: #dc2626;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(220, 38, 38, 0.6);
+}
+
+.banner-icon-box.warning {
+  background: #d97706;
+  box-shadow: 0 0 14px rgba(217, 119, 6, 0.6);
+}
+
+.banner-content {
+  flex: 1;
+}
+
+.banner-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+.banner-desc {
+  font-size: 13px;
+  color: #fecaca;
+  line-height: 1.5;
+}
+
+.banner-action-row {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.banner-hint {
+  font-size: 11px;
+  color: #fca5a5;
+  font-style: italic;
+}
+
+/* ===================================================================
+   WARNING APPROVAL BANNER (TIÊU CHÍ 2 ĐỀ BÀI)
+   =================================================================== */
+.warning-approval-banner {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.18), rgba(180, 83, 9, 0.28));
+  border: 1.5px solid #f59e0b;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+}
+
+.warning-approval-banner .banner-desc {
+  color: #fde68a;
+  font-size: 12px;
+}
+
+/* ===================================================================
+   CREDIT AUDIT COMPARISON (MODAL FORM)
+   =================================================================== */
+.credit-audit-comparison {
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.audit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+
+.audit-row:last-child {
+  border-bottom: none;
+}
+
+.audit-label {
+  color: var(--text-secondary);
+}
+
+.audit-value {
+  color: #fff;
+}
+
+.row-danger {
+  color: #f87171;
+}
+
+.row-danger-highlight {
+  background: rgba(239, 68, 68, 0.12);
+  margin: 6px -18px -14px -18px;
+  padding: 10px 18px;
+  border-top: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* ===================================================================
+   APPROVAL SCREEN & STATS STRIP
+   =================================================================== */
+.approval-screen-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.approval-header-section {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.approval-stats-strip {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stat-badge-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+}
+
+.stat-count {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.stat-badge-card.pending {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.05);
+}
+.stat-badge-card.pending .stat-count { color: #fbbf24; }
+
+.stat-badge-card.approved {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.05);
+}
+.stat-badge-card.approved .stat-count { color: #34d399; }
+
+.approval-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-tabs-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill-btn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pill-btn:hover {
+  background: var(--bg-hover);
+  color: #fff;
+}
+
+.pill-btn.active {
+  background: var(--bg-surface-elevated);
+  border-color: var(--primary);
+  color: #60a5fa;
+}
+
+.pill-warning.active {
+  border-color: var(--warning);
+  color: #fbbf24;
+}
+
+.pill-success.active {
+  border-color: var(--success);
+  color: #34d399;
+}
+
+.pill-danger.active {
+  border-color: var(--danger);
+  color: #f87171;
+}
+
+/* Order Rows */
+.order-code-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.order-no {
+  color: #60a5fa;
+}
+
+.order-time {
+  font-size: 11px;
+}
+
+.dealer-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.dealer-subcode {
+  font-size: 11px;
+}
+
+.sales-rep-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.credit-notes-cell {
+  max-width: 320px;
+}
+
+.credit-summary-text {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.approval-justification {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-buttons-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* ===================================================================
+   DEALER MATRIX & AR AGING ANALYSIS
+   =================================================================== */
+.matrix-screen-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.matrix-header-box {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.policy-controller-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  min-width: 380px;
+}
+
+.policy-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 8px;
+}
+
+.policy-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.policy-input-group .form-input {
+  width: 90px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.policy-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.mini-utilization-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-pct {
+  font-size: 11px;
+  font-weight: 700;
+  width: 35px;
+}
+
+.mini-bar-track {
+  width: 70px;
+  height: 6px;
+  background: #0d131f;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mini-bar-fill {
+  height: 100%;
+}
+
+.fill-success { background: #10b981; }
+.fill-warning { background: #f59e0b; }
+.fill-danger { background: #ef4444; }
+
+.aging-header {
+  margin-bottom: 12px;
+}
+
+.aging-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Lock Explanation Banner */
+.lock-explanation-banner {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid #ef4444;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: #fca5a5;
+  line-height: 1.5;
+}
+
+.lock-explanation-banner .banner-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ef4444;
+  margin-bottom: 4px;
+}
+
+/* Order Success Card */
+.success-order-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.status-callout {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid;
+}
+
+.callout-success {
+  background: var(--success-bg);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.callout-warning {
+  background: var(--warning-bg);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.callout-title {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.callout-text {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-main);
+}
+
+.order-receipt-summary {
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+}
+
+.receipt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.receipt-row:last-child {
+  border-bottom: none;
+}

@@ -1,406 +1,318 @@
 /**
- * DISTRICARE CRM - Data Store & State Management
- * Kiến trúc Reactive Observer Pattern, tự động đồng bộ LocalStorage, xử lý Audit Log & Nghiệp vụ chuyển giao
+ * NEXUS ENTERPRISE ORDER MANAGEMENT SYSTEM (NEXUS OMS)
+ * Module: Application State Store (Quản lý trạng thái tập trung)
+ * Ticket: SCRUM-86 / SCRUM-9
  */
 
-import { INITIAL_EMPLOYEES, INITIAL_AGENCIES, INITIAL_HANDOVERS, INITIAL_AUDIT_LOGS } from './data.js';
+import { SYSTEM_CONFIG, INITIAL_DEALERS, INITIAL_PRODUCTS, INITIAL_ORDERS } from './mockData.js';
+import { CreditRiskEngine } from './creditEngine.js';
 
-const STORAGE_KEYS = {
-  EMPLOYEES: 'districare_employees_v1',
-  AGENCIES: 'districare_agencies_v1',
-  HANDOVERS: 'districare_handovers_v1',
-  AUDIT_LOGS: 'districare_audit_logs_v1',
-  CURRENT_USER_ID: 'districare_current_user_id_v1'
-};
-
-class Store {
+class StateStore {
   constructor() {
-    this.listeners = new Set();
-    this.employees = [];
-    this.agencies = [];
-    this.handovers = [];
-    this.auditLogs = [];
-    this.currentUserId = 'NV001'; // Default: Quản lý Nguyễn Hồng Vĩnh
-    this.init();
-  }
+    this.config = { ...SYSTEM_CONFIG };
+    this.dealers = JSON.parse(JSON.stringify(INITIAL_DEALERS));
+    this.products = JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
+    this.orders = JSON.parse(JSON.stringify(INITIAL_ORDERS));
+    
+    // Khởi tạo đại lý mặc định: DL-001
+    this.currentDealerId = 'DL-001';
+    
+    // Giỏ hàng màn hình tạo đơn
+    this.cart = []; // [{ productId, sku, name, price, quantity, subtotal, unit }]
+    
+    // Ghi chú đơn hàng & thông tin bổ sung
+    this.orderMeta = {
+      notes: '',
+      deliveryAddress: '',
+      paymentMethod: 'DEBT_ACCOUNTING', // Ghi nhận công nợ
+      priority: 'STANDARD'
+    };
 
-  init() {
-    try {
-      const storedEmployees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
-      const storedAgencies = localStorage.getItem(STORAGE_KEYS.AGENCIES);
-      const storedHandovers = localStorage.getItem(STORAGE_KEYS.HANDOVERS);
-      const storedAuditLogs = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
-      const storedUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-
-      this.employees = storedEmployees ? JSON.parse(storedEmployees) : [...INITIAL_EMPLOYEES];
-      this.agencies = storedAgencies ? JSON.parse(storedAgencies) : [...INITIAL_AGENCIES];
-      this.handovers = storedHandovers ? JSON.parse(storedHandovers) : [...INITIAL_HANDOVERS];
-      this.auditLogs = storedAuditLogs ? JSON.parse(storedAuditLogs) : [...INITIAL_AUDIT_LOGS];
-
-      if (storedUserId && this.employees.some(e => e.id === storedUserId)) {
-        this.currentUserId = storedUserId;
-      } else {
-        this.currentUserId = 'NV001';
-      }
-
-      this.saveToStorage();
-    } catch (err) {
-      console.warn('Lỗi đọc LocalStorage, khởi tạo dữ liệu mặc định:', err);
-      this.resetToDefault();
-    }
-  }
-
-  saveToStorage() {
-    try {
-      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(this.employees));
-      localStorage.setItem(STORAGE_KEYS.AGENCIES, JSON.stringify(this.agencies));
-      localStorage.setItem(STORAGE_KEYS.HANDOVERS, JSON.stringify(this.handovers));
-      localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(this.auditLogs));
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, this.currentUserId);
-    } catch (err) {
-      console.error('Không thể lưu LocalStorage:', err);
-    }
-  }
-
-  resetToDefault() {
-    this.employees = JSON.parse(JSON.stringify(INITIAL_EMPLOYEES));
-    this.agencies = JSON.parse(JSON.stringify(INITIAL_AGENCIES));
-    this.handovers = JSON.parse(JSON.stringify(INITIAL_HANDOVERS));
-    this.auditLogs = JSON.parse(JSON.stringify(INITIAL_AUDIT_LOGS));
-    this.currentUserId = 'NV001';
-    this.saveToStorage();
-    this.notify({ type: 'RESET_DATA' });
+    // Subscriptions
+    this.listeners = [];
   }
 
   subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
   }
 
-  notify(event) {
-    this.saveToStorage();
-    this.listeners.forEach(fn => {
+  notify() {
+    for (const listener of this.listeners) {
       try {
-        fn(event, this);
+        listener(this.getState());
       } catch (err) {
-        console.error('Lỗi listener trong Store notify:', err);
+        console.error('[Store] Error in listener callback:', err);
       }
-    });
+    }
   }
 
-  // --- USER CONTEXT & RBAC ---
-  getCurrentUser() {
-    const user = this.employees.find(e => e.id === this.currentUserId);
-    return user || this.employees[0];
+  getState() {
+    const currentDealer = this.getCurrentDealer();
+    const cartTotals = this.getCartTotals();
+    const creditEvaluation = CreditRiskEngine.evaluateCreditGatekeeper(
+      currentDealer,
+      cartTotals.grandTotal,
+      this.config.defaultMaxOverdueDays
+    );
+
+    return {
+      config: this.config,
+      dealers: this.dealers,
+      products: this.products,
+      orders: this.orders,
+      currentDealer,
+      cart: this.cart,
+      cartTotals,
+      creditEvaluation,
+      orderMeta: this.orderMeta
+    };
   }
 
-  setCurrentUser(userId) {
-    const found = this.employees.find(e => e.id === userId);
-    if (!found) return false;
-    this.currentUserId = userId;
-    this.notify({ type: 'USER_SWITCHED', user: found });
-    return true;
+  getCurrentDealer() {
+    return this.dealers.find(d => d.id === this.currentDealerId) || this.dealers[0];
   }
 
-  isManager() {
-    const u = this.getCurrentUser();
-    return u && u.role === 'MANAGER';
+  // Set Dealer
+  setDealer(dealerId) {
+    if (this.currentDealerId !== dealerId) {
+      this.currentDealerId = dealerId;
+      this.notify();
+    }
   }
 
-  // --- GETTERS ---
-  getEmployees() {
-    return [...this.employees];
-  }
+  // Chọn nhanh kịch bản kiểm thử (Preset Scenario cho Giảng viên)
+  applyPresetScenario(scenarioKey) {
+    const dealer = this.dealers.find(d => d.presetScenario === scenarioKey);
+    if (!dealer) return;
 
-  getEmployeeById(id) {
-    return this.employees.find(e => e.id === id) || null;
-  }
+    this.currentDealerId = dealer.id;
+    this.cart = []; // Reset giỏ hàng trước
 
-  getAgencies() {
-    return [...this.agencies];
-  }
-
-  getAgencyById(id) {
-    return this.agencies.find(a => a.id === id) || null;
-  }
-
-  getHandovers() {
-    return [...this.handovers].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }
-
-  getAuditLogs() {
-    return [...this.auditLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }
-
-  /**
-   * Acceptance Criterion 1 & 2:
-   * Lọc danh sách đại lý theo phân quyền (RBAC / Row-Level Security) và các tiêu chí tìm kiếm
-   */
-  getVisibleAgencies(filters = {}) {
-    const currentUser = this.getCurrentUser();
-    let list = [...this.agencies];
-
-    // QUY TẮC BẢO MẬT HÀNG (Row-Level Security):
-    // Nhân viên kinh doanh chỉ nhìn thấy đại lý mình phụ trách chính!
-    if (currentUser.role === 'SALES_REP') {
-      list = list.filter(a => a.assignedSalesId === currentUser.id);
+    // Tự động thêm giỏ hàng phù hợp để Giảng viên test ngay:
+    if (scenarioKey === 'NORMAL_SAFE') {
+      // Thêm 1 Server 115M (Tổng 126.5M VAT -> Nợ lên 266.5M / 600M -> Vẫn An toàn)
+      this.addToCart('PRD-001', 1);
+    } else if (scenarioKey === 'OVER_LIMIT') {
+      // Đang nợ 350M / 400M (còn 50M). Thêm 1 Macbook 89M -> Tổng vượt 400M -> Test ngay Vượt Hạn Mức
+      this.addToCart('PRD-002', 1);
+    } else if (scenarioKey === 'OVERDUE_BLOCKED') {
+      // Đang có nợ quá hạn 56 ngày vi phạm -> Thêm sản phẩm để thấy NÚT TẠO ĐƠN BỊ KHÓA CỨNG
+      this.addToCart('PRD-003', 2);
+    } else if (scenarioKey === 'BORDERLINE') {
+      // Đang nợ 494M / 500M (còn đúng 6M). Thêm 1 SSD 14.2M -> Lập tức kích hoạt Cần duyệt
+      this.addToCart('PRD-007', 1);
     }
 
-    // Bộ lọc nghiệp vụ
-    if (filters.search) {
-      const q = filters.search.trim().toLowerCase();
-      list = list.filter(a =>
-        a.name.toLowerCase().includes(q) ||
-        a.code.toLowerCase().includes(q) ||
-        a.shortName.toLowerCase().includes(q) ||
-        a.province.toLowerCase().includes(q) ||
-        (a.taxId && a.taxId.includes(q))
+    this.notify();
+  }
+
+  // Cart operations
+  addToCart(productId, quantity = 1) {
+    const product = this.products.find(p => p.id === productId);
+    if (!product) return;
+
+    const existingIndex = this.cart.findIndex(item => item.productId === productId);
+    if (existingIndex > -1) {
+      this.cart[existingIndex].quantity += quantity;
+      this.cart[existingIndex].subtotal = this.cart[existingIndex].quantity * this.cart[existingIndex].price;
+    } else {
+      this.cart.push({
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
+        price: product.price,
+        unit: product.unit,
+        quantity: quantity,
+        subtotal: quantity * product.price,
+        image: product.image
+      });
+    }
+    this.notify();
+  }
+
+  updateCartItemQuantity(productId, quantity) {
+    const qty = parseInt(quantity, 10);
+    if (isNaN(qty) || qty <= 0) {
+      this.removeFromCart(productId);
+      return;
+    }
+
+    const item = this.cart.find(i => i.productId === productId);
+    if (item) {
+      item.quantity = qty;
+      item.subtotal = item.quantity * item.price;
+      this.notify();
+    }
+  }
+
+  removeFromCart(productId) {
+    this.cart = this.cart.filter(item => item.productId !== productId);
+    this.notify();
+  }
+
+  clearCart() {
+    this.cart = [];
+    this.notify();
+  }
+
+  getCartTotals() {
+    const subtotal = this.cart.reduce((sum, item) => sum + item.subtotal, 0);
+    const vatRate = this.config.vatRate;
+    const vatAmount = Math.round(subtotal * vatRate);
+    const grandTotal = subtotal + vatAmount;
+    const totalItems = this.cart.reduce((sum, item) => sum + item.quantity, 0);
+
+    return {
+      subtotal,
+      vatRate,
+      vatAmount,
+      grandTotal,
+      totalItems
+    };
+  }
+
+  // Tạo đơn hàng (Submit Order)
+  submitOrder(approvalPayload = null) {
+    const dealer = this.getCurrentDealer();
+    const cartTotals = this.getCartTotals();
+    
+    if (this.cart.length === 0) {
+      throw new Error('Giỏ hàng trống! Vui lòng chọn ít nhất một sản phẩm.');
+    }
+
+    // Đánh giá công nợ tại thời điểm chốt đơn
+    const evalResult = CreditRiskEngine.evaluateCreditGatekeeper(
+      dealer, 
+      cartTotals.grandTotal, 
+      this.config.defaultMaxOverdueDays
+    );
+
+    // KIỂM TRA ĐIỀU KIỆN 3: BỊ CHẶN HOÀN TOÀN DO NỢ QUÁ HẠN
+    if (evalResult.isOverdueBlocked) {
+      throw new Error(
+        `[CHẶN TẠO ĐƠN HOÀN TOÀN] Đại lý ${dealer.name} có khoản nợ quá hạn (${evalResult.maxOverdueDays} ngày) vượt mức cho phép (${evalResult.maxOverdueDaysAllowed} ngày). Không thể tạo đơn dưới bất kỳ hình thức nào!`
       );
     }
 
-    if (filters.region && filters.region !== 'ALL') {
-      list = list.filter(a => a.region === filters.region);
+    // KIỂM TRA ĐIỀU KIỆN 2: VƯỢT HẠN MỨC -> ĐÁNH DẤU CẦN DUYỆT
+    let finalStatus = 'APPROVED';
+    let statusLabel = 'Đã xác nhận (Approved)';
+    let approvalReason = 'Đơn hàng trong hạn mức tín dụng - Hệ thống tự động duyệt.';
+    let creditCheckStatus = 'PASSED';
+    let creditCheckSummary = `Trong hạn mức (Tổng nợ sau đơn: ${CreditRiskEngine.formatShortVND(evalResult.projectedTotalDebt)} / ${CreditRiskEngine.formatShortVND(dealer.creditLimit)})`;
+
+    if (evalResult.isExceededLimit) {
+      finalStatus = 'PENDING_APPROVAL';
+      statusLabel = 'Chờ duyệt công nợ (Pending Approval)';
+      creditCheckStatus = 'EXCEEDED_LIMIT';
+      creditCheckSummary = `Vượt hạn mức tín dụng +${CreditRiskEngine.formatVND(evalResult.exceededAmount)} (Tổng nợ dự kiến ${CreditRiskEngine.formatShortVND(evalResult.projectedTotalDebt)} / ${CreditRiskEngine.formatShortVND(dealer.creditLimit)})`;
+      
+      approvalReason = approvalPayload?.reason || 'Đơn vượt hạn mức tín dụng. Yêu cầu xem xét phê duyệt ngoại lệ.';
     }
 
-    if (filters.tier && filters.tier !== 'ALL') {
-      list = list.filter(a => a.tier === filters.tier);
+    const orderId = `ORD-${Date.now().toString().slice(-4)}`;
+    const orderNo = `NEX-ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newOrder = {
+      id: orderId,
+      orderNo: orderNo,
+      dealerId: dealer.id,
+      dealerName: dealer.name,
+      salesRep: dealer.salesRep,
+      createdAt: new Date().toLocaleString('vi-VN'),
+      totalBeforeVat: cartTotals.subtotal,
+      vatAmount: cartTotals.vatAmount,
+      totalAmount: cartTotals.grandTotal,
+      status: finalStatus,
+      statusLabel: statusLabel,
+      creditCheckStatus: creditCheckStatus,
+      creditCheckSummary: creditCheckSummary,
+      approvalReason: approvalReason,
+      approvalRequestedAt: finalStatus === 'PENDING_APPROVAL' ? new Date().toLocaleString('vi-VN') : null,
+      requestedBy: dealer.salesRep,
+      approver: finalStatus === 'PENDING_APPROVAL' ? (approvalPayload?.approver || 'Kế toán trưởng & GĐ Tài chính') : 'Hệ thống tự động',
+      paymentCommitmentDate: approvalPayload?.commitmentDate || null,
+      collateralInfo: approvalPayload?.collateral || null,
+      items: JSON.parse(JSON.stringify(this.cart))
+    };
+
+    // Lưu đơn hàng vào danh sách (đưa lên đầu)
+    this.orders.unshift(newOrder);
+
+    // Nếu đơn được duyệt ngay (trong hạn mức) -> Tăng công nợ hiện tại của đại lý
+    if (finalStatus === 'APPROVED') {
+      dealer.currentDebt += cartTotals.grandTotal;
     }
 
-    if (filters.assigneeId && filters.assigneeId !== 'ALL') {
-      if (filters.assigneeId === 'UNASSIGNED') {
-        list = list.filter(a => !a.assignedSalesId);
-      } else {
-        list = list.filter(a => a.assignedSalesId === filters.assigneeId);
+    // Reset giỏ hàng
+    this.cart = [];
+    this.notify();
+
+    return newOrder;
+  }
+
+  // Thao tác Kế toán phê duyệt đơn
+  approveOrder(orderId, approverNote = '') {
+    const order = this.orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const dealer = this.dealers.find(d => d.id === order.dealerId);
+    order.status = 'APPROVED';
+    order.statusLabel = 'Đã phê duyệt (Approved)';
+    order.approvedAt = new Date().toLocaleString('vi-VN');
+    order.approverNote = approverNote || 'Kế toán trưởng đã thẩm định bảo lãnh và phê duyệt đơn hàng.';
+
+    // Cập nhật công nợ cho đại lý
+    if (dealer) {
+      dealer.currentDebt += order.totalAmount;
+    }
+
+    this.notify();
+  }
+
+  // Thao tác Kế toán từ chối đơn
+  rejectOrder(orderId, rejectReason = '') {
+    const order = this.orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    order.status = 'REJECTED';
+    order.statusLabel = 'Đã từ chối (Rejected)';
+    order.rejectedAt = new Date().toLocaleString('vi-VN');
+    order.rejectReason = rejectReason || 'Từ chối do rủi ro công nợ cao và không có bảo lãnh hợp lệ.';
+
+    this.notify();
+  }
+
+  // Giảng viên thanh toán hoá đơn nợ quá hạn để mở khóa đại lý (Interactive Testing Tool)
+  settleOverdueInvoice(dealerId, invoiceNo) {
+    const dealer = this.dealers.find(d => d.id === dealerId);
+    if (!dealer || !dealer.unpaidInvoices) return;
+
+    const invoice = dealer.unpaidInvoices.find(inv => inv.invoiceNo === invoiceNo);
+    if (invoice) {
+      dealer.currentDebt = Math.max(0, dealer.currentDebt - invoice.remainingAmount);
+      dealer.unpaidInvoices = dealer.unpaidInvoices.filter(inv => inv.invoiceNo !== invoiceNo);
+      
+      // Kiểm tra lại xem còn nợ quá hạn không
+      const remainingViolations = dealer.unpaidInvoices.filter(
+        inv => (inv.overdueDays || 0) > this.config.defaultMaxOverdueDays
+      );
+      if (remainingViolations.length === 0) {
+        dealer.status = 'ACTIVE';
+        dealer.riskLevel = 'MEDIUM';
       }
-    }
-
-    return list;
-  }
-
-  // --- ACTIONS (NGHIỆP VỤ) ---
-
-  /**
-   * Acceptance Criterion 1:
-   * Gán một nhân viên phụ trách chính cho mỗi đại lý
-   */
-  assignAgencyPrimaryRep({ agencyId, employeeId, notes = '' }) {
-    const agency = this.agencies.find(a => a.id === agencyId);
-    if (!agency) {
-      throw new Error(`Không tìm thấy đại lý có mã ID: ${agencyId}`);
-    }
-
-    const oldRep = agency.assignedSalesId ? this.getEmployeeById(agency.assignedSalesId) : null;
-    const newRep = employeeId ? this.getEmployeeById(employeeId) : null;
-    const actor = this.getCurrentUser();
-
-    // Cập nhật
-    agency.assignedSalesId = employeeId || null;
-    agency.status = employeeId ? 'ACTIVE' : 'PENDING_ASSIGN';
-    agency.lastContactDate = new Date().toISOString().split('T')[0];
-
-    // Ghi nhật ký Audit Log
-    const auditRecord = {
-      id: 'LOG' + Date.now(),
-      timestamp: new Date().toISOString(),
-      actorName: actor.name,
-      actorRole: actor.roleTitle,
-      action: 'SINGLE_ASSIGN',
-      targetAgencyCode: agency.code,
-      targetAgencyName: agency.name,
-      oldAssignee: oldRep ? oldRep.name : 'Chưa phân công',
-      newAssignee: newRep ? newRep.name : 'Bỏ gán (Chưa phân công)',
-      notes: notes || `Phân công nhân viên phụ trách chính trực tiếp bởi ${actor.name}`
-    };
-
-    this.auditLogs.unshift(auditRecord);
-    this.notify({
-      type: 'AGENCY_ASSIGNED',
-      agency,
-      oldRep,
-      newRep,
-      auditRecord
-    });
-
-    return { agency, oldRep, newRep };
-  }
-
-  /**
-   * Acceptance Criterion 3:
-   * Chuyển giao địa bàn hàng loạt khi nhân viên nghỉ, có ghi lịch sử đầy đủ
-   */
-  executeBulkHandover({
-    fromEmployeeId,
-    toEmployeeId,
-    agencyIds,
-    reason,
-    reasonText,
-    effectiveDate,
-    notes
-  }) {
-    if (!fromEmployeeId || !toEmployeeId) {
-      throw new Error('Vui lòng chọn nhân viên bàn giao và nhân viên tiếp nhận hợp lệ.');
-    }
-    if (fromEmployeeId === toEmployeeId) {
-      throw new Error('Nhân viên tiếp nhận không được trùng với nhân viên bàn giao!');
-    }
-    if (!agencyIds || agencyIds.length === 0) {
-      throw new Error('Danh sách đại lý chuyển giao không được để trống.');
-    }
-
-    const fromEmp = this.getEmployeeById(fromEmployeeId);
-    const toEmp = this.getEmployeeById(toEmployeeId);
-    if (!fromEmp || !toEmp) {
-      throw new Error('Không tìm thấy thông tin nhân sự trong hệ thống.');
-    }
-
-    const actor = this.getCurrentUser();
-    const transferredAgencies = [];
-
-    // Cập nhật từng đại lý
-    agencyIds.forEach(id => {
-      const agency = this.agencies.find(a => a.id === id);
-      if (agency) {
-        agency.assignedSalesId = toEmployeeId;
-        agency.status = 'ACTIVE';
-        transferredAgencies.push({
-          id: agency.id,
-          code: agency.code,
-          name: agency.name,
-          region: agency.region,
-          province: agency.province,
-          tier: agency.tier,
-          monthlyRevenue: agency.monthlyRevenue,
-          debtBalance: agency.debtBalance
-        });
-      }
-    });
-
-    // Nếu nhân sự cũ đang trong trạng thái RESIGNING (xin nghỉ) và đã chuyển hết đại lý:
-    const remainingAgencies = this.agencies.filter(a => a.assignedSalesId === fromEmployeeId);
-    if (fromEmp.status === 'RESIGNING' && remainingAgencies.length === 0) {
-      fromEmp.status = 'HANDED_OVER'; // Đã hoàn thành bàn giao
-      fromEmp.notes = (fromEmp.notes || '') + ' [Đã hoàn tất bàn giao địa bàn toàn bộ]';
-    }
-
-    // Tạo mã phiếu bàn giao chuẩn
-    const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
-    const handoverIndex = String(this.handovers.length + 1).padStart(3, '0');
-    const handoverCode = `HO-${yearMonth}-${handoverIndex}`;
-
-    const newHandover = {
-      id: 'HO' + Date.now(),
-      code: handoverCode,
-      timestamp: new Date().toISOString(),
-      effectiveDate: effectiveDate || new Date().toISOString().split('T')[0],
-      transferredById: actor.id,
-      transferredByName: actor.name,
-      fromEmployeeId: fromEmp.id,
-      fromEmployeeName: fromEmp.name,
-      fromEmployeeRole: fromEmp.roleTitle,
-      toEmployeeId: toEmp.id,
-      toEmployeeName: toEmp.name,
-      toEmployeeRole: toEmp.roleTitle,
-      agencyIds: [...agencyIds],
-      agenciesSummary: transferredAgencies,
-      totalRevenue: transferredAgencies.reduce((sum, a) => sum + (a.monthlyRevenue || 0), 0),
-      totalDebt: transferredAgencies.reduce((sum, a) => sum + (a.debtBalance || 0), 0),
-      reason: reason || 'RESIGNATION',
-      reasonText: reasonText || 'Bàn giao chuyển giao địa bàn',
-      notes: notes || 'Hoàn tất bàn giao hồ sơ khách hàng, công nợ và chỉ tiêu doanh số.',
-      status: 'COMPLETED'
-    };
-
-    this.handovers.unshift(newHandover);
-
-    // Ghi Audit Log cho hệ thống
-    const auditRecord = {
-      id: 'LOG' + Date.now(),
-      timestamp: new Date().toISOString(),
-      actorName: actor.name,
-      actorRole: actor.roleTitle,
-      action: 'BULK_HANDOVER',
-      code: handoverCode,
-      notes: `Chuyển giao hàng loạt ${transferredAgencies.length} đại lý từ [${fromEmp.name}] sang [${toEmp.name}]. Lý do: ${newHandover.reasonText}`
-    };
-
-    this.auditLogs.unshift(auditRecord);
-
-    this.notify({
-      type: 'BULK_HANDOVER_EXECUTED',
-      handover: newHandover,
-      transferredAgencies
-    });
-
-    return newHandover;
-  }
-
-  // --- STATS & METRICS ---
-  getDashboardMetrics() {
-    const user = this.getCurrentUser();
-    const isMgr = user.role === 'MANAGER';
-
-    const visibleAgencies = this.getVisibleAgencies();
-    const totalCount = visibleAgencies.length;
-    const allAgencies = this.agencies;
-
-    if (isMgr) {
-      const assignedCount = allAgencies.filter(a => a.assignedSalesId).length;
-      const unassignedCount = allAgencies.filter(a => !a.assignedSalesId).length;
-      const totalRevenue = allAgencies.reduce((acc, a) => acc + (a.monthlyRevenue || 0), 0);
-      const totalDebt = allAgencies.reduce((acc, a) => acc + (a.debtBalance || 0), 0);
-      const activeSalesReps = this.employees.filter(e => e.role === 'SALES_REP' && e.status === 'ACTIVE').length;
-      const resigningReps = this.employees.filter(e => e.status === 'RESIGNING').length;
-
-      return {
-        isManager: true,
-        totalAgencies: allAgencies.length,
-        assignedAgencies: assignedCount,
-        unassignedAgencies: unassignedCount,
-        assignedPercentage: Math.round((assignedCount / allAgencies.length) * 100),
-        totalRevenue,
-        totalDebt,
-        activeSalesReps,
-        resigningReps,
-        totalHandovers: this.handovers.length
-      };
-    } else {
-      // Dành cho nhân viên kinh doanh
-      const myRevenue = visibleAgencies.reduce((acc, a) => acc + (a.monthlyRevenue || 0), 0);
-      const myDebt = visibleAgencies.reduce((acc, a) => acc + (a.debtBalance || 0), 0);
-      const targetRevenue = user.targetRevenue || 10000000000;
-      const targetProgress = Math.min(100, Math.round((myRevenue / targetRevenue) * 100));
-
-      return {
-        isManager: false,
-        myAgenciesCount: visibleAgencies.length,
-        myRevenue,
-        myDebt,
-        targetRevenue,
-        targetProgress,
-        diamondAgencies: visibleAgencies.filter(a => a.tier === 'DIAMOND').length,
-        goldAgencies: visibleAgencies.filter(a => a.tier === 'GOLD').length
-      };
+      this.notify();
     }
   }
 
-  // Phân tích tải công việc nhân viên (Workload Distribution)
-  getSalesWorkload() {
-    const salesReps = this.employees.filter(e => e.role === 'SALES_REP');
-    return salesReps.map(rep => {
-      const repsAgencies = this.agencies.filter(a => a.assignedSalesId === rep.id);
-      const totalRev = repsAgencies.reduce((s, a) => s + (a.monthlyRevenue || 0), 0);
-      return {
-        id: rep.id,
-        name: rep.name,
-        avatar: rep.avatar,
-        status: rep.status,
-        region: rep.region,
-        agencyCount: repsAgencies.length,
-        totalRevenue: totalRev,
-        isResigning: rep.status === 'RESIGNING'
-      };
-    });
+  // Cập nhật cấu hình chính sách (Cho Giảng viên thử nghiệm điều chỉnh số ngày quá hạn)
+  updateMaxOverdueDays(days) {
+    this.config.defaultMaxOverdueDays = Number(days);
+    this.notify();
   }
 }
 
-export const store = new Store();
+export const store = new StateStore();
