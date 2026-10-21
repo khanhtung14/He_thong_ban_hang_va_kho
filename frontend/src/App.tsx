@@ -9,6 +9,7 @@ import Navigation from "./Navigation";
 import RoleWorkspace from "./RoleWorkspace";
 import Error403 from "./Error403";
 import { hasValidSession, getCurrentUserRole } from "./services/sessionService";
+import DebtManagement from "./DebtManagement";
 
 const roleWorkspacePaths = [
   "/portal/orders",
@@ -76,14 +77,12 @@ export default function App() {
     return <Error403 />;
   }
 
-  // 2. Unauthenticated check:
-  // If not logged in (no token / valid session / valid role), MUST display Login screen.
-  // Never hardcode SalesManagerDashboard on root (/) or protected routes.
+  // 2. Unauthenticated check
   if (!isAuthenticated || !userRole) {
     return <Login />;
   }
 
-  // 3. Authenticated: on root (/) or /workspace, render user's role workspace
+  // 3. Authenticated: on root (/) or /workspace
   if (currentPath === "/" || currentPath === "/workspace") {
     return <RoleWorkspace />;
   }
@@ -100,7 +99,10 @@ export default function App() {
     return <Error403 />;
   }
 
-  // 5. User settings / common routes
+  // 5. User settings / common routes & Debt Management
+  if (currentPath === "/portal/debt" || currentPath === "/accounting/debt-book") {
+    return <DebtManagement />;
+  }
   if (currentPath === "/change-password") {
     return <ChangePassword />;
   }
@@ -111,7 +113,7 @@ export default function App() {
     return <Navigation />;
   }
 
-  // 6. Role workspace routes (e.g. /manager/dashboard, /sales/orders, etc.)
+  // 6. Role workspace routes
   if (
     roleWorkspacePaths.includes(currentPath) ||
     currentPath.startsWith("/admin/")
@@ -119,6 +121,6 @@ export default function App() {
     return <RoleWorkspace />;
   }
 
-  // Fallback for any other route when authenticated
+  // Fallback
   return <RoleWorkspace />;
 }

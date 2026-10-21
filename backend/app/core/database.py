@@ -74,6 +74,7 @@ def migrate_pricing_schema():
         DiscountPolicy,
         DiscountTier,
         CreditLimitLog,
+        DebtReminderLog,
     )
 
     target_tables = cast(
@@ -88,6 +89,7 @@ def migrate_pricing_schema():
             DiscountPolicy.__table__,
             DiscountTier.__table__,
             CreditLimitLog.__table__,
+            DebtReminderLog.__table__,
         ],
     )
     Base.metadata.create_all(
@@ -177,6 +179,17 @@ def migrate_pricing_schema():
             "min_quantity": "INTEGER NOT NULL DEFAULT 1",
             "max_quantity": "INTEGER NULL",
             "discount_value": "FLOAT NOT NULL DEFAULT 0.0",
+        },
+        "return_orders": {
+            "return_date": "DATE NULL",
+            "confirmed_at": "DATETIME NULL",
+            "confirmed_by": "INTEGER NULL",
+        },
+        "return_order_items": {
+            "lot_number": "VARCHAR(100) NULL",
+        },
+        "payments": {
+            "receiver_name": "VARCHAR(150) NULL",
         },
     }
     for table_name, columns_to_add in additions.items():

@@ -192,5 +192,35 @@ Bộ phận Quản trị hệ thống OMS
         logger.info(f"[EMAIL DEV] Recorded activation email to {to_email} for user {username}")
         return True
 
+    def send_notification_email(self, to_email: str, subject: str, text: str) -> bool:
+        """Send a plain notification email, or record it in demo mode."""
+        record = {"to": to_email, "subject": subject, "text": text}
+        smtp_host = os.getenv("SMTP_HOST")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USERNAME") or os.getenv("SMTP_USER")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+        smtp_from = os.getenv("SMTP_FROM", smtp_user or "OMS-noreply@company.com")
+        use_ssl = os.getenv("SMTP_USE_SSL", "false").strip().lower() in {"1", "true", "yes"}
+        if not (smtp_host and smtp_user and smtp_password):
+            self.sent_emails.append(record)
+            logger.info("[EMAIL DEV] Recorded notification email to %s", to_email)
+            return True
+        try:
+            msg = MIMEText(text, "plain", "utf-8")
+            msg["Subject"] = subject
+            msg["From"] = smtp_from
+            msg["To"] = to_email
+            smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+            with smtp_class(smtp_host, smtp_port, timeout=10) as server:
+                if not use_ssl:
+                    server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(smtp_from, [to_email], msg.as_string())
+            self.sent_emails.append(record)
+            return True
+        except Exception as exc:
+            logger.warning("[EMAIL ERROR] Failed notification email to %s: %s", to_email, exc)
+            return False
+
 
 email_service = EmailService()

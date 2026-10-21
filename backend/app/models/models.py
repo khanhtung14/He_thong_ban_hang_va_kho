@@ -870,6 +870,7 @@ class Payment(Base):
     amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     payment_method: Mapped[str] = mapped_column(String(50), nullable=False)
     payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    receiver_name: Mapped[Optional[str]] = mapped_column(String(150))
 
 
 class InvoicePayment(Base):
@@ -894,8 +895,11 @@ class ReturnOrder(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False)
+    return_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, default=date.today)
     reason: Mapped[Text] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(30), default="PENDING")
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    confirmed_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
 
 class ReturnOrderItem(Base):
@@ -903,6 +907,7 @@ class ReturnOrderItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     return_id: Mapped[int] = mapped_column(ForeignKey("return_orders.id", ondelete="CASCADE"), nullable=False)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
+    lot_number: Mapped[Optional[str]] = mapped_column(String(100))
     quantity: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
@@ -912,6 +917,22 @@ class CreditNote(Base):
     return_id: Mapped[Optional[int]] = mapped_column(ForeignKey("return_orders.id", ondelete="SET NULL"))
     note: Mapped[Text] = mapped_column(Text)
     amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+
+class DebtReminderLog(Base):
+    __tablename__ = "debt_reminder_logs"
+    __table_args__ = (
+        UniqueConstraint("invoice_id", "reminder_date", name="uq_debt_reminder_invoice_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    reminder_date: Mapped[date] = mapped_column(Date, nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    email_sent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    in_app_sent: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class InventoryAdjustment(Base):

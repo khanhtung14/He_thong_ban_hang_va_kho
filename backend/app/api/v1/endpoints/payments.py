@@ -2,22 +2,22 @@ from datetime import date
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.models.models import Payment, Invoice, InvoicePayment, CustomerDebt
+from app.models.models import Payment, Invoice, InvoicePayment, CustomerDebt, Customer
 from app.api.v1.endpoints.rbac import AuthenticatedUser, require_permissions
 
 router = APIRouter(prefix="/api/v1/payments", tags=["Payments"])
 
 class PaymentCreate(BaseModel):
-    customer_id: int
+    customer_id: int = Field(validation_alias=AliasChoices("customerId", "customer_id"))
     amount: float
-    payment_method: str
-    payment_date: str
-    invoice_ids: List[int]
-    receipt_image: Optional[str] = None
+    payment_method: str = Field(validation_alias=AliasChoices("paymentMethod", "payment_method"))
+    payment_date: str = Field(validation_alias=AliasChoices("paymentDate", "payment_date"))
+    invoice_ids: List[int] = Field(validation_alias=AliasChoices("invoiceIds", "invoice_ids"))
+    receipt_image: Optional[str] = Field(None, validation_alias=AliasChoices("receiptImage", "receipt_image"))
 
 @router.post("")
 def create_payment(
@@ -28,9 +28,44 @@ def create_payment(
     payment = Payment(
         customer_id=data.customer_id,
         amount=data.amount,
-        payment_method=data.payment_method
+        payment_method=data.payment_method,
+        payment_date=date.fromisoformat(data.payment_date),
+        receiver_name=user.username,
     )
     db.add(payment)
+    db.flush()
+    remaining = data.amount
+    for invoice_id in data.invoice_ids:
+        invoice = db.get(Invoice, invoice_id)
+        if not invoice or invoice.customer_id != data.customer_id:
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy hóa đơn #{invoice_id}.")
+        already_paid = sum(
+            float(row.amount_applied or 0)
+            for row in db.query(InvoicePayment).filter(InvoicePayment.invoice_id == invoice.id).all()
+        )
+        invoice_remaining = max(0.0, float(invoice.total_amount or 0) - already_paid)
+        applied = min(remaining, invoice_remaining)
+        if applied <= 0:
+            continue
+        db.add(InvoicePayment(invoice_id=invoice.id, payment_id=payment.id, amount_applied=applied))
+        remaining -= applied
+        invoice.status = "PAID" if applied >= invoice_remaining else "PARTIAL"
+        if remaining <= 0:
+            break
+    debt = db.query(CustomerDebt).filter(CustomerDebt.customer_id == data.customer_id).first()
+    if debt:
+        debt.total_debt = max(0.0, debt.total_debt - data.amount)
+    else:
+        debt = CustomerDebt(customer_id=data.customer_id, total_debt=0.0)
+        db.add(debt)
+    customer = db.get(Customer, data.customer_id)
+    if customer:
+        customer.current_debt = max(0.0, customer.current_debt - data.amount)
     db.commit()
     db.refresh(payment)
-    return {"success": True, "code": 201, "message": "Payment recorded", "data": {"id": payment.id}}
+    return {
+        "success": True,
+        "code": 201,
+        "message": "Payment recorded",
+        "data": {"id": payment.id, "receiptNumber": f"PT-{payment.id:06d}"},
+    }

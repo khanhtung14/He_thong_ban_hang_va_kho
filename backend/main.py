@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Optional
@@ -21,6 +22,7 @@ from app.api.v1.endpoints.navigation import router as navigation_router
 from app.api.v1.endpoints.product_categories import router as product_categories_router
 from app.api.v1.endpoints.products import compat_router as products_compat_router, router as products_router
 from app.api.v1.endpoints.price_lists import router as price_lists_router
+from app.api.v1.endpoints.debt_management import daily_reminder_scheduler, legacy_router as debt_management_legacy_router, router as debt_management_router
 from app.api.v1.endpoints.profile import migrate_profile_schema, router as profile_router
 from app.api.v1.endpoints.reports import router as reports_router
 
@@ -41,6 +43,8 @@ from app.api.v1.endpoints.dealer_history import router as dealer_history_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    reminder_stop = asyncio.Event()
+    reminder_task = None
     try:
         migrate_profile_schema()
     except Exception:
@@ -54,7 +58,14 @@ async def lifespan(app: FastAPI):
             seed_default_warehouses_and_territories(db)
     except Exception:
         pass
-    yield
+    reminder_task = asyncio.create_task(daily_reminder_scheduler(reminder_stop))
+    try:
+        yield
+    finally:
+        reminder_stop.set()
+        if reminder_task:
+            reminder_task.cancel()
+            await asyncio.gather(reminder_task, return_exceptions=True)
 
 
 app = FastAPI(
@@ -211,6 +222,8 @@ app.include_router(sales_assignment_router)
 app.include_router(users_router)
 app.include_router(users_compat_router)
 app.include_router(user_router)
+app.include_router(debt_management_router)
+app.include_router(debt_management_legacy_router, prefix="/api/v1/debt", tags=["Debt Management Legacy"])
 app.include_router(profile_router)
 app.include_router(customer_lock_router)
 app.include_router(delivery_addresses_router)
