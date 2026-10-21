@@ -1,0 +1,59 @@
+/* ==========================================================================
+   DISTRICARE CRM - Print Stylesheet (In Biên Bản Bàn Giao A4 Chuẩn)
+   ========================================================================== */
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .modal-backdrop, #handoverDocumentModal {
+    position: static !important;
+    background: transparent !important;
+    display: block !important;
+    padding: 0 !important;
+    inset: auto !important;
+  }
+
+  .modal-dialog {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: none !important;
+  }
+
+  .modal-body {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .print-document-container, .print-document-container * {
+    visibility: visible !important;
+  }
+
+  .print-document-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    background: white;
+  }
+
+  .print-sheet {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+}

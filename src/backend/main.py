@@ -1,24 +1,9 @@
-from fastapi import FastAPI
+import sys
+from pathlib import Path
 
-try:  # Supports both `python -m src.backend.main` and running this file directly.
-    from src.backend.change_password import router as change_password_router
-    from src.backend.login import router as login_router
-except ModuleNotFoundError:  # pragma: no cover - direct script execution
-    from change_password import router as change_password_router
-    from login import router as login_router
+ROOT = Path(__file__).resolve().parents[2]
+for target in (str(ROOT), str(ROOT / "backend")):
+    if target not in sys.path:
+        sys.path.insert(0, target)
 
-app = FastAPI()
-
-app.include_router(change_password_router)
-app.include_router(login_router)
-
-
-@app.get("/")
-def home():
-    return {"message": "Backend đang chạy"}
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+from backend.main import *  # noqa: F401,F403

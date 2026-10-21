@@ -1,0 +1,353 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Colors - Modern palette */
+  --bg-primary: #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-surface-hover: #F1F5F9;
+  
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-tertiary: #94A3B8;
+
+  --border-subtle: #E2E8F0;
+  --border-strong: #CBD5E1;
+
+  --accent-primary: #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-light: #EEF2FF;
+  --accent-text: #3730A3;
+
+  /* Status Colors */
+  --success-bg: #F0FDF4;
+  --success-text: #166534;
+  --success-border: #BBF7D0;
+
+  --warning-bg: #FFFBEB;
+  --warning-text: #B45309;
+  --warning-border: #FEF3C7;
+
+  --danger-bg: #FEF2F2;
+  --danger-text: #991B1B;
+  --danger-border: #FECACA;
+
+  --info-bg: #EFF6FF;
+  --info-text: #1E40AF;
+  --info-border: #BFDBFE;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+  
+  --shadow-accent: 0 4px 14px 0 rgba(79, 70, 229, 0.39);
+
+  /* Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Base button styles */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) forwards;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* =========================================================
+   Ant Design Message & Notification - Position Bottom Right
+   ========================================================= */
+.ant-message,
+.ant-message-holder,
+.ant-message-wrapper,
+.ant-message.ant-message-top,
+.ant-message.ant-message-bottom {
+  position: fixed !important;
+  top: auto !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  left: auto !important;
+  margin: 0 !important;
+  width: auto !important;
+  max-width: calc(100vw - 48px) !important;
+  transform: none !important;
+  pointer-events: none !important;
+  z-index: 2147483647 !important; /* Luôn hiển thị trên cùng mọi modal, drawer, backdrop */
+  display: flex !important;
+  flex-direction: column-reverse !important;
+  align-items: flex-end !important;
+}
+
+.ant-message .ant-message-list,
+.ant-message .ant-message-list-content {
+  display: flex !important;
+  flex-direction: column-reverse !important;
+  align-items: flex-end !important;
+  width: auto !important;
+  pointer-events: none !important;
+}
+
+.ant-message .ant-message-notice {
+  text-align: right !important;
+  left: auto !important;
+  right: 0 !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  margin-top: 8px !important;
+  transform: none !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2147483647 !important;
+}
+
+.ant-message .ant-message-notice-content {
+  display: inline-flex !important;
+  align-items: center !important;
+  text-align: left !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  position: relative !important;
+  z-index: 2147483647 !important;
+}
+
+.ant-notification,
+.ant-notification-bottomRight {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  z-index: 2147483647 !important; /* Luôn trên cùng */
+}
+
+/* ==========================================================================
+   UNIVERSAL TABLE SCROLL & STICKY HEADER SYSTEM (ALL ROLES)
+   "Khi cuộn xuống chỉ cuộn xuống danh sách dòng trong bảng, 
+    không cuộn cả trang và không cuộn tên cột"
+   ========================================================================== */
+
+/* 1. Giới hạn khung bảng và ngăn tràn trang */
+.ant-table-wrapper {
+  max-width: 100%;
+}
+
+/* 2. Thân bảng (chứa các dòng) có thanh cuộn riêng biệt */
+.ant-table-content,
+.ant-table-body {
+  max-height: calc(100vh - 310px);
+  min-height: 180px;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+  overscroll-behavior: contain;
+  position: relative;
+}
+
+/* 3. CỐ ĐỊNH TÊN CỘT (Sticky Column Headers)
+   Khi cuộn các dòng bên dưới, hàng tên cột luôn ghim cố định ở đỉnh bảng */
+.ant-table-thead {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 15 !important;
+}
+
+.ant-table-thead > tr > th,
+.ant-table-thead > tr > td {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 15 !important;
+  background-color: #f1f5f9 !important; /* Nền xám nhạt đục để không thấy chữ bên dưới khi cuộn qua */
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 4. Giữ vị trí và độ nổi cho các cột cố định trái / phải (Fixed columns) */
+.ant-table-thead > tr > th.ant-table-cell-fix-left,
+.ant-table-thead > tr > th.ant-table-cell-fix-right {
+  z-index: 25 !important;
+  background-color: #e2e8f0 !important;
+}
+
+.ant-table-tbody > tr > td.ant-table-cell-fix-left,
+.ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  z-index: 5 !important;
+  background-color: #ffffff !important;
+}
+
+.ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+.ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background-color: #f8fafc !important;
+}
+
+/* 5. Tùy chỉnh cho bảng hiển thị bên trong Modal */
+.ant-modal .ant-table-content,
+.ant-modal .ant-table-body {
+  max-height: calc(75vh - 200px) !important;
+  min-height: 140px;
+}
+
+/* 6. Tùy chỉnh cho bảng hiển thị bên trong Drawer */
+.ant-drawer .ant-table-content,
+.ant-drawer .ant-table-body {
+  max-height: calc(100vh - 220px) !important;
+}
+
+/* 7. Tùy chỉnh danh sách hiển thị bằng Ant List nếu có */
+.ant-list:not(.ant-list-split-disabled) .ant-list-items {
+  max-height: calc(100vh - 340px);
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.ant-modal .ant-list .ant-list-items {
+  max-height: calc(70vh - 180px) !important;
+}
+
+/* 8. Thanh cuộn bảng thanh lịch, hiện đại */
+.ant-table-content::-webkit-scrollbar,
+.ant-table-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ant-table-content::-webkit-scrollbar-track,
+.ant-table-body::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.ant-table-content::-webkit-scrollbar-thumb,
+.ant-table-body::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.ant-table-content::-webkit-scrollbar-thumb:hover,
+.ant-table-body::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* 9. Mobile Responsive Fixes (SCRUM Mobile Support) */
+@media (max-width: 991px) {
+  /* Thu gọn trạng thái hệ thống: chỉ còn dấu tích trên mobile */
+  .system-status-text {
+    display: none !important;
+  }
+
+  /* Xóa tên người dùng trên thanh header làm việc trên mobile */
+  .user-profile-names {
+    display: none !important;
+  }
+
+  /* Tạo khoảng trống bên trái cho nút mở sidebar */
+  .customer-header-responsive {
+    padding-left: 58px !important;
+    padding-right: 14px !important;
+  }
+
+  /* Nút hiển thị thanh sidebar không bị đè, nổi bật và dễ click */
+  .ant-layout-sider-zero-width-trigger {
+    z-index: 1010 !important;
+    top: 14px !important;
+    inset-inline-end: -46px !important;
+    width: 40px !important;
+    height: 38px !important;
+    line-height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #1e293b !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    border-radius: 0 8px 8px 0 !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+  }
+
+  .ant-layout-sider-zero-width-trigger:hover {
+    background: #334155 !important;
+  }
+
+  /* Khi sidebar mở trên mobile, ghim fixed overlay mượt mà */
+  .customer-sider-responsive:not(.ant-layout-sider-collapsed) {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100vh !important;
+    z-index: 1010 !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15) !important;
+  }
+}
+
+

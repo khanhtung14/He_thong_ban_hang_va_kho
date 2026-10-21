@@ -1,0 +1,461 @@
+/* ==========================================================================
+   NEXUS WMS DESIGN SYSTEM & THEME TOKENS (SCRUM-87 / SCRUM-35)
+   Modern Dark SaaS Theme (Inspired by Linear, Stripe, Datadog & Enterprise ERP)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Color Palette - Deep Dark Tech Palette */
+  --bg-app: #080c14;
+  --bg-surface: #0e1524;
+  --bg-surface-elevated: #131c30;
+  --bg-card: rgba(18, 26, 44, 0.75);
+  --bg-card-hover: rgba(26, 38, 64, 0.85);
+  --bg-input: #0a0f1d;
+  --bg-input-focus: #111a2f;
+
+  /* Accent Colors */
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-light: rgba(99, 102, 241, 0.15);
+  --primary-glow: rgba(99, 102, 241, 0.35);
+
+  --emerald: #10b981;
+  --emerald-light: rgba(16, 185, 129, 0.12);
+  --emerald-glow: rgba(16, 185, 129, 0.3);
+
+  --amber: #f59e0b;
+  --amber-light: rgba(245, 158, 11, 0.12);
+  --amber-glow: rgba(245, 158, 11, 0.3);
+  
+  --blue: #3b82f6;
+  --blue-light: rgba(59, 130, 246, 0.12);
+
+  --purple: #8b5cf6;
+  --purple-light: rgba(139, 92, 246, 0.12);
+
+  --rose: #f43f5e;
+  --rose-light: rgba(244, 63, 94, 0.15);
+  --rose-glow: rgba(244, 63, 94, 0.45);
+  --rose-dark: #881337;
+
+  --cyan: #06b6d4;
+  --cyan-light: rgba(6, 182, 212, 0.15);
+
+  /* Typography Colors */
+  --text-main: #f1f5f9;
+  --text-light: #ffffff;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --text-dark: #334155;
+
+  /* Borders & Glassmorphism */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-card: rgba(255, 255, 255, 0.12);
+  --border-focus: #6366f1;
+
+  /* Radius & Shadows */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 9999px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow-rose: 0 0 20px rgba(244, 63, 94, 0.35);
+  --shadow-glow-cyan: 0 0 20px rgba(6, 182, 212, 0.35);
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 14px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Typography Utilities */
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+.font-bold {
+  font-weight: 700;
+}
+.font-medium {
+  font-weight: 600;
+}
+.font-normal {
+  font-weight: 400;
+}
+.text-main { color: var(--text-main); }
+.text-light { color: var(--text-light); }
+.text-muted { color: var(--text-muted); }
+.text-rose { color: var(--rose); }
+.text-rose-glow {
+  color: #ff4d6d;
+  text-shadow: 0 0 12px rgba(244, 63, 94, 0.6);
+}
+.text-emerald { color: var(--emerald); }
+.text-amber { color: var(--amber); }
+.text-blue { color: var(--blue); }
+.text-purple { color: var(--purple); }
+.text-cyan { color: var(--cyan); }
+
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.85rem; }
+.text-base { font-size: 1rem; }
+.text-lg { font-size: 1.15rem; }
+.text-xl { font-size: 1.35rem; }
+
+.hidden {
+  display: none !important;
+}
+
+/* APP HEADER LAYOUT */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(14, 21, 36, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 24px;
+}
+
+.header-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo-wrap {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.brand-badge {
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* HEADER CONTROLS SECTION */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.scenario-badge-wrap, .global-wh-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+}
+
+.control-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.user-profile-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--radius-pill);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--primary);
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.user-meta-name {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #fff;
+}
+
+.user-meta-role {
+  font-size: 0.7rem;
+  color: #a5b4fc;
+}
+
+/* LIVE ALERT TICKER */
+.alert-ticker-container {
+  margin-top: 8px;
+}
+
+.alert-ticker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  transition: all var(--transition-normal);
+}
+
+.ticker-alert {
+  background: linear-gradient(90deg, rgba(244, 63, 94, 0.22) 0%, rgba(244, 63, 94, 0.08) 100%);
+  border: 1px solid rgba(244, 63, 94, 0.45);
+  box-shadow: 0 2px 12px rgba(244, 63, 94, 0.2);
+}
+
+.ticker-healthy {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
+
+.ticker-badge {
+  font-weight: 800;
+  color: var(--rose);
+  white-space: nowrap;
+}
+
+.ticker-healthy .ticker-badge {
+  color: var(--emerald);
+}
+
+.ticker-text {
+  color: var(--text-main);
+  flex: 1;
+}
+
+.ticker-btn {
+  background: rgba(244, 63, 94, 0.25);
+  border: 1px solid rgba(244, 63, 94, 0.5);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+
+.ticker-btn:hover {
+  background: rgba(244, 63, 94, 0.45);
+}
+
+/* NAVIGATION TABS STRIP */
+.app-nav-bar {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow-x: auto;
+}
+
+.nav-tabs-group {
+  display: flex;
+  gap: 4px;
+}
+
+.app-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.app-nav-tab:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.app-nav-tab.active {
+  color: #fff;
+  border-bottom-color: var(--primary);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.nav-tab-badge {
+  background: var(--rose);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
+}
+
+/* APP MAIN CONTAINER */
+.app-container {
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ANIMATIONS */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseRed {
+  0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-pulse {
+  animation: pulseRed 2s infinite;
+}
+
+/* PRINT MEDIA QUERIES (DÀNH CHO IN ẤN PHIẾU PO A4) */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .app-header, .app-nav-bar, .modal-form-actions, .section-actions, .btn {
+    display: none !important;
+  }
+  .modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+  .modal-card {
+    background: #fff !important;
+    color: #000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .po-document {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+  .nexus-table th, .nexus-table td {
+    color: #000 !important;
+    border-color: #ddd !important;
+  }
+}

@@ -1,0 +1,126 @@
+import { useEffect, useState } from "react";
+import Login from "./features/auth/Login";
+import ForgotPassword from "./features/auth/ForgotPassword";
+import ResetPassword from "./features/auth/ResetPassword";
+import ChangePassword from "./features/auth/ChangePassword";
+import CreateUser from "./roles/admin/CreateUser";
+import Profile from "./features/profile/Profile";
+import Navigation from "./Navigation";
+import RoleWorkspace from "./RoleWorkspace";
+import Error403 from "./Error403";
+import { hasValidSession, getCurrentUserRole } from "./services/sessionService";
+import DebtManagement from "./DebtManagement";
+
+const roleWorkspacePaths = [
+  "/portal/orders",
+  "/portal/products",
+  "/portal/catalog",
+  "/portal/debt",
+  "/portal/contracts",
+  "/portal/dashboard",
+  "/sales/orders",
+  "/sales/customers",
+  "/sales/assignments",
+  "/manager/dashboard",
+  "/manager/orders/approval",
+  "/manager/pricing",
+  "/manager/reports",
+  "/manager/categories",
+  "/manager/discounts",
+  "/manager/products",
+  "/manager/products/import",
+  "/manager/products/import-excel",
+  "/warehouse/picking",
+  "/warehouse/receiving",
+  "/warehouse/inventory",
+  "/warehouse/suppliers",
+  "/warehouse/dashboard",
+  "/accounting/debt-book",
+  "/accounting/invoices",
+  "/accounting/agencies",
+  "/accountant/agencies",
+  "/accounting/customers",
+  "/accountant/customers",
+  "/accounting/agency-locks",
+  "/admin/users",
+  "/admin/users/import",
+];
+
+export default function App() {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const isAuthenticated = hasValidSession();
+  const userRole = getCurrentUserRole();
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  if (currentPath.startsWith("/admin/users")) {
+    document.title = "Quản trị tài khoản | OMS";
+  }
+
+  // 1. Public routes (accessible without login)
+  if (currentPath === "/login") {
+    return <Login />;
+  }
+  if (currentPath === "/forgot-password") {
+    return <ForgotPassword />;
+  }
+  if (currentPath === "/reset-password") {
+    return <ResetPassword />;
+  }
+  if (currentPath === "/errors/403") {
+    return <Error403 />;
+  }
+
+  // 2. Unauthenticated check
+  if (!isAuthenticated || !userRole) {
+    return <Login />;
+  }
+
+  // 3. Authenticated: on root (/) or /workspace
+  if (currentPath === "/" || currentPath === "/workspace") {
+    return <RoleWorkspace />;
+  }
+
+  // 4. Admin create user route
+  if (currentPath === "/admin/users/create") {
+    const normalized = (userRole ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/[ -]/g, "_");
+    if (["ADMIN", "ADMINISTRATOR"].includes(normalized)) {
+      return <CreateUser />;
+    }
+    return <Error403 />;
+  }
+
+  // 5. User settings / common routes & Debt Management
+  if (currentPath === "/portal/debt" || currentPath === "/accounting/debt-book") {
+    return <DebtManagement />;
+  }
+  if (currentPath === "/change-password") {
+    return <ChangePassword />;
+  }
+  if (currentPath === "/profile") {
+    return <Profile />;
+  }
+  if (currentPath === "/navigation" || currentPath === "/navigation-ui") {
+    return <Navigation />;
+  }
+
+  // 6. Role workspace routes
+  if (
+    roleWorkspacePaths.includes(currentPath) ||
+    currentPath.startsWith("/admin/")
+  ) {
+    return <RoleWorkspace />;
+  }
+
+  // Fallback
+  return <RoleWorkspace />;
+}

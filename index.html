@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXUS WMS - Quản Lý Kho & Cảnh Báo Tồn Tối Thiểu (SCRUM-87 / SCRUM-35)</title>
+  <meta name="description" content="Hệ thống Quản lý kho thông minh (WMS): Khai báo tồn tối thiểu theo SKU và theo kho, cảnh báo trực quan hàng dưới ngưỡng trên Sổ tồn và Dashboard kho, tạo đơn PO đặt hàng nhà cung cấp trước khi đứt hàng." />
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Core Stylesheets -->
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/stockLedger.css" />
+  <link rel="stylesheet" href="css/thresholdConfig.css" />
+
+  <!-- Chart.js CDN for modern interactive visual analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ==================== HEADER DOANH NGHIỆP ==================== -->
+  <header class="app-header">
+    <div class="header-top-bar">
+      
+      <!-- Brand & Project Info -->
+      <div class="brand-section">
+        <div class="brand-logo-wrap" title="NEXUS Smart Warehouse Management System">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <div class="brand-title">
+            <span>NEXUS WMS // ENTERPRISE SMART INVENTORY</span>
+            <span class="brand-badge">SCRUM-87 / SCRUM-35</span>
+          </div>
+          <span class="brand-subtitle">Phân hệ Quản trị Kho Vận & Cảnh Báo Ngưỡng Tồn An Toàn Trực Quan</span>
+        </div>
+      </div>
+
+      <!-- Controls & Role Profile -->
+      <div class="header-controls">
+        
+        <!-- Dropdown Kịch bản Demo cho giáo viên -->
+        <div class="scenario-badge-wrap" title="Bộ chọn kịch bản kiểm thử dành riêng cho Giảng viên chấm bài">
+          <label for="demo-scenario-selector" class="control-label">🧪 Kịch Bản Demo:</label>
+          <select id="demo-scenario-selector" class="custom-select custom-select-sm">
+            <option value="SCENARIO_DEFAULT">1. Vận hành thực tế (8 SKU dưới Min, 2 Cháy hàng)</option>
+            <option value="SCENARIO_NORTH_SURGE">2. Đột biến xuất kho Miền Bắc (Báo động đỏ diện rộng)</option>
+            <option value="SCENARIO_RESTOCKED">3. Sau khi nhận hàng bù tồn (Kho an toàn 100%)</option>
+          </select>
+        </div>
+
+        <!-- Bộ chọn Kho toàn cục -->
+        <div class="global-wh-wrap">
+          <label for="global-warehouse-selector" class="control-label">Kho:</label>
+          <select id="global-warehouse-selector" class="custom-select custom-select-sm">
+            <option value="ALL">🌐 Toàn Quốc (4 Kho)</option>
+            <option value="WH-HN">Kho Miền Bắc (Hà Nội)</option>
+            <option value="WH-HCM">Kho Miền Nam (Bình Dương/HCM)</option>
+            <option value="WH-DN">Kho Miền Trung (Đà Nẵng)</option>
+            <option value="WH-CT">Kho Miền Tây (Cần Thơ)</option>
+          </select>
+        </div>
+
+        <!-- Nút bật/tắt âm thanh cảnh báo -->
+        <button id="btn-toggle-sound" class="btn btn-secondary btn-sm" title="Bật/Tắt chuông âm thanh cảnh báo khi tồn rơi xuống dưới mức tối thiểu">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+          Bật Chuông Cảnh Báo
+        </button>
+
+        <!-- Nút Khôi phục dữ liệu ban đầu -->
+        <button id="btn-reset-system" class="btn btn-secondary btn-sm" title="Khôi phục trạng thái cơ sở dữ liệu mẫu ban đầu">
+          🔄 Reset
+        </button>
+
+        <!-- User Profile Chip -->
+        <div class="user-profile-badge">
+          <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80" alt="Avatar" class="user-avatar" />
+          <div class="user-meta">
+            <span class="user-meta-name">Trần Minh Hoàng</span>
+            <span class="user-meta-role">Quản lý kho (Chief Inventory Officer)</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Dải chạy cảnh báo thời gian thực (LIVE ALERT TICKER) -->
+    <div class="alert-ticker-container">
+      <div id="header-alert-ticker" class="alert-ticker ticker-alert animate-pulse">
+        <!-- Được cập nhật động bằng Javascript -->
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== THANH ĐIỀU HƯỚNG TABS ==================== -->
+  <nav class="app-nav-bar" aria-label="Main Navigation">
+    <div class="nav-tabs-group">
+      
+      <!-- Tab 1: Dashboard Kho & Trực Quan Hóa -->
+      <button class="app-nav-tab active" id="nav-tab-dashboard" data-tab="dashboard">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+        <span>1. Dashboard Kho & Cảnh Báo Sớm</span>
+      </button>
+
+      <!-- Tab 2: Sổ Tồn Kho Chi Tiết (Nổi Bật Hàng Dưới Min) -->
+      <button class="app-nav-tab" id="nav-tab-ledger" data-tab="ledger">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+        <span>2. Sổ Tồn Kho Chi Tiết</span>
+        <span class="nav-tab-badge" id="tab-ledger-badge">8</span>
+      </button>
+
+      <!-- Tab 3: Khai Báo Ngưỡng Tồn Min/Max (Theo SKU & Kho) -->
+      <button class="app-nav-tab" id="nav-tab-threshold" data-tab="threshold">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>3. Khai Báo Ngưỡng Tồn Tối Thiểu (SKU & Kho)</span>
+      </button>
+
+      <!-- Tab 4: Đặt Hàng Bù Tồn Nhà Cung Cấp (PO Generator) -->
+      <button class="app-nav-tab" id="nav-tab-reorder" data-tab="reorder">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+        <span>4. Đặt Hàng Bù Tồn NCC (PO Center)</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- ==================== NỘI DUNG CHÍNH CỦA ỨNG DỤNG ==================== -->
+  <main class="app-container">
+    
+    <!-- Tab 1: Dashboard Kho & Trực Quan Hóa -->
+    <div id="tab-content-dashboard" class="tab-page-container">
+      <!-- Được render động bởi kpiDashboard.js -->
+    </div>
+
+    <!-- Tab 2: Sổ Tồn Kho Chi Tiết -->
+    <div id="tab-content-ledger" class="tab-page-container hidden">
+      <!-- Được render động bởi stockLedgerView.js -->
+    </div>
+
+    <!-- Tab 3: Khai Báo Ngưỡng Tồn Min/Max -->
+    <div id="tab-content-threshold" class="tab-page-container hidden">
+      <!-- Được render động bởi thresholdManager.js -->
+    </div>
+
+    <!-- Tab 4: Trung Tâm Đặt Hàng NCC -->
+    <div id="tab-content-reorder" class="tab-page-container hidden">
+      <!-- Được render động bởi app.js _renderReorderCenterTab -->
+    </div>
+
+  </main>
+
+  <!-- ==================== CÁC MODAL HỆ THỐNG ==================== -->
+
+  <!-- Modal 1: Khai Báo & Chỉnh Sửa Ngưỡng Tồn Tối Thiểu Đơn Lẻ -->
+  <div id="modal-edit-threshold" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-edit-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6366f1" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          <h3 id="modal-edit-title" class="modal-title">Khai Báo Ngưỡng Tồn Kho An Toàn (SKU & Kho)</h3>
+        </div>
+        <button class="modal-close-btn btn-close-modal" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body modal-content-container">
+        <!-- Render động bởi modals.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Khai Báo Ngưỡng Hàng Loạt (Batch Threshold) -->
+  <div id="modal-batch-threshold" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-batch-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#06b6d4" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polyline></svg>
+          <h3 id="modal-batch-title" class="modal-title">Điều Chỉnh Ngưỡng Tồn Tối Thiểu Hàng Loạt</h3>
+        </div>
+        <button class="modal-close-btn btn-close-modal" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body modal-content-container">
+        <!-- Render động bởi modals.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Phiếu Đặt Hàng Nhà Cung Cấp (Purchase Order PO) -->
+  <div id="modal-procurement-po" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-po-title">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#06b6d4" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+          <h3 id="modal-po-title" class="modal-title">Phiếu Đặt Hàng Nhà Cung Cấp Bù Tồn Kho (Purchase Order)</h3>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-print-po">
+            🖨️ In Phiếu (A4)
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-confirm-send-po">
+            ✅ Xác Nhận Gửi & Nhập Bù Tồn
+          </button>
+          <button class="modal-close-btn btn-close-modal" aria-label="Close modal">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body modal-content-container">
+        <!-- Render động bởi procurementPo.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Container chứa Toast Notifications -->
+  <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Script Khởi Chạy Ứng Dụng -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

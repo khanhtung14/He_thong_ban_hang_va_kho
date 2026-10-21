@@ -1,24 +1,10 @@
-"""MySQL engine and SQLAlchemy session factory."""
+import sys
+from pathlib import Path
 
-import os
+ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = ROOT / "backend"
+for target in (str(ROOT), str(BACKEND_ROOT)):
+    if target not in sys.path:
+        sys.path.insert(0, target)
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "mysql+pymysql://oms_user:change-me@localhost:3306/oms?charset=utf8mb4",
-)
-
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-
-
-def get_db():
-    """FastAPI dependency that yields a database session."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from app.core.database import *  # noqa: F401,F403

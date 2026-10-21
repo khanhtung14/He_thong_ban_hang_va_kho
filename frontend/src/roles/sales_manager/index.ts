@@ -1,0 +1,13 @@
+export { default as SalesManagerDashboard, SalesManagerDashboard as SalesManagerDashboardComponent } from "./SalesManagerDashboard";
+export { default as ApprovalList } from "./ApprovalList";
+export { default as TerritoryProgress } from "./TerritoryProgress";
+export { default as CreatePriceListModal } from "./CreatePriceListModal";
+export { default as ExportReportModal } from "./ExportReportModal";
+export { default as CategoryManagement, CategoryManagement as CategoryManagementComponent } from "./CategoryManagement";
+export { default as SalesAssignmentManager, SalesAssignmentManager as SalesAssignmentManagerComponent } from "./SalesAssignmentManager";
+export { default as SalesReportPage, SalesReportPage as SalesReportPageComponent } from "./SalesReportPage";
+export { default as CustomerTerritoryManagement } from "./CustomerTerritoryManagement";
+export { default as ProductPriceHistoryModal } from "./ProductPriceHistoryModal";
+export { default as ProductCatalogManagement } from "./ProductCatalogManagement";
+export { default as ProductManagement } from "./ProductManagement";
+export { default as DiscountPolicyManagement, DiscountPolicyManagement as DiscountPolicyManagementComponent } from "./DiscountPolicyManagement";

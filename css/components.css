@@ -1,0 +1,651 @@
+/* ==========================================================================
+   UI COMPONENTS (SCRUM-87 / SCRUM-35)
+   Buttons, Inputs, Tables, Modals, Badges, Stock Gauges, Toasts, PO Sheet
+   ========================================================================== */
+
+/* 1. BUTTONS */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  outline: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  border-color: var(--border-subtle);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+}
+
+.btn-xs {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-link-action {
+  background: transparent;
+  border: none;
+  color: #f43f5e;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--transition-fast);
+}
+
+.btn-link-action:hover {
+  color: #ff758f;
+  text-decoration: underline;
+}
+
+/* Simulation Buttons */
+.simulation-btn-group {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.btn-sim-sub {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #fda4af;
+  font-weight: 700;
+}
+.btn-sim-sub:hover {
+  background: rgba(244, 63, 94, 0.3);
+  color: #fff;
+}
+
+.btn-sim-add {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
+  font-weight: 700;
+}
+.btn-sim-add:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #fff;
+}
+
+/* 2. INPUTS & SELECTS */
+.custom-input, .custom-select, .custom-textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.85rem;
+  transition: all var(--transition-fast);
+  outline: none;
+  width: 100%;
+}
+
+.custom-input:focus, .custom-select:focus, .custom-textarea:focus {
+  border-color: var(--border-focus);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+.custom-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.custom-select-sm {
+  padding: 4px 8px;
+  font-size: 0.78rem;
+}
+
+/* 3. ENTERPRISE TABLES */
+.nexus-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+}
+
+.nexus-table th {
+  background: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.nexus-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+  color: var(--text-main);
+  vertical-align: middle;
+}
+
+.nexus-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.nexus-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* 🚨 QUY TẮC HIGHLIGHT DÒNG HÀNG DƯỚI NGƯỠNG TỐI THIỂU (TIÊU CHÍ 2 ĐỀ BÀI) */
+.row-below-min-alert {
+  background: rgba(244, 63, 94, 0.08) !important;
+  border-left: 3px solid var(--rose) !important;
+}
+
+.row-below-min-alert:hover {
+  background: rgba(244, 63, 94, 0.14) !important;
+}
+
+.row-stockout-pulse {
+  background: rgba(239, 68, 68, 0.14) !important;
+  border-left: 4px solid #ef4444 !important;
+  animation: pulseSubtle 3s infinite;
+}
+
+@keyframes pulseSubtle {
+  0% { background: rgba(239, 68, 68, 0.12); }
+  50% { background: rgba(239, 68, 68, 0.22); }
+  100% { background: rgba(239, 68, 68, 0.12); }
+}
+
+.row-near-min {
+  background: rgba(245, 158, 11, 0.05);
+  border-left: 3px solid var(--amber);
+}
+
+.row-healthy {
+  border-left: 3px solid transparent;
+}
+
+.row-overstock {
+  background: rgba(139, 92, 246, 0.05);
+  border-left: 3px solid var(--purple);
+}
+
+/* 4. BADGES & PILLS */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-below-min {
+  background: rgba(244, 63, 94, 0.2);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.45);
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.25);
+}
+
+.badge-stockout {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ff6b6b;
+  border: 1px solid #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+.badge-near-min {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.badge-healthy {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-overstock {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.badge-pulse-anim {
+  animation: pulseRed 2s infinite;
+}
+
+.wh-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+/* 5. THƯỚC ĐO TRỰC QUAN NGƯỠNG TỒN (STOCK GAUGE & MARKER) */
+.stock-gauge-wrapper {
+  width: 140px;
+  margin: 0 auto;
+}
+
+.gauge-track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-pill);
+  overflow: visible;
+}
+
+.gauge-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width var(--transition-normal);
+}
+
+.gauge-zero {
+  width: 0% !important;
+}
+
+.gauge-danger {
+  background: linear-gradient(90deg, #e11d48, #f43f5e);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.6);
+}
+
+.gauge-warning {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+
+.gauge-healthy {
+  background: linear-gradient(90deg, #059669, #10b981);
+}
+
+/* Vạch Marker chỉ đúng điểm Min */
+.gauge-marker-min {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: #f43f5e;
+  box-shadow: 0 0 4px #f43f5e;
+  border-radius: 1px;
+  z-index: 2;
+}
+
+.gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--text-subtle);
+}
+
+/* 6. MODAL OVERLAY & CARD */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(4, 7, 13, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-card-lg {
+  max-width: 1100px;
+}
+
+.modal-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface-elevated);
+}
+
+.modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  background: var(--bg-surface-elevated);
+}
+
+/* 7. TOAST NOTIFICATIONS */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 440px;
+  pointer-events: none;
+}
+
+.nexus-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  background: rgba(14, 21, 36, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: var(--text-main);
+  transition: all var(--transition-normal);
+}
+
+.toast-error, .toast-critical {
+  border-color: rgba(244, 63, 94, 0.5);
+  background: linear-gradient(135deg, rgba(30, 10, 18, 0.95), rgba(14, 21, 36, 0.95));
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.25);
+}
+
+.toast-error .toast-icon-wrap, .toast-critical .toast-icon-wrap {
+  color: var(--rose);
+}
+
+.toast-warning {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+.toast-warning .toast-icon-wrap {
+  color: var(--amber);
+}
+
+.toast-success {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+.toast-success .toast-icon-wrap {
+  color: var(--emerald);
+}
+
+.toast-info {
+  border-color: rgba(99, 102, 241, 0.5);
+}
+.toast-info .toast-icon-wrap {
+  color: var(--primary);
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-title {
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+  color: #fff;
+}
+
+.toast-msg {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* 8. PURCHASE ORDER SHEET (PO DOCUMENT) */
+.po-document {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.po-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.po-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.po-logo-badge {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  color: #fff;
+  font-weight: 800;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+}
+
+.po-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.po-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.po-meta-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.po-parties-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.party-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  font-size: 0.8rem;
+}
+
+.party-box-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.party-name {
+  font-size: 0.95rem;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.po-table-wrap {
+  margin-bottom: 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.po-qty-input {
+  width: 70px;
+  padding: 4px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  text-align: right;
+  font-weight: 700;
+}
+
+.po-financial-summary {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.po-totals-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.total-row-grand {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.po-signatures-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.sig-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sig-role {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.sig-note {
+  font-size: 0.7rem;
+  color: var(--text-subtle);
+  font-style: italic;
+  margin-bottom: 40px;
+}
+
+.sig-name {
+  font-size: 0.85rem;
+  color: #fff;
+}
