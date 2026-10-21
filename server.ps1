@@ -1,8 +1,9 @@
 # ===================================================================
-# NEXUS OMS - Lightweight Local Web Server (PowerShell & .NET)
-# Ticket: SCRUM-86 / SCRUM-9 (Credit Risk Gatekeeper)
+# NEXUS WMS - Lightweight Local Static Web Server (PowerShell & .NET)
+# Ticket: SCRUM-87 / SCRUM-35 (Khai báo tồn tối thiểu & Cảnh báo đứt hàng)
 # ===================================================================
-$port = 5509
+
+$port = 8035
 $rootPath = $PSScriptRoot
 
 $listener = New-Object System.Net.HttpListener
@@ -12,18 +13,18 @@ $listener.Prefixes.Add($url)
 try {
     $listener.Start()
     Write-Host "======================================================================" -ForegroundColor Cyan
-    Write-Host " [NEXUS OMS] Enterprise Credit Risk Gatekeeper & Order Lifecycle" -ForegroundColor Green
-    Write-Host " Running on: $url" -ForegroundColor Yellow
-    Write-Host " Web root:   $rootPath" -ForegroundColor Gray
-    Write-Host " Ticket:     SCRUM-86 / SCRUM-9" -ForegroundColor Magenta
+    Write-Host " [NEXUS WMS] He Thong Quan Ly Kho & Canh Bao Ton Toi Thieu (SCRUM-35)" -ForegroundColor Green
+    Write-Host " Dang chay tai: $url" -ForegroundColor Yellow
+    Write-Host " Thu muc goc:   $rootPath" -ForegroundColor Gray
     Write-Host " Nhan Ctrl + C de dung server." -ForegroundColor DarkGray
     Write-Host "======================================================================" -ForegroundColor Cyan
     
-    # Auto open browser
+    # Tu dong mo trinh duyet mac dinh
     Start-Process $url
 }
 catch {
-    Write-Host "Khong the khoi dong HttpListener tren port $port. Mo file truc tiep trong trinh duyet..." -ForegroundColor Red
+    Write-Host "Khong the khoi dong HttpListener tren port $port (co the port dang duoc dung)." -ForegroundColor Red
+    Write-Host "Mo file index.html truc tiep trong trinh duyet..." -ForegroundColor Yellow
     Start-Process "$rootPath\index.html"
     exit
 }
@@ -58,6 +59,7 @@ while ($listener.IsListening) {
             $response.ContentType = $contentType
             $bytes = [System.IO.File]::ReadAllBytes($filePath)
             $response.ContentLength64 = $bytes.Length
+            $response.AddHeader("Access-Control-Allow-Origin", "*")
             $response.OutputStream.Write($bytes, 0, $bytes.Length)
             $response.StatusCode = 200
         }
@@ -69,6 +71,6 @@ while ($listener.IsListening) {
         $response.Close()
     }
     catch {
-        # Silent ignore on close
+        # Bo qua client disconnect
     }
 }

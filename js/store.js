@@ -1,318 +1,441 @@
 /**
- * NEXUS ENTERPRISE ORDER MANAGEMENT SYSTEM (NEXUS OMS)
- * Module: Application State Store (Quản lý trạng thái tập trung)
- * Ticket: SCRUM-86 / SCRUM-9
+ * NEXUS ENTERPRISE WMS - CENTRAL REACTIVE STORE
+ * Ticket: SCRUM-87 / SCRUM-35
+ * Module: Quản lý trạng thái ứng dụng, LocalStorage Cache, Sự kiện phát tín hiệu thời gian thực
  */
 
-import { SYSTEM_CONFIG, INITIAL_DEALERS, INITIAL_PRODUCTS, INITIAL_ORDERS } from './mockData.js';
-import { CreditRiskEngine } from './creditEngine.js';
+import {
+  SYSTEM_CONFIG,
+  WAREHOUSES,
+  SUPPLIERS,
+  PRODUCT_CATALOG,
+  INITIAL_INVENTORY_ITEMS,
+  INITIAL_AUDIT_LOGS,
+  DEMO_SCENARIOS
+} from './mockData.js';
 
-class StateStore {
+import { InventoryEngine } from './inventoryEngine.js';
+
+const STORAGE_KEY = 'NEXUS_WMS_SCRUM35_STATE_V1';
+
+class InventoryStore {
   constructor() {
-    this.config = { ...SYSTEM_CONFIG };
-    this.dealers = JSON.parse(JSON.stringify(INITIAL_DEALERS));
-    this.products = JSON.parse(JSON.stringify(INITIAL_PRODUCTS));
-    this.orders = JSON.parse(JSON.stringify(INITIAL_ORDERS));
-    
-    // Khởi tạo đại lý mặc định: DL-001
-    this.currentDealerId = 'DL-001';
-    
-    // Giỏ hàng màn hình tạo đơn
-    this.cart = []; // [{ productId, sku, name, price, quantity, subtotal, unit }]
-    
-    // Ghi chú đơn hàng & thông tin bổ sung
-    this.orderMeta = {
-      notes: '',
-      deliveryAddress: '',
-      paymentMethod: 'DEBT_ACCOUNTING', // Ghi nhận công nợ
-      priority: 'STANDARD'
-    };
+    this.subscribers = new Set();
+    this.productMap = new Map();
+    this.warehouseMap = new Map();
+    this.supplierMap = new Map();
 
-    // Subscriptions
-    this.listeners = [];
+    this.state = this._loadInitialState();
+    this._buildLookupMaps();
+  }
+
+  _buildLookupMaps() {
+    this.productMap.clear();
+    this.warehouseMap.clear();
+    this.supplierMap.clear();
+
+    this.state.productCatalog.forEach(p => this.productMap.set(p.sku, p));
+    this.state.warehouses.forEach(w => this.warehouseMap.set(w.id, w));
+    this.state.suppliers.forEach(s => this.supplierMap.set(s.id, s));
+  }
+
+  _loadInitialState() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.inventoryItems) && parsed.inventoryItems.length > 0) {
+          return {
+            ...parsed,
+            activeWarehouseFilter: 'ALL',
+            activeCategoryFilter: 'ALL',
+            activeStatusFilter: 'ALL',
+            searchQuery: '',
+            activeTab: 'dashboard',
+            soundEnabled: true
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Không thể đọc dữ liệu từ LocalStorage, khởi tạo dữ liệu mặc định.', e);
+    }
+
+    return {
+      systemConfig: { ...SYSTEM_CONFIG },
+      warehouses: [...WAREHOUSES],
+      suppliers: [...SUPPLIERS],
+      productCatalog: [...PRODUCT_CATALOG],
+      inventoryItems: JSON.parse(JSON.stringify(INITIAL_INVENTORY_ITEMS)),
+      auditLogs: [...INITIAL_AUDIT_LOGS],
+      activeWarehouseFilter: 'ALL',
+      activeCategoryFilter: 'ALL',
+      activeStatusFilter: 'ALL',
+      searchQuery: '',
+      activeTab: 'dashboard',
+      soundEnabled: true,
+      currentScenario: 'SCENARIO_DEFAULT'
+    };
+  }
+
+  save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        systemConfig: this.state.systemConfig,
+        warehouses: this.state.warehouses,
+        suppliers: this.state.suppliers,
+        productCatalog: this.state.productCatalog,
+        inventoryItems: this.state.inventoryItems,
+        auditLogs: this.state.auditLogs,
+        currentScenario: this.state.currentScenario
+      }));
+    } catch (e) {
+      console.error('Lỗi khi ghi dữ liệu vào LocalStorage:', e);
+    }
   }
 
   subscribe(listener) {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
-    };
+    this.subscribers.add(listener);
+    return () => this.subscribers.delete(listener);
   }
 
-  notify() {
-    for (const listener of this.listeners) {
+  notify(eventType = 'STATE_CHANGED', payload = null) {
+    this.save();
+    for (const listener of this.subscribers) {
       try {
-        listener(this.getState());
+        listener(this.state, eventType, payload);
       } catch (err) {
-        console.error('[Store] Error in listener callback:', err);
+        console.error('Lỗi trong subscriber listener:', err);
       }
     }
   }
 
+  // ==================== GETTERS ====================
   getState() {
-    const currentDealer = this.getCurrentDealer();
-    const cartTotals = this.getCartTotals();
-    const creditEvaluation = CreditRiskEngine.evaluateCreditGatekeeper(
-      currentDealer,
-      cartTotals.grandTotal,
-      this.config.defaultMaxOverdueDays
-    );
+    return this.state;
+  }
 
-    return {
-      config: this.config,
-      dealers: this.dealers,
-      products: this.products,
-      orders: this.orders,
-      currentDealer,
-      cart: this.cart,
-      cartTotals,
-      creditEvaluation,
-      orderMeta: this.orderMeta
+  getProduct(sku) {
+    return this.productMap.get(sku) || null;
+  }
+
+  getWarehouse(warehouseId) {
+    return this.warehouseMap.get(warehouseId) || null;
+  }
+
+  getSupplier(supplierId) {
+    return this.supplierMap.get(supplierId) || null;
+  }
+
+  /**
+   * Lấy toàn bộ danh sách tồn kho đã qua tính toán làm giàu chỉ số
+   */
+  getEnrichedInventoryItems() {
+    return this.state.inventoryItems.map(item => {
+      const product = this.getProduct(item.sku) || {};
+      const enriched = InventoryEngine.enrichItem(item, product);
+      const wh = this.getWarehouse(item.warehouseId);
+      return {
+        ...enriched,
+        warehouseName: wh ? wh.name : item.warehouseId,
+        warehouseShortName: wh ? wh.shortName : item.warehouseId,
+        warehouseRegion: wh ? wh.region : '',
+        warehouseColor: wh ? wh.color : '#6366f1'
+      };
+    });
+  }
+
+  /**
+   * Lấy danh sách tồn kho đã qua các bộ lọc giao diện
+   */
+  getFilteredItems() {
+    const enriched = this.getEnrichedInventoryItems();
+    const { activeWarehouseFilter, activeCategoryFilter, activeStatusFilter, searchQuery } = this.state;
+
+    return enriched.filter(item => {
+      // 1. Lọc theo kho
+      if (activeWarehouseFilter !== 'ALL' && item.warehouseId !== activeWarehouseFilter) {
+        return false;
+      }
+
+      // 2. Lọc theo danh mục
+      if (activeCategoryFilter !== 'ALL' && item.categoryCode !== activeCategoryFilter) {
+        return false;
+      }
+
+      // 3. Lọc theo trạng thái cảnh báo
+      if (activeStatusFilter !== 'ALL') {
+        if (activeStatusFilter === 'BELOW_MIN') {
+          // Bao gồm cả hàng hết (Stockout) và hàng dưới Min
+          if (!item.isBelowMin && !item.isStockout) return false;
+        } else if (activeStatusFilter === 'CRITICAL_ONLY') {
+          // Chỉ lấy hàng hết (Stockout)
+          if (!item.isStockout) return false;
+        } else if (activeStatusFilter === 'NEAR_MIN') {
+          if (!item.isNearMin) return false;
+        } else if (activeStatusFilter === 'HEALTHY') {
+          if (!item.isHealthy) return false;
+        } else if (activeStatusFilter === 'OVERSTOCK') {
+          if (!item.isOverstock) return false;
+        }
+      }
+
+      // 4. Lọc tìm kiếm từ khóa thông minh
+      if (searchQuery && searchQuery.trim() !== '') {
+        const query = searchQuery.trim().toLowerCase();
+        const matchSku = item.sku.toLowerCase().includes(query);
+        const matchName = item.productName.toLowerCase().includes(query);
+        const matchBarcode = item.barcode.toLowerCase().includes(query);
+        const matchWh = item.warehouseName.toLowerCase().includes(query);
+        const matchBin = (item.binLocation || '').toLowerCase().includes(query);
+        if (!matchSku && !matchName && !matchBarcode && !matchWh && !matchBin) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * Tính toán bộ chỉ số KPI tổng hợp cho Dashboard
+   */
+  getDashboardKPIs() {
+    const enriched = this.getEnrichedInventoryItems();
+    return InventoryEngine.computeDashboardKPIs(enriched, this.state.activeWarehouseFilter);
+  }
+
+  /**
+   * Lấy danh sách đề xuất PO theo NCC
+   */
+  getPORecommendations() {
+    const enriched = this.getEnrichedInventoryItems();
+    return InventoryEngine.generatePORecommendations(enriched, this.state.suppliers, this.state.activeWarehouseFilter);
+  }
+
+  // ==================== ACTIONS / MUTATIONS ====================
+
+  setWarehouseFilter(warehouseId) {
+    this.state.activeWarehouseFilter = warehouseId;
+    this.notify('FILTER_CHANGED', { type: 'warehouse', value: warehouseId });
+  }
+
+  setCategoryFilter(categoryCode) {
+    this.state.activeCategoryFilter = categoryCode;
+    this.notify('FILTER_CHANGED', { type: 'category', value: categoryCode });
+  }
+
+  setStatusFilter(status) {
+    this.state.activeStatusFilter = status;
+    this.notify('FILTER_CHANGED', { type: 'status', value: status });
+  }
+
+  setSearchQuery(query) {
+    this.state.searchQuery = query;
+    this.notify('FILTER_CHANGED', { type: 'search', value: query });
+  }
+
+  setActiveTab(tabName) {
+    this.state.activeTab = tabName;
+    this.notify('TAB_CHANGED', { tab: tabName });
+  }
+
+  toggleSound(enabled) {
+    this.state.soundEnabled = (enabled !== undefined) ? enabled : !this.state.soundEnabled;
+    this.notify('SOUND_TOGGLED', { soundEnabled: this.state.soundEnabled });
+  }
+
+  /**
+   * Cập nhật khai báo tồn tối thiểu cho 1 cặp (Kho, SKU)
+   * Đáp ứng trực tiếp yêu cầu 1: "Khai báo tồn tối thiểu theo SKU và theo kho"
+   */
+  updateThreshold({ itemId, minThreshold, maxCapacity, reorderQuantity, leadTimeDays, reason = '' }) {
+    const itemIndex = this.state.inventoryItems.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) {
+      throw new Error(`Không tìm thấy bản ghi tồn kho có mã ID: ${itemId}`);
+    }
+
+    const item = this.state.inventoryItems[itemIndex];
+    const oldMin = item.minThreshold;
+    const oldMax = item.maxCapacity;
+
+    const parsedMin = Math.max(0, parseInt(minThreshold, 10) || 0);
+    const parsedMax = Math.max(parsedMin, parseInt(maxCapacity, 10) || (parsedMin * 2));
+    const parsedReorder = Math.max(1, parseInt(reorderQuantity, 10) || 10);
+    const parsedLead = leadTimeDays ? Math.max(1, parseInt(leadTimeDays, 10)) : item.leadTimeDays;
+
+    item.minThreshold = parsedMin;
+    item.maxCapacity = parsedMax;
+    item.reorderQuantity = parsedReorder;
+    if (parsedLead) item.leadTimeDays = parsedLead;
+
+    // Ghi nhận Audit Log
+    const logEntry = {
+      id: `AUD-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actor: this.state.systemConfig.currentUser.name,
+      action: 'CẬP NHẬT NGƯỠNG TỒN MIN/MAX',
+      warehouseId: item.warehouseId,
+      sku: item.sku,
+      oldMin,
+      newMin: parsedMin,
+      reason: reason || `Điều chỉnh mức tồn tối thiểu từ ${oldMin} -> ${parsedMin} chiếc theo yêu cầu vận hành`
     };
+
+    this.state.auditLogs.unshift(logEntry);
+    if (this.state.auditLogs.length > 50) this.state.auditLogs.pop();
+
+    const product = this.getProduct(item.sku);
+    const enriched = InventoryEngine.enrichItem(item, product);
+
+    this.notify('THRESHOLD_UPDATED', {
+      item: enriched,
+      log: logEntry,
+      wasBelowMinBefore: item.physicalStock - item.reservedStock < oldMin,
+      isBelowMinNow: enriched.isBelowMin
+    });
+
+    return enriched;
   }
 
-  getCurrentDealer() {
-    return this.dealers.find(d => d.id === this.currentDealerId) || this.dealers[0];
+  /**
+   * Cập nhật hàng loạt (Batch apply) mức tồn tối thiểu theo kho hoặc theo nhóm hàng
+   */
+  batchUpdateThreshold({ warehouseId, categoryCode, percentMultiplier, reason = '' }) {
+    let affectedCount = 0;
+    const factor = (100 + Number(percentMultiplier || 0)) / 100;
+
+    this.state.inventoryItems.forEach(item => {
+      const matchWh = (warehouseId === 'ALL' || item.warehouseId === warehouseId);
+      const product = this.getProduct(item.sku);
+      const matchCat = (categoryCode === 'ALL' || (product && product.categoryCode === categoryCode));
+
+      if (matchWh && matchCat) {
+        const oldMin = item.minThreshold;
+        const newMin = Math.max(1, Math.round(item.minThreshold * factor));
+        item.minThreshold = newMin;
+        item.maxCapacity = Math.max(newMin * 2, Math.round(item.maxCapacity * factor));
+        affectedCount++;
+      }
+    });
+
+    const logEntry = {
+      id: `AUD-BATCH-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actor: this.state.systemConfig.currentUser.name,
+      action: 'CẬP NHẬT HÀNG LOẠT (BATCH)',
+      warehouseId,
+      sku: `Category: ${categoryCode}`,
+      oldMin: 'Multiple',
+      newMin: `Điều chỉnh ${percentMultiplier}% (${affectedCount} SKU)`,
+      reason: reason || `Cập nhật tồn tối thiểu hàng loạt theo tỷ lệ ${percentMultiplier}% cho ${affectedCount} bản ghi`
+    };
+
+    this.state.auditLogs.unshift(logEntry);
+    this.notify('BATCH_THRESHOLD_UPDATED', { affectedCount, log: logEntry });
+    return affectedCount;
   }
 
-  // Set Dealer
-  setDealer(dealerId) {
-    if (this.currentDealerId !== dealerId) {
-      this.currentDealerId = dealerId;
-      this.notify();
+  /**
+   * Mô phỏng giao dịch xuất / nhập kho trực tiếp (Live Transaction Simulator)
+   * Giúp giáo viên kiểm chứng hành vi: Tồn giảm qua ngưỡng Min -> Lập tức cảnh báo Đỏ, còi bíp kêu!
+   */
+  adjustPhysicalStock(itemId, deltaQty, reason = '') {
+    const itemIndex = this.state.inventoryItems.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return null;
+
+    const item = this.state.inventoryItems[itemIndex];
+    const oldPhysical = item.physicalStock;
+    const oldAvailable = Math.max(0, oldPhysical - item.reservedStock);
+    const wasBelowMin = oldAvailable < item.minThreshold;
+
+    const newPhysical = Math.max(0, oldPhysical + deltaQty);
+    item.physicalStock = newPhysical;
+    if (deltaQty > 0) {
+      item.lastRestockedDate = new Date().toISOString().substring(0, 10);
     }
+
+    const product = this.getProduct(item.sku);
+    const enriched = InventoryEngine.enrichItem(item, product);
+    const isBelowMinNow = enriched.isBelowMin;
+    const isDropBelowMin = !wasBelowMin && isBelowMinNow; // Vừa mới rơi xuống dưới ngưỡng!
+
+    const actionText = deltaQty < 0 ? `XUẤT KHO (${Math.abs(deltaQty)} cái)` : `NHẬP KHO (+${deltaQty} cái)`;
+    const logEntry = {
+      id: `TRX-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actor: this.state.systemConfig.currentUser.name,
+      action: actionText,
+      warehouseId: item.warehouseId,
+      sku: item.sku,
+      oldMin: item.minThreshold,
+      newMin: `Tồn mới: ${enriched.availableStock}`,
+      reason: reason || (isDropBelowMin
+        ? `⚠️ CẢNH BÁO: Xuất hàng khiến tồn khả dụng (${enriched.availableStock}) rơi xuống dưới mức tối thiểu (${item.minThreshold})!`
+        : `Giao dịch điều chỉnh tồn kho vật lý từ ${oldPhysical} -> ${newPhysical} cái`)
+    };
+
+    this.state.auditLogs.unshift(logEntry);
+    if (this.state.auditLogs.length > 50) this.state.auditLogs.pop();
+
+    this.notify('STOCK_ADJUSTED', {
+      item: enriched,
+      deltaQty,
+      isDropBelowMin,
+      isBelowMinNow,
+      log: logEntry
+    });
+
+    return { enriched, isDropBelowMin };
   }
 
-  // Chọn nhanh kịch bản kiểm thử (Preset Scenario cho Giảng viên)
-  applyPresetScenario(scenarioKey) {
-    const dealer = this.dealers.find(d => d.presetScenario === scenarioKey);
-    if (!dealer) return;
+  /**
+   * Kích hoạt Kịch bản Demo cho giáo viên
+   */
+  loadDemoScenario(scenarioId) {
+    this.state.currentScenario = scenarioId;
 
-    this.currentDealerId = dealer.id;
-    this.cart = []; // Reset giỏ hàng trước
-
-    // Tự động thêm giỏ hàng phù hợp để Giảng viên test ngay:
-    if (scenarioKey === 'NORMAL_SAFE') {
-      // Thêm 1 Server 115M (Tổng 126.5M VAT -> Nợ lên 266.5M / 600M -> Vẫn An toàn)
-      this.addToCart('PRD-001', 1);
-    } else if (scenarioKey === 'OVER_LIMIT') {
-      // Đang nợ 350M / 400M (còn 50M). Thêm 1 Macbook 89M -> Tổng vượt 400M -> Test ngay Vượt Hạn Mức
-      this.addToCart('PRD-002', 1);
-    } else if (scenarioKey === 'OVERDUE_BLOCKED') {
-      // Đang có nợ quá hạn 56 ngày vi phạm -> Thêm sản phẩm để thấy NÚT TẠO ĐƠN BỊ KHÓA CỨNG
-      this.addToCart('PRD-003', 2);
-    } else if (scenarioKey === 'BORDERLINE') {
-      // Đang nợ 494M / 500M (còn đúng 6M). Thêm 1 SSD 14.2M -> Lập tức kích hoạt Cần duyệt
-      this.addToCart('PRD-007', 1);
-    }
-
-    this.notify();
-  }
-
-  // Cart operations
-  addToCart(productId, quantity = 1) {
-    const product = this.products.find(p => p.id === productId);
-    if (!product) return;
-
-    const existingIndex = this.cart.findIndex(item => item.productId === productId);
-    if (existingIndex > -1) {
-      this.cart[existingIndex].quantity += quantity;
-      this.cart[existingIndex].subtotal = this.cart[existingIndex].quantity * this.cart[existingIndex].price;
-    } else {
-      this.cart.push({
-        productId: product.id,
-        sku: product.sku,
-        name: product.name,
-        price: product.price,
-        unit: product.unit,
-        quantity: quantity,
-        subtotal: quantity * product.price,
-        image: product.image
+    if (scenarioId === 'SCENARIO_DEFAULT') {
+      this.state.inventoryItems = JSON.parse(JSON.stringify(INITIAL_INVENTORY_ITEMS));
+    } else if (scenarioId === 'SCENARIO_NORTH_SURGE') {
+      // Làm cho Kho Miền Bắc tụt dốc dưới Min hầu hết các SKU
+      this.state.inventoryItems = JSON.parse(JSON.stringify(INITIAL_INVENTORY_ITEMS));
+      this.state.inventoryItems.forEach(item => {
+        if (item.warehouseId === 'WH-HN') {
+          item.physicalStock = Math.max(0, Math.floor(item.minThreshold * 0.4)); // Chỉ còn 40% Min
+          item.reservedStock = Math.min(item.physicalStock, 1);
+        }
+      });
+    } else if (scenarioId === 'SCENARIO_RESTOCKED') {
+      // Đầy kho an toàn
+      this.state.inventoryItems = JSON.parse(JSON.stringify(INITIAL_INVENTORY_ITEMS));
+      this.state.inventoryItems.forEach(item => {
+        item.physicalStock = Math.round(item.minThreshold * 1.8);
+        item.reservedStock = 1;
       });
     }
-    this.notify();
-  }
 
-  updateCartItemQuantity(productId, quantity) {
-    const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty <= 0) {
-      this.removeFromCart(productId);
-      return;
-    }
-
-    const item = this.cart.find(i => i.productId === productId);
-    if (item) {
-      item.quantity = qty;
-      item.subtotal = item.quantity * item.price;
-      this.notify();
-    }
-  }
-
-  removeFromCart(productId) {
-    this.cart = this.cart.filter(item => item.productId !== productId);
-    this.notify();
-  }
-
-  clearCart() {
-    this.cart = [];
-    this.notify();
-  }
-
-  getCartTotals() {
-    const subtotal = this.cart.reduce((sum, item) => sum + item.subtotal, 0);
-    const vatRate = this.config.vatRate;
-    const vatAmount = Math.round(subtotal * vatRate);
-    const grandTotal = subtotal + vatAmount;
-    const totalItems = this.cart.reduce((sum, item) => sum + item.quantity, 0);
-
-    return {
-      subtotal,
-      vatRate,
-      vatAmount,
-      grandTotal,
-      totalItems
-    };
-  }
-
-  // Tạo đơn hàng (Submit Order)
-  submitOrder(approvalPayload = null) {
-    const dealer = this.getCurrentDealer();
-    const cartTotals = this.getCartTotals();
-    
-    if (this.cart.length === 0) {
-      throw new Error('Giỏ hàng trống! Vui lòng chọn ít nhất một sản phẩm.');
-    }
-
-    // Đánh giá công nợ tại thời điểm chốt đơn
-    const evalResult = CreditRiskEngine.evaluateCreditGatekeeper(
-      dealer, 
-      cartTotals.grandTotal, 
-      this.config.defaultMaxOverdueDays
-    );
-
-    // KIỂM TRA ĐIỀU KIỆN 3: BỊ CHẶN HOÀN TOÀN DO NỢ QUÁ HẠN
-    if (evalResult.isOverdueBlocked) {
-      throw new Error(
-        `[CHẶN TẠO ĐƠN HOÀN TOÀN] Đại lý ${dealer.name} có khoản nợ quá hạn (${evalResult.maxOverdueDays} ngày) vượt mức cho phép (${evalResult.maxOverdueDaysAllowed} ngày). Không thể tạo đơn dưới bất kỳ hình thức nào!`
-      );
-    }
-
-    // KIỂM TRA ĐIỀU KIỆN 2: VƯỢT HẠN MỨC -> ĐÁNH DẤU CẦN DUYỆT
-    let finalStatus = 'APPROVED';
-    let statusLabel = 'Đã xác nhận (Approved)';
-    let approvalReason = 'Đơn hàng trong hạn mức tín dụng - Hệ thống tự động duyệt.';
-    let creditCheckStatus = 'PASSED';
-    let creditCheckSummary = `Trong hạn mức (Tổng nợ sau đơn: ${CreditRiskEngine.formatShortVND(evalResult.projectedTotalDebt)} / ${CreditRiskEngine.formatShortVND(dealer.creditLimit)})`;
-
-    if (evalResult.isExceededLimit) {
-      finalStatus = 'PENDING_APPROVAL';
-      statusLabel = 'Chờ duyệt công nợ (Pending Approval)';
-      creditCheckStatus = 'EXCEEDED_LIMIT';
-      creditCheckSummary = `Vượt hạn mức tín dụng +${CreditRiskEngine.formatVND(evalResult.exceededAmount)} (Tổng nợ dự kiến ${CreditRiskEngine.formatShortVND(evalResult.projectedTotalDebt)} / ${CreditRiskEngine.formatShortVND(dealer.creditLimit)})`;
-      
-      approvalReason = approvalPayload?.reason || 'Đơn vượt hạn mức tín dụng. Yêu cầu xem xét phê duyệt ngoại lệ.';
-    }
-
-    const orderId = `ORD-${Date.now().toString().slice(-4)}`;
-    const orderNo = `NEX-ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newOrder = {
-      id: orderId,
-      orderNo: orderNo,
-      dealerId: dealer.id,
-      dealerName: dealer.name,
-      salesRep: dealer.salesRep,
-      createdAt: new Date().toLocaleString('vi-VN'),
-      totalBeforeVat: cartTotals.subtotal,
-      vatAmount: cartTotals.vatAmount,
-      totalAmount: cartTotals.grandTotal,
-      status: finalStatus,
-      statusLabel: statusLabel,
-      creditCheckStatus: creditCheckStatus,
-      creditCheckSummary: creditCheckSummary,
-      approvalReason: approvalReason,
-      approvalRequestedAt: finalStatus === 'PENDING_APPROVAL' ? new Date().toLocaleString('vi-VN') : null,
-      requestedBy: dealer.salesRep,
-      approver: finalStatus === 'PENDING_APPROVAL' ? (approvalPayload?.approver || 'Kế toán trưởng & GĐ Tài chính') : 'Hệ thống tự động',
-      paymentCommitmentDate: approvalPayload?.commitmentDate || null,
-      collateralInfo: approvalPayload?.collateral || null,
-      items: JSON.parse(JSON.stringify(this.cart))
+    const logEntry = {
+      id: `AUD-SCENARIO-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actor: 'Giáo viên / Quản trị viên',
+      action: 'CHUYỂN KỊCH BẢN DEMO',
+      warehouseId: 'ALL',
+      sku: 'ALL',
+      oldMin: '-',
+      newMin: scenarioId,
+      reason: `Kích hoạt kịch bản kiểm thử: ${scenarioId}`
     };
 
-    // Lưu đơn hàng vào danh sách (đưa lên đầu)
-    this.orders.unshift(newOrder);
-
-    // Nếu đơn được duyệt ngay (trong hạn mức) -> Tăng công nợ hiện tại của đại lý
-    if (finalStatus === 'APPROVED') {
-      dealer.currentDebt += cartTotals.grandTotal;
-    }
-
-    // Reset giỏ hàng
-    this.cart = [];
-    this.notify();
-
-    return newOrder;
+    this.state.auditLogs.unshift(logEntry);
+    this.notify('SCENARIO_LOADED', { scenarioId, log: logEntry });
   }
 
-  // Thao tác Kế toán phê duyệt đơn
-  approveOrder(orderId, approverNote = '') {
-    const order = this.orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    const dealer = this.dealers.find(d => d.id === order.dealerId);
-    order.status = 'APPROVED';
-    order.statusLabel = 'Đã phê duyệt (Approved)';
-    order.approvedAt = new Date().toLocaleString('vi-VN');
-    order.approverNote = approverNote || 'Kế toán trưởng đã thẩm định bảo lãnh và phê duyệt đơn hàng.';
-
-    // Cập nhật công nợ cho đại lý
-    if (dealer) {
-      dealer.currentDebt += order.totalAmount;
-    }
-
-    this.notify();
-  }
-
-  // Thao tác Kế toán từ chối đơn
-  rejectOrder(orderId, rejectReason = '') {
-    const order = this.orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    order.status = 'REJECTED';
-    order.statusLabel = 'Đã từ chối (Rejected)';
-    order.rejectedAt = new Date().toLocaleString('vi-VN');
-    order.rejectReason = rejectReason || 'Từ chối do rủi ro công nợ cao và không có bảo lãnh hợp lệ.';
-
-    this.notify();
-  }
-
-  // Giảng viên thanh toán hoá đơn nợ quá hạn để mở khóa đại lý (Interactive Testing Tool)
-  settleOverdueInvoice(dealerId, invoiceNo) {
-    const dealer = this.dealers.find(d => d.id === dealerId);
-    if (!dealer || !dealer.unpaidInvoices) return;
-
-    const invoice = dealer.unpaidInvoices.find(inv => inv.invoiceNo === invoiceNo);
-    if (invoice) {
-      dealer.currentDebt = Math.max(0, dealer.currentDebt - invoice.remainingAmount);
-      dealer.unpaidInvoices = dealer.unpaidInvoices.filter(inv => inv.invoiceNo !== invoiceNo);
-      
-      // Kiểm tra lại xem còn nợ quá hạn không
-      const remainingViolations = dealer.unpaidInvoices.filter(
-        inv => (inv.overdueDays || 0) > this.config.defaultMaxOverdueDays
-      );
-      if (remainingViolations.length === 0) {
-        dealer.status = 'ACTIVE';
-        dealer.riskLevel = 'MEDIUM';
-      }
-      this.notify();
-    }
-  }
-
-  // Cập nhật cấu hình chính sách (Cho Giảng viên thử nghiệm điều chỉnh số ngày quá hạn)
-  updateMaxOverdueDays(days) {
-    this.config.defaultMaxOverdueDays = Number(days);
-    this.notify();
+  resetAll() {
+    localStorage.removeItem(STORAGE_KEY);
+    this.state = this._loadInitialState();
+    this._buildLookupMaps();
+    this.notify('STATE_RESET', null);
   }
 }
 
-export const store = new StateStore();
+export const store = new InventoryStore();

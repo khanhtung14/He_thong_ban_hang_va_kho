@@ -1,595 +1,410 @@
 /**
- * NEXUS ENTERPRISE ORDER MANAGEMENT SYSTEM (NEXUS OMS)
- * Module: Enterprise Modal Dialogs System
- * Ticket: SCRUM-86 / SCRUM-9
+ * NEXUS ENTERPRISE WMS - MODALS CONTROLLER
+ * Ticket: SCRUM-87 / SCRUM-35
+ * Module: Modal khai báo ngưỡng tồn tối thiểu đơn lẻ & Khai báo hàng loạt (Batch Threshold Update)
  */
 
 import { store } from './store.js';
-import { CreditRiskEngine } from './creditEngine.js';
+import { InventoryEngine } from './inventoryEngine.js';
 
-export class ModalManager {
+export class ModalsManager {
   constructor() {
-    this.modalOverlay = document.getElementById('globalModalOverlay');
-    this.modalContainer = document.getElementById('globalModalContainer');
-    this.activeModal = null;
-    this.initCloseListeners();
+    this.editModalEl = document.getElementById('modal-edit-threshold');
+    this.batchModalEl = document.getElementById('modal-batch-threshold');
+    this.activeItemId = null;
+
+    this._bindGlobalEvents();
   }
 
-  initCloseListeners() {
-    if (this.modalOverlay) {
-      this.modalOverlay.addEventListener('click', (e) => {
-        if (e.target === this.modalOverlay) {
-          this.close();
-        }
+  _bindGlobalEvents() {
+    window.addEventListener('OPEN_THRESHOLD_MODAL', (e) => {
+      this.openEditModal(e.detail || {});
+    });
+
+    window.addEventListener('OPEN_BATCH_MODAL', (e) => {
+      this.openBatchModal(e.detail || {});
+    });
+  }
+
+  openEditModal({ itemId = null, isNew = false }) {
+    if (!this.editModalEl) return;
+
+    this.activeItemId = itemId;
+    const state = store.getState();
+    const enrichedItems = store.getEnrichedInventoryItems();
+
+    let targetItem = itemId ? enrichedItems.find(i => i.id === itemId) : enrichedItems[0];
+    if (!targetItem) targetItem = enrichedItems[0];
+
+    const modalBody = this.editModalEl.querySelector('.modal-content-container');
+    if (!modalBody) return;
+
+    const smartRec = InventoryEngine.calculateSmartSafetyThreshold(targetItem.dailyBurnRate, targetItem.leadTimeDays);
+
+    modalBody.innerHTML = `
+      <form id="form-edit-threshold" class="threshold-form animate-fade-in">
+        
+        <div class="form-header-badge">
+          <span>Khai báo cấu hình: ${targetItem.sku} • ${targetItem.warehouseShortName}</span>
+        </div>
+
+        <div class="form-grid-2col">
+          <!-- Kho lưu trữ -->
+          <div class="form-group">
+            <label class="form-label">Kho áp dụng:</label>
+            <input type="text" class="custom-input" value="${targetItem.warehouseName}" disabled />
+            <input type="hidden" id="edit-wh-id" value="${targetItem.warehouseId}" />
+          </div>
+
+          <!-- SKU & Sản phẩm -->
+          <div class="form-group">
+            <label class="form-label">Mã SKU & Tên sản phẩm:</label>
+            <input type="text" class="custom-input" value="${targetItem.sku} - ${targetItem.productName}" disabled />
+            <input type="hidden" id="edit-sku-code" value="${targetItem.sku}" />
+          </div>
+        </div>
+
+        <!-- THÔNG TIN HIỆN TRẠNG TỒN THỰC TẾ -->
+        <div class="stock-status-callout">
+          <div class="callout-col">
+            <span class="callout-label">Tồn Khả Dụng Hiện Tại:</span>
+            <span class="callout-val font-mono font-bold ${targetItem.isBelowMin ? 'text-rose' : 'text-emerald'}">
+              ${targetItem.availableStock} ${targetItem.unit}
+            </span>
+          </div>
+          <div class="callout-col">
+            <span class="callout-label">Tồn Vật Lý / Giữ Chỗ:</span>
+            <span class="callout-val font-mono text-muted">${targetItem.physicalStock} / ${targetItem.reservedStock}</span>
+          </div>
+          <div class="callout-col">
+            <span class="callout-label">Tốc Độ Tiêu Thụ:</span>
+            <span class="callout-val font-mono">${targetItem.dailyBurnRate} cái / ngày</span>
+          </div>
+          <div class="callout-col">
+            <span class="callout-label">Hiện Trạng:</span>
+            <span class="badge ${targetItem.badgeClass}">${targetItem.statusLabel}</span>
+          </div>
+        </div>
+
+        <!-- CÁC TRƯỜNG THIẾT LẬP NGƯỠNG -->
+        <div class="form-grid-2col">
+          
+          <!-- Ngưỡng tồn tối thiểu (Min) -->
+          <div class="form-group highlight-field">
+            <div class="label-with-hint">
+              <label class="form-label font-bold text-rose">Mức Tồn Tối Thiểu (Min Threshold) *</label>
+              <span class="hint-text">Ngưỡng báo động đứt hàng</span>
+            </div>
+            <div class="input-with-unit">
+              <input type="number" id="input-edit-min" min="0" max="9999" class="custom-input font-mono font-bold" 
+                value="${targetItem.minThreshold}" required />
+              <span class="input-unit">${targetItem.unit}</span>
+            </div>
+          </div>
+
+          <!-- Sức chứa tối đa (Max) -->
+          <div class="form-group">
+            <div class="label-with-hint">
+              <label class="form-label">Sức Chứa Tối Đa (Max Capacity) *</label>
+              <span class="hint-text">Giới hạn không vượt quá</span>
+            </div>
+            <div class="input-with-unit">
+              <input type="number" id="input-edit-max" min="1" max="9999" class="custom-input font-mono" 
+                value="${targetItem.maxCapacity}" required />
+              <span class="input-unit">${targetItem.unit}</span>
+            </div>
+          </div>
+
+          <!-- Số lượng đặt hàng kinh tế (Reorder Qty) -->
+          <div class="form-group">
+            <div class="label-with-hint">
+              <label class="form-label">Số Lượng Đặt Hàng Mỗi Lần (MOQ) *</label>
+              <span class="hint-text">Lô đặt hàng tối thiểu</span>
+            </div>
+            <div class="input-with-unit">
+              <input type="number" id="input-edit-reorder" min="1" max="9999" class="custom-input font-mono" 
+                value="${targetItem.reorderQuantity}" required />
+              <span class="input-unit">${targetItem.unit}</span>
+            </div>
+          </div>
+
+          <!-- Lead time NCC -->
+          <div class="form-group">
+            <div class="label-with-hint">
+              <label class="form-label">Thời Gian Giao Hàng NCC (Lead Time) *</label>
+              <span class="hint-text">Số ngày từ lúc đặt đến khi nhập kho</span>
+            </div>
+            <div class="input-with-unit">
+              <input type="number" id="input-edit-lead" min="1" max="90" class="custom-input font-mono" 
+                value="${targetItem.leadTimeDays}" required />
+              <span class="input-unit">Ngày</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- TRỢ LÝ THÔNG MINH GỢI Ý THUẬT TOÁN SCM -->
+        <div class="smart-formula-box">
+          <div class="formula-icon">⚡</div>
+          <div class="formula-info">
+            <div class="formula-title">Gợi ý từ Thuật Toán An Toàn Kho SCM (Lean Inventory)</div>
+            <div class="formula-desc">
+              Dựa trên tiêu thụ trung bình (${targetItem.dailyBurnRate} cái/ngày) và Lead Time (${targetItem.leadTimeDays} ngày), mức tồn tối thiểu khuyên dùng là <strong>${smartRec.recommendedMin} ${targetItem.unit}</strong>, sức chứa tối đa là <strong>${smartRec.recommendedMax} ${targetItem.unit}</strong>.
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-use-smart-suggestion"
+            data-min="${smartRec.recommendedMin}"
+            data-max="${smartRec.recommendedMax}"
+            data-reorder="${smartRec.recommendedReorderQty}">
+            Áp Dụng Gợi Ý Này
+          </button>
+        </div>
+
+        <!-- DỰ BÁO TRẠNG THÁI SAU KHI LƯU (REAL-TIME IMPACT PREVIEW) -->
+        <div class="impact-preview-box" id="impact-preview-container">
+          <!-- Cập nhật tự động khi gõ input -->
+        </div>
+
+        <!-- LÝ DO ĐIỀU CHỈNH (AUDIT REASON) -->
+        <div class="form-group">
+          <label class="form-label">Lý do điều chỉnh (Kiểm toán nội bộ WMS):</label>
+          <input type="text" id="input-edit-reason" class="custom-input" 
+            placeholder="Ví dụ: Tăng tồn tối thiểu đón mùa cao điểm quý 4 / Đại lý đặt trước hợp đồng lớn..." 
+            value="Điều chỉnh mức tồn tối thiểu theo định kỳ đánh giá an toàn chuỗi cung ứng" required />
+        </div>
+
+        <!-- NÚT THAO TÁC -->
+        <div class="modal-form-actions">
+          <button type="button" class="btn btn-secondary btn-close-modal">Hủy Bỏ</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-threshold">
+            💾 Lưu Khai Báo Ngưỡng An Toàn
+          </button>
+        </div>
+
+      </form>
+    `;
+
+    this._bindEditModalEvents(targetItem);
+    this.editModalEl.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+  }
+
+  _bindEditModalEvents(targetItem) {
+    const minInput = this.editModalEl.querySelector('#input-edit-min');
+    const maxInput = this.editModalEl.querySelector('#input-edit-max');
+    const previewContainer = this.editModalEl.querySelector('#impact-preview-container');
+
+    const updatePreview = () => {
+      const newMin = parseInt(minInput.value, 10) || 0;
+      const newMax = parseInt(maxInput.value, 10) || (newMin * 2);
+      const avail = targetItem.availableStock;
+
+      let willBeBelow = avail < newMin;
+      let willBeStockout = avail === 0;
+      let deficit = willBeBelow ? (newMin - avail) : 0;
+
+      previewContainer.innerHTML = `
+        <div class="preview-item">
+          <span class="preview-title">Dự báo sau khi áp dụng:</span>
+          ${willBeStockout ? `
+            <span class="badge badge-stockout">⛔ CHÁY HÀNG (0 CÁI) - CẦN ĐẶT HÀNG GẤP</span>
+          ` : willBeBelow ? `
+            <span class="badge badge-below-min">🚨 DƯỚI NGƯỠNG TỐI THIỂU (Thiếu hụt ${deficit} cái)</span>
+          ` : `
+            <span class="badge badge-healthy">✅ ĐẠT VÙNG AN TOÀN (Cao hơn Min ${avail - newMin} cái)</span>
+          `}
+        </div>
+      `;
+    };
+
+    if (minInput && maxInput) {
+      minInput.addEventListener('input', updatePreview);
+      maxInput.addEventListener('input', updatePreview);
+      updatePreview();
+    }
+
+    // Nút áp dụng gợi ý SCM
+    const btnSmart = this.editModalEl.querySelector('#btn-use-smart-suggestion');
+    if (btnSmart) {
+      btnSmart.addEventListener('click', (e) => {
+        const sMin = e.target.dataset.min;
+        const sMax = e.target.dataset.max;
+        const sReorder = e.target.dataset.reorder;
+        if (minInput) minInput.value = sMin;
+        if (maxInput) maxInput.value = sMax;
+        const reorderInput = this.editModalEl.querySelector('#input-edit-reorder');
+        if (reorderInput) reorderInput.value = sReorder;
+        updatePreview();
       });
     }
 
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.activeModal) {
-        this.close();
-      }
-    });
-  }
-
-  open(contentHtml, customClass = '') {
-    if (!this.modalOverlay || !this.modalContainer) return;
-    this.modalContainer.className = `modal-dialog-box ${customClass}`;
-    this.modalContainer.innerHTML = contentHtml;
-    this.modalOverlay.classList.add('active');
-    this.activeModal = true;
-    document.body.style.overflow = 'hidden';
-
-    // Auto bind close buttons
-    const closeBtns = this.modalContainer.querySelectorAll('.btn-close-modal, .modal-close-icon');
-    closeBtns.forEach(btn => {
-      btn.addEventListener('click', () => this.close());
-    });
-  }
-
-  close() {
-    if (!this.modalOverlay) return;
-    this.modalOverlay.classList.remove('active');
-    this.activeModal = null;
-    document.body.style.overflow = '';
-  }
-
-  // MODAL 1: PHIẾU ĐỀ XUẤT DUYỆT VƯỢT HẠN MỨC (TIÊU CHÍ 2)
-  openApprovalRequestModal() {
-    const state = store.getState();
-    const { currentDealer, cartTotals, creditEvaluation } = state;
-
-    const html = `
-      <div class="modal-header header-warning">
-        <div class="modal-title-wrap">
-          <i class="ph-fill ph-file-text modal-header-icon"></i>
-          <div>
-            <h3 class="modal-title">Phiếu Đề Xuất Phê Duyệt Vượt Hạn Mức Tín Dụng</h3>
-            <span class="modal-subtitle">Trình Kế toán trưởng & Ban Giám Đốc xem xét ngoại lệ</span>
-          </div>
-        </div>
-        <button class="modal-close-icon"><i class="ph-bold ph-x"></i></button>
-      </div>
-
-      <div class="modal-body">
-        
-        <!-- BẢNG ĐỐI CHIẾU THẨM ĐỊNH TÀI CHÍNH TỨC THỜI -->
-        <div class="credit-audit-comparison">
-          <div class="audit-row">
-            <span class="audit-label">Đại lý đề xuất:</span>
-            <span class="audit-value font-bold">${currentDealer.name} (${currentDealer.code})</span>
-          </div>
-          <div class="audit-row">
-            <span class="audit-label">Hạn mức tín dụng được cấp:</span>
-            <span class="audit-value font-mono font-bold">${CreditRiskEngine.formatVND(creditEvaluation.creditLimit)}</span>
-          </div>
-          <div class="audit-row">
-            <span class="audit-label">Công nợ hiện tại:</span>
-            <span class="audit-value font-mono">${CreditRiskEngine.formatVND(creditEvaluation.currentDebt)}</span>
-          </div>
-          <div class="audit-row">
-            <span class="audit-label">Giá trị đơn hàng mới:</span>
-            <span class="audit-value font-mono text-primary font-bold">${CreditRiskEngine.formatVND(cartTotals.grandTotal)}</span>
-          </div>
-          <div class="audit-row row-danger">
-            <span class="audit-label font-bold text-danger">Tổng nợ dự kiến sau đơn:</span>
-            <span class="audit-value font-mono font-bold text-danger">${CreditRiskEngine.formatVND(creditEvaluation.projectedTotalDebt)}</span>
-          </div>
-          <div class="audit-row row-danger-highlight">
-            <span class="audit-label font-bold">Số tiền vượt hạn mức (+):</span>
-            <span class="audit-value font-mono font-bold text-danger text-lg">+ ${CreditRiskEngine.formatVND(creditEvaluation.exceededAmount)}</span>
-          </div>
-        </div>
-
-        <!-- FORM NHẬP LÝ DO & CAM KẾT THANH TOÁN CỦA SALES -->
-        <form id="formApprovalRequest" class="approval-form">
-          <div class="form-group">
-            <label class="form-label" for="approvalReasonInput">
-              Lý do xin duyệt vượt hạn mức <span class="text-danger">*</span>:
-            </label>
-            
-            <!-- Quick tags -->
-            <div class="quick-tags-container">
-              <span class="quick-tag" data-text="Khách hàng tham gia đấu thầu dự án trọng điểm cấp bách">🎯 Dự án cấp bách</span>
-              <span class="quick-tag" data-text="Khách cam kết chuyển khoản thanh toán khoản nợ cũ trong vòng 5 ngày làm việc">⏱️ Cam kết trả trong 5 ngày</span>
-              <span class="quick-tag" data-text="Đã có Thư bảo lãnh thanh toán của Ngân hàng Vietcombank">🏦 Có bảo lãnh ngân hàng</span>
-              <span class="quick-tag" data-text="Đại lý chiến lược VIP Tier 1, doanh thu cam kết quý trên 5 tỷ">⭐ Đối tác VIP chiến lược</span>
-            </div>
-
-            <textarea id="approvalReasonInput" class="form-textarea" rows="3" 
-                      placeholder="Nhập giải trình lý do xuất kho vượt hạn mức cho đơn hàng này..." required>Khách hàng tham gia đấu thầu dự án trọng điểm cấp bách, đại lý cam kết thanh toán đợt 1 trong 7 ngày tới.</textarea>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label class="form-label" for="commitmentDateInput">
-                Ngày cam kết thanh toán <span class="text-danger">*</span>:
-              </label>
-              <input type="date" id="commitmentDateInput" class="form-input" 
-                     value="2026-10-27" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="approverSelect">
-                Cấp phê duyệt thẩm quyền:
-              </label>
-              <select id="approverSelect" class="form-select">
-                <option value="Kế toán trưởng (KTT)">Kế toán trưởng</option>
-                <option value="Giám đốc Tài chính (CFO)">Giám đốc Tài chính (CFO)</option>
-                <option value="Tổng Giám Đốc (CEO)">Tổng Giám Đốc (CEO)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="collateralInput">
-              Tài sản bảo lãnh / Chứng từ kèm theo (nếu có):
-            </label>
-            <input type="text" id="collateralInput" class="form-input" 
-                   placeholder="Ví dụ: Giấy cam kết thanh toán số 42/CK-AD, Thư bảo lãnh BIDV...">
-          </div>
-        </form>
-
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-outline btn-close-modal">Hủy bỏ</button>
-        <button class="btn btn-warning" id="btnConfirmSubmitApproval">
-          <i class="ph-bold ph-paper-plane-tilt"></i> Xác Nhận Gửi Phê Duyệt
-        </button>
-      </div>
-    `;
-
-    this.open(html, 'modal-md');
-
-    // Quick tag insert
-    const tags = this.modalContainer.querySelectorAll('.quick-tag');
-    const reasonTextarea = this.modalContainer.querySelector('#approvalReasonInput');
-    tags.forEach(tag => {
-      tag.addEventListener('click', () => {
-        if (reasonTextarea) {
-          reasonTextarea.value = tag.dataset.text;
-        }
+    // Đóng modal
+    this.editModalEl.querySelectorAll('.btn-close-modal').forEach(b => {
+      b.addEventListener('click', () => {
+        this.editModalEl.classList.add('hidden');
+        document.body.classList.remove('modal-open');
       });
     });
 
-    // Handle submit
-    const btnSubmit = this.modalContainer.querySelector('#btnConfirmSubmitApproval');
-    if (btnSubmit) {
-      btnSubmit.addEventListener('click', () => {
-        const reason = reasonTextarea?.value.trim();
-        const commitmentDate = this.modalContainer.querySelector('#commitmentDateInput')?.value;
-        const approver = this.modalContainer.querySelector('#approverSelect')?.value;
-        const collateral = this.modalContainer.querySelector('#collateralInput')?.value;
+    // Submit form
+    const form = this.editModalEl.querySelector('#form-edit-threshold');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const minVal = parseInt(minInput.value, 10);
+        const maxVal = parseInt(maxInput.value, 10);
+        const reorderVal = parseInt(this.editModalEl.querySelector('#input-edit-reorder').value, 10);
+        const leadVal = parseInt(this.editModalEl.querySelector('#input-edit-lead').value, 10);
+        const reason = this.editModalEl.querySelector('#input-edit-reason').value;
 
-        if (!reason) {
-          alert('Vui lòng nhập lý do giải trình vượt hạn mức!');
+        if (maxVal < minVal) {
+          alert('Lỗi nghiệp vụ: Sức chứa tối đa (Max) không được nhỏ hơn Mức tồn tối thiểu (Min)!');
           return;
         }
 
-        try {
-          const order = store.submitOrder({
-            reason,
-            commitmentDate,
-            approver,
-            collateral
-          });
+        const enriched = store.updateThreshold({
+          itemId: targetItem.id,
+          minThreshold: minVal,
+          maxCapacity: maxVal,
+          reorderQuantity: reorderVal,
+          leadTimeDays: leadVal,
+          reason
+        });
 
-          this.close();
+        this.editModalEl.classList.add('hidden');
+        document.body.classList.remove('modal-open');
 
-          if (window.AppNotifications) {
-            window.AppNotifications.toast(
-              'warning',
-              `Đơn hàng #${order.orderNo} đã tạo với trạng thái [CẦN DUYỆT] và chuyển tới ${approver}!`
-            );
+        window.dispatchEvent(new CustomEvent('SHOW_TOAST', {
+          detail: {
+            type: enriched.isBelowMin ? 'warning' : 'success',
+            title: '✅ ĐÃ CẬP NHẬT NGƯỠNG AN TOÀN',
+            message: `SKU ${enriched.sku} tại ${enriched.warehouseShortName} đã được cập nhật: Min = ${minVal}, Max = ${maxVal}. Trạng thái hiện tại: ${enriched.statusLabel}`
           }
-
-          if (window.AppModals) {
-            window.AppModals.openOrderSuccessModal(order);
-          }
-        } catch (err) {
-          alert(err.message);
-        }
+        }));
       });
     }
   }
 
-  // MODAL 2: BẢNG KÊ HÓA ĐƠN QUÁ HẠN (TIÊU CHÍ 3)
-  openOverdueInvoicesModal() {
+  openBatchModal({ warehouseId = 'ALL' }) {
+    if (!this.batchModalEl) return;
+
     const state = store.getState();
-    const { currentDealer, config } = state;
-    const unpaidInvoices = currentDealer.unpaidInvoices || [];
-    const maxAllowed = config.defaultMaxOverdueDays;
+    const modalBody = this.batchModalEl.querySelector('.modal-content-container');
+    if (!modalBody) return;
 
-    const html = `
-      <div class="modal-header header-danger">
-        <div class="modal-title-wrap">
-          <i class="ph-fill ph-lock-key modal-header-icon"></i>
-          <div>
-            <h3 class="modal-title">Bảng Kê Hóa Đơn Nợ Quá Hạn & Lý Do Khóa Cổng</h3>
-            <span class="modal-subtitle">Đại lý: ${currentDealer.name} (${currentDealer.code})</span>
-          </div>
-        </div>
-        <button class="modal-close-icon"><i class="ph-bold ph-x"></i></button>
-      </div>
-
-      <div class="modal-body">
+    modalBody.innerHTML = `
+      <form id="form-batch-threshold" class="threshold-form animate-fade-in">
         
-        <div class="lock-explanation-banner">
-          <div class="banner-title">
-            <i class="ph-bold ph-warning-octagon"></i> QUY ĐỊNH CHẶN TẠO ĐƠN DO NỢ QUÁ HẠN:
+        <div class="form-header-badge">
+          <span>⚡ Điều chỉnh ngưỡng tồn tối thiểu hàng loạt theo tỷ lệ %</span>
+        </div>
+
+        <p class="form-desc text-muted">
+          Áp dụng cho các đợt cao điểm bán hàng (Tăng tồn tối thiểu để dự phòng) hoặc chuyển mùa (Giảm tồn tối thiểu để giải phóng vốn lưu động).
+        </p>
+
+        <div class="form-grid-2col">
+          <div class="form-group">
+            <label class="form-label">Kho áp dụng:</label>
+            <select id="batch-wh-select" class="custom-select">
+              <option value="ALL">🌐 Tất cả các kho (Toàn quốc)</option>
+              ${state.warehouses.map(w => `
+                <option value="${w.id}" ${warehouseId === w.id ? 'selected' : ''}>${w.name}</option>
+              `).join('')}
+            </select>
           </div>
-          <p>
-            Theo Điều 4 Quy chế Tín dụng Doanh nghiệp: Nếu đại lý phát sinh bất kỳ hóa đơn nào quá hạn thanh toán 
-            vượt quá <strong>${maxAllowed} ngày</strong>, hệ thống tự động <strong>KHÓA TOÀN BỘ QUYỀN TẠO ĐƠN</strong> 
-            cho đến khi khách hàng hoàn tất việc thanh toán hoặc kế toán ghi nhận tất toán nợ.
-          </p>
+
+          <div class="form-group">
+            <label class="form-label">Nhóm ngành hàng áp dụng:</label>
+            <select id="batch-cat-select" class="custom-select">
+              <option value="ALL">Tất cả các nhóm ngành</option>
+              <option value="SERVER">Máy Chủ & Data Center</option>
+              <option value="LAPTOP">Máy Tính Doanh Nghiệp</option>
+              <option value="NETWORK">Thiết Bị Mạng Cisco</option>
+              <option value="POWER">Nguồn UPS APC</option>
+              <option value="SECURITY">Bảo Mật Fortinet</option>
+              <option value="STORAGE">Lưu Trữ Synology</option>
+            </select>
+          </div>
         </div>
 
-        <div class="table-container modal-table">
-          <table class="enterprise-table">
-            <thead>
-              <tr>
-                <th>Số Hóa Đơn</th>
-                <th>Mã Đơn Gốc</th>
-                <th>Ngày Phát Hành</th>
-                <th>Hạn Thanh Toán</th>
-                <th>Số Tiền Nợ</th>
-                <th>Số Ngày Quá Hạn</th>
-                <th>Tình Trạng</th>
-                <th class="text-right">Tất Toán Test</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${unpaidInvoices.length === 0 ? `
-                <tr><td colspan="8" class="table-empty-row">Không có hóa đơn nợ quá hạn.</td></tr>
-              ` : unpaidInvoices.map(inv => {
-                const isViolating = (inv.overdueDays || 0) > maxAllowed;
-                return `
-                  <tr class="${isViolating ? 'row-violating' : ''}">
-                    <td class="font-mono font-bold">${inv.invoiceNo}</td>
-                    <td class="font-mono text-muted">${inv.orderNo}</td>
-                    <td class="font-mono">${inv.issueDate}</td>
-                    <td class="font-mono">${inv.dueDate}</td>
-                    <td class="font-mono font-bold text-danger">${CreditRiskEngine.formatVND(inv.remainingAmount)}</td>
-                    <td>
-                      <span class="font-mono font-bold ${isViolating ? 'text-danger' : 'text-warning'}">
-                        ${inv.overdueDays} ngày
-                      </span>
-                    </td>
-                    <td>
-                      ${isViolating ? `
-                        <span class="badge badge-danger font-bold">Vi phạm (> ${maxAllowed}d)</span>
-                      ` : `
-                        <span class="badge badge-warning">Trong ân hạn</span>
-                      `}
-                    </td>
-                    <td class="text-right">
-                      <button class="btn btn-sm btn-light btn-settle-modal" 
-                              data-invoice="${inv.invoiceNo}" 
-                              title="Tất toán ngay hóa đơn này để kiểm tra mở khóa">
-                        <i class="ph-bold ph-hand-coins"></i> Trả nợ (Test)
-                      </button>
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
+        <!-- TỶ LỆ ĐIỀU CHỈNH % -->
+        <div class="form-group highlight-field">
+          <label class="form-label font-bold">Tỷ lệ điều chỉnh Mức Tồn Tối Thiểu (%):</label>
+          <div class="quick-percent-buttons">
+            <button type="button" class="btn-percent" data-val="10">+10%</button>
+            <button type="button" class="btn-percent active" data-val="20">+20% (Khuyên dùng mùa cao điểm)</button>
+            <button type="button" class="btn-percent" data-val="30">+30%</button>
+            <button type="button" class="btn-percent" data-val="-10">-10% (Giảm tồn)</button>
+            <button type="button" class="btn-percent" data-val="-20">-20%</button>
+          </div>
+          <input type="number" id="batch-percent-input" class="custom-input font-mono font-bold mt-2" value="20" required />
         </div>
 
-      </div>
+        <div class="form-group">
+          <label class="form-label">Lý do điều chỉnh hàng loạt:</label>
+          <input type="text" id="batch-reason-input" class="custom-input" 
+            value="Nâng ngưỡng tồn kho an toàn đón đợt bán hàng cao điểm cuối năm" required />
+        </div>
 
-      <div class="modal-footer">
-        <span class="text-muted text-sm">
-          <i class="ph-bold ph-lightbulb"></i> Bạn có thể click <strong>"Trả nợ (Test)"</strong> để giả lập khách hàng thanh toán và thấy hệ thống mở khóa ngay lập tức!
-        </span>
-        <button class="btn btn-outline btn-close-modal">Đóng</button>
-      </div>
+        <div class="modal-form-actions">
+          <button type="button" class="btn btn-secondary btn-close-modal">Hủy Bỏ</button>
+          <button type="submit" class="btn btn-primary">
+            ⚡ Thực Hiện Cập Nhật Hàng Loạt
+          </button>
+        </div>
+
+      </form>
     `;
 
-    this.open(html, 'modal-lg');
+    this._bindBatchModalEvents();
+    this.batchModalEl.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+  }
 
-    // Attach settle test events
-    const settleBtns = this.modalContainer.querySelectorAll('.btn-settle-modal');
-    settleBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const invNo = btn.dataset.invoice;
-        store.settleOverdueInvoice(currentDealer.id, invNo);
-        if (window.AppNotifications) {
-          window.AppNotifications.toast('success', `Đã ghi nhận thanh toán hóa đơn ${invNo}!`);
-        }
-        this.close();
+  _bindBatchModalEvents() {
+    this.batchModalEl.querySelectorAll('.btn-close-modal').forEach(b => {
+      b.addEventListener('click', () => {
+        this.batchModalEl.classList.add('hidden');
+        document.body.classList.remove('modal-open');
       });
     });
-  }
 
-  // MODAL 3: THÔNG BÁO TẠO ĐƠN THÀNH CÔNG
-  openOrderSuccessModal(order) {
-    const isPending = order.status === 'PENDING_APPROVAL';
-
-    const html = `
-      <div class="modal-header ${isPending ? 'header-warning' : 'header-success'}">
-        <div class="modal-title-wrap">
-          <i class="ph-fill ${isPending ? 'ph-hourglass-high' : 'ph-check-circle'} modal-header-icon"></i>
-          <div>
-            <h3 class="modal-title">${isPending ? 'Đơn Hàng Đã Gửi Phê Duyệt Công Nợ' : 'Tạo Đơn Hàng Thành Công!'}</h3>
-            <span class="modal-subtitle">Mã đơn: #${order.orderNo} | Đại lý: ${order.dealerName}</span>
-          </div>
-        </div>
-        <button class="modal-close-icon"><i class="ph-bold ph-x"></i></button>
-      </div>
-
-      <div class="modal-body">
-        
-        <div class="success-order-card">
-          <div class="status-callout ${isPending ? 'callout-warning' : 'callout-success'}">
-            <div class="callout-title font-bold">
-              Trạng thái đơn hàng: ${order.statusLabel}
-            </div>
-            <p class="callout-text">
-              ${isPending 
-                ? 'Đơn hàng đã được đánh dấu CẦN DUYỆT và chuyển tới Kế toán trưởng thẩm định bảo lãnh công nợ.' 
-                : 'Đơn hàng nằm trọn trong hạn mức tín dụng và được xác nhận tức thời, sẵn sàng xuất kho.'}
-            </p>
-          </div>
-
-          <div class="order-receipt-summary">
-            <div class="receipt-row">
-              <span>Đại lý mua hàng:</span>
-              <strong>${order.dealerName}</strong>
-            </div>
-            <div class="receipt-row">
-              <span>Nhân viên phụ trách:</span>
-              <span>${order.salesRep}</span>
-            </div>
-            <div class="receipt-row">
-              <span>Thời gian lập:</span>
-              <span class="font-mono">${order.createdAt}</span>
-            </div>
-            <div class="receipt-row">
-              <span>Tổng thanh toán (gồm VAT):</span>
-              <strong class="font-mono text-primary text-lg">${CreditRiskEngine.formatVND(order.totalAmount)}</strong>
-            </div>
-            ${isPending ? `
-              <div class="receipt-row">
-                <span>Lý do vượt hạn mức:</span>
-                <span class="text-italic text-warning">"${order.approvalReason}"</span>
-              </div>
-            ` : ''}
-          </div>
-        </div>
-
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-outline btn-close-modal">Tạo đơn tiếp theo</button>
-        <button class="btn btn-primary" id="btnGoToApprovalScreen">
-          <i class="ph-bold ph-list-checks"></i> Xem trong Danh Sách Đơn Hàng
-        </button>
-      </div>
-    `;
-
-    this.open(html, 'modal-md');
-
-    const btnGo = this.modalContainer.querySelector('#btnGoToApprovalScreen');
-    if (btnGo) {
-      btnGo.addEventListener('click', () => {
-        this.close();
-        if (window.AppNavigation) {
-          window.AppNavigation.switchTab('approval-screen');
-        }
+    const percentInput = this.batchModalEl.querySelector('#batch-percent-input');
+    this.batchModalEl.querySelectorAll('.btn-percent').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.batchModalEl.querySelectorAll('.btn-percent').forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        if (percentInput) percentInput.value = e.currentTarget.dataset.val;
       });
-    }
-  }
+    });
 
-  // MODAL 4: XEM CHI TIẾT ĐƠN HÀNG
-  openOrderDetailModal(orderId) {
-    const state = store.getState();
-    const order = state.orders.find(o => o.id === orderId);
-    if (!order) return;
+    const form = this.batchModalEl.querySelector('#form-batch-threshold');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const wh = this.batchModalEl.querySelector('#batch-wh-select').value;
+        const cat = this.batchModalEl.querySelector('#batch-cat-select').value;
+        const percent = parseFloat(percentInput.value) || 0;
+        const reason = this.batchModalEl.querySelector('#batch-reason-input').value;
 
-    const html = `
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <i class="ph-fill ph-receipt modal-header-icon"></i>
-          <div>
-            <h3 class="modal-title">Chi Tiết Đơn Hàng #${order.orderNo}</h3>
-            <span class="modal-subtitle">Ngày tạo: ${order.createdAt}</span>
-          </div>
-        </div>
-        <button class="modal-close-icon"><i class="ph-bold ph-x"></i></button>
-      </div>
+        const count = store.batchUpdateThreshold({
+          warehouseId: wh,
+          categoryCode: cat,
+          percentMultiplier: percent,
+          reason
+        });
 
-      <div class="modal-body">
-        
-        <div class="order-detail-meta-grid">
-          <div>
-            <span class="text-muted text-sm">Đại lý:</span>
-            <div class="font-bold">${order.dealerName}</div>
-          </div>
-          <div>
-            <span class="text-muted text-sm">Nhân viên phụ trách:</span>
-            <div>${order.salesRep}</div>
-          </div>
-          <div>
-            <span class="text-muted text-sm">Trạng thái:</span>
-            <div><span class="badge badge-warning">${order.statusLabel}</span></div>
-          </div>
-          <div>
-            <span class="text-muted text-sm">Kiểm soát tín dụng:</span>
-            <div class="text-sm font-semibold">${order.creditCheckSummary}</div>
-          </div>
-        </div>
+        this.batchModalEl.classList.add('hidden');
+        document.body.classList.remove('modal-open');
 
-        <div class="table-container modal-table mt-4">
-          <table class="enterprise-table">
-            <thead>
-              <tr>
-                <th>Tên Sản Phẩm</th>
-                <th class="text-center">Số Lượng</th>
-                <th class="text-right">Đơn Giá</th>
-                <th class="text-right">Thành Tiền</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(order.items || []).map(item => `
-                <tr>
-                  <td><strong>${item.name}</strong></td>
-                  <td class="text-center font-mono">${item.quantity}</td>
-                  <td class="text-right font-mono">${CreditRiskEngine.formatVND(item.price)}</td>
-                  <td class="text-right font-mono font-bold">${CreditRiskEngine.formatVND(item.subtotal)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="3" class="text-right font-semibold">Tạm tính trước thuế:</td>
-                <td class="text-right font-mono">${CreditRiskEngine.formatVND(order.totalBeforeVat)}</td>
-              </tr>
-              <tr>
-                <td colspan="3" class="text-right font-semibold">Thuế GTGT (VAT 10%):</td>
-                <td class="text-right font-mono">${CreditRiskEngine.formatVND(order.vatAmount)}</td>
-              </tr>
-              <tr class="row-grand-total">
-                <td colspan="3" class="text-right font-bold text-lg">TỔNG CỘNG:</td>
-                <td class="text-right font-mono font-bold text-primary text-lg">${CreditRiskEngine.formatVND(order.totalAmount)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-outline btn-close-modal">Đóng</button>
-      </div>
-    `;
-
-    this.open(html, 'modal-lg');
-  }
-
-  // MODAL 5: XÁC NHẬN PHÊ DUYỆT ĐƠN (KẾ TOÁN TRƯỞNG)
-  openConfirmApprovalModal(orderId) {
-    const state = store.getState();
-    const order = state.orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    const html = `
-      <div class="modal-header header-success">
-        <div class="modal-title-wrap">
-          <i class="ph-fill ph-seal-check modal-header-icon"></i>
-          <div>
-            <h3 class="modal-title">Phê Duyệt Đơn Hàng Vượt Hạn Mức</h3>
-            <span class="modal-subtitle">Đơn hàng: #${order.orderNo} | Đại lý: ${order.dealerName}</span>
-          </div>
-        </div>
-        <button class="modal-close-icon"><i class="ph-bold ph-x"></i></button>
-      </div>
-
-      <div class="modal-body">
-        <p>
-          Bạn đang đóng vai trò <strong>Kế toán trưởng / Giám đốc Tài chính</strong>.
-          <br>
-          Bạn có đồng ý phê duyệt ngoại lệ cho đơn hàng <strong>${CreditRiskEngine.formatVND(order.totalAmount)}</strong> này để tiến hành xuất kho?
-        </p>
-        <div class="form-group mt-3">
-          <label class="form-label" for="approverNoteInput">Ghi chú phê duyệt của Kế toán:</label>
-          <input type="text" id="approverNoteInput" class="form-input" 
-                 value="Đồng ý cấp ngoại lệ, yêu cầu đại lý thanh toán đúng cam kết ngày ${order.paymentCommitmentDate || 'hạn tới'}.">
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-outline btn-close-modal">Hủy</button>
-        <button class="btn btn-success" id="btnDoApprove">
-          <i class="ph-bold ph-check"></i> Xác Nhận Phê Duyệt
-        </button>
-      </div>
-    `;
-
-    this.open(html, 'modal-md');
-
-    const btnApprove = this.modalContainer.querySelector('#btnDoApprove');
-    if (btnApprove) {
-      btnApprove.addEventListener('click', () => {
-        const note = this.modalContainer.querySelector('#approverNoteInput')?.value;
-        store.approveOrder(orderId, note);
-        this.close();
-        if (window.AppNotifications) {
-          window.AppNotifications.toast('success', `Đơn hàng #${order.orderNo} đã được Kế toán phê duyệt thành công!`);
-        }
-      });
-    }
-  }
-
-  // MODAL 6: TỪ CHỐI ĐƠN HÀNG
-  openConfirmRejectModal(orderId) {
-    const state = store.getState();
-    const order = state.orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    const html = `
-      <div class="modal-header header-danger">
-        <div class="modal-title-wrap">
-          <i class="ph-fill ph-x-circle modal-header-icon"></i>
-          <div>
-            <h3 class="modal-title">Từ Chối Đơn Hàng Vượt Hạn Mức</h3>
-            <span class="modal-subtitle">Đơn hàng: #${order.orderNo} | Đại lý: ${order.dealerName}</span>
-          </div>
-        </div>
-        <button class="modal-close-icon"><i class="ph-bold ph-x"></i></button>
-      </div>
-
-      <div class="modal-body">
-        <p>
-          Từ chối đơn hàng sẽ chuyển trạng thái sang <strong>TỪ CHỐI (REJECTED)</strong> và không ghi nhận công nợ.
-        </p>
-        <div class="form-group mt-3">
-          <label class="form-label" for="rejectReasonInput">Lý do từ chối:</label>
-          <input type="text" id="rejectReasonInput" class="form-input" 
-                 value="Rủi ro công nợ cao, đại lý cần thu xếp trả bớt nợ cũ trước khi cấp hạn mức mới.">
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-outline btn-close-modal">Hủy</button>
-        <button class="btn btn-danger" id="btnDoReject">
-          <i class="ph-bold ph-x"></i> Xác Nhận Từ Chối
-        </button>
-      </div>
-    `;
-
-    this.open(html, 'modal-md');
-
-    const btnReject = this.modalContainer.querySelector('#btnDoReject');
-    if (btnReject) {
-      btnReject.addEventListener('click', () => {
-        const reason = this.modalContainer.querySelector('#rejectReasonInput')?.value;
-        store.rejectOrder(orderId, reason);
-        this.close();
-        if (window.AppNotifications) {
-          window.AppNotifications.toast('error', `Đơn hàng #${order.orderNo} đã bị từ chối.`);
-        }
+        window.dispatchEvent(new CustomEvent('SHOW_TOAST', {
+          detail: {
+            type: 'success',
+            title: '✅ CẬP NHẬT HÀNG LOẠT THÀNH CÔNG',
+            message: `Đã cập nhật tỷ lệ ${percent > 0 ? `+${percent}` : percent}% cho ${count} bản ghi tồn kho SKU!`
+          }
+        }));
       });
     }
   }

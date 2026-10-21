@@ -1,0 +1,372 @@
+/* ==========================================================================
+   STOCK LEDGER CSS (SCRUM-87 / SCRUM-35)
+   Requirement 2: "Hàng dưới ngưỡng hiển thị nổi bật trong sổ tồn"
+   Filter Pills, Search Box, Below-Min Highlighting & Gauge Meters
+   ========================================================================== */
+
+.ledger-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 1. TOOLBAR & FILTERS */
+.ledger-toolbar {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.toolbar-top-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.search-box-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+}
+
+.search-input {
+  width: 100%;
+  padding-left: 36px;
+  padding-right: 32px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.85rem;
+  height: 38px;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.search-input:focus {
+  border-color: var(--border-focus);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+.btn-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.filter-select-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* 2. STATUS FILTER PILLS */
+.status-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pills-label {
+  font-size: 0.75rem;
+  color: var(--text-subtle);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.filter-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.filter-pill.active {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* 🚨 NÚT PILL HÀNG DƯỚI NGƯỠNG TỐI THIỂU NỔI BẬT */
+.pill-critical {
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, 0.4);
+}
+
+.pill-critical:hover {
+  background: rgba(244, 63, 94, 0.2);
+}
+
+.pill-critical.active {
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.35) 0%, rgba(244, 63, 94, 0.2) 100%);
+  border-color: var(--rose);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
+}
+
+.pulse-critical {
+  animation: pulsePill 2s infinite;
+}
+
+@keyframes pulsePill {
+  0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(244, 63, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+
+.pill-danger { color: #fca5a5; }
+.pill-danger.active { background: rgba(239, 68, 68, 0.25); border-color: #ef4444; color: #fff; }
+
+.pill-warning { color: #fde68a; }
+.pill-warning.active { background: rgba(245, 158, 11, 0.25); border-color: var(--amber); color: #fff; }
+
+.pill-success { color: #86efac; }
+.pill-success.active { background: rgba(16, 185, 129, 0.25); border-color: var(--emerald); color: #fff; }
+
+.pill-purple { color: #d8b4fe; }
+.pill-purple.active { background: rgba(139, 92, 246, 0.25); border-color: var(--purple); color: #fff; }
+
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.red-dot { background-color: var(--rose); }
+.amber-dot { background-color: #ef4444; }
+.yellow-dot { background-color: var(--amber); }
+.green-dot { background-color: var(--emerald); }
+.purple-dot { background-color: var(--purple); }
+
+.btn-reset-filters {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-reset-filters:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--rose);
+}
+
+/* 3. BẢNG SỔ TỒN */
+.ledger-table-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.table-meta-bar {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface-elevated);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.legend-items {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+}
+
+.legend-box {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.box-below-min { background: var(--rose); box-shadow: 0 0 6px var(--rose); }
+.box-stockout { background: #ef4444; }
+.box-healthy { background: var(--emerald); }
+
+/* Table Columns Specifics */
+.nexus-table-ledger th {
+  padding: 12px 14px;
+}
+
+.product-info-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sku-and-category {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sku-code {
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.category-badge {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.product-fullname {
+  color: var(--text-main);
+  font-size: 0.82rem;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barcode-subtext {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--text-subtle);
+}
+
+.warehouse-badge-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bin-location {
+  font-size: 0.68rem;
+  color: var(--text-subtle);
+}
+
+/* Available Stock Display */
+.available-stock-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+}
+
+.stock-below-min {
+  background: rgba(244, 63, 94, 0.2);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.25);
+}
+
+.stock-zero {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ff6b6b;
+  border: 1px solid #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.45);
+}
+
+.stock-healthy {
+  color: #fff;
+}
+
+/* Threshold Pill in Row */
+.threshold-pill-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-edit-threshold-mini {
+  background: transparent;
+  border: none;
+  color: var(--text-subtle);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: all var(--transition-fast);
+}
+
+.btn-edit-threshold-mini:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--primary);
+}
+
+.deficit-badge-negative {
+  color: #ff4d6d;
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.2);
+}
+
+.actions-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}

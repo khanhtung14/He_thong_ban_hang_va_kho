@@ -1,335 +1,843 @@
 /**
- * NEXUS ENTERPRISE ORDER MANAGEMENT SYSTEM (NEXUS OMS)
- * Module: Mock Data & Domain Seeds
- * Ticket: SCRUM-86 / SCRUM-9
- * Description: Dữ liệu mẫu danh mục Đại lý, Hạn mức tín dụng, Hóa đơn nợ & Kho hàng
+ * NEXUS ENTERPRISE WMS (SMART INVENTORY & REPLENISHMENT SYSTEM)
+ * Ticket: SCRUM-87 / SCRUM-35
+ * Role: Quản lý kho (Warehouse & Inventory Manager)
+ * Description: Dữ liệu mẫu danh mục Kho hàng, Nhà cung cấp, SKU và Tồn kho chi tiết theo từng kho
  */
 
 export const SYSTEM_CONFIG = {
-  currentDate: '2026-10-20',
-  defaultMaxOverdueDays: 30, // Quy định công ty: nợ quá hạn tối đa 30 ngày là ngưỡng bị khóa cứng
+  systemCode: 'NEXUS-WMS',
+  ticketCode: 'SCRUM-87 / SCRUM-35',
+  version: 'v4.5 Enterprise Edition',
+  currentDate: '2026-10-21',
   currency: 'VND',
-  vatRate: 0.10, // 10% VAT
-  companyName: 'NEXUS DISTRIBUTION GLOBAL CORP',
-  creditPolicyVersion: 'v4.2 - Basel III Compliant'
+  currentUser: {
+    id: 'USR-WM-01',
+    name: 'Trần Minh Hoàng',
+    role: 'Quản lý kho cấp cao (Chief Inventory Officer)',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80',
+    email: 'hoang.tm@nexus-wms.corp',
+    phone: '0908.123.889'
+  }
 };
 
-export const INITIAL_DEALERS = [
+export const WAREHOUSES = [
   {
-    id: 'DL-001',
-    code: 'ANHDUONG',
-    name: 'Công ty CP Công Nghệ Ánh Dương',
-    taxCode: '0106894321',
-    address: 'Tầng 8, Tòa nhà Keangnam Landmark 72, Cầu Giấy, Hà Nội',
-    tier: 'Đại lý Kim Cương (VIP Tier 1)',
-    tierBadge: 'tier-vip',
+    id: 'WH-HN',
+    code: 'WH-HN-01',
+    name: 'Kho Tổng Miền Bắc (Hà Nội)',
+    shortName: 'Kho Miền Bắc',
     region: 'Miền Bắc',
-    salesRep: 'Nguyễn Văn Nam (Sales Executive HN)',
-    creditLimit: 600000000, // 600 Triệu
-    currentDebt: 140000000, // 140 Triệu
-    maxOverdueDaysAllowed: 30,
-    paymentTermDays: 30, // Hạn thanh toán Net 30
-    contactPerson: 'Ông Trần Quốc Tuấn - GĐ Mua hàng (0912.345.678)',
-    status: 'ACTIVE',
-    riskLevel: 'LOW',
-    notes: 'Đại lý uy tín 5 năm, doanh số top 1 miền Bắc, thanh toán đúng hạn.',
-    // Hóa đơn nợ chi tiết
-    unpaidInvoices: [
-      {
-        invoiceNo: 'INV-2026-0891',
-        orderNo: 'ORD-2026-8801',
-        issueDate: '2026-09-15',
-        dueDate: '2026-10-15',
-        amount: 140000000,
-        paidAmount: 0,
-        remainingAmount: 140000000,
-        overdueDays: 5, // Quá hạn 5 ngày (Nhỏ hơn ngưỡng 30 ngày cho phép -> Không bị chặn)
-        status: 'OVERDUE_GRACE' // Quá hạn trong ân hạn
-      }
-    ],
-    presetScenario: 'NORMAL_SAFE',
-    presetLabel: '🟢 Kịch bản 1: An Toàn (Còn dư 460M, quá hạn 5d < 30d -> Tạo đơn thoải mái)'
+    address: 'Lô CN-08, KCN Nội Bài, Xã Quang Tiến, Huyện Sóc Sơn, TP. Hà Nội',
+    manager: 'Nguyễn Văn Hùng (Kho trưởng)',
+    phone: '024.3886.5522',
+    capacityPallets: 45000,
+    areaSquareMeters: 12000,
+    color: '#3b82f6',
+    badgeClass: 'badge-hn'
   },
   {
-    id: 'DL-002',
-    code: 'SAOMAI',
-    name: 'Công ty TNHH Phân Phối Tin Học Sao Mai',
-    taxCode: '0304912389',
-    address: 'Số 142 Nguyễn Thị Minh Khai, Phường 6, Quận 3, TP. Hồ Chí Minh',
-    tier: 'Đại lý Vàng (Tier 2)',
-    tierBadge: 'tier-gold',
+    id: 'WH-HCM',
+    code: 'WH-HCM-02',
+    name: 'Kho Tổng Miền Nam (Bình Dương / TP.HCM)',
+    shortName: 'Kho Miền Nam',
     region: 'Miền Nam',
-    salesRep: 'Trần Thị Mai (Sales Executive HCM)',
-    creditLimit: 400000000, // 400 Triệu
-    currentDebt: 350000000, // 350 Triệu (Còn dư 50M)
-    maxOverdueDaysAllowed: 30,
-    paymentTermDays: 30,
-    contactPerson: 'Bà Lê Thị Hương - Kế toán trưởng (0908.123.456)',
-    status: 'ACTIVE',
-    riskLevel: 'MEDIUM',
-    notes: 'Doanh số ổn định, lịch sử thanh toán tốt nhưng hạn mức đang tiệm cận trần.',
-    unpaidInvoices: [
-      {
-        invoiceNo: 'INV-2026-0850',
-        orderNo: 'ORD-2026-8710',
-        issueDate: '2026-09-08',
-        dueDate: '2026-10-08',
-        amount: 200000000,
-        paidAmount: 0,
-        remainingAmount: 200000000,
-        overdueDays: 12, // Quá hạn 12 ngày (< 30 ngày -> Được tạo đơn nhưng nợ đã 350M/400M)
-        status: 'OVERDUE_GRACE'
-      },
-      {
-        invoiceNo: 'INV-2026-0912',
-        orderNo: 'ORD-2026-8799',
-        issueDate: '2026-09-28',
-        dueDate: '2026-10-28',
-        amount: 150000000,
-        paidAmount: 0,
-        remainingAmount: 150000000,
-        overdueDays: 0, // Chưa đến hạn (Còn 8 ngày)
-        status: 'WITHIN_TERM'
-      }
-    ],
-    presetScenario: 'OVER_LIMIT',
-    presetLabel: '🟡 Kịch bản 2: Vượt Hạn Mức (Nợ 350M/400M, đơn > 50M -> Đánh dấu CẦN DUYỆT)'
+    address: 'Số 18 Đại lộ Độc Lập, KCN Sóng Thần 2, Dĩ An, Tỉnh Bình Dương',
+    manager: 'Lê Hoàng Tuấn (Kho trưởng)',
+    phone: '0274.379.8866',
+    capacityPallets: 60000,
+    areaSquareMeters: 15000,
+    color: '#10b981',
+    badgeClass: 'badge-hcm'
   },
   {
-    id: 'DL-003',
-    code: 'THANGLONG',
-    name: 'Tập Đoàn Công Nghệ & Thương Mại Thăng Long',
-    taxCode: '0101239874',
-    address: 'Tòa nhà Thăng Long Tower, 98 Ngụy Như Kon Tum, Thanh Xuân, Hà Nội',
-    tier: 'Đại lý Bạc (Tier 3)',
-    tierBadge: 'tier-silver',
-    region: 'Miền Bắc',
-    salesRep: 'Lê Hoàng Long (Sales Executive HN)',
-    creditLimit: 500000000, // 500 Triệu
-    currentDebt: 220000000, // 220 Triệu (Còn dư 280M hạn mức)
-    maxOverdueDaysAllowed: 30, // Quy định tối đa 30 ngày
-    paymentTermDays: 30,
-    contactPerson: 'Ông Hoàng Đình Phúc - Phó GĐ Kinh doanh (0983.555.999)',
-    status: 'BLOCKED_OVERDUE',
-    riskLevel: 'CRITICAL',
-    notes: 'CẢNH BÁO: Đại lý có nợ tồn đọng quá hạn 56 ngày chưa xử lý. Khóa giao dịch toàn bộ.',
-    unpaidInvoices: [
-      {
-        invoiceNo: 'INV-2026-0741',
-        orderNo: 'ORD-2026-8512',
-        issueDate: '2026-07-25',
-        dueDate: '2026-08-25', // Hạn 25/08/2026
-        amount: 120000000,
-        paidAmount: 0,
-        remainingAmount: 120000000,
-        overdueDays: 56, // QUÁ HẠN 56 NGÀY (Vi phạm > 30 ngày -> KHÓA CỨNG HOÀN TOÀN)
-        status: 'CRITICAL_OVERDUE'
-      },
-      {
-        invoiceNo: 'INV-2026-0789',
-        orderNo: 'ORD-2026-8588',
-        issueDate: '2026-08-05',
-        dueDate: '2026-09-05',
-        amount: 100000000,
-        paidAmount: 0,
-        remainingAmount: 100000000,
-        overdueDays: 45, // QUÁ HẠN 45 NGÀY (Vi phạm > 30 ngày)
-        status: 'CRITICAL_OVERDUE'
-      }
-    ],
-    presetScenario: 'OVERDUE_BLOCKED',
-    presetLabel: '🔴 Kịch bản 3: Nợ Quá Hạn Vi Phạm (Quá hạn 56d > 30d -> CHẶN TẠO ĐƠN HOÀN TOÀN)'
+    id: 'WH-DN',
+    code: 'WH-DN-03',
+    name: 'Kho Trung Chuyển Miền Trung (Đà Nẵng)',
+    shortName: 'Kho Miền Trung',
+    region: 'Miền Trung',
+    address: 'Đường số 4, KCN Hòa Cầm, Phường Hòa Thọ Tây, Quận Cẩm Lệ, TP. Đà Nẵng',
+    manager: 'Trần Đình Trọng (Kho trưởng)',
+    phone: '0236.376.1144',
+    capacityPallets: 20000,
+    areaSquareMeters: 6000,
+    color: '#f59e0b',
+    badgeClass: 'badge-dn'
   },
   {
-    id: 'DL-004',
-    code: 'SAIGONSTAR',
-    name: 'Hệ Thống Bán Lẻ Công Nghệ Sài Gòn Star',
-    taxCode: '0312384756',
-    address: 'Số 457 Điện Biên Phủ, Phường 25, Bình Thạnh, TP. Hồ Chí Minh',
-    tier: 'Đại lý Kim Cương (VIP Tier 1)',
-    tierBadge: 'tier-vip',
-    region: 'Miền Nam',
-    salesRep: 'Đặng Thu Hà (Sales Executive HCM)',
-    creditLimit: 500000000, // 500 Triệu
-    currentDebt: 494000000, // 494 Triệu (Chỉ còn đúng 6 Triệu khả dụng - 98.8%)
-    maxOverdueDaysAllowed: 30,
-    paymentTermDays: 30,
-    contactPerson: 'Ông Võ Hoài An - Trưởng phòng Thu mua (0933.888.111)',
-    status: 'ACTIVE',
-    riskLevel: 'HIGH',
-    notes: 'Đại lý bán lẻ quy mô lớn, công nợ luôn ở mức 98-99% hạn mức cho phép.',
-    unpaidInvoices: [
-      {
-        invoiceNo: 'INV-2026-0902',
-        orderNo: 'ORD-2026-8740',
-        issueDate: '2026-09-22',
-        dueDate: '2026-10-22',
-        amount: 494000000,
-        paidAmount: 0,
-        remainingAmount: 494000000,
-        overdueDays: 0, // Chưa quá hạn (Còn 2 ngày)
-        status: 'WITHIN_TERM'
-      }
-    ],
-    presetScenario: 'BORDERLINE',
-    presetLabel: '🟣 Kịch bản 4: Cận Hạn Mức Biên 98.8% (Chỉ còn 6M, thêm bất kỳ món nào cũng cần duyệt)'
-  },
-  {
-    id: 'DL-005',
-    code: 'MEKONG',
-    name: 'Công ty Giải Pháp Tin Học Mekong Delta',
-    taxCode: '1801298453',
-    address: 'Đường 30/4, Phường Hưng Lợi, Quận Ninh Kiều, TP. Cần Thơ',
-    tier: 'Đại lý Mới (Tier 4)',
-    tierBadge: 'tier-new',
+    id: 'WH-CT',
+    code: 'WH-CT-04',
+    name: 'Kho Phân Phối Miền Tây (Cần Thơ)',
+    shortName: 'Kho Miền Tây',
     region: 'Miền Tây',
-    salesRep: 'Đặng Thu Hà (Sales Executive HCM)',
-    creditLimit: 300000000, // 300 Triệu
-    currentDebt: 0, // 0 Đồng nợ
-    maxOverdueDaysAllowed: 30,
-    paymentTermDays: 30,
-    contactPerson: 'Bà Nguyễn Mai Phương - Giám đốc (0971.222.333)',
-    status: 'ACTIVE',
-    riskLevel: 'LOW',
-    notes: 'Đại lý mới kích hoạt, hồ sơ tín dụng trong sạch 100%, chưa phát sinh công nợ.',
-    unpaidInvoices: [],
-    presetScenario: 'CLEAN_NEW',
-    presetLabel: '⚪ Kịch bản 5: Không Công Nợ (Nợ 0đ, hạn mức khả dụng 100% 300M)'
+    address: 'Lô 28B, KCN Trà Nóc 1, Phường Trà Nóc, Quận Bình Thủy, TP. Cần Thơ',
+    manager: 'Đặng Quốc Khánh (Kho trưởng)',
+    phone: '0292.384.2299',
+    capacityPallets: 15000,
+    areaSquareMeters: 5000,
+    color: '#8b5cf6',
+    badgeClass: 'badge-ct'
   }
 ];
 
-export const INITIAL_PRODUCTS = [
+export const SUPPLIERS = [
   {
-    id: 'PRD-001',
+    id: 'SUP-01',
+    code: 'DELL-VN',
+    name: 'Dell Technologies Vietnam Enterprise Co.',
+    taxCode: '0305892114',
+    contactPerson: 'Phạm Thị Thùy Linh (Giám đốc Kênh Phân phối)',
+    phone: '028.3823.8800',
+    email: 'distribution.vn@dell.com',
+    leadTimeDays: 5,
+    minOrderValue: 200000000,
+    paymentTerms: 'Công nợ Net 30'
+  },
+  {
+    id: 'SUP-02',
+    code: 'APPLE-ENT',
+    name: 'Apple Enterprise Logistics Asia Pte.',
+    taxCode: '0313412567',
+    contactPerson: 'David Chen (Supply Chain Lead)',
+    phone: '028.3822.9900',
+    email: 'enterprise-orders@apple.vn.corp',
+    leadTimeDays: 7,
+    minOrderValue: 300000000,
+    paymentTerms: 'Thanh toán LC / Net 15'
+  },
+  {
+    id: 'SUP-03',
+    code: 'CISCO-VN',
+    name: 'Cisco Systems Enterprise Solutions Vietnam',
+    taxCode: '0102554789',
+    contactPerson: 'Vũ Quốc Bảo (Key Account Manager)',
+    phone: '024.3936.4422',
+    email: 'cisco-orders@cisco.vn',
+    leadTimeDays: 4,
+    minOrderValue: 150000000,
+    paymentTerms: 'Công nợ Net 45'
+  },
+  {
+    id: 'SUP-04',
+    code: 'APC-SE',
+    name: 'Schneider Electric / APC Infrastructure Corp',
+    taxCode: '0300456123',
+    contactPerson: 'Nguyễn Thị Bích Ngọc (Trưởng phòng Cung ứng)',
+    phone: '028.3520.3344',
+    email: 'orders.apc@se.com',
+    leadTimeDays: 6,
+    minOrderValue: 100000000,
+    paymentTerms: 'Công nợ Net 30'
+  },
+  {
+    id: 'SUP-05',
+    code: 'SYNOLOGY-VN',
+    name: 'Synology Enterprise Storage Distributor',
+    taxCode: '0108923412',
+    contactPerson: 'Hoàng Anh Quân (Phó Giám Đốc Kinh Doanh)',
+    phone: '024.3787.9911',
+    email: 'b2b-vn@synology.corp',
+    leadTimeDays: 3,
+    minOrderValue: 80000000,
+    paymentTerms: 'Công nợ Net 30'
+  },
+  {
+    id: 'SUP-06',
+    code: 'FORTINET-VN',
+    name: 'Fortinet Security Networks Asia',
+    taxCode: '0312984511',
+    contactPerson: 'Đỗ Minh Trí (Technical Account Manager)',
+    phone: '028.3910.7788',
+    email: 'enterprise-sec@fortinet.vn',
+    leadTimeDays: 4,
+    minOrderValue: 120000000,
+    paymentTerms: 'Công nợ Net 30'
+  }
+];
+
+export const PRODUCT_CATALOG = [
+  {
     sku: 'SRV-DELL-R760',
-    name: 'Máy Chủ Dell PowerEdge R760 Enterprise (2x Intel Xeon Gold 6430 / 128GB RAM / 4x 1.92TB NVMe)',
+    name: 'Máy Chủ Dell PowerEdge R760 2U (2x Intel Xeon Gold 6430 / 128GB RAM / 4x 1.92TB NVMe)',
     category: 'Máy Chủ & Data Center',
-    categoryIcon: 'server',
-    price: 115000000, // 115 Triệu
-    stock: 14,
+    categoryCode: 'SERVER',
     unit: 'Chiếc',
-    image: '🖥️'
+    unitCost: 98000000, // Giá nhập NCC
+    sellingPrice: 115000000,
+    supplierId: 'SUP-01',
+    defaultLeadTime: 5,
+    barcode: '8936001007601'
   },
   {
-    id: 'PRD-002',
+    sku: 'SRV-DELL-R660',
+    name: 'Máy Chủ Dell PowerEdge R660 1U Enterprise (2x Xeon Silver 4410Y / 64GB / 2x 960GB SAS)',
+    category: 'Máy Chủ & Data Center',
+    categoryCode: 'SERVER',
+    unit: 'Chiếc',
+    unitCost: 72000000,
+    sellingPrice: 85000000,
+    supplierId: 'SUP-01',
+    defaultLeadTime: 5,
+    barcode: '8936001006602'
+  },
+  {
     sku: 'MBP-M3-MAX-16',
-    name: 'Apple MacBook Pro 16" M3 Max (16-core CPU / 40-core GPU / 64GB Unified RAM / 1TB SSD Space Black)',
+    name: 'Apple MacBook Pro 16" M3 Max (16-core CPU / 40-core GPU / 64GB RAM / 1TB SSD Space Black)',
     category: 'Máy Tính Doanh Nghiệp',
-    categoryIcon: 'laptop',
-    price: 89000000, // 89 Triệu
-    stock: 28,
+    categoryCode: 'LAPTOP',
     unit: 'Chiếc',
-    image: '💻'
+    unitCost: 78000000,
+    sellingPrice: 89000000,
+    supplierId: 'SUP-02',
+    defaultLeadTime: 7,
+    barcode: '8936002003163'
   },
   {
-    id: 'PRD-003',
+    sku: 'MBA-M3-15',
+    name: 'Apple MacBook Air 15" M3 (8-core CPU / 10-core GPU / 16GB RAM / 512GB SSD Midnight)',
+    category: 'Máy Tính Doanh Nghiệp',
+    categoryCode: 'LAPTOP',
+    unit: 'Chiếc',
+    unitCost: 32000000,
+    sellingPrice: 37900000,
+    supplierId: 'SUP-02',
+    defaultLeadTime: 7,
+    barcode: '8936002003154'
+  },
+  {
     sku: 'NET-CS-C9300',
-    name: 'Thiết Bị Chuyển Mạch Cisco Catalyst 9300 48-Port Gigabit Ethernet PoE+ (Network Essentials)',
+    name: 'Thiết Bị Chuyển Mạch Cisco Catalyst 9300 48-Port PoE+ Gigabit (C9300-48P-E Layer 3)',
     category: 'Thiết Bị Mạng',
-    categoryIcon: 'network',
-    price: 45000000, // 45 Triệu
-    stock: 22,
+    categoryCode: 'NETWORK',
     unit: 'Thiết bị',
-    image: '🖧'
+    unitCost: 38000000,
+    sellingPrice: 45000000,
+    supplierId: 'SUP-03',
+    defaultLeadTime: 4,
+    barcode: '8936003093005'
   },
   {
-    id: 'PRD-004',
+    sku: 'NET-CS-C9200L',
+    name: 'Bộ Chuyển Mạch Cisco Catalyst 9200L 24-Port Data (C9200L-24T-4G-E Stackable)',
+    category: 'Thiết Bị Mạng',
+    categoryCode: 'NETWORK',
+    unit: 'Thiết bị',
+    unitCost: 21000000,
+    sellingPrice: 25500000,
+    supplierId: 'SUP-03',
+    defaultLeadTime: 4,
+    barcode: '8936003092006'
+  },
+  {
     sku: 'UPS-APC-RT10K',
-    name: 'Bộ Lưu Điện UPS APC Smart-UPS On-Line RT 10kVA / 10kW 230V Rack/Tower 6U',
+    name: 'Bộ Lưu Điện UPS APC Smart-UPS On-Line RT 10kVA / 10kW 230V Rack/Tower 6U (SRT10KXLI)',
     category: 'Nguồn & Hạ Tầng',
-    categoryIcon: 'zap',
-    price: 68000000, // 68 Triệu
-    stock: 8,
+    categoryCode: 'POWER',
     unit: 'Bộ',
-    image: '⚡'
+    unitCost: 56000000,
+    sellingPrice: 68000000,
+    supplierId: 'SUP-04',
+    defaultLeadTime: 6,
+    barcode: '8936004010007'
   },
   {
-    id: 'PRD-005',
-    sku: 'MON-DELL-U3224KB',
-    name: 'Màn Hình Chuyên Nghiệp Dell UltraSharp 32" 6K UHD IPS Black (Tích hợp 4K HDR Webcam & Thunderbolt 4)',
-    category: 'Thiết Bị Ngoại Vi',
-    categoryIcon: 'monitor',
-    price: 26500000, // 26.5 Triệu
-    stock: 35,
-    unit: 'Chiếc',
-    image: '🖥️'
+    sku: 'UPS-APC-SMT3000',
+    name: 'Bộ Lưu Điện UPS APC Smart-UPS 3000VA LCD 230V SmartConnect (SMT3000IC)',
+    category: 'Nguồn & Hạ Tầng',
+    categoryCode: 'POWER',
+    unit: 'Bộ',
+    unitCost: 26000000,
+    sellingPrice: 31500000,
+    supplierId: 'SUP-04',
+    defaultLeadTime: 6,
+    barcode: '8936004030008'
   },
   {
-    id: 'PRD-006',
     sku: 'SEC-FORTI-100F',
-    name: 'Tường Lửa Doanh Nghiệp Fortinet FortiGate 100F Network Security Appliance kèm 1 Năm Unified Threat Bundle',
-    category: 'An Ninh & Bảo Mật',
-    categoryIcon: 'shield',
-    price: 52000000, // 52 Triệu
-    stock: 19,
+    name: 'Tường Lửa Fortinet FortiGate 100F Enterprise Firewall kèm 1 Năm Unified Threat Protection',
+    category: 'An Ninh Mạng',
+    categoryCode: 'SECURITY',
     unit: 'Thiết bị',
-    image: '🛡️'
+    unitCost: 43000000,
+    sellingPrice: 52000000,
+    supplierId: 'SUP-06',
+    defaultLeadTime: 4,
+    barcode: '8936006001009'
   },
   {
-    id: 'PRD-007',
+    sku: 'SEC-FORTI-60F',
+    name: 'Thiết Bị Bảo Mật Fortinet FortiGate 60F Desktop Next-Gen Firewall (FG-60F)',
+    category: 'An Ninh Mạng',
+    categoryCode: 'SECURITY',
+    unit: 'Thiết bị',
+    unitCost: 14500000,
+    sellingPrice: 17800000,
+    supplierId: 'SUP-06',
+    defaultLeadTime: 4,
+    barcode: '8936006000600'
+  },
+  {
     sku: 'SSD-SYN-3840G',
-    name: 'Ổ Cứng Enterprise SSD Synology SAT5210 3.84TB 2.5" SATA 6Gb/s Chuyên Dụng Lưu Trữ 24/7',
+    name: 'Ổ Cứng SSD Synology Enterprise SAT5210 3.84TB 2.5" SATA 6Gb/s 24/7 Endurance',
     category: 'Lưu Trữ & Backup',
-    categoryIcon: 'database',
-    price: 14200000, // 14.2 Triệu
-    stock: 60,
+    categoryCode: 'STORAGE',
     unit: 'Chiếc',
-    image: '💾'
+    unitCost: 11800000,
+    sellingPrice: 14200000,
+    supplierId: 'SUP-05',
+    defaultLeadTime: 3,
+    barcode: '8936005038401'
   },
   {
-    id: 'PRD-008',
-    sku: 'WIFI-ARUBA-AP635',
-    name: 'Bộ Phát Sóng WiFi Doanh Nghiệp Aruba AP-635 Campus AP Wi-Fi 6E (Tri-band 2.4/5/6 GHz)',
-    category: 'Thiết Bị Mạng',
-    categoryIcon: 'wifi',
-    price: 12500000, // 12.5 Triệu
-    stock: 45,
-    unit: 'Chiếc',
-    image: '📡'
+    sku: 'NAS-SYN-RS3621',
+    name: 'Hệ Thống Lưu Trữ NAS Synology RackStation RS3621xs+ 12-Bay 2U High-Performance',
+    category: 'Lưu Trữ & Backup',
+    categoryCode: 'STORAGE',
+    unit: 'Bộ',
+    unitCost: 85000000,
+    sellingPrice: 102000000,
+    supplierId: 'SUP-05',
+    defaultLeadTime: 4,
+    barcode: '8936005036212'
   }
 ];
 
-export const INITIAL_ORDERS = [
+/**
+ * Danh sách Tồn kho chi tiết theo từng cặp (Warehouse, SKU).
+ * Thiết kế chuẩn nghiệp vụ WMS:
+ * - physicalStock: Tồn vật lý trong kho
+ * - reservedStock: Số lượng đã giữ chỗ cho đơn bán hàng đang soạn/chờ giao
+ * - availableStock = physicalStock - reservedStock (Tồn khả dụng thực tế)
+ * - minThreshold: Mức tồn tối thiểu được khai báo riêng cho từng kho
+ * - maxCapacity: Mức tồn tối đa được phép lưu trữ ở kho
+ * - reorderQuantity: Số lượng đặt hàng kinh tế (Economic Order Quantity / MOQ)
+ * - dailyBurnRate: Tốc độ xuất kho trung bình ngày (cái/ngày)
+ */
+export const INITIAL_INVENTORY_ITEMS = [
+  // ===================== KHO TỔNG MIỀN BẮC (WH-HN) =====================
   {
-    id: 'ORD-2026-9001',
-    orderNo: 'NEX-ORD-9001',
-    dealerId: 'DL-001',
-    dealerName: 'Công ty CP Công Nghệ Ánh Dương',
-    salesRep: 'Nguyễn Văn Nam',
-    createdAt: '2026-10-18 09:30',
-    totalBeforeVat: 115000000,
-    vatAmount: 11500000,
-    totalAmount: 126500000,
-    status: 'APPROVED',
-    statusLabel: 'Đã xác nhận (Approved)',
-    creditCheckStatus: 'PASSED',
-    creditCheckSummary: 'Trong hạn mức (Sau đơn nợ đạt 266.5M/600M - 44.4%)',
-    approvalReason: 'Đơn hàng trong hạn mức tín dụng tự động phê duyệt.',
-    items: [
-      { productId: 'PRD-001', name: 'Máy Chủ Dell PowerEdge R760 Enterprise', quantity: 1, price: 115000000, subtotal: 115000000 }
-    ]
+    id: 'INV-HN-001',
+    warehouseId: 'WH-HN',
+    sku: 'SRV-DELL-R760',
+    physicalStock: 4,
+    reservedStock: 2,
+    minThreshold: 10,     // 🚨 Khai báo Min = 10, Khả dụng = 2 -> DƯỚI NGƯỠNG RẤT NẶNG! (Thiếu 8 cái)
+    maxCapacity: 30,
+    reorderQuantity: 15,
+    dailyBurnRate: 1.2,
+    leadTimeDays: 5,
+    binLocation: 'Kệ A1-Tầng 02',
+    lastRestockedDate: '2026-09-28'
   },
   {
-    id: 'ORD-2026-9002',
-    orderNo: 'NEX-ORD-9002',
-    dealerId: 'DL-002',
-    dealerName: 'Công ty TNHH Phân Phối Tin Học Sao Mai',
-    salesRep: 'Trần Thị Mai',
-    createdAt: '2026-10-19 14:15',
-    totalBeforeVat: 102200000,
-    vatAmount: 10220000,
-    totalAmount: 112420000,
-    status: 'PENDING_APPROVAL',
-    statusLabel: 'Chờ duyệt công nợ (Pending Approval)',
-    creditCheckStatus: 'EXCEEDED_LIMIT',
-    creditCheckSummary: 'Vượt hạn mức tín dụng +62,420,000 ₫ (Tổng nợ dự kiến 462.4M / 400M)',
-    approvalReason: 'Đại lý cam kết thanh toán 150 triệu vào thứ 6 tuần này từ dự án Bệnh viện Từ Dũ. Đề nghị Kế toán trưởng duyệt ngoại lệ.',
-    approvalRequestedAt: '2026-10-19 14:20',
-    requestedBy: 'Trần Thị Mai',
-    approver: 'Kế toán trưởng & GĐ Tài chính',
-    items: [
-      { productId: 'PRD-002', name: 'Apple MacBook Pro 16" M3 Max', quantity: 1, price: 89000000, subtotal: 89000000 },
-      { productId: 'PRD-008', name: 'Bộ Phát Sóng WiFi Doanh Nghiệp Aruba AP-635', quantity: 1, price: 12500000, subtotal: 12500000 }
-    ]
+    id: 'INV-HN-002',
+    warehouseId: 'WH-HN',
+    sku: 'SRV-DELL-R660',
+    physicalStock: 12,
+    reservedStock: 3,
+    minThreshold: 8,      // Khả dụng = 9 >= Min (8) -> An toàn
+    maxCapacity: 25,
+    reorderQuantity: 10,
+    dailyBurnRate: 0.8,
+    leadTimeDays: 5,
+    binLocation: 'Kệ A1-Tầng 03',
+    lastRestockedDate: '2026-10-10'
+  },
+  {
+    id: 'INV-HN-003',
+    warehouseId: 'WH-HN',
+    sku: 'MBP-M3-MAX-16',
+    physicalStock: 2,
+    reservedStock: 2,
+    minThreshold: 12,     // ⛔ Khả dụng = 0 (2 - 2) -> CHÁY HÀNG HOÀN TOÀN (STOCKOUT)!
+    maxCapacity: 40,
+    reorderQuantity: 20,
+    dailyBurnRate: 2.0,
+    leadTimeDays: 7,
+    binLocation: 'Kệ B2-Tầng 01 (Kho VIP)',
+    lastRestockedDate: '2026-09-15'
+  },
+  {
+    id: 'INV-HN-004',
+    warehouseId: 'WH-HN',
+    sku: 'MBA-M3-15',
+    physicalStock: 8,
+    reservedStock: 1,
+    minThreshold: 15,     // 🚨 Khả dụng = 7 < Min (15) -> DƯỚI NGƯỠNG (Thiếu 8 cái)
+    maxCapacity: 50,
+    reorderQuantity: 25,
+    dailyBurnRate: 2.5,
+    leadTimeDays: 7,
+    binLocation: 'Kệ B2-Tầng 02',
+    lastRestockedDate: '2026-10-02'
+  },
+  {
+    id: 'INV-HN-005',
+    warehouseId: 'WH-HN',
+    sku: 'NET-CS-C9300',
+    physicalStock: 18,
+    reservedStock: 4,
+    minThreshold: 12,     // Khả dụng = 14 > Min (12) -> An toàn
+    maxCapacity: 45,
+    reorderQuantity: 20,
+    dailyBurnRate: 1.5,
+    leadTimeDays: 4,
+    binLocation: 'Kệ C1-Tầng 01',
+    lastRestockedDate: '2026-10-12'
+  },
+  {
+    id: 'INV-HN-006',
+    warehouseId: 'WH-HN',
+    sku: 'NET-CS-C9200L',
+    physicalStock: 6,
+    reservedStock: 1,
+    minThreshold: 10,     // 🚨 Khả dụng = 5 < Min (10) -> DƯỚI NGƯỠNG
+    maxCapacity: 35,
+    reorderQuantity: 15,
+    dailyBurnRate: 1.8,
+    leadTimeDays: 4,
+    binLocation: 'Kệ C1-Tầng 02',
+    lastRestockedDate: '2026-10-05'
+  },
+  {
+    id: 'INV-HN-007',
+    warehouseId: 'WH-HN',
+    sku: 'UPS-APC-RT10K',
+    physicalStock: 5,
+    reservedStock: 0,
+    minThreshold: 6,      // 🚨 Khả dụng = 5 < Min (6) -> DƯỚI NGƯỠNG
+    maxCapacity: 20,
+    reorderQuantity: 8,
+    dailyBurnRate: 0.6,
+    leadTimeDays: 6,
+    binLocation: 'Khu Trọng Tải Nặng D1',
+    lastRestockedDate: '2026-09-20'
+  },
+  {
+    id: 'INV-HN-008',
+    warehouseId: 'WH-HN',
+    sku: 'UPS-APC-SMT3000',
+    physicalStock: 15,
+    reservedStock: 2,
+    minThreshold: 10,     // Khả dụng = 13 > Min -> An toàn
+    maxCapacity: 30,
+    reorderQuantity: 12,
+    dailyBurnRate: 1.0,
+    leadTimeDays: 6,
+    binLocation: 'Khu Trọng Tải Nặng D2',
+    lastRestockedDate: '2026-10-14'
+  },
+  {
+    id: 'INV-HN-009',
+    warehouseId: 'WH-HN',
+    sku: 'SEC-FORTI-100F',
+    physicalStock: 14,
+    reservedStock: 1,
+    minThreshold: 8,      // Khả dụng = 13 > Min -> An toàn
+    maxCapacity: 30,
+    reorderQuantity: 12,
+    dailyBurnRate: 0.9,
+    leadTimeDays: 4,
+    binLocation: 'Kệ E1-Tầng 01',
+    lastRestockedDate: '2026-10-16'
+  },
+  {
+    id: 'INV-HN-010',
+    warehouseId: 'WH-HN',
+    sku: 'SEC-FORTI-60F',
+    physicalStock: 22,
+    reservedStock: 3,
+    minThreshold: 15,     // Khả dụng = 19 > Min -> An toàn
+    maxCapacity: 50,
+    reorderQuantity: 20,
+    dailyBurnRate: 2.2,
+    leadTimeDays: 4,
+    binLocation: 'Kệ E1-Tầng 02',
+    lastRestockedDate: '2026-10-15'
+  },
+  {
+    id: 'INV-HN-011',
+    warehouseId: 'WH-HN',
+    sku: 'SSD-SYN-3840G',
+    physicalStock: 12,
+    reservedStock: 4,
+    minThreshold: 20,     // 🚨 Khả dụng = 8 < Min (20) -> DƯỚI NGƯỠNG (Thiếu 12 cái)
+    maxCapacity: 80,
+    reorderQuantity: 40,
+    dailyBurnRate: 3.5,
+    leadTimeDays: 3,
+    binLocation: 'Tủ Linh Kiện An Toàn F1',
+    lastRestockedDate: '2026-10-01'
+  },
+  {
+    id: 'INV-HN-012',
+    warehouseId: 'WH-HN',
+    sku: 'NAS-SYN-RS3621',
+    physicalStock: 4,
+    reservedStock: 1,
+    minThreshold: 3,      // Khả dụng = 3 = Min (3) -> Cận ngưỡng nguy cơ!
+    maxCapacity: 12,
+    reorderQuantity: 5,
+    dailyBurnRate: 0.4,
+    leadTimeDays: 4,
+    binLocation: 'Kệ F2-Tầng 01',
+    lastRestockedDate: '2026-10-08'
+  },
+
+  // ===================== KHO TỔNG MIỀN NAM (WH-HCM) =====================
+  {
+    id: 'INV-HCM-001',
+    warehouseId: 'WH-HCM',
+    sku: 'SRV-DELL-R760',
+    physicalStock: 15,
+    reservedStock: 3,
+    minThreshold: 12,     // Khả dụng = 12 = Min -> Cận ngưỡng
+    maxCapacity: 40,
+    reorderQuantity: 20,
+    dailyBurnRate: 1.6,
+    leadTimeDays: 5,
+    binLocation: 'Kệ S1-A1',
+    lastRestockedDate: '2026-10-11'
+  },
+  {
+    id: 'INV-HCM-002',
+    warehouseId: 'WH-HCM',
+    sku: 'SRV-DELL-R660',
+    physicalStock: 3,
+    reservedStock: 1,
+    minThreshold: 10,     // 🚨 Khả dụng = 2 < Min (10) -> DƯỚI NGƯỠNG
+    maxCapacity: 30,
+    reorderQuantity: 15,
+    dailyBurnRate: 1.1,
+    leadTimeDays: 5,
+    binLocation: 'Kệ S1-A2',
+    lastRestockedDate: '2026-09-25'
+  },
+  {
+    id: 'INV-HCM-003',
+    warehouseId: 'WH-HCM',
+    sku: 'MBP-M3-MAX-16',
+    physicalStock: 25,
+    reservedStock: 5,
+    minThreshold: 15,     // Khả dụng = 20 > Min -> An toàn
+    maxCapacity: 50,
+    reorderQuantity: 25,
+    dailyBurnRate: 2.8,
+    leadTimeDays: 7,
+    binLocation: 'Khu Công Nghệ Cao L1',
+    lastRestockedDate: '2026-10-18'
+  },
+  {
+    id: 'INV-HCM-004',
+    warehouseId: 'WH-HCM',
+    sku: 'MBA-M3-15',
+    physicalStock: 5,
+    reservedStock: 2,
+    minThreshold: 18,     // 🚨 Khả dụng = 3 < Min (18) -> DƯỚI NGƯỠNG (Thiếu 15 cái!)
+    maxCapacity: 60,
+    reorderQuantity: 30,
+    dailyBurnRate: 3.2,
+    leadTimeDays: 7,
+    binLocation: 'Khu Công Nghệ Cao L2',
+    lastRestockedDate: '2026-09-30'
+  },
+  {
+    id: 'INV-HCM-005',
+    warehouseId: 'WH-HCM',
+    sku: 'NET-CS-C9300',
+    physicalStock: 26,
+    reservedStock: 6,
+    minThreshold: 15,     // Khả dụng = 20 > Min -> An toàn
+    maxCapacity: 50,
+    reorderQuantity: 20,
+    dailyBurnRate: 2.0,
+    leadTimeDays: 4,
+    binLocation: 'Kệ N1-01',
+    lastRestockedDate: '2026-10-14'
+  },
+  {
+    id: 'INV-HCM-006',
+    warehouseId: 'WH-HCM',
+    sku: 'NET-CS-C9200L',
+    physicalStock: 30,
+    reservedStock: 4,
+    minThreshold: 15,     // Khả dụng = 26 > Min -> An toàn
+    maxCapacity: 50,
+    reorderQuantity: 20,
+    dailyBurnRate: 2.4,
+    leadTimeDays: 4,
+    binLocation: 'Kệ N1-02',
+    lastRestockedDate: '2026-10-16'
+  },
+  {
+    id: 'INV-HCM-007',
+    warehouseId: 'WH-HCM',
+    sku: 'UPS-APC-RT10K',
+    physicalStock: 0,
+    reservedStock: 0,
+    minThreshold: 8,      // ⛔ Khả dụng = 0 -> CHÁY HÀNG (STOCKOUT)!
+    maxCapacity: 25,
+    reorderQuantity: 10,
+    dailyBurnRate: 0.9,
+    leadTimeDays: 6,
+    binLocation: 'Khu Điện Lực P1',
+    lastRestockedDate: '2026-09-10'
+  },
+  {
+    id: 'INV-HCM-008',
+    warehouseId: 'WH-HCM',
+    sku: 'UPS-APC-SMT3000',
+    physicalStock: 18,
+    reservedStock: 2,
+    minThreshold: 12,     // Khả dụng = 16 > Min -> An toàn
+    maxCapacity: 40,
+    reorderQuantity: 15,
+    dailyBurnRate: 1.4,
+    leadTimeDays: 6,
+    binLocation: 'Khu Điện Lực P2',
+    lastRestockedDate: '2026-10-15'
+  },
+  {
+    id: 'INV-HCM-009',
+    warehouseId: 'WH-HCM',
+    sku: 'SEC-FORTI-100F',
+    physicalStock: 5,
+    reservedStock: 1,
+    minThreshold: 10,     // 🚨 Khả dụng = 4 < Min (10) -> DƯỚI NGƯỠNG
+    maxCapacity: 35,
+    reorderQuantity: 15,
+    dailyBurnRate: 1.2,
+    leadTimeDays: 4,
+    binLocation: 'Kệ B1-Sec',
+    lastRestockedDate: '2026-10-04'
+  },
+  {
+    id: 'INV-HCM-010',
+    warehouseId: 'WH-HCM',
+    sku: 'SEC-FORTI-60F',
+    physicalStock: 35,
+    reservedStock: 5,
+    minThreshold: 20,     // Khả dụng = 30 > Min -> An toàn
+    maxCapacity: 60,
+    reorderQuantity: 25,
+    dailyBurnRate: 3.0,
+    leadTimeDays: 4,
+    binLocation: 'Kệ B2-Sec',
+    lastRestockedDate: '2026-10-17'
+  },
+  {
+    id: 'INV-HCM-011',
+    warehouseId: 'WH-HCM',
+    sku: 'SSD-SYN-3840G',
+    physicalStock: 48,
+    reservedStock: 8,
+    minThreshold: 25,     // Khả dụng = 40 > Min -> An toàn
+    maxCapacity: 100,
+    reorderQuantity: 50,
+    dailyBurnRate: 4.5,
+    leadTimeDays: 3,
+    binLocation: 'Tủ SSD Chuyên Dụng T1',
+    lastRestockedDate: '2026-10-12'
+  },
+  {
+    id: 'INV-HCM-012',
+    warehouseId: 'WH-HCM',
+    sku: 'NAS-SYN-RS3621',
+    physicalStock: 6,
+    reservedStock: 1,
+    minThreshold: 4,      // Khả dụng = 5 > Min -> An toàn
+    maxCapacity: 15,
+    reorderQuantity: 6,
+    dailyBurnRate: 0.5,
+    leadTimeDays: 4,
+    binLocation: 'Kệ S2-NAS',
+    lastRestockedDate: '2026-10-10'
+  },
+
+  // ===================== KHO TRUNG CHUYỂN MIỀN TRUNG (WH-DN) =====================
+  {
+    id: 'INV-DN-001',
+    warehouseId: 'WH-DN',
+    sku: 'SRV-DELL-R760',
+    physicalStock: 2,
+    reservedStock: 0,
+    minThreshold: 4,      // 🚨 Khả dụng = 2 < Min (4) -> DƯỚI NGƯỠNG (Kho khu vực duy trì mức Min thấp hơn kho tổng)
+    maxCapacity: 10,
+    reorderQuantity: 5,
+    dailyBurnRate: 0.3,
+    leadTimeDays: 5,
+    binLocation: 'Khu A-MT',
+    lastRestockedDate: '2026-10-02'
+  },
+  {
+    id: 'INV-DN-002',
+    warehouseId: 'WH-DN',
+    sku: 'MBP-M3-MAX-16',
+    physicalStock: 6,
+    reservedStock: 1,
+    minThreshold: 5,      // Khả dụng = 5 = Min -> Cận ngưỡng
+    maxCapacity: 15,
+    reorderQuantity: 8,
+    dailyBurnRate: 0.7,
+    leadTimeDays: 7,
+    binLocation: 'Khu B-MT',
+    lastRestockedDate: '2026-10-09'
+  },
+  {
+    id: 'INV-DN-003',
+    warehouseId: 'WH-DN',
+    sku: 'NET-CS-C9300',
+    physicalStock: 7,
+    reservedStock: 1,
+    minThreshold: 5,      // Khả dụng = 6 > Min -> An toàn
+    maxCapacity: 15,
+    reorderQuantity: 8,
+    dailyBurnRate: 0.5,
+    leadTimeDays: 4,
+    binLocation: 'Khu C-MT',
+    lastRestockedDate: '2026-10-13'
+  },
+  {
+    id: 'INV-DN-004',
+    warehouseId: 'WH-DN',
+    sku: 'UPS-APC-RT10K',
+    physicalStock: 1,
+    reservedStock: 0,
+    minThreshold: 3,      // 🚨 Khả dụng = 1 < Min (3) -> DƯỚI NGƯỠNG
+    maxCapacity: 8,
+    reorderQuantity: 4,
+    dailyBurnRate: 0.2,
+    leadTimeDays: 6,
+    binLocation: 'Khu D-MT',
+    lastRestockedDate: '2026-09-22'
+  },
+  {
+    id: 'INV-DN-005',
+    warehouseId: 'WH-DN',
+    sku: 'SSD-SYN-3840G',
+    physicalStock: 15,
+    reservedStock: 2,
+    minThreshold: 10,     // Khả dụng = 13 > Min -> An toàn
+    maxCapacity: 30,
+    reorderQuantity: 15,
+    dailyBurnRate: 1.1,
+    leadTimeDays: 3,
+    binLocation: 'Khu E-MT',
+    lastRestockedDate: '2026-10-15'
+  },
+
+  // ===================== KHO PHÂN PHỐI MIỀN TÂY (WH-CT) =====================
+  {
+    id: 'INV-CT-001',
+    warehouseId: 'WH-CT',
+    sku: 'SRV-DELL-R660',
+    physicalStock: 3,
+    reservedStock: 0,
+    minThreshold: 3,      // Khả dụng = 3 = Min -> Cận ngưỡng
+    maxCapacity: 8,
+    reorderQuantity: 4,
+    dailyBurnRate: 0.3,
+    leadTimeDays: 5,
+    binLocation: 'Khu MT-01',
+    lastRestockedDate: '2026-10-05'
+  },
+  {
+    id: 'INV-CT-002',
+    warehouseId: 'WH-CT',
+    sku: 'MBA-M3-15',
+    physicalStock: 2,
+    reservedStock: 1,
+    minThreshold: 6,      // 🚨 Khả dụng = 1 < Min (6) -> DƯỚI NGƯỠNG NẶNG
+    maxCapacity: 15,
+    reorderQuantity: 8,
+    dailyBurnRate: 0.8,
+    leadTimeDays: 7,
+    binLocation: 'Khu MT-02',
+    lastRestockedDate: '2026-09-29'
+  },
+  {
+    id: 'INV-CT-003',
+    warehouseId: 'WH-CT',
+    sku: 'NET-CS-C9200L',
+    physicalStock: 8,
+    reservedStock: 1,
+    minThreshold: 5,      // Khả dụng = 7 > Min -> An toàn
+    maxCapacity: 15,
+    reorderQuantity: 6,
+    dailyBurnRate: 0.6,
+    leadTimeDays: 4,
+    binLocation: 'Khu MT-03',
+    lastRestockedDate: '2026-10-11'
+  },
+  {
+    id: 'INV-CT-004',
+    warehouseId: 'WH-CT',
+    sku: 'SEC-FORTI-60F',
+    physicalStock: 12,
+    reservedStock: 2,
+    minThreshold: 8,      // Khả dụng = 10 > Min -> An toàn
+    maxCapacity: 20,
+    reorderQuantity: 10,
+    dailyBurnRate: 0.9,
+    leadTimeDays: 4,
+    binLocation: 'Khu MT-04',
+    lastRestockedDate: '2026-10-16'
+  }
+];
+
+export const DEMO_SCENARIOS = [
+  {
+    id: 'SCENARIO_DEFAULT',
+    title: 'Hiện trạng thực tế vận hành',
+    description: 'Kho Tổng Miền Bắc và Miền Nam có 8 SKU rơi vào báo động dưới ngưỡng tối thiểu, 2 SKU cháy hàng (Stockout) cần tạo PO đặt NCC gấp.',
+    badge: 'Mặc định (Live)'
+  },
+  {
+    id: 'SCENARIO_NORTH_SURGE',
+    title: 'Đột biến xuất kho Miền Bắc (Báo động Đỏ diện rộng)',
+    description: 'Nhu cầu dự án tăng vọt làm 10/12 SKU tại Kho Miền Bắc tụt dốc dưới mức Min. Còi cảnh báo hú to, cần kích hoạt kế hoạch điều chuyển nội bộ và mua hàng khẩn cấp.',
+    badge: 'Báo động khẩn cấp'
+  },
+  {
+    id: 'SCENARIO_RESTOCKED',
+    title: 'Sau khi nhận hàng bù tồn (Kho an toàn)',
+    description: 'Hàng từ 3 nhà cung cấp đã về đầy đủ, toàn bộ SKU trở lại trạng thái Xanh an toàn (Healthy Stock Rate = 100%).',
+    badge: 'Tồn kho tối ưu'
+  }
+];
+
+export const INITIAL_AUDIT_LOGS = [
+  {
+    id: 'AUD-001',
+    timestamp: '2026-10-21 08:30:15',
+    actor: 'Trần Minh Hoàng',
+    action: 'CẬP NHẬT NGƯỠNG MIN',
+    warehouseId: 'WH-HN',
+    sku: 'SRV-DELL-R760',
+    oldMin: 6,
+    newMin: 10,
+    reason: 'Điều chỉnh tăng ngưỡng tồn an toàn đón dự án đấu thầu khối Ngân hàng quý 4'
+  },
+  {
+    id: 'AUD-002',
+    timestamp: '2026-10-21 09:12:40',
+    actor: 'Lê Hoàng Tuấn',
+    action: 'CẬP NHẬT NGƯỠNG MIN',
+    warehouseId: 'WH-HCM',
+    sku: 'MBA-M3-15',
+    oldMin: 12,
+    newMin: 18,
+    reason: 'Doanh số MacBook Air tăng 40% tại khu vực phía Nam'
+  },
+  {
+    id: 'AUD-003',
+    timestamp: '2026-10-21 10:05:22',
+    actor: 'Hệ thống tự động',
+    action: 'CẢNH BÁO ĐỨT HÀNG',
+    warehouseId: 'WH-HN',
+    sku: 'MBP-M3-MAX-16',
+    oldMin: 12,
+    newMin: 12,
+    reason: 'Xuất kho cho đơn ORD-2026-8801 làm Tồn khả dụng về 0 cái (Cháy hàng)'
   }
 ];
