@@ -36,6 +36,11 @@ from app.api.v1.endpoints.discount_policy_routes import router as discounts_rout
 from app.api.v1.endpoints.sales_orders import router as sales_orders_router
 from app.api.v1.endpoints.debt_limit import router as debt_limit_router, compat_router as debt_limit_compat_router
 from app.api.v1.endpoints.dealer_history import router as dealer_history_router
+from app.api.v1.endpoints.pick_lists import (
+    router as pick_lists_router,
+    compat_v1_router as pick_lists_compat_v1_router,
+    warehouse_pick_router,
+)
 
 
 
@@ -222,6 +227,9 @@ app.include_router(sales_orders_router)
 app.include_router(debt_limit_router)
 app.include_router(debt_limit_compat_router)
 app.include_router(dealer_history_router)
+app.include_router(pick_lists_router)
+app.include_router(pick_lists_compat_v1_router)
+app.include_router(warehouse_pick_router)
 try:
     from app.api.v1.endpoints.warehouse import (
         router as warehouse_router,

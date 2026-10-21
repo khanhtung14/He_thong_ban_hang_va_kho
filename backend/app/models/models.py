@@ -810,12 +810,68 @@ class WarehouseAuditItem(Base):
     actual_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
-# --- EP-06: Xuất kho, Giao hàng & Chứng từ ---
+# --- EP-06: Xuất kho, Giao hàng & Chứng từ (Pick Lists & Batch Picking) ---
+class WarehouseLocation(Base):
+    __tablename__ = "warehouse_locations"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False, default=1)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    aisle: Mapped[str] = mapped_column(String(20), nullable=False, default="A")
+    rack: Mapped[str] = mapped_column(String(20), nullable=False, default="01")
+    shelf: Mapped[str] = mapped_column(String(20), nullable=False, default="01")
+    bin: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    pick_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=1, index=True)
+    product_id: Mapped[Optional[int]] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
 class PickList(Base):
     __tablename__ = "pick_lists"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, default="", index=True)
+    warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
+    order_id: Mapped[Optional[int]] = mapped_column(ForeignKey("orders.id", ondelete="SET NULL"), nullable=True)
+    order_ids: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="PENDING")
+    total_items: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_required_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    total_actual_qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    details: Mapped[List["PickListDetail"]] = relationship(
+        "PickListDetail", back_populates="pick_list", cascade="all, delete-orphan", order_by="PickListDetail.pick_sequence"
+    )
+
+
+class PickListDetail(Base):
+    __tablename__ = "pick_list_details"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    pick_list_id: Mapped[int] = mapped_column(ForeignKey("pick_lists.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="RESTRICT"), nullable=False, index=True)
+    sku: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    product_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    unit_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    location_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouse_locations.id", ondelete="SET NULL"), nullable=True)
+    location_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    pick_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=1, index=True)
+    required_qty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    actual_qty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    missing_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    order_ids: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="PENDING")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    pick_list: Mapped["PickList"] = relationship("PickList", back_populates="details")
+
+
+# Aliases
+PickLists = PickList
+PickListDetails = PickListDetail
+WarehouseLocations = WarehouseLocation
+
 
 
 class Dispatch(Base):

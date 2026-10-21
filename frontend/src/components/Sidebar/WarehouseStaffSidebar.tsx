@@ -55,7 +55,7 @@ export const WarehouseStaffSidebar: React.FC<WarehouseStaffSidebarProps> = ({
         {
           key: "outbound",
           icon: <ExportOutlined />,
-          label: "Thực hiện Xuất kho",
+          label: "Soạn hàng (Pick List)",
         },
         {
           key: "unit-conversion", // <-- Key mới cho chức năng này

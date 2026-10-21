@@ -766,11 +766,43 @@
 
 ### EP-06: XUẤT KHO & GIAO HÀNG (SPRINT 6)
 
-#### `POST /warehouse/pick-lists`
+#### `GET /api/pick-lists/pending-orders`
 - **Story:** S6-03
-- **Phân quyền:** Warehouse
-- **Request Body:** `{"orderId": 9851}`
-- **Response Data:** Phiếu soạn hàng với danh sách SKU kèm vị trí kệ hàng tối ưu đường đi.
+- **Phân quyền:** Warehouse, WH Manager
+- **Query Params:** `warehouse_id` (optional)
+- **Response Data:** Danh sách đơn hàng đã duyệt (`APPROVED`, `PROCESSING`) sẵn sàng để gộp soạn.
+
+#### `POST /api/pick-lists`
+- **Story:** S6-03 (Batch Picking / Gộp đơn soạn hàng)
+- **Phân quyền:** Warehouse, WH Manager
+- **Request Body:**
+```json
+{
+  "order_ids": [101, 102],
+  "warehouse_id": 1,
+  "note": "Gộp soạn đơn sáng"
+}
+```
+- **Response Data:** Phiếu soạn hàng `PickList` kèm `details` đã được group by mặt hàng, cộng dồn số lượng, và sắp xếp tối ưu theo `pick_sequence` của vị trí lưu trữ (Location/Bin).
+
+#### `PUT /api/pick-lists/{id}/execute`
+- **Story:** S6-03 (Thực thi nhặt hàng & kiểm tra lý do soạn thiếu)
+- **Phân quyền:** Warehouse, WH Manager
+- **Request Body:**
+```json
+{
+  "items": [
+    {
+      "detail_id": 1,
+      "actual_qty": 8,
+      "missing_reason": "Hết hàng trên kệ A-01-01",
+      "is_completed": true
+    }
+  ],
+  "note": "Hoàn tất nhặt hàng kệ dãy A"
+}
+```
+- **Validation Rule:** Nếu `actual_qty < required_qty` mà `missing_reason` rỗng/trắng -> Trả lỗi HTTP 400.
 
 #### `GET /warehouse/pick-lists/{id}/suggest-lots`
 - **Story:** S6-04

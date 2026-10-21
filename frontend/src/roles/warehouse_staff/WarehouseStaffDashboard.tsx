@@ -7,6 +7,7 @@ import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSi
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
 import SupplierManagement from "./SupplierManagement";
+import PickListManager from "./PickListManager";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -146,9 +147,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
           {/* Các tab khác */}
           {selectedKey === "scan" && <div>Giao diện quét mã Barcode / QR</div>}
           {selectedKey === "inbound" && <div>Giao diện Thực hiện Nhập kho</div>}
-          {selectedKey === "outbound" && (
-            <div>Giao diện Thực hiện Xuất kho</div>
-          )}
+          {selectedKey === "outbound" && <PickListManager />}
           {selectedKey === "stocktake-exec" && (
             <div>Giao diện Đếm hàng kiểm kê</div>
           )}
