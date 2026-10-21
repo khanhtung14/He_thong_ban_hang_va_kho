@@ -3,130 +3,431 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NEXUS OMS // Hệ Thống Kiểm Soát Hạn Mức Công Nợ & Chặn Đơn Quá Hạn (SCRUM-9)</title>
-  <meta name="description" content="Hệ thống B2B Enterprise Order Management & Credit Risk Gatekeeper - Kiểm soát hạn mức công nợ đại lý, đánh dấu cần duyệt khi vượt hạn mức, chặn tạo đơn hoàn toàn khi có nợ quá hạn." />
+  <title>In & Xuất PDF Đơn Hàng Đại Lý Tại Chỗ | NEXUS OMS (SCRUM-86 / SCRUM-15)</title>
+  <meta name="description" content="Phân hệ In ấn & Xuất PDF đơn hàng cho Nhân viên kinh doanh xác nhận trực tiếp tại đại lý, tích hợp mã vạch Barcode 128 cho kho tra cứu nhanh" />
 
   <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Phosphor Icons CDN -->
-  <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
   <!-- Core Stylesheets -->
   <link rel="stylesheet" href="css/main.css" />
   <link rel="stylesheet" href="css/components.css" />
-  <link rel="stylesheet" href="css/order-form.css" />
-  <link rel="stylesheet" href="css/credit-gatekeeper.css" />
+  <link rel="stylesheet" href="css/invoice.css" />
+  <link rel="stylesheet" href="css/print.css" />
+
+  <!-- html2pdf.js CDN for direct PDF file generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
-  <!-- ===================================================================
-       APPLICATION HEADER (DOANH NGHIỆP TOÀN CẦU)
-       =================================================================== -->
+  <!-- ========================================================================= -->
+  <!-- 1. APP HEADER: BRANDING, SALES REP CONTEXT & LIVE WMS STATUS             -->
+  <!-- ========================================================================= -->
   <header class="app-header">
     <div class="brand-section">
       <div class="brand-logo-wrap">
-        <i class="ph-fill ph-shield-check" style="font-size: 24px;"></i>
+        <svg class="brand-logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
       </div>
       <div class="brand-info">
         <div class="brand-title">
-          <span>NEXUS OMS</span>
-          <span class="brand-badge">B2B SALES PLATFORM</span>
-          <span class="ticket-tag">SCRUM-86 / SCRUM-9</span>
+          <span>NEXUS ENTERPRISE OMS</span>
+          <span class="brand-badge">SCRUM-86 / SCRUM-15</span>
         </div>
-        <span class="brand-desc">Phân Hệ Thẩm Định Tín Dụng & Cổng Chặn Rủi Ro Công Nợ Đại Lý (Credit Risk Gatekeeper)</span>
+        <span class="brand-subtitle">Phân hệ In & Xuất PDF Xác Nhận Đơn Hàng Tại Chỗ (On-site Field Sales)</span>
       </div>
     </div>
 
-    <!-- MAIN NAVIGATION TABS -->
-    <nav class="app-nav-tabs">
-      <button class="nav-tab-btn active" data-tab="order-screen">
-        <i class="ph-bold ph-file-plus"></i>
-        <span>Tạo Đơn Hàng</span>
-      </button>
+    <div class="header-right">
+      <!-- Trạng thái kết nối WMS Kho Vận -->
+      <div class="system-status-indicator">
+        <div class="status-dot"></div>
+        <span>WMS Barcode Sync: Sẵn sàng</span>
+      </div>
 
-      <button class="nav-tab-btn" data-tab="approval-screen">
-        <i class="ph-bold ph-shield-check"></i>
-        <span>Đơn Hàng & Phê Duyệt</span>
-        <span class="badge-counter" id="pendingApprovalBadge">1</span>
-      </button>
+      <!-- Bộ chuyển đổi Nhân viên kinh doanh phụ trách -->
+      <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+        <label for="sales-rep-select" style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">NV Kinh doanh:</label>
+        <select id="sales-rep-select" class="form-select" style="padding: 5px 10px; font-size: 0.78rem; width: 220px;">
+          <option value="user-nam">Nguyễn Văn Nam (Miền Bắc)</option>
+          <option value="user-mai">Trần Thị Mai (Miền Nam)</option>
+          <option value="user-long">Lê Hoàng Long (Miền Trung)</option>
+          <option value="user-ha">Đặng Thu Hà (Miền Tây)</option>
+        </select>
+      </div>
 
-      <button class="nav-tab-btn" data-tab="matrix-screen">
-        <i class="ph-bold ph-chart-polar"></i>
-        <span>Giám Sát Công Nợ & Aging</span>
-      </button>
-    </nav>
+      <!-- Profile Chip của Sales Rep đang thao tác -->
+      <div class="sales-rep-chip">
+        <img id="active-rep-avatar" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80" alt="Avatar" class="rep-avatar" />
+        <div class="rep-details">
+          <span id="active-rep-name" class="rep-name">Nguyễn Văn Nam</span>
+          <span id="active-rep-role" class="rep-role">Nhân viên kinh doanh (Miền Bắc)</span>
+        </div>
+      </div>
+    </div>
   </header>
 
-  <!-- ===================================================================
-       SCENARIO QUICK SWITCHER BAR (DÀNH RIÊNG CHO GIẢNG VIÊN KIỂM THỬ 1-CLICK)
-       =================================================================== -->
-  <div class="scenario-quick-bar">
-    <div class="scenario-label">
-      <i class="ph-fill ph-lightning"></i>
-      <span>KỊCH BẢN KIỂM THỬ NHANH DÀNH CHO GIẢNG VIÊN (1-CLICK TEST):</span>
-    </div>
+  <!-- ========================================================================= -->
+  <!-- 2. MAIN WORKSPACE: SPLIT-VIEW (CONTROL PANEL + LIVE PRINT PREVIEW)        -->
+  <!-- ========================================================================= -->
+  <main class="app-workspace">
 
-    <div class="scenario-pills-row">
-      <!-- Kịch bản 1: An Toàn -->
-      <button class="preset-btn active" data-scenario="NORMAL_SAFE" title="Công nợ 140M / 600M, còn 460M, nợ 5 ngày < 30 ngày -> Tạo đơn bình thường, duyệt ngay">
-        🟢 Kịch bản 1: An Toàn (ĐL Ánh Dương)
-      </button>
+    <!-- CỘT TRÁI: ĐIỀU KHIỂN ĐƠN HÀNG, TÙY BIẾN MẪU IN & THAO TÁC XUẤT           -->
+    <aside class="sidebar-panel">
+      <!-- TIÊU ĐỀ BẢNG ĐIỀU KHIỂN -->
+      <div class="panel-header-section">
+        <div class="panel-title-row">
+          <span class="panel-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 18V4a2 2 0 0 0-2-2H8"/><path d="M2 6h4"/></svg>
+            DANH SÁCH ĐƠN HÀNG
+          </span>
+          <button id="btn-open-new-order-modal" class="btn btn-outline btn-sm" title="Tạo đơn hàng mới tại chỗ với đại lý">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Tạo đơn mới</span>
+          </button>
+        </div>
+        <p style="font-size: 0.72rem; color: #94a3b8;">Chọn đơn để đại lý kiểm tra, ký nhận và in trước khi rời đi:</p>
+      </div>
 
-      <!-- Kịch bản 2: Vượt Hạn Mức -->
-      <button class="preset-btn" data-scenario="OVER_LIMIT" title="Công nợ 350M / 400M, còn 50M. Đơn > 50M -> Hệ thống tự động chuyển trạng thái CẦN DUYỆT">
-        🟡 Kịch bản 2: Vượt Hạn Mức -> Cần Duyệt (ĐL Sao Mai)
-      </button>
+      <div class="panel-body-content">
+        <!-- 1. Bộ chọn danh sách đơn hàng thực tế -->
+        <div class="control-block">
+          <div class="control-block-label">
+            <span>Đơn hàng gần đây</span>
+            <span style="color: #60a5fa; font-family: var(--font-mono); font-size: 0.72rem;">5 mẫu</span>
+          </div>
+          <div class="order-list-scroller" id="order-list-scroller">
+            <!-- Render động bằng JS -->
+          </div>
+        </div>
 
-      <!-- Kịch bản 3: Nợ Quá Hạn Vi Phạm -->
-      <button class="preset-btn" data-scenario="OVERDUE_BLOCKED" title="Có 2 hóa đơn quá hạn 56 ngày & 45 ngày (> 30 ngày quy định) -> CHẶN TẠO ĐƠN HOÀN TOÀN">
-        🔴 Kịch bản 3: Nợ Quá Hạn Vi Phạm -> KHÓA CỨNG (ĐL Thăng Long)
-      </button>
+        <!-- 2. Chọn định dạng in: Khổ A4 Doanh nghiệp vs Máy in nhiệt mini K80 -->
+        <div class="control-block">
+          <div class="control-block-label">
+            <span>Định dạng khổ in (Format Profile)</span>
+          </div>
+          <div class="profile-toggle-group">
+            <button id="toggle-profile-a4" class="toggle-pill active" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
+              <span>Chuẩn A4</span>
+            </button>
+            <button id="toggle-profile-k80" class="toggle-pill" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="1"/><line x1="9" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="15" y2="10"/></svg>
+              <span>Nhiệt K80 (80mm)</span>
+            </button>
+          </div>
+        </div>
 
-      <!-- Kịch bản 4: Cận Hạn Mức Biên -->
-      <button class="preset-btn" data-scenario="BORDERLINE" title="Công nợ 494M / 500M (98.8%), chỉ còn 6M khả dụng -> Test sự nhạy bén của thanh đo">
-        🟣 Kịch bản 4: Cận Hạn Mức Biên 98.8% (ĐL Sài Gòn Star)
-      </button>
+        <!-- 3. Tùy chọn hiển thị chi tiết mẫu in -->
+        <div class="control-block">
+          <div class="control-block-label">
+            <span>Tùy chỉnh thành phần mẫu in</span>
+          </div>
+          <div class="options-grid">
+            <label class="option-checkbox-item">
+              <input type="checkbox" id="chk-show-logo" checked />
+              <span>Logo Doanh nghiệp</span>
+            </label>
+            <label class="option-checkbox-item">
+              <input type="checkbox" id="chk-show-barcode" checked />
+              <span>Mã vạch Barcode 128</span>
+            </label>
+            <label class="option-checkbox-item">
+              <input type="checkbox" id="chk-show-qrcode" checked />
+              <span>Mã QR tra cứu</span>
+            </label>
+            <label class="option-checkbox-item">
+              <input type="checkbox" id="chk-show-signatures" checked />
+              <span>Khu vực ký nhận</span>
+            </label>
+            <label class="option-checkbox-item">
+              <input type="checkbox" id="chk-show-watermark" checked />
+              <span>Dấu Thủy ấn xác nhận</span>
+            </label>
+            <label class="option-checkbox-item">
+              <input type="checkbox" id="chk-show-terms" checked />
+              <span>Điều khoản giao nhận</span>
+            </label>
+          </div>
+        </div>
 
-      <!-- Kịch bản 5: Đại Lý Mới -->
-      <button class="preset-btn" data-scenario="CLEAN_NEW" title="Đại lý mới 100% không có nợ, hạn mức 300M dồi dào">
-        ⚪ Kịch bản 5: Không Công Nợ (ĐL Mekong)
-      </button>
-    </div>
-  </div>
+        <!-- 4. THAO TÁC CỐT LÕI: IN NGAY, XUẤT PDF, KÝ ĐIỆN TỬ & TEST SCANNER -->
+        <div class="control-block">
+          <div class="control-block-label">
+            <span>Thao tác tại hiện trường</span>
+          </div>
+          <div class="action-stack">
+            <!-- Nút In lớn nổi bật -->
+            <button id="btn-print" class="btn btn-primary btn-print-hero btn-block" title="In trực tiếp ra máy in văn phòng hoặc máy in nhiệt">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              <span>IN ĐƠN HÀNG NGAY (PRINT)</span>
+            </button>
 
-  <!-- ===================================================================
-       APP MAIN CONTENT (CONTAINERS CHO 3 TABS)
-       =================================================================== -->
-  <main class="app-main-content">
-    
-    <!-- TAB 1: MÀN HÌNH TẠO ĐƠN HÀNG (TRỌNG TÂM ĐỀ BÀI) -->
-    <div id="orderScreenContainer" class="tab-view-container active"></div>
+            <div class="action-row-split">
+              <!-- Nút Xuất PDF -->
+              <button id="btn-export-pdf" class="btn btn-secondary" title="Tải file PDF độ phân giải cao">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Xuất PDF</span>
+              </button>
 
-    <!-- TAB 2: DANH SÁCH ĐƠN & PHÊ DUYỆT CÔNG NỢ (TIÊU CHÍ 2 DUYỆT NGOẠI LỆ) -->
-    <div id="approvalScreenContainer" class="tab-view-container"></div>
+              <!-- Nút Ký xác nhận điện tử trực tiếp -->
+              <button id="btn-open-sign-modal" class="btn btn-success" title="Khách hàng ký trực tiếp trên màn hình tablet/laptop">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="11" cy="11" r="2"/></svg>
+                <span>Ký xác nhận (e-Sign)</span>
+              </button>
+            </div>
 
-    <!-- TAB 3: MA TRẬN CÔNG NỢ ĐẠI LÝ & BÁO CÁO AGING DEBT (TIÊU CHÍ 3 KIỂM SOÁT QUÁ HẠN) -->
-    <div id="matrixScreenContainer" class="tab-view-container"></div>
+            <!-- Nút Giả lập máy quét Barcode kho vận -->
+            <button id="btn-open-scanner-modal" class="btn btn-outline btn-block" style="border-color: #059669; color: #34d399;" title="Kiểm thử việc thủ kho quét mã vạch tra cứu đơn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+              <span>Thủ kho Quét Mã Vạch (PDA Scanner)</span>
+            </button>
+          </div>
+        </div>
 
+        <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid var(--color-border); font-size: 0.72rem; color: #64748b; line-height: 1.4;">
+          <strong>Nghiệp vụ thực địa:</strong> Sau khi đại lý duyệt và ký nhận, phiếu in hoặc bản PDF sẽ được chuyển tiếp về kho vận WMS để soạn hàng tự động theo mã vạch.
+        </div>
+      </div>
+    </aside>
+
+    <!-- CỘT PHẢI: KHUNG XEM TRƯỚC BẢN IN TRUNG THỰC (LIVE WYSIWYG CANVAS) -->
+    <section class="canvas-panel">
+      <!-- Toolbar điều hướng canvas -->
+      <div class="canvas-toolbar">
+        <div class="toolbar-left">
+          <span class="view-mode-tag">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Xem trước bản in thực tế (WYSIWYG 100% giống bản in giấy)
+          </span>
+        </div>
+
+        <div class="toolbar-right">
+          <!-- Bộ điều khiển Phóng to / Thu nhỏ Canvas -->
+          <div class="zoom-controller">
+            <button id="btn-zoom-out" class="zoom-btn" title="Thu nhỏ (Ctrl -)">−</button>
+            <span id="zoom-level-text" class="zoom-level-text">100%</span>
+            <button id="btn-zoom-in" class="zoom-btn" title="Phóng to (Ctrl +)">+</button>
+            <button id="btn-zoom-fit" class="zoom-btn" style="width: auto; padding: 0 6px; font-size: 0.72rem;" title="Đặt lại 100%">1:1</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vùng cuộn hiển thị tờ giấy in -->
+      <div class="canvas-scroll-viewport" id="canvas-scroll-viewport">
+        <div class="paper-container" id="paper-container">
+          <!-- Bản in đơn hàng HTML sẽ được render ở đây -->
+        </div>
+      </div>
+    </section>
   </main>
 
-  <!-- ===================================================================
-       GLOBAL MODAL DIALOG CONTAINER
-       =================================================================== -->
-  <div id="globalModalOverlay" class="modal-overlay">
-    <div id="globalModalContainer" class="modal-dialog-box"></div>
+  <!-- ========================================================================= -->
+  <!-- 3. MODALS SYSTEM: CHỮ KÝ SỐ, SCANNER THỦ KHO, TẠO ĐƠN MỚI                 -->
+  <!-- ========================================================================= -->
+
+  <!-- MODAL 1: BẢNG VẼ CHỮ KÝ ĐIỆN TỬ CẢM ỨNG TẠI CHỖ (E-SIGNATURE PAD) -->
+  <div class="modal-backdrop" id="sign-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+          KÝ XÁC NHẬN ĐƠN HÀNG TRỰC TIẾP TẠI ĐẠI LÝ
+        </span>
+        <button class="modal-close-btn modal-close-trigger">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 0.8rem; color: #94a3b8;">
+          Khách hàng đại lý dùng ngón tay (trên màn hình cảm ứng điện thoại/tablet) hoặc chuột máy tính để ký xác nhận đơn hàng ngay tại chỗ:
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="signer-name-input">Họ và tên người ký xác nhận:</label>
+          <input type="text" id="signer-name-input" class="form-input" placeholder="Ví dụ: Vũ Mạnh Cường (Giám đốc)" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Khung vẽ chữ ký cảm ứng:</label>
+          <div class="signature-canvas-wrapper">
+            <canvas id="signature-canvas" class="signature-canvas"></canvas>
+          </div>
+          <div class="signature-pad-hint">
+            <span>Dùng ngón tay hoặc chuột để ký tên</span>
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-clear-signature" class="btn btn-outline btn-sm" type="button">Xóa chữ ký</button>
+              <button id="btn-sample-signature" class="btn btn-secondary btn-sm" type="button">Dùng chữ ký mẫu</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline modal-close-trigger" type="button">Hủy bỏ</button>
+        <button id="btn-apply-signature" class="btn btn-success" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Lưu & Áp dụng chữ ký vào Phiếu In</span>
+        </button>
+      </div>
+    </div>
   </div>
 
-  <!-- ===================================================================
-       TOAST NOTIFICATIONS CONTAINER
-       =================================================================== -->
-  <div id="toastContainer" class="toast-container"></div>
+  <!-- MODAL 2: GIẢ LẬP ĐẦU ĐỌC MÃ VẠCH KHO VẬN (WAREHOUSE BARCODE SCANNER HUD) -->
+  <div class="modal-backdrop" id="scanner-modal">
+    <div class="modal-box" style="max-width: 650px;">
+      <div class="modal-header">
+        <span class="modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+          MÁY QUÉT MÃ VẠCH KHO VẬN WMS (BARCODE SCANNER SIMULATOR)
+        </span>
+        <button class="modal-close-btn modal-close-trigger">&times;</button>
+      </div>
 
-  <!-- Main ES6 Application Entrypoint -->
+      <div class="modal-body">
+        <p style="font-size: 0.8rem; color: #94a3b8;">
+          Mô phỏng thao tác máy quét laser PDA tại Kho Vận Cát Lái khi nhận phiếu in từ Sales Rep mang về hoặc đơn điện tử đẩy sang:
+        </p>
+
+        <div class="scanner-hud">
+          <div class="scanner-viewfinder">
+            <div class="laser-beam"></div>
+            <div class="viewfinder-barcode-sample">
+              <svg width="220" height="40" viewBox="0 0 220 40">
+                <rect x="10" y="0" width="3" height="40" fill="#10b981"/>
+                <rect x="18" y="0" width="2" height="40" fill="#10b981"/>
+                <rect x="25" y="0" width="5" height="40" fill="#10b981"/>
+                <rect x="36" y="0" width="2" height="40" fill="#10b981"/>
+                <rect x="42" y="0" width="4" height="40" fill="#10b981"/>
+                <rect x="52" y="0" width="2" height="40" fill="#10b981"/>
+                <rect x="60" y="0" width="6" height="40" fill="#10b981"/>
+                <rect x="74" y="0" width="3" height="40" fill="#10b981"/>
+                <rect x="85" y="0" width="5" height="40" fill="#10b981"/>
+                <rect x="98" y="0" width="2" height="40" fill="#10b981"/>
+                <rect x="110" y="0" width="4" height="40" fill="#10b981"/>
+                <rect x="120" y="0" width="6" height="40" fill="#10b981"/>
+                <rect x="134" y="0" width="2" height="40" fill="#10b981"/>
+                <rect x="142" y="0" width="5" height="40" fill="#10b981"/>
+                <rect x="155" y="0" width="3" height="40" fill="#10b981"/>
+                <rect x="165" y="0" width="4" height="40" fill="#10b981"/>
+                <rect x="176" y="0" width="2" height="40" fill="#10b981"/>
+                <rect x="185" y="0" width="6" height="40" fill="#10b981"/>
+                <rect x="200" y="0" width="3" height="40" fill="#10b981"/>
+              </svg>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="scanner-barcode-input" class="form-input text-mono font-bold" style="flex: 1;" placeholder="Nhập hoặc quét mã đơn (NX-ORD-...)" />
+            <button id="btn-trigger-scan" class="btn btn-success" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Quét (BÍP)</span>
+            </button>
+          </div>
+
+          <!-- Kết quả tra cứu kho vận tức thì -->
+          <div id="scanner-result-box">
+            <!-- Render kết quả tra cứu WMS tại đây -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-close-trigger" type="button">Đóng cửa sổ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: TẠO ĐƠN HÀNG MỚI TRỰC TIẾP TẠI HIỆN TRƯỜNG -->
+  <div class="modal-backdrop" id="new-order-modal">
+    <div class="modal-box" style="max-width: 720px;">
+      <div class="modal-header">
+        <span class="modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          TẠO ĐƠN HÀNG MỚI TẠI CHỖ VỚI ĐẠI LÝ
+        </span>
+        <button class="modal-close-btn modal-close-trigger">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="new-order-agency-select">Chọn Đại lý khách hàng:</label>
+            <select id="new-order-agency-select" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-order-delivery-date">Ngày giao hàng dự kiến:</label>
+            <input type="date" id="new-order-delivery-date" class="form-input" />
+          </div>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.5); padding: 12px; border-radius: 6px; border: 1px solid var(--color-border); margin-top: 6px;">
+          <span style="font-size: 0.78rem; font-weight: 700; color: #60a5fa; text-transform: uppercase;">Thêm sản phẩm vào đơn:</span>
+          <div style="display: grid; grid-template-columns: 2.2fr 0.8fr 0.8fr auto; gap: 8px; margin-top: 8px; align-items: flex-end;">
+            <div class="form-group">
+              <label class="form-label" style="font-size: 0.72rem;">Sản phẩm:</label>
+              <select id="new-order-product-select" class="form-select"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size: 0.72rem;">Số lượng:</label>
+              <input type="number" id="new-order-qty-input" class="form-input" value="1" min="1" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size: 0.72rem;">CK dòng (%):</label>
+              <input type="number" id="new-order-discount-input" class="form-input" value="5" min="0" max="50" />
+            </div>
+            <button id="btn-add-order-item" class="btn btn-secondary" type="button" style="height: 38px;">
+              + Thêm
+            </button>
+          </div>
+        </div>
+
+        <!-- Bảng danh sách dòng hàng nháp -->
+        <div class="form-group">
+          <label class="form-label">Danh mục sản phẩm trong đơn:</label>
+          <div style="max-height: 180px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 6px;">
+            <table class="inv-table" style="font-size: 0.75rem;">
+              <thead>
+                <tr>
+                  <th>STT</th>
+                  <th>Mã SKU</th>
+                  <th>Tên mặt hàng</th>
+                  <th>SL</th>
+                  <th>Đơn giá</th>
+                  <th>CK (%)</th>
+                  <th>Thành tiền</th>
+                  <th>Xóa</th>
+                </tr>
+              </thead>
+              <tbody id="new-order-items-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(37,99,235,0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(37,99,235,0.25);">
+          <span style="font-size: 0.82rem; font-weight: 600; color: #93c5fd;">Tạm tính đơn hàng:</span>
+          <span id="new-order-subtotal-preview" style="font-size: 1.05rem; font-weight: 800; color: #34d399;">0 đ</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="new-order-notes">Ghi chú giao nhận / Điều khoản đặc biệt:</label>
+          <textarea id="new-order-notes" class="form-textarea" rows="2" placeholder="Ví dụ: Giao trước 11h sáng, bốc xếp vào kho tầng 2..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline modal-close-trigger" type="button">Hủy bỏ</button>
+        <button id="btn-submit-new-order" class="btn btn-primary" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Lên Đơn & Mở Bản In Ngay</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Application Controller Script (ES Module) -->
   <script type="module" src="js/app.js"></script>
-
 </body>
 </html>

@@ -1,42 +1,36 @@
-# ===================================================================
-# NEXUS OMS - Lightweight Local Web Server (PowerShell & .NET)
-# Ticket: SCRUM-86 / SCRUM-9 (Credit Risk Gatekeeper)
-# ===================================================================
-$port = 5509
-$rootPath = $PSScriptRoot
+# ==============================================================================
+# LIGHTWEIGHT STATIC HTTP WEB SERVER IN POWERSHELL FOR NEXUS OMS (SCRUM-86 / SCRUM-15)
+# Không cần cài đặt Node.js hay Python, chạy độc lập 100% trên mọi máy tính Windows!
+# ==============================================================================
 
+$port = 8085
 $listener = New-Object System.Net.HttpListener
-$url = "http://localhost:$port/"
-$listener.Prefixes.Add($url)
+$url = "http://127.0.0.1:$port/"
 
 try {
+    $listener.Prefixes.Add($url)
     $listener.Start()
-    Write-Host "======================================================================" -ForegroundColor Cyan
-    Write-Host " [NEXUS OMS] Enterprise Credit Risk Gatekeeper & Order Lifecycle" -ForegroundColor Green
-    Write-Host " Running on: $url" -ForegroundColor Yellow
-    Write-Host " Web root:   $rootPath" -ForegroundColor Gray
-    Write-Host " Ticket:     SCRUM-86 / SCRUM-9" -ForegroundColor Magenta
-    Write-Host " Nhan Ctrl + C de dung server." -ForegroundColor DarkGray
-    Write-Host "======================================================================" -ForegroundColor Cyan
-    
-    # Auto open browser
-    Start-Process $url
-}
-catch {
-    Write-Host "Khong the khoi dong HttpListener tren port $port. Mo file truc tiep trong trinh duyet..." -ForegroundColor Red
-    Start-Process "$rootPath\index.html"
-    exit
+} catch {
+    # Nếu port 8085 bận, thử port 8086
+    $port = 8086
+    $url = "http://127.0.0.1:$port/"
+    $listener = New-Object System.Net.HttpListener
+    $listener.Prefixes.Add($url)
+    $listener.Start()
 }
 
-$mimeTypes = @{
-    ".html" = "text/html; charset=utf-8"
-    ".css"  = "text/css; charset=utf-8"
-    ".js"   = "application/javascript; charset=utf-8"
-    ".json" = "application/json; charset=utf-8"
-    ".png"  = "image/png"
-    ".jpg"  = "image/jpeg"
-    ".svg"  = "image/svg+xml"
-}
+Write-Host "==========================================================================" -ForegroundColor Cyan
+Write-Host "   NEXUS OMS // FIELD SALES ORDER PRINTING & PDF EXPORT SYSTEM" -ForegroundColor Yellow
+Write-Host "   SCRUM-86 / SCRUM-15: In & Xuat PDF Don Hang Xac Nhan Dai Ly" -ForegroundColor Green
+Write-Host "==========================================================================" -ForegroundColor Cyan
+Write-Host "Server dang chay tai dia chi: $url" -ForegroundColor White
+Write-Host "Dang mo trinh duyet tu dong..." -ForegroundColor Gray
+
+try {
+    Start-Process $url -ErrorAction SilentlyContinue
+} catch {}
+
+$root = $PSScriptRoot
 
 while ($listener.IsListening) {
     try {
@@ -44,31 +38,39 @@ while ($listener.IsListening) {
         $request = $context.Request
         $response = $context.Response
 
-        $relPath = $request.Url.LocalPath.TrimStart('/')
-        if ([string]::IsNullOrEmpty($relPath)) {
-            $relPath = "index.html"
+        $path = $request.Url.LocalPath
+        if ($path -eq "/" -or [string]::IsNullOrEmpty($path)) {
+            $path = "/index.html"
         }
-        $relPath = $relPath -replace '/', '\'
 
-        $filePath = Join-Path $rootPath $relPath
+        $localPath = Join-Path $root ($path.TrimStart('/').Replace('/', '\'))
 
-        if (Test-Path $filePath -PathType Leaf) {
-            $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
-            $contentType = if ($mimeTypes.ContainsKey($ext)) { $mimeTypes[$ext] } else { "application/octet-stream" }
-            $response.ContentType = $contentType
-            $bytes = [System.IO.File]::ReadAllBytes($filePath)
+        if (Test-Path $localPath -PathType Leaf) {
+            $ext = [System.IO.Path]::GetExtension($localPath).ToLower()
+            $mime = switch ($ext) {
+                ".html" { "text/html; charset=utf-8" }
+                ".css"  { "text/css; charset=utf-8" }
+                ".js"   { "application/javascript; charset=utf-8" }
+                ".json" { "application/json; charset=utf-8" }
+                ".png"  { "image/png" }
+                ".jpg"  { "image/jpeg" }
+                ".svg"  { "image/svg+xml; charset=utf-8" }
+                ".pdf"  { "application/pdf" }
+                Default { "application/octet-stream" }
+            }
+
+            $bytes = [System.IO.File]::ReadAllBytes($localPath)
+            $response.ContentType = $mime
             $response.ContentLength64 = $bytes.Length
+            $response.AddHeader("Access-Control-Allow-Origin", "*")
             $response.OutputStream.Write($bytes, 0, $bytes.Length)
-            $response.StatusCode = 200
-        }
-        else {
+        } else {
             $response.StatusCode = 404
-            $notFound = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found")
-            $response.OutputStream.Write($notFound, 0, $notFound.Length)
+            $msg = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found")
+            $response.OutputStream.Write($msg, 0, $msg.Length)
         }
         $response.Close()
-    }
-    catch {
-        # Silent ignore on close
+    } catch {
+        # Bo qua loi khi client ngat ket noi
     }
 }
