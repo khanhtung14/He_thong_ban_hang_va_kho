@@ -1,406 +1,441 @@
 /**
- * DISTRICARE CRM - Data Store & State Management
- * Kiến trúc Reactive Observer Pattern, tự động đồng bộ LocalStorage, xử lý Audit Log & Nghiệp vụ chuyển giao
+ * NEXUS ENTERPRISE WMS - CENTRAL REACTIVE STORE
+ * Ticket: SCRUM-87 / SCRUM-35
+ * Module: Quản lý trạng thái ứng dụng, LocalStorage Cache, Sự kiện phát tín hiệu thời gian thực
  */
 
-import { INITIAL_EMPLOYEES, INITIAL_AGENCIES, INITIAL_HANDOVERS, INITIAL_AUDIT_LOGS } from './data.js';
+import {
+  SYSTEM_CONFIG,
+  WAREHOUSES,
+  SUPPLIERS,
+  PRODUCT_CATALOG,
+  INITIAL_INVENTORY_ITEMS,
+  INITIAL_AUDIT_LOGS,
+  DEMO_SCENARIOS
+} from './mockData.js';
 
-const STORAGE_KEYS = {
-  EMPLOYEES: 'districare_employees_v1',
-  AGENCIES: 'districare_agencies_v1',
-  HANDOVERS: 'districare_handovers_v1',
-  AUDIT_LOGS: 'districare_audit_logs_v1',
-  CURRENT_USER_ID: 'districare_current_user_id_v1'
-};
+import { InventoryEngine } from './inventoryEngine.js';
 
-class Store {
+const STORAGE_KEY = 'NEXUS_WMS_SCRUM35_STATE_V1';
+
+class InventoryStore {
   constructor() {
-    this.listeners = new Set();
-    this.employees = [];
-    this.agencies = [];
-    this.handovers = [];
-    this.auditLogs = [];
-    this.currentUserId = 'NV001'; // Default: Quản lý Nguyễn Hồng Vĩnh
-    this.init();
+    this.subscribers = new Set();
+    this.productMap = new Map();
+    this.warehouseMap = new Map();
+    this.supplierMap = new Map();
+
+    this.state = this._loadInitialState();
+    this._buildLookupMaps();
   }
 
-  init() {
+  _buildLookupMaps() {
+    this.productMap.clear();
+    this.warehouseMap.clear();
+    this.supplierMap.clear();
+
+    this.state.productCatalog.forEach(p => this.productMap.set(p.sku, p));
+    this.state.warehouses.forEach(w => this.warehouseMap.set(w.id, w));
+    this.state.suppliers.forEach(s => this.supplierMap.set(s.id, s));
+  }
+
+  _loadInitialState() {
     try {
-      const storedEmployees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
-      const storedAgencies = localStorage.getItem(STORAGE_KEYS.AGENCIES);
-      const storedHandovers = localStorage.getItem(STORAGE_KEYS.HANDOVERS);
-      const storedAuditLogs = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
-      const storedUserId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
-
-      this.employees = storedEmployees ? JSON.parse(storedEmployees) : [...INITIAL_EMPLOYEES];
-      this.agencies = storedAgencies ? JSON.parse(storedAgencies) : [...INITIAL_AGENCIES];
-      this.handovers = storedHandovers ? JSON.parse(storedHandovers) : [...INITIAL_HANDOVERS];
-      this.auditLogs = storedAuditLogs ? JSON.parse(storedAuditLogs) : [...INITIAL_AUDIT_LOGS];
-
-      if (storedUserId && this.employees.some(e => e.id === storedUserId)) {
-        this.currentUserId = storedUserId;
-      } else {
-        this.currentUserId = 'NV001';
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.inventoryItems) && parsed.inventoryItems.length > 0) {
+          return {
+            ...parsed,
+            activeWarehouseFilter: 'ALL',
+            activeCategoryFilter: 'ALL',
+            activeStatusFilter: 'ALL',
+            searchQuery: '',
+            activeTab: 'dashboard',
+            soundEnabled: true
+          };
+        }
       }
-
-      this.saveToStorage();
-    } catch (err) {
-      console.warn('Lỗi đọc LocalStorage, khởi tạo dữ liệu mặc định:', err);
-      this.resetToDefault();
+    } catch (e) {
+      console.warn('Không thể đọc dữ liệu từ LocalStorage, khởi tạo dữ liệu mặc định.', e);
     }
+
+    return {
+      systemConfig: { ...SYSTEM_CONFIG },
+      warehouses: [...WAREHOUSES],
+      suppliers: [...SUPPLIERS],
+      productCatalog: [...PRODUCT_CATALOG],
+      inventoryItems: JSON.parse(JSON.stringify(INITIAL_INVENTORY_ITEMS)),
+      auditLogs: [...INITIAL_AUDIT_LOGS],
+      activeWarehouseFilter: 'ALL',
+      activeCategoryFilter: 'ALL',
+      activeStatusFilter: 'ALL',
+      searchQuery: '',
+      activeTab: 'dashboard',
+      soundEnabled: true,
+      currentScenario: 'SCENARIO_DEFAULT'
+    };
   }
 
-  saveToStorage() {
+  save() {
     try {
-      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(this.employees));
-      localStorage.setItem(STORAGE_KEYS.AGENCIES, JSON.stringify(this.agencies));
-      localStorage.setItem(STORAGE_KEYS.HANDOVERS, JSON.stringify(this.handovers));
-      localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(this.auditLogs));
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, this.currentUserId);
-    } catch (err) {
-      console.error('Không thể lưu LocalStorage:', err);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        systemConfig: this.state.systemConfig,
+        warehouses: this.state.warehouses,
+        suppliers: this.state.suppliers,
+        productCatalog: this.state.productCatalog,
+        inventoryItems: this.state.inventoryItems,
+        auditLogs: this.state.auditLogs,
+        currentScenario: this.state.currentScenario
+      }));
+    } catch (e) {
+      console.error('Lỗi khi ghi dữ liệu vào LocalStorage:', e);
     }
-  }
-
-  resetToDefault() {
-    this.employees = JSON.parse(JSON.stringify(INITIAL_EMPLOYEES));
-    this.agencies = JSON.parse(JSON.stringify(INITIAL_AGENCIES));
-    this.handovers = JSON.parse(JSON.stringify(INITIAL_HANDOVERS));
-    this.auditLogs = JSON.parse(JSON.stringify(INITIAL_AUDIT_LOGS));
-    this.currentUserId = 'NV001';
-    this.saveToStorage();
-    this.notify({ type: 'RESET_DATA' });
   }
 
   subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.subscribers.add(listener);
+    return () => this.subscribers.delete(listener);
   }
 
-  notify(event) {
-    this.saveToStorage();
-    this.listeners.forEach(fn => {
+  notify(eventType = 'STATE_CHANGED', payload = null) {
+    this.save();
+    for (const listener of this.subscribers) {
       try {
-        fn(event, this);
+        listener(this.state, eventType, payload);
       } catch (err) {
-        console.error('Lỗi listener trong Store notify:', err);
+        console.error('Lỗi trong subscriber listener:', err);
       }
-    });
+    }
   }
 
-  // --- USER CONTEXT & RBAC ---
-  getCurrentUser() {
-    const user = this.employees.find(e => e.id === this.currentUserId);
-    return user || this.employees[0];
+  // ==================== GETTERS ====================
+  getState() {
+    return this.state;
   }
 
-  setCurrentUser(userId) {
-    const found = this.employees.find(e => e.id === userId);
-    if (!found) return false;
-    this.currentUserId = userId;
-    this.notify({ type: 'USER_SWITCHED', user: found });
-    return true;
+  getProduct(sku) {
+    return this.productMap.get(sku) || null;
   }
 
-  isManager() {
-    const u = this.getCurrentUser();
-    return u && u.role === 'MANAGER';
+  getWarehouse(warehouseId) {
+    return this.warehouseMap.get(warehouseId) || null;
   }
 
-  // --- GETTERS ---
-  getEmployees() {
-    return [...this.employees];
-  }
-
-  getEmployeeById(id) {
-    return this.employees.find(e => e.id === id) || null;
-  }
-
-  getAgencies() {
-    return [...this.agencies];
-  }
-
-  getAgencyById(id) {
-    return this.agencies.find(a => a.id === id) || null;
-  }
-
-  getHandovers() {
-    return [...this.handovers].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }
-
-  getAuditLogs() {
-    return [...this.auditLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  getSupplier(supplierId) {
+    return this.supplierMap.get(supplierId) || null;
   }
 
   /**
-   * Acceptance Criterion 1 & 2:
-   * Lọc danh sách đại lý theo phân quyền (RBAC / Row-Level Security) và các tiêu chí tìm kiếm
+   * Lấy toàn bộ danh sách tồn kho đã qua tính toán làm giàu chỉ số
    */
-  getVisibleAgencies(filters = {}) {
-    const currentUser = this.getCurrentUser();
-    let list = [...this.agencies];
-
-    // QUY TẮC BẢO MẬT HÀNG (Row-Level Security):
-    // Nhân viên kinh doanh chỉ nhìn thấy đại lý mình phụ trách chính!
-    if (currentUser.role === 'SALES_REP') {
-      list = list.filter(a => a.assignedSalesId === currentUser.id);
-    }
-
-    // Bộ lọc nghiệp vụ
-    if (filters.search) {
-      const q = filters.search.trim().toLowerCase();
-      list = list.filter(a =>
-        a.name.toLowerCase().includes(q) ||
-        a.code.toLowerCase().includes(q) ||
-        a.shortName.toLowerCase().includes(q) ||
-        a.province.toLowerCase().includes(q) ||
-        (a.taxId && a.taxId.includes(q))
-      );
-    }
-
-    if (filters.region && filters.region !== 'ALL') {
-      list = list.filter(a => a.region === filters.region);
-    }
-
-    if (filters.tier && filters.tier !== 'ALL') {
-      list = list.filter(a => a.tier === filters.tier);
-    }
-
-    if (filters.assigneeId && filters.assigneeId !== 'ALL') {
-      if (filters.assigneeId === 'UNASSIGNED') {
-        list = list.filter(a => !a.assignedSalesId);
-      } else {
-        list = list.filter(a => a.assignedSalesId === filters.assigneeId);
-      }
-    }
-
-    return list;
-  }
-
-  // --- ACTIONS (NGHIỆP VỤ) ---
-
-  /**
-   * Acceptance Criterion 1:
-   * Gán một nhân viên phụ trách chính cho mỗi đại lý
-   */
-  assignAgencyPrimaryRep({ agencyId, employeeId, notes = '' }) {
-    const agency = this.agencies.find(a => a.id === agencyId);
-    if (!agency) {
-      throw new Error(`Không tìm thấy đại lý có mã ID: ${agencyId}`);
-    }
-
-    const oldRep = agency.assignedSalesId ? this.getEmployeeById(agency.assignedSalesId) : null;
-    const newRep = employeeId ? this.getEmployeeById(employeeId) : null;
-    const actor = this.getCurrentUser();
-
-    // Cập nhật
-    agency.assignedSalesId = employeeId || null;
-    agency.status = employeeId ? 'ACTIVE' : 'PENDING_ASSIGN';
-    agency.lastContactDate = new Date().toISOString().split('T')[0];
-
-    // Ghi nhật ký Audit Log
-    const auditRecord = {
-      id: 'LOG' + Date.now(),
-      timestamp: new Date().toISOString(),
-      actorName: actor.name,
-      actorRole: actor.roleTitle,
-      action: 'SINGLE_ASSIGN',
-      targetAgencyCode: agency.code,
-      targetAgencyName: agency.name,
-      oldAssignee: oldRep ? oldRep.name : 'Chưa phân công',
-      newAssignee: newRep ? newRep.name : 'Bỏ gán (Chưa phân công)',
-      notes: notes || `Phân công nhân viên phụ trách chính trực tiếp bởi ${actor.name}`
-    };
-
-    this.auditLogs.unshift(auditRecord);
-    this.notify({
-      type: 'AGENCY_ASSIGNED',
-      agency,
-      oldRep,
-      newRep,
-      auditRecord
+  getEnrichedInventoryItems() {
+    return this.state.inventoryItems.map(item => {
+      const product = this.getProduct(item.sku) || {};
+      const enriched = InventoryEngine.enrichItem(item, product);
+      const wh = this.getWarehouse(item.warehouseId);
+      return {
+        ...enriched,
+        warehouseName: wh ? wh.name : item.warehouseId,
+        warehouseShortName: wh ? wh.shortName : item.warehouseId,
+        warehouseRegion: wh ? wh.region : '',
+        warehouseColor: wh ? wh.color : '#6366f1'
+      };
     });
-
-    return { agency, oldRep, newRep };
   }
 
   /**
-   * Acceptance Criterion 3:
-   * Chuyển giao địa bàn hàng loạt khi nhân viên nghỉ, có ghi lịch sử đầy đủ
+   * Lấy danh sách tồn kho đã qua các bộ lọc giao diện
    */
-  executeBulkHandover({
-    fromEmployeeId,
-    toEmployeeId,
-    agencyIds,
-    reason,
-    reasonText,
-    effectiveDate,
-    notes
-  }) {
-    if (!fromEmployeeId || !toEmployeeId) {
-      throw new Error('Vui lòng chọn nhân viên bàn giao và nhân viên tiếp nhận hợp lệ.');
-    }
-    if (fromEmployeeId === toEmployeeId) {
-      throw new Error('Nhân viên tiếp nhận không được trùng với nhân viên bàn giao!');
-    }
-    if (!agencyIds || agencyIds.length === 0) {
-      throw new Error('Danh sách đại lý chuyển giao không được để trống.');
+  getFilteredItems() {
+    const enriched = this.getEnrichedInventoryItems();
+    const { activeWarehouseFilter, activeCategoryFilter, activeStatusFilter, searchQuery } = this.state;
+
+    return enriched.filter(item => {
+      // 1. Lọc theo kho
+      if (activeWarehouseFilter !== 'ALL' && item.warehouseId !== activeWarehouseFilter) {
+        return false;
+      }
+
+      // 2. Lọc theo danh mục
+      if (activeCategoryFilter !== 'ALL' && item.categoryCode !== activeCategoryFilter) {
+        return false;
+      }
+
+      // 3. Lọc theo trạng thái cảnh báo
+      if (activeStatusFilter !== 'ALL') {
+        if (activeStatusFilter === 'BELOW_MIN') {
+          // Bao gồm cả hàng hết (Stockout) và hàng dưới Min
+          if (!item.isBelowMin && !item.isStockout) return false;
+        } else if (activeStatusFilter === 'CRITICAL_ONLY') {
+          // Chỉ lấy hàng hết (Stockout)
+          if (!item.isStockout) return false;
+        } else if (activeStatusFilter === 'NEAR_MIN') {
+          if (!item.isNearMin) return false;
+        } else if (activeStatusFilter === 'HEALTHY') {
+          if (!item.isHealthy) return false;
+        } else if (activeStatusFilter === 'OVERSTOCK') {
+          if (!item.isOverstock) return false;
+        }
+      }
+
+      // 4. Lọc tìm kiếm từ khóa thông minh
+      if (searchQuery && searchQuery.trim() !== '') {
+        const query = searchQuery.trim().toLowerCase();
+        const matchSku = item.sku.toLowerCase().includes(query);
+        const matchName = item.productName.toLowerCase().includes(query);
+        const matchBarcode = item.barcode.toLowerCase().includes(query);
+        const matchWh = item.warehouseName.toLowerCase().includes(query);
+        const matchBin = (item.binLocation || '').toLowerCase().includes(query);
+        if (!matchSku && !matchName && !matchBarcode && !matchWh && !matchBin) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * Tính toán bộ chỉ số KPI tổng hợp cho Dashboard
+   */
+  getDashboardKPIs() {
+    const enriched = this.getEnrichedInventoryItems();
+    return InventoryEngine.computeDashboardKPIs(enriched, this.state.activeWarehouseFilter);
+  }
+
+  /**
+   * Lấy danh sách đề xuất PO theo NCC
+   */
+  getPORecommendations() {
+    const enriched = this.getEnrichedInventoryItems();
+    return InventoryEngine.generatePORecommendations(enriched, this.state.suppliers, this.state.activeWarehouseFilter);
+  }
+
+  // ==================== ACTIONS / MUTATIONS ====================
+
+  setWarehouseFilter(warehouseId) {
+    this.state.activeWarehouseFilter = warehouseId;
+    this.notify('FILTER_CHANGED', { type: 'warehouse', value: warehouseId });
+  }
+
+  setCategoryFilter(categoryCode) {
+    this.state.activeCategoryFilter = categoryCode;
+    this.notify('FILTER_CHANGED', { type: 'category', value: categoryCode });
+  }
+
+  setStatusFilter(status) {
+    this.state.activeStatusFilter = status;
+    this.notify('FILTER_CHANGED', { type: 'status', value: status });
+  }
+
+  setSearchQuery(query) {
+    this.state.searchQuery = query;
+    this.notify('FILTER_CHANGED', { type: 'search', value: query });
+  }
+
+  setActiveTab(tabName) {
+    this.state.activeTab = tabName;
+    this.notify('TAB_CHANGED', { tab: tabName });
+  }
+
+  toggleSound(enabled) {
+    this.state.soundEnabled = (enabled !== undefined) ? enabled : !this.state.soundEnabled;
+    this.notify('SOUND_TOGGLED', { soundEnabled: this.state.soundEnabled });
+  }
+
+  /**
+   * Cập nhật khai báo tồn tối thiểu cho 1 cặp (Kho, SKU)
+   * Đáp ứng trực tiếp yêu cầu 1: "Khai báo tồn tối thiểu theo SKU và theo kho"
+   */
+  updateThreshold({ itemId, minThreshold, maxCapacity, reorderQuantity, leadTimeDays, reason = '' }) {
+    const itemIndex = this.state.inventoryItems.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) {
+      throw new Error(`Không tìm thấy bản ghi tồn kho có mã ID: ${itemId}`);
     }
 
-    const fromEmp = this.getEmployeeById(fromEmployeeId);
-    const toEmp = this.getEmployeeById(toEmployeeId);
-    if (!fromEmp || !toEmp) {
-      throw new Error('Không tìm thấy thông tin nhân sự trong hệ thống.');
-    }
+    const item = this.state.inventoryItems[itemIndex];
+    const oldMin = item.minThreshold;
+    const oldMax = item.maxCapacity;
 
-    const actor = this.getCurrentUser();
-    const transferredAgencies = [];
+    const parsedMin = Math.max(0, parseInt(minThreshold, 10) || 0);
+    const parsedMax = Math.max(parsedMin, parseInt(maxCapacity, 10) || (parsedMin * 2));
+    const parsedReorder = Math.max(1, parseInt(reorderQuantity, 10) || 10);
+    const parsedLead = leadTimeDays ? Math.max(1, parseInt(leadTimeDays, 10)) : item.leadTimeDays;
 
-    // Cập nhật từng đại lý
-    agencyIds.forEach(id => {
-      const agency = this.agencies.find(a => a.id === id);
-      if (agency) {
-        agency.assignedSalesId = toEmployeeId;
-        agency.status = 'ACTIVE';
-        transferredAgencies.push({
-          id: agency.id,
-          code: agency.code,
-          name: agency.name,
-          region: agency.region,
-          province: agency.province,
-          tier: agency.tier,
-          monthlyRevenue: agency.monthlyRevenue,
-          debtBalance: agency.debtBalance
-        });
+    item.minThreshold = parsedMin;
+    item.maxCapacity = parsedMax;
+    item.reorderQuantity = parsedReorder;
+    if (parsedLead) item.leadTimeDays = parsedLead;
+
+    // Ghi nhận Audit Log
+    const logEntry = {
+      id: `AUD-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actor: this.state.systemConfig.currentUser.name,
+      action: 'CẬP NHẬT NGƯỠNG TỒN MIN/MAX',
+      warehouseId: item.warehouseId,
+      sku: item.sku,
+      oldMin,
+      newMin: parsedMin,
+      reason: reason || `Điều chỉnh mức tồn tối thiểu từ ${oldMin} -> ${parsedMin} chiếc theo yêu cầu vận hành`
+    };
+
+    this.state.auditLogs.unshift(logEntry);
+    if (this.state.auditLogs.length > 50) this.state.auditLogs.pop();
+
+    const product = this.getProduct(item.sku);
+    const enriched = InventoryEngine.enrichItem(item, product);
+
+    this.notify('THRESHOLD_UPDATED', {
+      item: enriched,
+      log: logEntry,
+      wasBelowMinBefore: item.physicalStock - item.reservedStock < oldMin,
+      isBelowMinNow: enriched.isBelowMin
+    });
+
+    return enriched;
+  }
+
+  /**
+   * Cập nhật hàng loạt (Batch apply) mức tồn tối thiểu theo kho hoặc theo nhóm hàng
+   */
+  batchUpdateThreshold({ warehouseId, categoryCode, percentMultiplier, reason = '' }) {
+    let affectedCount = 0;
+    const factor = (100 + Number(percentMultiplier || 0)) / 100;
+
+    this.state.inventoryItems.forEach(item => {
+      const matchWh = (warehouseId === 'ALL' || item.warehouseId === warehouseId);
+      const product = this.getProduct(item.sku);
+      const matchCat = (categoryCode === 'ALL' || (product && product.categoryCode === categoryCode));
+
+      if (matchWh && matchCat) {
+        const oldMin = item.minThreshold;
+        const newMin = Math.max(1, Math.round(item.minThreshold * factor));
+        item.minThreshold = newMin;
+        item.maxCapacity = Math.max(newMin * 2, Math.round(item.maxCapacity * factor));
+        affectedCount++;
       }
     });
 
-    // Nếu nhân sự cũ đang trong trạng thái RESIGNING (xin nghỉ) và đã chuyển hết đại lý:
-    const remainingAgencies = this.agencies.filter(a => a.assignedSalesId === fromEmployeeId);
-    if (fromEmp.status === 'RESIGNING' && remainingAgencies.length === 0) {
-      fromEmp.status = 'HANDED_OVER'; // Đã hoàn thành bàn giao
-      fromEmp.notes = (fromEmp.notes || '') + ' [Đã hoàn tất bàn giao địa bàn toàn bộ]';
-    }
-
-    // Tạo mã phiếu bàn giao chuẩn
-    const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
-    const handoverIndex = String(this.handovers.length + 1).padStart(3, '0');
-    const handoverCode = `HO-${yearMonth}-${handoverIndex}`;
-
-    const newHandover = {
-      id: 'HO' + Date.now(),
-      code: handoverCode,
-      timestamp: new Date().toISOString(),
-      effectiveDate: effectiveDate || new Date().toISOString().split('T')[0],
-      transferredById: actor.id,
-      transferredByName: actor.name,
-      fromEmployeeId: fromEmp.id,
-      fromEmployeeName: fromEmp.name,
-      fromEmployeeRole: fromEmp.roleTitle,
-      toEmployeeId: toEmp.id,
-      toEmployeeName: toEmp.name,
-      toEmployeeRole: toEmp.roleTitle,
-      agencyIds: [...agencyIds],
-      agenciesSummary: transferredAgencies,
-      totalRevenue: transferredAgencies.reduce((sum, a) => sum + (a.monthlyRevenue || 0), 0),
-      totalDebt: transferredAgencies.reduce((sum, a) => sum + (a.debtBalance || 0), 0),
-      reason: reason || 'RESIGNATION',
-      reasonText: reasonText || 'Bàn giao chuyển giao địa bàn',
-      notes: notes || 'Hoàn tất bàn giao hồ sơ khách hàng, công nợ và chỉ tiêu doanh số.',
-      status: 'COMPLETED'
+    const logEntry = {
+      id: `AUD-BATCH-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actor: this.state.systemConfig.currentUser.name,
+      action: 'CẬP NHẬT HÀNG LOẠT (BATCH)',
+      warehouseId,
+      sku: `Category: ${categoryCode}`,
+      oldMin: 'Multiple',
+      newMin: `Điều chỉnh ${percentMultiplier}% (${affectedCount} SKU)`,
+      reason: reason || `Cập nhật tồn tối thiểu hàng loạt theo tỷ lệ ${percentMultiplier}% cho ${affectedCount} bản ghi`
     };
 
-    this.handovers.unshift(newHandover);
+    this.state.auditLogs.unshift(logEntry);
+    this.notify('BATCH_THRESHOLD_UPDATED', { affectedCount, log: logEntry });
+    return affectedCount;
+  }
 
-    // Ghi Audit Log cho hệ thống
-    const auditRecord = {
-      id: 'LOG' + Date.now(),
-      timestamp: new Date().toISOString(),
-      actorName: actor.name,
-      actorRole: actor.roleTitle,
-      action: 'BULK_HANDOVER',
-      code: handoverCode,
-      notes: `Chuyển giao hàng loạt ${transferredAgencies.length} đại lý từ [${fromEmp.name}] sang [${toEmp.name}]. Lý do: ${newHandover.reasonText}`
+  /**
+   * Mô phỏng giao dịch xuất / nhập kho trực tiếp (Live Transaction Simulator)
+   * Giúp giáo viên kiểm chứng hành vi: Tồn giảm qua ngưỡng Min -> Lập tức cảnh báo Đỏ, còi bíp kêu!
+   */
+  adjustPhysicalStock(itemId, deltaQty, reason = '') {
+    const itemIndex = this.state.inventoryItems.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return null;
+
+    const item = this.state.inventoryItems[itemIndex];
+    const oldPhysical = item.physicalStock;
+    const oldAvailable = Math.max(0, oldPhysical - item.reservedStock);
+    const wasBelowMin = oldAvailable < item.minThreshold;
+
+    const newPhysical = Math.max(0, oldPhysical + deltaQty);
+    item.physicalStock = newPhysical;
+    if (deltaQty > 0) {
+      item.lastRestockedDate = new Date().toISOString().substring(0, 10);
+    }
+
+    const product = this.getProduct(item.sku);
+    const enriched = InventoryEngine.enrichItem(item, product);
+    const isBelowMinNow = enriched.isBelowMin;
+    const isDropBelowMin = !wasBelowMin && isBelowMinNow; // Vừa mới rơi xuống dưới ngưỡng!
+
+    const actionText = deltaQty < 0 ? `XUẤT KHO (${Math.abs(deltaQty)} cái)` : `NHẬP KHO (+${deltaQty} cái)`;
+    const logEntry = {
+      id: `TRX-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actor: this.state.systemConfig.currentUser.name,
+      action: actionText,
+      warehouseId: item.warehouseId,
+      sku: item.sku,
+      oldMin: item.minThreshold,
+      newMin: `Tồn mới: ${enriched.availableStock}`,
+      reason: reason || (isDropBelowMin
+        ? `⚠️ CẢNH BÁO: Xuất hàng khiến tồn khả dụng (${enriched.availableStock}) rơi xuống dưới mức tối thiểu (${item.minThreshold})!`
+        : `Giao dịch điều chỉnh tồn kho vật lý từ ${oldPhysical} -> ${newPhysical} cái`)
     };
 
-    this.auditLogs.unshift(auditRecord);
+    this.state.auditLogs.unshift(logEntry);
+    if (this.state.auditLogs.length > 50) this.state.auditLogs.pop();
 
-    this.notify({
-      type: 'BULK_HANDOVER_EXECUTED',
-      handover: newHandover,
-      transferredAgencies
+    this.notify('STOCK_ADJUSTED', {
+      item: enriched,
+      deltaQty,
+      isDropBelowMin,
+      isBelowMinNow,
+      log: logEntry
     });
 
-    return newHandover;
+    return { enriched, isDropBelowMin };
   }
 
-  // --- STATS & METRICS ---
-  getDashboardMetrics() {
-    const user = this.getCurrentUser();
-    const isMgr = user.role === 'MANAGER';
+  /**
+   * Kích hoạt Kịch bản Demo cho giáo viên
+   */
+  loadDemoScenario(scenarioId) {
+    this.state.currentScenario = scenarioId;
 
-    const visibleAgencies = this.getVisibleAgencies();
-    const totalCount = visibleAgencies.length;
-    const allAgencies = this.agencies;
-
-    if (isMgr) {
-      const assignedCount = allAgencies.filter(a => a.assignedSalesId).length;
-      const unassignedCount = allAgencies.filter(a => !a.assignedSalesId).length;
-      const totalRevenue = allAgencies.reduce((acc, a) => acc + (a.monthlyRevenue || 0), 0);
-      const totalDebt = allAgencies.reduce((acc, a) => acc + (a.debtBalance || 0), 0);
-      const activeSalesReps = this.employees.filter(e => e.role === 'SALES_REP' && e.status === 'ACTIVE').length;
-      const resigningReps = this.employees.filter(e => e.status === 'RESIGNING').length;
-
-      return {
-        isManager: true,
-        totalAgencies: allAgencies.length,
-        assignedAgencies: assignedCount,
-        unassignedAgencies: unassignedCount,
-        assignedPercentage: Math.round((assignedCount / allAgencies.length) * 100),
-        totalRevenue,
-        totalDebt,
-        activeSalesReps,
-        resigningReps,
-        totalHandovers: this.handovers.length
-      };
-    } else {
-      // Dành cho nhân viên kinh doanh
-      const myRevenue = visibleAgencies.reduce((acc, a) => acc + (a.monthlyRevenue || 0), 0);
-      const myDebt = visibleAgencies.reduce((acc, a) => acc + (a.debtBalance || 0), 0);
-      const targetRevenue = user.targetRevenue || 10000000000;
-      const targetProgress = Math.min(100, Math.round((myRevenue / targetRevenue) * 100));
-
-      return {
-        isManager: false,
-        myAgenciesCount: visibleAgencies.length,
-        myRevenue,
-        myDebt,
-        targetRevenue,
-        targetProgress,
-        diamondAgencies: visibleAgencies.filter(a => a.tier === 'DIAMOND').length,
-        goldAgencies: visibleAgencies.filter(a => a.tier === 'GOLD').length
-      };
+    if (scenarioId === 'SCENARIO_DEFAULT') {
+      this.state.inventoryItems = JSON.parse(JSON.stringify(INITIAL_INVENTORY_ITEMS));
+    } else if (scenarioId === 'SCENARIO_NORTH_SURGE') {
+      // Làm cho Kho Miền Bắc tụt dốc dưới Min hầu hết các SKU
+      this.state.inventoryItems = JSON.parse(JSON.stringify(INITIAL_INVENTORY_ITEMS));
+      this.state.inventoryItems.forEach(item => {
+        if (item.warehouseId === 'WH-HN') {
+          item.physicalStock = Math.max(0, Math.floor(item.minThreshold * 0.4)); // Chỉ còn 40% Min
+          item.reservedStock = Math.min(item.physicalStock, 1);
+        }
+      });
+    } else if (scenarioId === 'SCENARIO_RESTOCKED') {
+      // Đầy kho an toàn
+      this.state.inventoryItems = JSON.parse(JSON.stringify(INITIAL_INVENTORY_ITEMS));
+      this.state.inventoryItems.forEach(item => {
+        item.physicalStock = Math.round(item.minThreshold * 1.8);
+        item.reservedStock = 1;
+      });
     }
+
+    const logEntry = {
+      id: `AUD-SCENARIO-${Date.now()}`,
+      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      actor: 'Giáo viên / Quản trị viên',
+      action: 'CHUYỂN KỊCH BẢN DEMO',
+      warehouseId: 'ALL',
+      sku: 'ALL',
+      oldMin: '-',
+      newMin: scenarioId,
+      reason: `Kích hoạt kịch bản kiểm thử: ${scenarioId}`
+    };
+
+    this.state.auditLogs.unshift(logEntry);
+    this.notify('SCENARIO_LOADED', { scenarioId, log: logEntry });
   }
 
-  // Phân tích tải công việc nhân viên (Workload Distribution)
-  getSalesWorkload() {
-    const salesReps = this.employees.filter(e => e.role === 'SALES_REP');
-    return salesReps.map(rep => {
-      const repsAgencies = this.agencies.filter(a => a.assignedSalesId === rep.id);
-      const totalRev = repsAgencies.reduce((s, a) => s + (a.monthlyRevenue || 0), 0);
-      return {
-        id: rep.id,
-        name: rep.name,
-        avatar: rep.avatar,
-        status: rep.status,
-        region: rep.region,
-        agencyCount: repsAgencies.length,
-        totalRevenue: totalRev,
-        isResigning: rep.status === 'RESIGNING'
-      };
-    });
+  resetAll() {
+    localStorage.removeItem(STORAGE_KEY);
+    this.state = this._loadInitialState();
+    this._buildLookupMaps();
+    this.notify('STATE_RESET', null);
   }
 }
 
-export const store = new Store();
+export const store = new InventoryStore();

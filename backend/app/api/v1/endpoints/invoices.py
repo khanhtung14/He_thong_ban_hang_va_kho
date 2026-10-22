@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.models.models import Invoice, Dispatch
+from app.models.models import Invoice, Dispatch, DispatchItem
 from app.api.v1.endpoints.rbac import AuthenticatedUser, require_permissions
 
 router = APIRouter(prefix="/api/v1/invoices", tags=["Invoices"])
@@ -39,7 +39,22 @@ def list_invoices(
             "invoice_date": it.invoice_date.isoformat() if it.invoice_date else None,
             "payment_term_days": it.payment_term_days,
             "total_amount": it.total_amount,
-            "status": it.status
+            "status": it.status,
+            "items": [
+                {
+                    "productId": dispatch_item.product_id,
+                    "unitId": 1,
+                    "lotNumber": dispatch_item.lot_number or "UNKNOWN",
+                    "deliveredQuantity": dispatch_item.actual_qty,
+                }
+                for dispatch_item in (
+                    db.query(DispatchItem)
+                    .filter(DispatchItem.dispatch_id == it.dispatch_id)
+                    .all()
+                    if it.dispatch_id
+                    else []
+                )
+            ],
         })
     return {"success": True, "code": 200, "data": data}
 
