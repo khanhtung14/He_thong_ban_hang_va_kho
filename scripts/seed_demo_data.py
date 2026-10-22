@@ -38,6 +38,7 @@ from src.backend.models import (  # noqa: E402
     PriceList,
     PriceListItem,
     Permission,
+    Product,
     Role,
     Territory,
     User,
@@ -215,6 +216,11 @@ def seed() -> Path:
             )
 
         _seed_sales_manager_data(db, seeded_users, territories)
+        # Link the demo dealer login to its seeded customer so the dealer portal
+        # (including Scrum 52 delivery tracking) can enforce customer scope.
+        seeded_users["demo_customer"].customer_id = db.scalar(
+            select(Customer.id).where(Customer.code == "DEMO-CUST-L1")
+        )
 
         db.commit()
         fixture_path = DATABASE_DIR / "demo_login_users.json"
@@ -281,6 +287,23 @@ def _seed_sales_manager_data(db, users: dict[str, User], territories: dict[str, 
         customers[customer_group] = customer
     db.flush()
 
+    products: dict[str, Product] = {}
+    product_definitions = [
+        ("SKU-001", "Nước tăng lực Red Bull 250ml"),
+        ("SKU-002", "Cà phê lon Highlands 235ml"),
+    ]
+    for sku, name in product_definitions:
+        product = db.scalar(select(Product).where(Product.sku == sku))
+        if product is None:
+            product = Product(sku=sku, name=name, base_unit="lon")
+            db.add(product)
+        else:
+            product.name = name
+            product.base_unit = "lon"
+            product.status = "ACTIVE"
+        products[sku] = product
+    db.flush()
+
     price_definitions = {
         "DEALER_LEVEL_1": ("PL-DEMO-L1", [("SKU-001", 470000, 450000), ("SKU-002", 225000, 210000)]),
         "DEALER_LEVEL_2": ("PL-DEMO-L2", [("SKU-001", 490000, 470000), ("SKU-002", 232000, 220000)]),
@@ -299,7 +322,12 @@ def _seed_sales_manager_data(db, users: dict[str, User], territories: dict[str, 
         price_list.end_date = end_date
         price_list.published = True
         price_list.items = [
-            PriceListItem(sku=sku, sale_price=sale_price, floor_price=floor_price)
+            PriceListItem(
+                product_id=products[sku].id,
+                sku=sku,
+                sale_price=sale_price,
+                floor_price=floor_price,
+            )
             for sku, sale_price, floor_price in line_definitions
         ]
         price_lists[customer_group] = price_list
@@ -345,6 +373,7 @@ def _seed_sales_manager_data(db, users: dict[str, User], territories: dict[str, 
         order.total_amount = sum(quantity * unit_price for _, _, quantity, unit_price, _ in definition["lines"])
         order.items = [
             OrderItem(
+                product_id=products[sku].id,
                 sku=sku,
                 product_name=product_name,
                 quantity=quantity,

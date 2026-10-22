@@ -71,6 +71,7 @@ class UserCreate(UserBase):
     role: Optional[str] = Field(default=None, description="Mã vai trò đơn (tiện ích cho form)")
     warehouse_ids: List[int] = Field(default_factory=list)
     territory_ids: List[int] = Field(default_factory=list)
+    customer_id: Optional[int] = Field(default=None, gt=0, description="Hồ sơ đại lý gắn với tài khoản CUSTOMER")
     status: Optional[AccountStatus] = Field(default=AccountStatus.PENDING_ACTIVATION, description="Trạng thái tài khoản ban đầu (mặc định chờ kích hoạt theo SCRUM-100)")
 
 
@@ -82,6 +83,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     status: Optional[AccountStatus] = None
     must_change_password: Optional[bool] = None
+    customer_id: Optional[int] = Field(default=None, gt=0)
 
     @field_validator("full_name")
     @classmethod
@@ -112,6 +114,7 @@ class UserResponse(BaseModel):
     full_name: str
     email: str
     phone: Optional[str] = None
+    customer_id: Optional[int] = None
     status: AccountStatus
     must_change_password: bool = True
     roles: List[RoleResponse] = []

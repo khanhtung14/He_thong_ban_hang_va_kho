@@ -135,6 +135,7 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
 
     roles: Mapped[List["Role"]] = relationship(secondary=user_roles, back_populates="users")
     warehouses: Mapped[List["Warehouse"]] = relationship(secondary=user_warehouses)
@@ -520,6 +521,17 @@ class OrderItem(Base):
     order: Mapped[Order] = relationship(back_populates="items")
 
 
+class OrderStatusHistory(Base):
+    __tablename__ = "order_status_history"
+    __table_args__ = (Index("ix_order_status_history_order_time", "order_id", "created_at"),)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    actor_username: Mapped[Optional[str]] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 # --- EP-05: Kho, Tồn kho & Điều chuyển ---
 class Supplier(Base):
     __tablename__ = "suppliers"
@@ -642,6 +654,7 @@ class PickList(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="PENDING")
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Dispatch(Base):
@@ -650,6 +663,7 @@ class Dispatch(Base):
     pick_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("pick_lists.id", ondelete="SET NULL"))
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="SHIPPED")
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class DeliveryConfirmation(Base):
@@ -689,6 +703,7 @@ class DeliveryTrip(Base):
     vehicle_number: Mapped[str] = mapped_column(String(50), nullable=False)
     route_name: Mapped[Optional[str]] = mapped_column(String(150))
     status: Mapped[str] = mapped_column(String(30), default="IN_PROGRESS")
+    expected_completion_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class DeliveryTripDispatch(Base):
@@ -696,6 +711,7 @@ class DeliveryTripDispatch(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     trip_id: Mapped[int] = mapped_column(ForeignKey("delivery_trips.id", ondelete="CASCADE"), nullable=False)
     dispatch_id: Mapped[int] = mapped_column(ForeignKey("dispatches.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 # --- EP-07: Hóa đơn, Công nợ & Thanh toán ---

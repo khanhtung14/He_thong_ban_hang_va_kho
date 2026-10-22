@@ -165,3 +165,48 @@ def migrate_delivery_confirmation_schema():
         bind=engine,
         tables=[DeliveryConfirmation.__table__, DeliveryProofImage.__table__],
     )
+
+
+def migrate_delivery_trip_schema():
+    """Add the expected completion time required by SCRUM-52 tracking."""
+    from app.models.models import Base, DeliveryTrip, DeliveryTripDispatch
+
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[DeliveryTrip.__table__, DeliveryTripDispatch.__table__],
+    )
+    inspector = inspect(engine)
+    if inspector.has_table("delivery_trips"):
+        columns = {column["name"] for column in inspector.get_columns("delivery_trips")}
+        if "expected_completion_at" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE delivery_trips ADD COLUMN expected_completion_at DATETIME NULL"))
+
+
+def migrate_scrum52_tracking_schema():
+    """Add account-to-customer links and truthful delivery milestone timestamps."""
+    from app.models.models import Base, OrderStatusHistory
+
+    Base.metadata.create_all(bind=engine, tables=[OrderStatusHistory.__table__])
+    inspector = inspect(engine)
+    additions = {
+        "users": {"customer_id": "INTEGER NULL"},
+        "pick_lists": {"created_at": "DATETIME NULL"},
+        "dispatches": {"created_at": "DATETIME NULL"},
+        "delivery_trip_dispatches": {"created_at": "DATETIME NULL"},
+    }
+    for table_name, columns in additions.items():
+        if not inspector.has_table(table_name):
+            continue
+        existing = {column["name"] for column in inspector.get_columns(table_name)}
+        missing = [(name, definition) for name, definition in columns.items() if name not in existing]
+        if missing:
+            with engine.begin() as connection:
+                for name, definition in missing:
+                    connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}"))
+    inspector = inspect(engine)
+    if inspector.has_table("users"):
+        indexes = {index["name"] for index in inspector.get_indexes("users")}
+        if "ix_users_customer_id" not in indexes:
+            with engine.begin() as connection:
+                connection.execute(text("CREATE INDEX ix_users_customer_id ON users (customer_id)"))

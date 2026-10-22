@@ -165,10 +165,12 @@
   "phone": "0987654321",
   "roleIds": [2],
   "warehouseIds": [1],
-  "regionIds": [10]
+  "regionIds": [10],
+  "customer_id": 1024
 }
 ```
-- **Response Data:** Chi tiết user vừa tạo. Tự động gửi email kích hoạt và mật khẩu tạm.
+- **Quy tắc SCRUM-52:** `customer_id` là bắt buộc với vai trò `CUSTOMER`, phải tham chiếu hồ sơ đại lý tồn tại. Vai trò khác không được gắn `customer_id`.
+- **Response Data:** Chi tiết user vừa tạo, gồm `customer_id` nếu là tài khoản đại lý. Tự động gửi email kích hoạt và mật khẩu tạm.
 
 #### `PUT /admin/users/{id}`
 - **Story:** S1-09
@@ -656,15 +658,22 @@
   "driverName": "Bác Tài C",
   "vehicleNumber": "29H-123.45",
   "dispatchIds": [401, 402, 403],
-  "routeName": "Tuyến Cầu Giấy - Từ Liêm"
+  "routeName": "Tuyến Cầu Giấy - Từ Liêm",
+  "expectedCompletionAt": "2026-10-22T17:00:00+07:00"
 }
 ```
-- **Response Data:** Gom nhiều phiếu xuất vào một chuyến xe phân tuyến.
+- **Response:** `201 Created`; dữ liệu trả về gồm chuyến mới tạo với thông tin theo dõi như `GET /deliveries/trips/active`.
+- `expectedCompletionAt` là thời điểm dự kiến hoàn tất chuyến, bắt buộc để theo dõi cảnh báo trễ.
 
 #### `GET /deliveries/trips/active`
 - **Story:** S6-07
 - **Phân quyền:** WH Manager, Sales Manager
-- **Response Data:** Theo dõi chuyến hàng đang chạy, số điểm đã giao, số điểm còn lại.
+- **Response Data:** `{ success, code, data: ActiveDeliveryTrip[] }`. Mỗi chuyến gồm `tripId`, `driverName`, `vehicleNumber`, `routeName`, `expectedCompletionAt`, `isOverdue`, `deliveredStops`, `remainingStops`, `onRoadAmount`, `dispatches`.
+- Mỗi phần tử `dispatches` gồm `dispatchId`, `orderId`, `status`, `customerName`, `desiredDeliveryDate`.
+- Chuyến cũ tạo trước Scrum 52 có thể trả `expectedCompletionAt: null`; khi đó `isOverdue` là `false` cho đến khi chuyến được thiết lập thời gian dự kiến.
+- Chuyến đang chạy có ít nhất một phiếu xuất `SHIPPED` chưa có kết quả giao. `deliveredStops` đếm phiếu `DELIVERED`; `remainingStops` đếm phiếu `SHIPPED` chưa xác nhận. Hàng chưa giao vẫn thuộc chuyến, không tự nhập lại kho.
+- `isOverdue` là `true` khi thời điểm hiện tại lớn hơn `expectedCompletionAt` và chuyến còn phiếu chưa xác nhận.
+- `onRoadAmount` tạm tính bằng tổng `Order.total_amount` của các đơn có ít nhất một phiếu `SHIPPED` chưa xác nhận trong chuyến; mỗi đơn chỉ tính một lần. Đây là tổng giá trị đơn, không điều chỉnh theo số lượng xuất thực tế.
 
 #### `GET /deliveries/pending-confirmations`
 - **Story:** S6-08 / SCRUM-51
@@ -691,10 +700,20 @@
 - **Phân quyền:** Warehouse, Sales Rep
 - **Response:** Stream ảnh chứng từ `image/jpeg`; trả `404` nếu không tìm thấy tệp.
 
-#### `GET /deliveries/track/{orderId}`
-- **Story:** S6-09
+#### `GET /deliveries/track`
+- **Story:** S6-09 / SCRUM-52
 - **Phân quyền:** Customer, Sales Rep
-- **Response Data:** Timeline trực quan trạng thái giao hàng: `Đã duyệt` -> `Đang soạn` -> `Đã xuất kho` -> `Đang giao hàng` -> `Giao thành công`.
+- **Query:** `search` (mã đơn), `status`, `fromDate`, `toDate`, `page` (mặc định `1`), `pageSize` (mặc định `20`, tối đa `100`).
+- **Response Data:** `{ success, code, data: { stats, items, page, pageSize, total } }`. `stats` có `totalOrders`, `processingOrders`, `inDeliveryOrders`, `deliveredOrders`, `problemOrders`. Danh sách cùng phạm vi quyền; mỗi đơn có `orderId`, `orderCode`, `createdAt`, `currentStatus`, `lineCount`, `deliveryProgress`, `lastUpdatedAt`.
+- **Phạm vi:** Customer chỉ xem đơn thuộc `customer_id` được gắn vào tài khoản. Sales Rep chỉ xem đơn của đại lý mình phụ trách. Đơn ngoài phạm vi trả `404` ở API chi tiết.
+
+#### `GET /deliveries/track/{orderId}`
+- **Story:** S6-09 / SCRUM-52
+- **Phân quyền:** Customer, Sales Rep
+- **Response Data:** Đơn hàng, dòng hàng, các phiếu xuất/kết quả giao và timeline gồm `APPROVED`, `PREPARING`, `DISPATCHED`, `IN_DELIVERY`, `DELIVERED`.
+- Mỗi mốc có `state` (`completed`, `current`, `pending`, `exception`), `occurredAt` và `note`. Chỉ trả thời gian đã ghi trong backend; thời gian chưa lưu là `null` và giao diện hiển thị “Chưa ghi nhận”. Lỗi giao trả trạng thái, lý do và thời điểm thực tế; các mốc sau lỗi không được đánh dấu hoàn tất.
+- Mỗi dòng hàng có `sku`, `productName`, `unitName`, `orderedQuantity`, `actualDeliveredQuantity`, `quantityDifference`, `note`. Số thực giao chỉ cộng số lượng của phiếu có xác nhận `DELIVERED`, quy đổi theo `conversion_factor`. Không thể đối chiếu hoặc thiếu dữ liệu thì `actualDeliveredQuantity` và `quantityDifference` là `null`; không tự gán bằng `0`. Khi các phiếu đã có kết quả, phiếu `FAILED` đóng góp `0` vì toàn bộ lượng phiếu đó được hoàn về kho theo SCRUM-51.
+- Dòng lặp cùng sản phẩm nhưng không có liên kết tới dòng đơn được định danh là không thể đối chiếu chính xác; trả `null` cho số lượng thực giao thay vì phân bổ ước lượng.
 
 ---
 

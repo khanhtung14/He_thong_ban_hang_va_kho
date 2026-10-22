@@ -8,6 +8,8 @@ import { CustomerHeader } from "../../components/Header/CustomerHeader";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
+import DeliveryTracking from "./DeliveryTracking";
+import "./DeliveryTracking.css";
 
 const { Content } = Layout;
 
@@ -22,6 +24,7 @@ export const CustomerDashboard: React.FC = () => {
   });
 
   const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [, setLoading] = useState(false);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -43,7 +46,7 @@ export const CustomerDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadProfileData();
+    void Promise.resolve().then(loadProfileData);
 
     const handleProfileSync = () => loadProfileData();
     window.addEventListener("profile-updated", handleProfileSync);
@@ -56,36 +59,18 @@ export const CustomerDashboard: React.FC = () => {
   }, [loadProfileData]);
 
   return (
-    <Layout hasSider style={{ minHeight: "100vh", position: "relative" }}>
-      {/* 1. Lớp hình nền mờ giữ nguyên từ /bg.jpg */}
-      <div
-        style={{
-          position: "fixed",
-          inset: "-20px",
-          backgroundImage: "url('/bg.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "blur(4px)",
-          transform: "scale(1.05)",
-          zIndex: 0,
-        }}
-      />
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          backgroundColor: "rgba(248, 250, 252, 0.5)",
-          zIndex: 0,
-        }}
-      />
-
+    <Layout hasSider className="customer-dashboard-shell">
       <CustomerSidebar
         selectedKey={selectedKey}
         onSelect={setSelectedKey}
         onLogout={logout}
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={() => setMobileMenuOpen(false)}
+        fullName={profile?.full_name || "Đại lý khách hàng"}
+        roleName={profile?.role || "Đại lý / Khách hàng"}
       />
 
-      <Layout style={{ backgroundColor: "transparent", minWidth: 0, zIndex: 1 }}>
+      <Layout className="customer-dashboard-main">
         <CustomerHeader
           fullName={profile?.full_name || "Đại lý khách hàng"}
           roleName={profile?.role || "Đại lý / Khách hàng"}
@@ -94,24 +79,19 @@ export const CustomerDashboard: React.FC = () => {
           onLogout={logout}
           onProfileClick={() => setIsProfileModalOpen(true)}
           onChangePassword={() => setIsChangePassModalOpen(true)}
+          onMenuClick={() => setMobileMenuOpen(true)}
+          pageTitle={selectedKey === "delivery-tracking" ? "Theo dõi giao hàng" : "Tổng quan đại lý"}
         />
 
-        <Content
-          style={{
-            padding: "24px 32px",
-            maxWidth: 1400,
-            width: "100%",
-            margin: "0 auto",
-          }}
-        >
-          {/* Nội dung danh mục sản phẩm, đặt đơn, xem công nợ */}
+        <Content className="customer-dashboard-content">
+          {selectedKey === "delivery-tracking" ? <DeliveryTracking /> : null}
         </Content>
       </Layout>
 
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        onProfileUpdated={(updated: any) => {
+        onProfileUpdated={(updated: UserProfile) => {
           setProfile(updated);
           localStorage.setItem("user", JSON.stringify(updated));
         }}

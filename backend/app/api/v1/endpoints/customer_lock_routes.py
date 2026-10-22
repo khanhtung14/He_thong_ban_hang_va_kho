@@ -76,6 +76,7 @@ except ImportError:  # pragma: no cover
     )
 
 from app.api.v1.endpoints.products import MOCK_PRODUCTS
+from app.services.order_tracking_service import record_order_status_transition
 
 router = APIRouter(prefix="/api/v1", tags=["Customers & Orders (SCRUM-85)"])
 
@@ -1077,6 +1078,7 @@ def approve_below_floor_order(
     if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL) or not order.approval_reason:
         raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt giá sàn.")
     order.status = OrderStatus.APPROVED
+    record_order_status_transition(db, order, order.status, note="Đơn hàng được duyệt.", actor_username=_user.username)
     db.commit()
     customer = db.get(Customer, order.customer_id)
     response = OrderResponse.model_validate(order)
@@ -1141,7 +1143,14 @@ def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
 
+    previous_status = order.status
     order.status = new_status
+    if previous_status != new_status:
+        record_order_status_transition(
+            db, order, new_status,
+            note=f"Trạng thái được cập nhật từ {getattr(previous_status, 'value', previous_status)}.",
+            actor_username=user.username,
+        )
     db.commit()
     db.refresh(order)
 

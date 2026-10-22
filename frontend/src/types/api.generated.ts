@@ -1705,6 +1705,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/deliveries/trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Delivery Trip */
+        post: operations["create_delivery_trip_api_v1_deliveries_trips_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/deliveries/trips/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Active Delivery Trips */
+        get: operations["list_active_delivery_trips_api_v1_deliveries_trips_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/warehouse/receipts": {
         parameters: {
             query?: never;
@@ -1993,6 +2027,29 @@ export interface components {
          * @enum {string}
          */
         AccountStatus: "ACTIVE" | "LOCKED" | "DISABLED" | "PENDING_ACTIVATION";
+        /** ActiveDeliveryTripData */
+        ActiveDeliveryTripData: {
+            /** Tripid */
+            tripId: number;
+            /** Drivername */
+            driverName: string;
+            /** Vehiclenumber */
+            vehicleNumber: string;
+            /** Routename */
+            routeName: string | null;
+            /** Expectedcompletionat */
+            expectedCompletionAt: string | null;
+            /** Isoverdue */
+            isOverdue: boolean;
+            /** Deliveredstops */
+            deliveredStops: number;
+            /** Remainingstops */
+            remainingStops: number;
+            /** Onroadamount */
+            onRoadAmount: number;
+            /** Dispatches */
+            dispatches: components["schemas"]["DeliveryTripDispatchData"][];
+        };
         /** AssignSalesRepRequest */
         AssignSalesRepRequest: {
             /**
@@ -2144,6 +2201,22 @@ export interface components {
              * @description Mô tả nhóm hàng
              */
             description?: string | null;
+        };
+        /** CreateDeliveryTripRequest */
+        CreateDeliveryTripRequest: {
+            /** Drivername */
+            driverName: string;
+            /** Vehiclenumber */
+            vehicleNumber: string;
+            /** Dispatchids */
+            dispatchIds: number[];
+            /** Routename */
+            routeName?: string | null;
+            /**
+             * Expectedcompletionat
+             * Format: date-time
+             */
+            expectedCompletionAt: string;
         };
         /** CreateUserResult */
         CreateUserResult: {
@@ -2408,6 +2481,36 @@ export interface components {
             contact_phone?: string | null;
             /** Is Default */
             is_default: boolean;
+        };
+        /** DeliveryTripDispatchData */
+        DeliveryTripDispatchData: {
+            /** Dispatchid */
+            dispatchId: number;
+            /** Orderid */
+            orderId: number;
+            /** Status */
+            status: string;
+            /** Customername */
+            customerName: string;
+            /** Desireddeliverydate */
+            desiredDeliveryDate: string | null;
+        };
+        /** DeliveryTripListResponse */
+        DeliveryTripListResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Data */
+            data: components["schemas"]["ActiveDeliveryTripData"][];
+        };
+        /** DeliveryTripResponse */
+        DeliveryTripResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            data: components["schemas"]["ActiveDeliveryTripData"];
         };
         /** DiscountTierView */
         DiscountTierView: {
@@ -6660,6 +6763,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_delivery_trip_api_v1_deliveries_trips_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDeliveryTripRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryTripResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_active_delivery_trips_api_v1_deliveries_trips_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryTripListResponse"];
                 };
             };
         };

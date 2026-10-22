@@ -43,6 +43,7 @@ type AssignmentOptions = {
   roles: AssignmentOption[];
   warehouses: AssignmentOption[];
   territories: AssignmentOption[];
+  customers: AssignmentOption[];
 };
 
 type CreatedUser = {
@@ -108,7 +109,9 @@ export default function CreateUser() {
     roles: [],
     warehouses: [],
     territories: [],
+    customers: [],
   });
+  const [selectedRoleCodes, setSelectedRoleCodes] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessageText, setErrorMessageText] = useState("");
   const [createdData, setCreatedData] = useState<CreateUserResponse | null>(
@@ -131,6 +134,7 @@ export default function CreateUser() {
   const initialRole = roles.some((option) => option.code === requestedRole)
     ? requestedRole!
     : roles[0].code;
+  const isCustomerRoleSelected = selectedRoleCodes.includes("CUSTOMER");
 
   const fetchScopeOptions = async () => {
     try {
@@ -146,6 +150,7 @@ export default function CreateUser() {
   };
 
   useEffect(() => {
+    setSelectedRoleCodes([initialRole]);
     fetchScopeOptions();
 
     const handleSync = () => {
@@ -166,6 +171,7 @@ export default function CreateUser() {
     const roleCodes: string[] = values.role_codes || [];
     const warehouseIds: number[] = values.warehouse_ids || [];
     const territoryIds: number[] = values.territory_ids || [];
+    const customerId = values.customer_id ? Number(values.customer_id) : null;
 
     const includesWarehouseRole = roleCodes.some((code) =>
       ["WAREHOUSE", "WH_MANAGER"].includes(code),
@@ -174,6 +180,10 @@ export default function CreateUser() {
       setErrorMessageText(
         "Người dùng thuộc vai trò kho phải được gắn với ít nhất một kho phụ trách.",
       );
+      return;
+    }
+    if (roleCodes.includes("CUSTOMER") && !customerId) {
+      setErrorMessageText("Vui lòng gắn tài khoản đại lý với hồ sơ đại lý.");
       return;
     }
 
@@ -190,6 +200,7 @@ export default function CreateUser() {
           role_codes: roleCodes,
           warehouse_ids: warehouseIds,
           territory_ids: territoryIds,
+          customer_id: roleCodes.includes("CUSTOMER") ? customerId : null,
         }),
       });
 
@@ -513,6 +524,10 @@ export default function CreateUser() {
                       <Select
                         mode="multiple"
                         placeholder="Chọn vai trò cấp quyền..."
+                        onChange={(codes: string[]) => {
+                          setSelectedRoleCodes(codes);
+                          if (!codes.includes("CUSTOMER")) form.setFieldValue("customer_id", undefined);
+                        }}
                         options={roles.map((r) => ({
                           label: `${r.label} — ${r.description}`,
                           value: r.code,
@@ -520,6 +535,25 @@ export default function CreateUser() {
                       />
                     </Form.Item>
                   </Col>
+
+                  {isCustomerRoleSelected && <Col span={24}>
+                    <Form.Item
+                      name="customer_id"
+                      label={<span style={{ fontWeight: 600 }}><ShopOutlined /> Hồ sơ đại lý liên kết</span>}
+                      rules={[{ required: true, message: "Vui lòng chọn hồ sơ đại lý." }]}
+                    >
+                      <Select
+                        showSearch
+                        optionFilterProp="label"
+                        placeholder="Chọn đại lý để giới hạn đơn hàng được xem"
+                        onDropdownVisibleChange={(open) => { if (open) fetchScopeOptions(); }}
+                        options={scopeOptions.customers.map((customer) => ({
+                          label: `${customer.code} · ${customer.name}`,
+                          value: customer.id,
+                        }))}
+                      />
+                    </Form.Item>
+                  </Col>}
 
                   <Col xs={24} md={12}>
                     <Form.Item

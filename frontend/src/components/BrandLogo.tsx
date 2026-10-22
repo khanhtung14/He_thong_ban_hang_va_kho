@@ -5,12 +5,14 @@ interface BrandLogoProps {
   title?: string;
   subtitle?: string;
   icon?: React.ReactNode;
+  collapsed?: boolean;
 }
 
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   title = "WMS",
   subtitle = "Hệ thống quản lý kho & bán hàng",
   icon = <HomeOutlined />,
+  collapsed = false,
 }) => {
   return (
     <div
@@ -18,7 +20,8 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         display: "flex",
         alignItems: "center",
         gap: 12,
-        padding: "20px 20px 16px 20px",
+        justifyContent: collapsed ? "center" : undefined,
+        padding: collapsed ? "16px 0" : "20px 20px 16px 20px",
         userSelect: "none",
       }}
     >
@@ -42,7 +45,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
 
       {/* Chữ thương hiệu */}
       <div style={{ overflow: "hidden" }}>
-        <div
+        {!collapsed && <div
           style={{
             fontSize: 17,
             fontWeight: 800,
@@ -52,8 +55,8 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           }}
         >
           {title}
-        </div>
-        <div
+        </div>}
+        {!collapsed && <div
           style={{
             fontSize: 11,
             color: "#94a3b8",
@@ -63,7 +66,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           }}
         >
           {subtitle}
-        </div>
+        </div>}
       </div>
     </div>
   );

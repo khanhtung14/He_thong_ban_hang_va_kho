@@ -3,6 +3,50 @@ info:
   title: API He Thong Ban Hang
   version: 1.0.0
 paths:
+  /api/v1/deliveries/trips:
+    post:
+      summary: Tạo chuyến giao hàng (SCRUM-52)
+      description: Gán các phiếu xuất SHIPPED chưa thuộc chuyến khác và khai báo thời gian dự kiến hoàn tất.
+      security:
+        - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeliveryTripRequest'
+      responses:
+        '201':
+          description: Chuyến giao đã được tạo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryTripResponse'
+        '401':
+          description: Chưa xác thực
+        '403':
+          description: Không đủ quyền
+        '422':
+          description: Request không hợp lệ
+        '409':
+          description: Phiếu xuất không còn ở trạng thái giao hoặc đã thuộc chuyến khác
+  /api/v1/deliveries/trips/active:
+    get:
+      summary: Theo dõi chuyến giao đang chạy (SCRUM-52)
+      description: Danh sách chuyến còn phiếu SHIPPED chưa xác nhận; hàng chưa giao vẫn thuộc chuyến. Giá trị trên đường tạm tính bằng Order.total_amount của mỗi đơn có phiếu chưa giao, mỗi đơn tính một lần.
+      security:
+        - HTTPBearer: []
+      responses:
+        '200':
+          description: Các chuyến đang chạy, số điểm giao và giá trị hàng trên đường
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryTripListResponse'
+        '401':
+          description: Chưa xác thực
+        '403':
+          description: Không đủ quyền
   /api/v1/deliveries/pending-confirmations:
     get:
       summary: Danh sách phiếu xuất chờ xác nhận giao hàng (SCRUM-51)
@@ -115,7 +159,104 @@ paths:
                 items:
                   $ref: '#/components/schemas/Product'
 components:
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
   schemas:
+    CreateDeliveryTripRequest:
+      type: object
+      required: [driverName, vehicleNumber, dispatchIds, expectedCompletionAt]
+      properties:
+        driverName:
+          type: string
+          minLength: 1
+          maxLength: 150
+        vehicleNumber:
+          type: string
+          minLength: 1
+          maxLength: 50
+        dispatchIds:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+        routeName:
+          type: string
+          nullable: true
+          maxLength: 150
+        expectedCompletionAt:
+          type: string
+          format: date-time
+          description: Bắt buộc; được chuẩn hóa về UTC.
+    DeliveryTripResponse:
+      type: object
+      required: [success, code, data]
+      properties:
+        success:
+          type: boolean
+        code:
+          type: integer
+        data:
+          $ref: '#/components/schemas/ActiveDeliveryTrip'
+    DeliveryTripListResponse:
+      type: object
+      required: [success, code, data]
+      properties:
+        success:
+          type: boolean
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActiveDeliveryTrip'
+    ActiveDeliveryTrip:
+      type: object
+      required: [tripId, driverName, vehicleNumber, expectedCompletionAt, isOverdue, deliveredStops, remainingStops, onRoadAmount, dispatches]
+      properties:
+        tripId:
+          type: integer
+        driverName:
+          type: string
+        vehicleNumber:
+          type: string
+        routeName:
+          type: string
+          nullable: true
+        expectedCompletionAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Có thể null với chuyến cũ được tạo trước khi có lịch dự kiến.
+        isOverdue:
+          type: boolean
+        deliveredStops:
+          type: integer
+        remainingStops:
+          type: integer
+        onRoadAmount:
+          type: number
+        dispatches:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryTripDispatch'
+    DeliveryTripDispatch:
+      type: object
+      required: [dispatchId, orderId, status, customerName]
+      properties:
+        dispatchId:
+          type: integer
+        orderId:
+          type: integer
+        status:
+          type: string
+        customerName:
+          type: string
+        desiredDeliveryDate:
+          type: string
+          format: date
+          nullable: true
     PendingDispatchesResponse:
       type: object
       required: [success, code, data]

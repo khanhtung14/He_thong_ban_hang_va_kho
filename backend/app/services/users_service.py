@@ -15,6 +15,7 @@ from app.services.email_service import email_service
 from app.models.models import (
     AccountAuditLog,
     AccountStatus,
+    Customer,
     Role,
     Territory,
     User,
@@ -229,6 +230,14 @@ def create_user(
 
     # Step 4: Resolve roles
     roles = resolve_roles(db, role_codes=user_data.role_codes, role=user_data.role)
+    is_customer_role = any(role.code.upper() == "CUSTOMER" for role in roles)
+    if is_customer_role and user_data.customer_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tài khoản đại lý cần được gắn với một hồ sơ đại lý.")
+    if user_data.customer_id is not None and not is_customer_role:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chỉ tài khoản vai trò CUSTOMER mới được gắn hồ sơ đại lý.")
+    customer_account = db.get(Customer, user_data.customer_id) if user_data.customer_id is not None else None
+    if user_data.customer_id is not None and (customer_account is None or not customer_account.is_active):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hồ sơ đại lý không tồn tại hoặc đã ngừng hoạt động.")
     selected_warehouse_ids = set(user_data.warehouse_ids)
     warehouses = db.query(Warehouse).filter(
         Warehouse.id.in_(selected_warehouse_ids), Warehouse.is_active.is_(True)
@@ -249,6 +258,7 @@ def create_user(
         email=email,
         full_name=full_name,
         phone=phone,
+        customer_id=user_data.customer_id,
         password_hash=password_hash,
         status=initial_status,
         must_change_password=True,
@@ -371,6 +381,24 @@ def update_user(
             )
         user.roles = roles
         updated_fields.append(f"roles:{[r.code for r in roles]}")
+
+    if "customer_id" in user_data.model_fields_set:
+        target_roles = roles if user_data.role_codes is not None or user_data.role is not None else user.roles
+        is_customer_role = any(role.code.upper() == "CUSTOMER" for role in target_roles)
+        if is_customer_role and user_data.customer_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tài khoản đại lý cần được gắn với một hồ sơ đại lý.")
+        if user_data.customer_id is not None and not is_customer_role:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chỉ tài khoản vai trò CUSTOMER mới được gắn hồ sơ đại lý.")
+        customer_account = db.get(Customer, user_data.customer_id) if user_data.customer_id is not None else None
+        if user_data.customer_id is not None and (customer_account is None or not customer_account.is_active):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hồ sơ đại lý không tồn tại hoặc đã ngừng hoạt động.")
+        user.customer_id = user_data.customer_id
+        updated_fields.append("customer_id")
+    elif user_data.role_codes is not None or user_data.role is not None:
+        if not any(role.code.upper() == "CUSTOMER" for role in user.roles):
+            user.customer_id = None
+        elif user.customer_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tài khoản đại lý cần được gắn với một hồ sơ đại lý.")
 
     try:
         db.commit()

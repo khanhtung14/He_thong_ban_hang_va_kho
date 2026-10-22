@@ -8,11 +8,11 @@ from sqlalchemy.orm import Session
 
 try:
     from app.core.database import get_db
-    from app.models.models import AccountAuditLog, Role, Territory, User, Warehouse
+    from app.models.models import AccountAuditLog, Customer, Role, Territory, User, Warehouse
     from app.core.security import require_admin
 except ImportError:  # pragma: no cover - direct script execution
     from app.core.database import get_db
-    from app.models.models import AccountAuditLog, Role, Territory, User, Warehouse
+    from app.models.models import AccountAuditLog, Customer, Role, Territory, User, Warehouse
     from app.core.security import require_admin
 
 
@@ -57,6 +57,13 @@ def get_assignment_options(
         "territories": [
             {"id": territory.id, "code": territory.code, "name": territory.name}
             for territory in db.query(Territory).order_by(Territory.name).all()
+        ],
+        "customers": [
+            {"id": customer.id, "code": customer.code, "name": customer.name}
+            for customer in db.query(Customer)
+            .filter(Customer.is_active.is_(True))
+            .order_by(Customer.name)
+            .all()
         ],
     }
 

@@ -16,6 +16,7 @@ import {
   LogoutOutlined,
   KeyOutlined,
   CheckCircleTwoTone,
+  MenuOutlined,
 } from "@ant-design/icons";
 
 const { Header } = Layout;
@@ -29,6 +30,8 @@ export interface CustomerHeaderProps {
   onLogout?: () => void;
   onProfileClick?: () => void;
   onChangePassword?: () => void;
+  onMenuClick?: () => void;
+  pageTitle?: string;
 }
 
 export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
@@ -39,6 +42,8 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   onProfileClick,
   onChangePassword,
   onLogout,
+  onMenuClick,
+  pageTitle = "Tổng quan đại lý",
 }) => {
   void _avatarUrl;
   const initials =
@@ -91,6 +96,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
 
   return (
     <Header
+      className="customer-header"
       style={{
         position: "sticky",
         top: 0,
@@ -106,17 +112,34 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
         lineHeight: "64px",
       }}
     >
-      <Space align="center">
+      <div className="customer-header__left">
+        <Button
+          className="customer-header__menu-button"
+          type="text"
+          icon={<MenuOutlined />}
+          aria-label="Mở menu"
+          onClick={onMenuClick}
+        />
+        <div className="customer-header__breadcrumb">
+          <Text type="secondary">Đại lý</Text>
+          <span>/</span>
+          {pageTitle === "Theo dõi giao hàng" && <>
+            <Text type="secondary">Đơn hàng</Text>
+            <span>/</span>
+          </>}
+          <Text strong>{pageTitle}</Text>
+        </div>
         <Tag
+          className="customer-header__health"
           icon={<CheckCircleTwoTone twoToneColor="#52c41a" />}
           color="success"
           style={{ padding: "4px 10px", borderRadius: 12, fontSize: 13 }}
         >
           Hệ thống hoạt động bình thường
         </Tag>
-      </Space>
+      </div>
 
-      <Space size="large" align="center">
+      <Space className="customer-header__actions" size="middle" align="center">
         <Badge count={notificationCount} size="small" offset={[-2, 4]}>
           <Button
             type="text"
@@ -131,7 +154,7 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
           trigger={["click"]}
           placement="bottomRight"
         >
-          <Space style={{ cursor: "pointer", userSelect: "none" }} size="small">
+          <Space className="customer-header__profile" style={{ cursor: "pointer", userSelect: "none" }} size="small">
             <ProfileAvatar editable={false} size={36} initials={initials} />
             <div
               style={{

@@ -22,6 +22,7 @@ from app.models.models import (
     Inventory, InventoryLot, InventoryStock, InventoryTransaction, Order,
     OrderStatus, Product, User, Warehouse,
 )
+from app.services.order_tracking_service import record_order_status_transition
 
 router = APIRouter(prefix="/api/v1/deliveries", tags=["Deliveries"])
 PROOF_DIR = Path("uploads/delivery-proofs")
@@ -183,6 +184,11 @@ async def confirm_delivery(
         if delivery_status == "DELIVERED":
             dispatch.status = "DELIVERED"
             order.status = OrderStatus.DELIVERED
+            record_order_status_transition(
+                db, order, order.status,
+                note=(note or "").strip() or "Đã xác nhận giao thành công.",
+                actor_username=user.username,
+            )
             directory = PROOF_DIR / str(dispatch.id)
             directory.mkdir(parents=True, exist_ok=True)
             for _, content in images:
@@ -195,6 +201,11 @@ async def confirm_delivery(
         else:
             dispatch.status = "DELIVERY_FAILED"
             order.status = OrderStatus.DELIVERY_FAILED
+            record_order_status_transition(
+                db, order, order.status,
+                note=failure_reason or "Giao hàng không thành công.",
+                actor_username=user.username,
+            )
             for (product_id, lot_number), quantity in return_quantities.items():
                 inventory = (
                     db.query(Inventory)
@@ -346,4 +357,3 @@ def get_delivery_proof(
         raise HTTPException(status_code=404, detail="Không tìm thấy ảnh chứng từ.")
     return FileResponse(match, media_type="image/jpeg")
 
-\r\n
