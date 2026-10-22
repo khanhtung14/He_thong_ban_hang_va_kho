@@ -43,6 +43,10 @@ export interface AgencyDebtItem {
   locked_at?: string;
   locked_by?: string;
   pending_orders_count: number; // Số đơn đang dở dang
+  is_credit_flagged?: boolean;
+  credit_flag_reason?: string;
+  credit_action_mode?: string;
+  is_manually_locked?: boolean;
 }
 
 const DEFAULT_AGENCIES: AgencyDebtItem[] = [
@@ -158,6 +162,10 @@ export const AgencyLockManager: React.FC = () => {
               : undefined,
             locked_by: item.locked_by_id ? `User #${item.locked_by_id}` : undefined,
             pending_orders_count: item.pending_orders_count ?? 0,
+            is_credit_flagged: Boolean(item.is_credit_flagged ?? item.isCreditFlagged),
+            credit_flag_reason: item.credit_flag_reason || item.creditFlagReason || undefined,
+            credit_action_mode: item.credit_action_mode || item.creditActionMode || "BLOCK",
+            is_manually_locked: Boolean(item.is_manually_locked ?? item.isManuallyLocked),
           }));
           setAgencies(mapped);
         }
@@ -171,6 +179,51 @@ export const AgencyLockManager: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  const [reevaluatingId, setReevaluatingId] = useState<string | number | null>(null);
+  const [dailyJobRunning, setDailyJobRunning] = useState(false);
+
+  // SCRUM-42: Đánh giá lại rủi ro tín dụng cho 1 đại lý
+  const handleReevaluateRisk = async (agency: AgencyDebtItem) => {
+    setReevaluatingId(agency.id);
+    try {
+      const res = await authenticatedFetch(`/api/v1/customers/${agency.id}/reevaluate-credit-risk`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error("Không thể đánh giá lại rủi ro tín dụng.");
+      }
+      const json = await res.json();
+      const evalData = json.data;
+      message.success(`Đã đánh giá rủi ro cho đại lý "${agency.name}": ${evalData.is_flagged ? "CÓ RỦI RO (Đã gắn cờ)" : "AN TOÀN"}`);
+      await loadAgenciesFromDB();
+    } catch (err: any) {
+      message.error(err.message || "Đã xảy ra lỗi khi đánh giá lại rủi ro.");
+    } finally {
+      setReevaluatingId(null);
+    }
+  };
+
+  // SCRUM-42: Chạy tác vụ quét rủi ro tín dụng hàng ngày toàn hệ thống
+  const handleRunDailyJob = async () => {
+    setDailyJobRunning(true);
+    try {
+      const res = await authenticatedFetch("/api/v1/debts/credit-risk/run-daily-job", {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error("Không thể chạy tác vụ quét rủi ro tín dụng hàng ngày.");
+      }
+      const json = await res.json();
+      const summary = json.data;
+      message.success(`Hoàn tất quét rủi ro toàn hệ thống: ${summary.totalCustomers} đại lý, ${summary.flaggedCount} có cờ rủi ro, ${summary.clearedCount} an toàn.`);
+      await loadAgenciesFromDB();
+    } catch (err: any) {
+      message.error(err.message || "Lỗi khi chạy quét rủi ro định kỳ.");
+    } finally {
+      setDailyJobRunning(false);
+    }
+  };
 
   useEffect(() => {
     loadAgenciesFromDB();
@@ -397,6 +450,24 @@ export const AgencyLockManager: React.FC = () => {
       },
     },
     {
+      title: "Rủi ro tín dụng",
+      key: "credit_risk",
+      width: 170,
+      render: (_: any, record: AgencyDebtItem) => {
+        if (!record.is_credit_flagged) {
+          return <Tag color="success">An toàn</Tag>;
+        }
+        const isBlock = (record.credit_action_mode || "BLOCK").toUpperCase() === "BLOCK";
+        return (
+          <Tooltip title={record.credit_flag_reason || "Vượt hạn mức tín dụng hoặc nợ quá hạn cho phép"}>
+            <Tag color={isBlock ? "error" : "warning"} icon={<WarningOutlined />}>
+              {isBlock ? "Cờ rủi ro (Chặn bán)" : "Cờ rủi ro (Cần duyệt)"}
+            </Tag>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: "Chi tiết lý do khóa",
       key: "lock_info",
       render: (_: any, record: AgencyDebtItem) => {
@@ -420,10 +491,10 @@ export const AgencyLockManager: React.FC = () => {
     {
       title: "Thao tác",
       key: "actions",
-      width: 160,
+      width: 260,
       align: "center" as const,
       render: (_: any, record: AgencyDebtItem) => (
-        <Space orientation="horizontal">
+        <Space orientation="horizontal" size={4}>
           {record.is_locked ? (
             <Popconfirm
               title="Mở khóa giao dịch cho đại lý?"
@@ -461,6 +532,16 @@ export const AgencyLockManager: React.FC = () => {
               {canEditCreditLimit ? "Hạn mức" : "Xem hạn mức"}
             </Button>
           </Tooltip>
+
+          <Tooltip title="Đánh giá lại rủi ro tín dụng ngay lập tức (SCRUM-42)">
+            <Button
+              size="small"
+              loading={reevaluatingId === record.id}
+              onClick={() => handleReevaluateRisk(record)}
+            >
+              Đánh giá rủi ro
+            </Button>
+          </Tooltip>
         </Space>
       ),
     },
@@ -480,14 +561,24 @@ export const AgencyLockManager: React.FC = () => {
           </div>
         }
         extra={
-          <Input
-            placeholder="Tìm theo tên hoặc mã đại lý..."
-            prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-            style={{ width: 300 }}
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            allowClear
-          />
+          <Space>
+            <Button
+              type="primary"
+              style={{ backgroundColor: "#2563eb" }}
+              loading={dailyJobRunning}
+              onClick={handleRunDailyJob}
+            >
+              Quét rủi ro định kỳ (SCRUM-42)
+            </Button>
+            <Input
+              placeholder="Tìm theo tên hoặc mã đại lý..."
+              prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+              style={{ width: 260 }}
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              allowClear
+            />
+          </Space>
         }
       >
         <Table

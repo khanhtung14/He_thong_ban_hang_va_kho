@@ -38,6 +38,7 @@ from app.api.v1.endpoints.discount_policy_routes import router as discounts_rout
 from app.api.v1.endpoints.sales_orders import router as sales_orders_router
 from app.api.v1.endpoints.debt_limit import router as debt_limit_router, compat_router as debt_limit_compat_router
 from app.api.v1.endpoints.dealer_history import router as dealer_history_router
+from app.services.credit_risk_service import daily_credit_risk_scheduler
 
 
 
@@ -45,6 +46,8 @@ from app.api.v1.endpoints.dealer_history import router as dealer_history_router
 async def lifespan(app: FastAPI):
     reminder_stop = asyncio.Event()
     reminder_task = None
+    credit_risk_stop = asyncio.Event()
+    credit_risk_task = None
     try:
         migrate_profile_schema()
     except Exception:
@@ -59,13 +62,17 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     reminder_task = asyncio.create_task(daily_reminder_scheduler(reminder_stop))
+    credit_risk_task = asyncio.create_task(daily_credit_risk_scheduler(credit_risk_stop))
     try:
         yield
     finally:
         reminder_stop.set()
-        if reminder_task:
-            reminder_task.cancel()
-            await asyncio.gather(reminder_task, return_exceptions=True)
+        credit_risk_stop.set()
+        tasks_to_cancel = [t for t in (reminder_task, credit_risk_task) if t]
+        for t in tasks_to_cancel:
+            t.cancel()
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
 
 
 app = FastAPI(

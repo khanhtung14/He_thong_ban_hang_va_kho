@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.models import Agency, Customer, CreditLimitLog, DebtLimitHistory, RoleCode, User
 from app.api.v1.endpoints.rbac import AuthenticatedUser, normalize_role, require_roles
+from app.services.credit_risk_service import CreditRiskService
 
 router = APIRouter(prefix="/api/v1", tags=["Kiểm soát hạn mức công nợ"])
 compat_router = APIRouter(prefix="/api", tags=["Kiểm soát hạn mức công nợ (Alias)"])
@@ -130,6 +131,8 @@ class DebtLimitUpdateRequest(BaseModel):
         description="Lý do thay đổi hạn mức (bắt buộc nhập)",
         json_schema_extra={"example": "Nâng hạn mức sau thẩm định hồ sơ tín dụng đại lý"},
     )
+    credit_action_mode: Optional[str] = Field(None, description="Chế độ xử lý rủi ro: BLOCK hoặc REVIEW")
+    creditActionMode: Optional[str] = Field(None, description="Alias cho credit_action_mode")
 
     @field_validator("credit_limit", "creditLimit", "max_debt_amount", "new_limit")
     @classmethod
@@ -260,6 +263,11 @@ def _execute_debt_limit_update(
         customer.max_due_days = int(days_val)
         customer.warning_threshold_percent = float(warning_val)
         customer.warning_threshold = float(warning_val)
+        mode_val = payload.credit_action_mode or payload.creditActionMode
+        if mode_val:
+            clean_mode = str(mode_val).strip().upper()
+            if clean_mode in ("BLOCK", "REVIEW"):
+                customer.credit_action_mode = clean_mode
 
         # Ghi log lịch sử vào bảng credit_limit_logs (CreditLimitLog)
         log_entry = CreditLimitLog(
@@ -277,6 +285,10 @@ def _execute_debt_limit_update(
         db.commit()
         db.refresh(customer)
         db.refresh(log_entry)
+
+        # SCRUM-42: Đánh giá lại rủi ro tín dụng ngay sau khi cập nhật hạn mức
+        CreditRiskService.apply_evaluation(db, customer, commit=True)
+        db.refresh(customer)
     except Exception as exc:
         db.rollback()
         raise HTTPException(

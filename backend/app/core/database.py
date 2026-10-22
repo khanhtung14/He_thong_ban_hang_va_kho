@@ -121,6 +121,11 @@ def migrate_pricing_schema():
             "current_debt": "FLOAT NOT NULL DEFAULT 0.0",
             "warning_threshold_percent": "FLOAT NOT NULL DEFAULT 80.0",
             "warning_threshold": "FLOAT NOT NULL DEFAULT 80.0",
+            "is_credit_flagged": "BOOLEAN NOT NULL DEFAULT 0",
+            "credit_flag_reason": "VARCHAR(255) NULL",
+            "credit_flagged_at": "DATETIME NULL",
+            "credit_action_mode": "VARCHAR(20) NOT NULL DEFAULT 'BLOCK'",
+            "is_manually_locked": "BOOLEAN NOT NULL DEFAULT 0",
         },
         "suppliers": {
             "contact_person": "VARCHAR(100) NULL",

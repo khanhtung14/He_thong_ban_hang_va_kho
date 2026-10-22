@@ -441,6 +441,13 @@ class Customer(Base):
     warning_threshold_percent: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
     warning_threshold: Mapped[float] = mapped_column(Float, default=80.0, nullable=False)
 
+    # NEW FIELDS: Automated Credit Risk Evaluation (SCRUM-42)
+    is_credit_flagged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    credit_flag_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    credit_flagged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    credit_action_mode: Mapped[str] = mapped_column(String(20), default="BLOCK", nullable=False)
+    is_manually_locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     max_debt_amount = synonym("credit_limit")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

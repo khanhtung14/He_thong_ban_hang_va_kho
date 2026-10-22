@@ -4,6 +4,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Select,
   Table,
   Tag,
   Typography,
@@ -42,6 +43,8 @@ export interface CreditLimitCustomer {
   debt_limit?: number;
   warning_threshold?: number;
   warning_threshold_percent?: number;
+  credit_action_mode?: string;
+  creditActionMode?: string;
 }
 
 export interface CreditLimitLogItem {
@@ -125,9 +128,11 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
   // Khởi tạo form và gọi API lịch sử mỗi khi modal mở
   useEffect(() => {
     if (visible && customer) {
+      const currentActionMode = (customer as any)?.credit_action_mode || (customer as any)?.creditActionMode || "BLOCK";
       form.setFieldsValue({
         new_credit_limit: currentCreditLimit,
         new_max_debt_days: currentMaxDebtDays,
+        credit_action_mode: currentActionMode,
         reason: "",
       });
       fetchLogs(customer.id);
@@ -148,13 +153,15 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
       const values = await form.validateFields();
       const newCredit = Number(values.new_credit_limit) || 0;
       const newDays = Number(values.new_max_debt_days ?? 0);
+      const newActionMode = values.credit_action_mode || "BLOCK";
       const currentCredit = Number(currentCreditLimit ?? 0);
       const currentDays = Number(currentMaxDebtDays ?? 0);
+      const currentActionMode = (customer as any)?.credit_action_mode || (customer as any)?.creditActionMode || "BLOCK";
 
-      // Ràng buộc: Hạn mức mới không được phép giống hệt hạn mức cũ
-      if (newCredit === currentCredit && newDays === currentDays) {
+      // Ràng buộc: Có thay đổi ít nhất 1 trong 3 thuộc tính (tiền, ngày, hoặc chế độ rủi ro)
+      if (newCredit === currentCredit && newDays === currentDays && newActionMode === currentActionMode) {
         message.warning(
-          "Hạn mức tiền hoặc số ngày nợ mới phải khác với giá trị hiện tại!",
+          "Hạn mức tiền, số ngày nợ hoặc chế độ xử lý rủi ro mới phải khác với giá trị hiện tại!",
         );
         return;
       }
@@ -168,6 +175,8 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
         max_debt_days: newDays,
         max_due_days: newDays,
         max_debt_amount: newCredit,
+        credit_action_mode: newActionMode,
+        creditActionMode: newActionMode,
         reason: values.reason.trim(),
       };
 
@@ -445,6 +454,26 @@ export const CreditLimitModal: React.FC<CreditLimitModalProps> = ({
             </Form.Item>
           </Col>
         </Row>
+
+        <Form.Item
+          style={{ marginBottom: 10 }}
+          label={
+            <span style={{ fontWeight: 600 }}>
+              Chế độ kiểm soát khi vi phạm rủi ro tín dụng (SCRUM-42) <span style={{ color: "#ef4444" }}>*</span>
+            </span>
+          }
+          name="credit_action_mode"
+          rules={[{ required: true, message: "Vui lòng chọn chế độ kiểm soát rủi ro!" }]}
+        >
+          <Select disabled={!canEditCreditLimit}>
+            <Select.Option value="BLOCK">
+              <span style={{ color: "#dc2626", fontWeight: 600 }}>CHẶN BÁN (BLOCK)</span> — Tự động chặn tạo đơn mới khi vượt hạn mức hoặc quá hạn
+            </Select.Option>
+            <Select.Option value="REVIEW">
+              <span style={{ color: "#d97706", fontWeight: 600 }}>CHUYỂN DUYỆT (REVIEW)</span> — Đơn hàng mới bắt buộc gửi lên Quản lý kinh doanh phê duyệt
+            </Select.Option>
+          </Select>
+        </Form.Item>
 
         <Form.Item
           style={{ marginBottom: 8 }}
