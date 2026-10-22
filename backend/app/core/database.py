@@ -137,6 +137,9 @@ def migrate_pricing_schema():
             "expected_delivery_date": "DATE NULL",
             "warehouse_id": "INTEGER NULL",
             "delivery_address_id": "INTEGER NULL",
+            "is_stock_reserved": "BOOLEAN NOT NULL DEFAULT 0",
+            "approved_at": "DATETIME NULL",
+            "reservation_expires_at": "DATETIME NULL",
         },
         "order_items": {
             "floor_price": "INTEGER NULL",
@@ -198,9 +201,25 @@ def migrate_pricing_schema():
         existing = {column["name"] for column in inspector.get_columns(table_name)}
         missing = [(name, definition) for name, definition in columns_to_add.items() if name not in existing]
         if missing:
-            with engine.begin() as connection:
-                for name, definition in missing:
-                    connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}"))
+            for name, definition in missing:
+                try:
+                    with engine.begin() as connection:
+                        connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {name} {definition}"))
+                except Exception as exc:
+                    # Xác minh bằng chứng tin cậy: nếu cột đã thực sự tồn tại (do instance khác vừa tạo đồng thời), bỏ qua an toàn
+                    column_exists = False
+                    try:
+                        fresh_cols = {column["name"] for column in inspect(engine).get_columns(table_name)}
+                        if name in fresh_cols:
+                            column_exists = True
+                    except Exception:
+                        # Nếu inspect thất bại (ví dụ mất kết nối, lỗi db), không thể xác nhận bằng chứng
+                        column_exists = False
+
+                    if column_exists:
+                        continue
+                    # Tuyệt đối không nuốt các lỗi khác (syntax, permission, connection, v.v.)
+                    raise exc
 
     # Backfill phone từ delivery_addresses nếu cột customers.phone đang rỗng
     if inspector.has_table("customers") and inspector.has_table("delivery_addresses"):

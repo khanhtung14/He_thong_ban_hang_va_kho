@@ -7,3 +7,4 @@ for target in (str(ROOT), str(ROOT / "backend")):
         sys.path.insert(0, target)
 
 from backend.main import *  # noqa: F401,F403
+from backend.main import app  # noqa: F401

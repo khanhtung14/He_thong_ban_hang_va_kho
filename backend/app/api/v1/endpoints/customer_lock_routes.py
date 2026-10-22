@@ -49,6 +49,9 @@ try:
         reserve_stock_atomic,
         release_reserved_stock,
         _inventory_lock,
+        reserve_order_stock_transactional,
+        release_order_stock_transactional,
+        auto_release_expired_reservations,
     )
     from app.api.v1.endpoints.price_lists import CustomerGroup, resolve_effective_price
     from app.api.v1.endpoints.discount_policy_routes import calculate_best_discount
@@ -360,6 +363,11 @@ class OrderResponse(BaseModel):
     created_at: Optional[datetime] = None
     is_partially_delivered: bool = False
     
+    # SCRUM-32 Stock Reservation fields
+    is_stock_reserved: Optional[bool] = False
+    approved_at: Optional[datetime] = None
+    reservation_expires_at: Optional[datetime] = None
+
     # SCRUM-85 Warning fields
     has_warning: bool = False
     warning_message: Optional[str] = None
@@ -1952,6 +1960,7 @@ def create_order(
             total_amount=total_amount,
             note=payload.note,
             approval_reason=approval_reason,
+            is_stock_reserved=True,
         )
         db.add(new_order)
         db.flush()
@@ -2141,6 +2150,9 @@ def _build_portal_order_dict(order: Order, db: Session, customer: Optional[Custo
         "note": order.note,
         "approval_reason": getattr(order, "approval_reason", None),
         "is_partially_delivered": has_partially_delivered,
+        "is_stock_reserved": getattr(order, "is_stock_reserved", False),
+        "approved_at": getattr(order, "approved_at", None),
+        "reservation_expires_at": getattr(order, "reservation_expires_at", None),
         "items": items_res,
     }
 
@@ -2506,9 +2518,15 @@ def list_orders_pending_approval(
     return results
 
 
+class ApproveOrderRequest(BaseModel):
+    override_reason: Optional[str] = Field(default=None, alias="overrideReason", max_length=500)
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+
 @router.post("/orders/{order_id}/approve", response_model=OrderResponse)
 def approve_below_floor_order(
     order_id: int,
+    payload: Optional[ApproveOrderRequest] = None,
     db: Session = Depends(get_db),
     _user: AuthenticatedUser = Depends(require_roles("Sales Manager", "Admin")),
 ):
@@ -2517,8 +2535,20 @@ def approve_below_floor_order(
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
     if order.status not in (OrderStatus.PENDING, OrderStatus.PENDING_APPROVAL):
         raise HTTPException(status_code=409, detail="Đơn hàng không ở trạng thái chờ duyệt.")
-    order.status = OrderStatus.APPROVED
-    db.commit()
+
+    if payload and payload.override_reason:
+        reasons = [r for r in [order.approval_reason, payload.override_reason.strip()] if r]
+        order.approval_reason = "; ".join(reasons)
+
+    try:
+        # SCRUM-32: Giữ chỗ tồn kho nguyên tử trong cùng giao dịch khi đơn được duyệt
+        reserve_order_stock_transactional(db, order)
+        order.status = OrderStatus.APPROVED
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     customer = db.get(Customer, order.customer_id)
     return _build_full_order_response(order, db, customer)
 
@@ -2543,11 +2573,14 @@ def reject_below_floor_order(
     rejection_note = f"Từ chối: {payload.reason.strip()}"
     order.approval_reason = f"{order.approval_reason}; {rejection_note}" if order.approval_reason else rejection_note
 
-    wh_id = getattr(order, "warehouse_id", None) or 1
-    for it in order.items:
-        if it.sku:
-            release_reserved_stock(db, it.sku, wh_id, it.quantity)
-    db.commit()
+    try:
+        # SCRUM-32: Tự động nhả tồn giữ chỗ khi từ chối đơn
+        release_order_stock_transactional(db, order, reason="REJECTED")
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     customer = db.get(Customer, order.customer_id)
     return _build_full_order_response(order, db, customer)
 
@@ -2573,22 +2606,26 @@ def update_order_status(
     """Cập nhật trạng thái đơn hàng dở dang.
     
     Theo SCRUM-85: Đơn đang dở của đại lý bị khóa VẪN XỬ LÝ TIẾP ĐƯỢC nhưng có cảnh báo.
-    Theo SCRUM-10: Nếu hủy đơn (CANCELLED), giải phóng tồn đang giữ chỗ (Reserved Stock).
+    Theo SCRUM-32: Nếu hủy đơn (CANCELLED), giải phóng tồn đang giữ chỗ (Reserved Stock);
+                   Nếu duyệt đơn (APPROVED), kích hoạt giữ chỗ tồn kho nguyên tử.
     """
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
 
-    if new_status == OrderStatus.CANCELLED and order.status != OrderStatus.CANCELLED:
-        wh_id = getattr(order, "warehouse_id", None) or 1
-        for it in order.items:
-            if it.sku:
-                release_reserved_stock(db, it.sku, wh_id, it.quantity)
+    try:
+        if new_status == OrderStatus.CANCELLED and order.status != OrderStatus.CANCELLED:
+            release_order_stock_transactional(db, order, reason="CANCELLED")
+        elif new_status == OrderStatus.APPROVED and order.status != OrderStatus.APPROVED:
+            reserve_order_stock_transactional(db, order)
 
-    order.status = new_status
-    db.commit()
+        order.status = new_status
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     db.refresh(order)
-
     customer = db.get(Customer, order.customer_id)
     return _build_full_order_response(order, db, customer)
 
@@ -2787,26 +2824,57 @@ def cancel_order(
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
 ):
-    """Hủy đơn hàng (cho phép khi đơn ở trạng thái DRAFT hoặc PENDING_APPROVAL)."""
+    """Hủy đơn hàng (cho phép khi đơn ở trạng thái DRAFT, PENDING_APPROVAL, PENDING hoặc APPROVED)."""
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng!")
 
-    if order.status not in (OrderStatus.DRAFT, OrderStatus.PENDING_APPROVAL, OrderStatus.PENDING):
-        raise HTTPException(status_code=400, detail="Chỉ có thể hủy đơn hàng ở trạng thái Bản nháp hoặc Chờ duyệt!")
+    if order.status not in (OrderStatus.DRAFT, OrderStatus.PENDING_APPROVAL, OrderStatus.PENDING, OrderStatus.APPROVED):
+        raise HTTPException(status_code=400, detail="Chỉ có thể hủy đơn hàng ở trạng thái Bản nháp, Chờ duyệt hoặc Đã duyệt!")
 
-    wh_id = getattr(order, "warehouse_id", None) or 1
-    for it in order.items:
-        if it.sku:
-            release_reserved_stock(db, it.sku, wh_id, it.quantity)
+    try:
+        # SCRUM-32: Tự động giải phóng tồn đang giữ chỗ khi hủy đơn
+        release_order_stock_transactional(db, order, reason="CANCELLED")
+        order.status = OrderStatus.CANCELLED
+        order.approval_reason = f"Hủy đơn bởi người tạo: {user.full_name or user.username}"
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
-    order.status = OrderStatus.CANCELLED
-    order.approval_reason = f"Hủy đơn bởi người tạo: {user.full_name or user.username}"
-    db.commit()
     db.refresh(order)
-
     customer = db.get(Customer, order.customer_id)
     return _build_full_order_response(order, db, customer)
+
+
+@router.patch("/orders/{order_id}/cancel", response_model=OrderResponse)
+def cancel_order_patch(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_permissions(PERM_ORDERS_CREATE)),
+):
+    """PATCH /orders/{order_id}/cancel theo đặc tả API_SPECIFICATION.md."""
+    return cancel_order(order_id=order_id, db=db, user=user)
+
+
+@router.post("/orders/release-expired-reservations")
+def trigger_release_expired_reservations(
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Warehouse Staff", "Warehouse", "WH Manager", "Admin", "Sales Manager")),
+):
+    """Quét và tự động giải phóng tồn giữ chỗ cho các đơn hàng đã duyệt quá hạn (SCRUM-32)."""
+    released_ids = auto_release_expired_reservations(db)
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Đã giải phóng thành công {len(released_ids)} đơn hàng quá hạn giữ chỗ tồn kho.",
+        "data": {
+            "released_order_ids": released_ids,
+            "count": len(released_ids),
+        },
+        "released_order_ids": released_ids,
+        "count": len(released_ids),
+    }
 
 
 @router.delete("/orders/{order_id}")
@@ -2823,10 +2891,7 @@ def delete_order(
     if order.status != OrderStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Chỉ có thể xóa hoàn toàn đơn hàng ở trạng thái Bản nháp (DRAFT)!")
 
-    wh_id = getattr(order, "warehouse_id", None) or 1
-    for it in order.items:
-        if it.sku:
-            release_reserved_stock(db, it.sku, wh_id, it.quantity)
+    release_order_stock_transactional(db, order)
 
     db.delete(order)
     db.commit()

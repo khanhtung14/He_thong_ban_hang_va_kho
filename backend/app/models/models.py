@@ -639,6 +639,11 @@ class Order(Base):
     )
     warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
 
+    # Giữ chỗ tồn kho khi đơn được duyệt (SCRUM-32)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    reservation_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_stock_reserved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     customer: Mapped[Customer] = relationship(back_populates="orders")
     warehouse: Mapped[Optional["Warehouse"]] = relationship("Warehouse", foreign_keys=[warehouse_id])
     delivery_address: Mapped[Optional[DeliveryAddress]] = relationship()
