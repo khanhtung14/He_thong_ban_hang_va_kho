@@ -286,6 +286,7 @@ class OrderItemCreate(BaseModel):
     product_id: Optional[int] = Field(default=None, alias="productId")
     quantity: int = Field(default=1, gt=0)
     unit_price: Optional[float] = Field(default=None, ge=0, alias="unitPrice")
+    require_effective_price: Optional[bool] = Field(default=False, alias="requireEffectivePrice")
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
@@ -310,8 +311,10 @@ class OrderCreateRequest(BaseModel):
     note: Optional[str] = None
     status: Optional[OrderStatus] = Field(None, description="Trạng thái đơn hàng khởi tạo (ví dụ: PENDING_APPROVAL)")
     submit_for_approval: Optional[bool] = Field(None, alias="submitForApproval", description="Gửi duyệt ngay")
+    require_effective_price: Optional[bool] = Field(default=False, alias="requireEffectivePrice", description="Yêu cầu bắt buộc bảng giá hiệu lực")
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
 
 
 class OrderItemResponse(BaseModel):
@@ -1666,6 +1669,9 @@ def simulate_order(
         items_validation.append({
             "productId": prod.id if prod else it.product_id,
             "sku": sku,
+            "hasValidPriceList": effective is not None,
+            "priceListCode": effective["code"] if effective else None,
+            "priceListId": effective["price_list_id"] if effective else None,
             "requestedQty": it.quantity,
             "availableQty": avail,
             "available_qty": avail,
@@ -1683,6 +1689,7 @@ def simulate_order(
             "lineTotal": line_total,
             "appliedPolicyName": disc.get("applied_policy_name"),
             "isBelowFloorPrice": is_below_floor,
+            "priceError": None if effective is not None else f"Sản phẩm [{sku}] không tồn tại bảng giá hiệu lực cho nhóm khách hàng '{customer.customer_group}'.",
         })
 
     grand_total = max(0.0, sub_total - total_discount)
@@ -1771,6 +1778,15 @@ def create_order(
             elif product and product.get("sale_price") is not None and product.get("sale_price") > 0:
                 base_product_price = float(product["sale_price"])
 
+            if effective is None and (
+                getattr(requested, "require_effective_price", False)
+                or getattr(payload, "require_effective_price", False)
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Sản phẩm [{sku}] không tồn tại bảng giá hiệu lực cho nhóm khách hàng '{customer.customer_group}'. Vui lòng cấu hình bảng giá trước khi lên đơn.",
+                )
+
             if effective is None and customer.customer_group in {
                 CustomerGroup.LEVEL_1.value,
                 CustomerGroup.LEVEL_2.value,
@@ -1781,6 +1797,11 @@ def create_order(
                 )
             if effective is None and product is None and db_product is None:
                 raise HTTPException(status_code=404, detail=f"Không tìm thấy SKU {sku} trong danh mục sản phẩm.")
+            if effective is None and base_product_price is None and (requested.unit_price is None or requested.unit_price <= 0):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Sản phẩm [{sku}] không tồn tại bảng giá hiệu lực cho nhóm khách hàng '{customer.customer_group}'. Vui lòng cấu hình bảng giá trước khi lên đơn.",
+                )
 
             # SCRUM-10: Kiểm tra và giữ chỗ tồn kho với Pessimistic Locking (SELECT ... FOR UPDATE)
             success, avail, max_allowed, stock_info = reserve_stock_atomic(
@@ -2699,6 +2720,20 @@ def update_order(
         if floor_price is not None and actual_price < floor_price:
             approval_lines.append(f"{sku}: {actual_price} dưới giá sàn {floor_price}")
 
+        if effective is None and (
+            getattr(requested, "require_effective_price", False)
+            or getattr(payload, "require_effective_price", False)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Sản phẩm [{sku}] không tồn tại bảng giá hiệu lực cho nhóm khách hàng '{customer.customer_group}'. Vui lòng cấu hình bảng giá trước khi lên đơn.",
+            )
+        if effective is None and base_product_price is None and (requested.unit_price is None or requested.unit_price <= 0):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Sản phẩm [{sku}] không tồn tại bảng giá hiệu lực cho nhóm khách hàng '{customer.customer_group}'. Vui lòng cấu hình bảng giá trước khi lên đơn.",
+            )
+
         product_id = db_product.id if db_product else None
         if not product_id and (product or requested.product_name):
             existing_prod = db.query(Product).filter(func.upper(Product.sku) == sku).first() if sku else None
@@ -2716,45 +2751,47 @@ def update_order(
                 db.flush()
                 product_id = new_prod.id
 
-            disc = calculate_best_discount(sku=sku, quantity=requested.quantity, base_price=actual_price, db=db)
-            disc_amount = float(disc.get("discount_amount") or 0.0)
-            disc_percent = float(disc.get("discount_percent") or 0.0)
-            line_subtotal = float(requested.quantity * actual_price)
-            line_total = max(0.0, line_subtotal - disc_amount)
+        disc = calculate_best_discount(sku=sku, quantity=requested.quantity, base_price=actual_price, db=db)
+        disc_amount = float(disc.get("discount_amount") or 0.0)
+        disc_percent = float(disc.get("discount_percent") or 0.0)
+        line_subtotal = float(requested.quantity * actual_price)
+        line_total = max(0.0, line_subtotal - disc_amount)
 
-            resolved_items.append({
-                "product_id": product_id,
-                "sku": sku,
-                "product_name": requested.product_name or (db_product.name if db_product else (product.get("name") if product else sku)),
-                "quantity": requested.quantity,
-                "unit_price": actual_price,
-                "floor_price": floor_price,
-                "price_list_id": price_list_id,
-                "discount_percent": disc_percent,
-                "discount_amount": disc_amount,
-                "applied_policy_name": disc.get("applied_policy_name"),
-                "line_subtotal": line_subtotal,
-                "line_total": line_total,
-            })
+        resolved_items.append({
+            "product_id": product_id,
+            "sku": sku,
+            "product_name": requested.product_name or (db_product.name if db_product else (product.get("name") if product else sku)),
+            "quantity": requested.quantity,
+            "unit_price": actual_price,
+            "floor_price": floor_price,
+            "price_list_id": price_list_id,
+            "discount_percent": disc_percent,
+            "discount_amount": disc_amount,
+            "applied_policy_name": disc.get("applied_policy_name"),
+            "line_subtotal": line_subtotal,
+            "line_total": line_total,
+        })
 
-        subtotal_amount = sum(it["line_subtotal"] for it in resolved_items)
-        total_discount = sum(it["discount_amount"] for it in resolved_items)
-        total_amount = max(0.0, subtotal_amount - total_discount)
+    subtotal_amount = sum(it["line_subtotal"] for it in resolved_items)
+    total_discount = sum(it["discount_amount"] for it in resolved_items)
+    total_amount = max(0.0, subtotal_amount - total_discount)
 
-        order.customer_id = customer.id
-        order.delivery_address_id = chosen_address_id
-        order.subtotal_amount = subtotal_amount
-        order.discount_amount = total_discount
-        order.total_amount = total_amount
-        order.note = payload.note
-        if payload.submit_for_approval or payload.status in (OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"):
-            order.status = OrderStatus.PENDING_APPROVAL
-        if approval_lines:
-            order.approval_reason = "; ".join(approval_lines)
-        elif order.status == OrderStatus.PENDING_APPROVAL and not order.approval_reason:
-            order.approval_reason = payload.note or "Chờ Quản lý kinh doanh phê duyệt"
+    order.customer_id = customer.id
+    order.delivery_address_id = chosen_address_id
+    order.subtotal_amount = subtotal_amount
+    order.discount_amount = total_discount
+    order.total_amount = total_amount
+    order.note = payload.note
+    if payload.submit_for_approval or payload.status in (OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"):
+        order.status = OrderStatus.PENDING_APPROVAL
+    elif approval_lines:
+        order.status = OrderStatus.PENDING_APPROVAL if (payload.status == OrderStatus.PENDING_APPROVAL or payload.submit_for_approval) else OrderStatus.PENDING
+    if approval_lines:
+        order.approval_reason = "; ".join(approval_lines)
+    elif order.status == OrderStatus.PENDING_APPROVAL and not order.approval_reason:
+        order.approval_reason = payload.note or "Chờ Quản lý kinh doanh phê duyệt"
 
-        # Xóa các dòng hàng cũ và thêm dòng hàng mới
+    # Xóa các dòng hàng cũ và thêm dòng hàng mới
         for old_it in list(order.items):
             db.delete(old_it)
         db.flush()

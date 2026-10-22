@@ -83,6 +83,9 @@ interface OrderItemRow extends OrderItemInput {
   applied_policy_name?: string;
   line_subtotal?: number;
   line_total?: number;
+  floor_price?: number | null;
+  price_list_id?: number | null;
+  is_below_floor?: boolean;
 }
 
 export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
@@ -396,12 +399,19 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
     setItems((prev) => prev.filter((it) => it.key !== key));
   };
 
-  // Xử lý khi chọn sản phẩm từ dropdown
+  // Xử lý khi chọn sản phẩm từ dropdown (SCRUM-7: Áp giá tự động & Chặn dòng hàng lỗi)
   const handleSelectProduct = async (key: string, selectedSku: string) => {
     const prod = products.find((p) => p.sku === selectedSku);
     if (!prod) return;
 
+    if (!selectedCustomer) {
+      message.warning("Vui lòng chọn đại lý trước khi chọn sản phẩm.");
+      return;
+    }
+
     let price = Number(prod.sale_price ?? prod.basePrice ?? 0);
+    let floorPrice: number | null = null;
+    let priceListId: number | null = null;
     const unit = prod.unit || prod.baseUnit || "";
     let availStock = Number(
       prod.available_quantity ?? prod.availableQuantity ?? prod.available_qty ?? prod.stock_available ?? prod.stock ?? 0
@@ -430,30 +440,40 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       }
     }
 
-    // Ưu tiên tra cứu giá theo bảng giá của nhóm đại lý nếu có
+    // SCRUM-7 AC-1 & AC-4: Tra cứu bảng giá đang có hiệu lực ứng với nhóm khách hàng mà đại lý thuộc về
     if (selectedCustomer?.customer_group) {
       try {
         const res = await authenticatedFetch(
           `/api/v1/price-lists/effective/${encodeURIComponent(prod.sku)}?customer_group=${encodeURIComponent(
             selectedCustomer.customer_group
-          )}&fallback=true`
+          )}&fallback=false`
         );
         if (res.ok) {
           const priceData = await res.json();
           if (priceData && priceData.sale_price !== undefined && priceData.sale_price !== null) {
             price = Number(priceData.sale_price);
+            floorPrice = priceData.floor_price !== undefined && priceData.floor_price !== null ? Number(priceData.floor_price) : null;
+            priceListId = priceData.price_list_id || null;
           }
+        } else {
+          // SCRUM-7 AC-4: Chặn dòng hàng lỗi nếu SKU không tồn tại bảng giá hiệu lực
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.detail || `Sản phẩm [${prod.sku}] không tồn tại bảng giá hiệu lực cho nhóm khách hàng '${selectedCustomer.customer_group}'. Không thể thêm dòng hàng!`;
+          message.error(errMsg);
+          Modal.error({
+            title: "Chặn dòng hàng lỗi (SCRUM-7)",
+            content: errMsg,
+            okText: "Đã hiểu",
+          });
+          // Reset ô SKU của dòng hàng này về rỗng để chặn không cho thêm
+          setItems((prev) =>
+            prev.map((it) => (it.key === key ? { ...it, sku: "", product_name: "", unit_price: 0, floor_price: null, is_below_floor: false } : it))
+          );
+          return;
         }
-      } catch {
-        // Tự động fallback về base_price niêm yết của sản phẩm
+      } catch (e) {
+        console.error("Lỗi tra cứu bảng giá hiệu lực:", e);
       }
-    }
-
-    // Chỉ hiển thị cảnh báo nhẹ nếu sản phẩm hoàn toàn không có giá nào trong hệ thống
-    if (!price || price <= 0) {
-      message.warning(
-        `Sản phẩm [${prod.sku}] hiện chưa có giá nào trong hệ thống. Vui lòng nhập đơn giá thủ công.`
-      );
     }
 
     setItems((prev) =>
@@ -465,9 +485,12 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             sku: prod.sku,
             product_name: prod.name,
             unit_price: price,
+            floor_price: floorPrice,
+            price_list_id: priceListId,
             unit: unit,
             available_quantity: availStock,
             quantity: targetQty,
+            is_below_floor: false,
           };
         }
         return it;
@@ -486,6 +509,15 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             if (it.available_quantity !== undefined && it.available_quantity >= 0 && numVal > it.available_quantity) {
               message.error(
                 `Vượt quá số lượng hàng tồn khả dụng! Sản phẩm [${it.product_name || it.sku}] chỉ còn khả dụng tối đa ${it.available_quantity} ${it.unit || "đơn vị"}. Số lượng tối đa còn có thể đặt: ${it.available_quantity}.`
+              );
+            }
+          } else if (field === "unit_price") {
+            const numPrice = Number(value) || 0;
+            const isBelow = it.floor_price !== undefined && it.floor_price !== null && numPrice < it.floor_price;
+            updated.is_below_floor = isBelow;
+            if (isBelow) {
+              message.warning(
+                `Đơn giá (${numPrice.toLocaleString("vi-VN")} ₫) thấp hơn giá sàn (${it.floor_price?.toLocaleString("vi-VN")} ₫)! Đơn hàng sẽ tự động chuyển sang trạng thái "Cần duyệt".`
               );
             }
           }
@@ -730,8 +762,18 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       setSubmitting(true);
       setErrorMsg(null);
 
+      const hasBelowFloorPrice = items.some(
+        (it) =>
+          Boolean(it.sku) &&
+          it.floor_price !== undefined &&
+          it.floor_price !== null &&
+          Number(it.unit_price || 0) < Number(it.floor_price)
+      );
+
       const chosenAddressId = values.delivery_address_id || selectedAddressId || null;
-      const isSubmitForApproval = values.submit_for_approval !== false;
+      const isSubmitForApproval = values.submit_for_approval !== false || hasBelowFloorPrice;
+      const initialStatus = hasBelowFloorPrice ? "PENDING_APPROVAL" : (isSubmitForApproval ? "PENDING_APPROVAL" : "DRAFT");
+
       const payload: CreateOrderPayload = {
         customer_id: selectedCustomer.id,
         customerId: selectedCustomer.id,
@@ -744,7 +786,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
           unit_price: it.unit_price,
         })),
         note: values.note ? values.note.trim() : undefined,
-        status: isSubmitForApproval ? "PENDING_APPROVAL" : "DRAFT",
+        status: initialStatus,
         submit_for_approval: isSubmitForApproval,
         submitForApproval: isSubmitForApproval,
       };
@@ -752,16 +794,20 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       if (editingOrder) {
         await updateOrder(editingOrder.id, payload);
         message.success(
-          isSubmitForApproval
-            ? "Cập nhật và đã gửi yêu cầu duyệt đơn hàng thành công!"
-            : "Cập nhật đơn hàng thành công!"
+          hasBelowFloorPrice
+            ? "Cập nhật thành công! Đơn hàng có giá dưới giá sàn đã tự động chuyển sang trạng thái Cần duyệt (Pending Approval)."
+            : (isSubmitForApproval
+                ? "Cập nhật và đã gửi yêu cầu duyệt đơn hàng thành công!"
+                : "Cập nhật đơn hàng thành công!")
         );
       } else {
         await createOrder(payload);
         message.success(
-          isSubmitForApproval
-            ? "Tạo đơn hàng thành công và đã gửi yêu cầu phê duyệt tới Quản lý kinh doanh!"
-            : "Tạo đơn hàng thành công (Lưu nháp)!"
+          hasBelowFloorPrice
+            ? "Tạo đơn hàng thành công! Đơn hàng có sản phẩm dưới giá sàn đã tự động chuyển sang trạng thái Cần duyệt (Pending Approval)."
+            : (isSubmitForApproval
+                ? "Tạo đơn hàng thành công và đã gửi yêu cầu phê duyệt tới Quản lý kinh doanh!"
+                : "Tạo đơn hàng thành công (Lưu nháp)!")
         );
       }
       if (onOrderCreated) onOrderCreated();
@@ -919,19 +965,45 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       title: "ĐƠN GIÁ (₫)",
       dataIndex: "unit_price",
       key: "unit_price",
-      width: 115,
-      render: (val: number, r) => (
-        <InputNumber
-          min={0}
-          step={1000}
-          value={val}
-          onChange={(num) => handleItemChange(r.key, "unit_price", num || 0)}
-          size="small"
-          style={{ width: "100%" }}
-          formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-          parser={(v) => Number(v?.replace(/\$\s?|(,*)/g, "") || 0)}
-        />
-      ),
+      width: 145,
+      render: (val: number, r) => {
+        const isBelow = r.floor_price !== undefined && r.floor_price !== null && Number(val || 0) < Number(r.floor_price);
+        return (
+          <Tooltip
+            title={
+              isBelow
+                ? `Cảnh báo giá sàn: Đơn giá (${Number(val || 0).toLocaleString("vi-VN")} ₫) thấp hơn giá sàn (${Number(r.floor_price).toLocaleString("vi-VN")} ₫). Đơn hàng sẽ cần Quản lý duyệt!`
+                : undefined
+            }
+          >
+            <div>
+              <InputNumber
+                min={0}
+                step={1000}
+                status={isBelow ? "warning" : undefined}
+                value={val}
+                onChange={(num) => handleItemChange(r.key, "unit_price", num || 0)}
+                size="small"
+                style={{ width: "100%", borderColor: isBelow ? "#f59e0b" : undefined }}
+                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                parser={(v) => Number(v?.replace(/\$\s?|(,*)/g, "") || 0)}
+              />
+              {r.floor_price !== undefined && r.floor_price !== null && (
+                isBelow ? (
+                  <div style={{ color: "#d97706", fontSize: 11, marginTop: 2, fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
+                    <WarningOutlined style={{ color: "#d97706" }} />
+                    <span>Dưới giá sàn ({Number(r.floor_price).toLocaleString("vi-VN")} ₫) - Cần duyệt!</span>
+                  </div>
+                ) : (
+                  <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>
+                    Sàn: {Number(r.floor_price).toLocaleString("vi-VN")} ₫
+                  </div>
+                )
+              )}
+            </div>
+          </Tooltip>
+        );
+      },
     },
     {
       title: "CHIẾT KHẤU",
@@ -1004,6 +1076,15 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
       (Number(it.quantity) > Number(it.available_quantity) || Number(it.available_quantity) <= 0)
   );
 
+  // SCRUM-7 Tiêu chí 3: Kiểm tra nếu có sản phẩm nào có đơn giá thấp hơn giá sàn
+  const hasBelowFloorPrice = items.some(
+    (it) =>
+      Boolean(it.sku) &&
+      it.floor_price !== undefined &&
+      it.floor_price !== null &&
+      Number(it.unit_price || 0) < Number(it.floor_price)
+  );
+
   return (
     <>
       <Modal
@@ -1013,7 +1094,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
             <span>
               {editingOrder
                 ? `Chỉnh sửa đơn hàng ${editingOrder.order_code}`
-                : "Lập đơn hàng bán (SCRUM-20 & SCRUM-85)"}
+                : "Lập đơn hàng bán (SCRUM-7, SCRUM-20 & SCRUM-85)"}
             </span>
           </div>
         }
@@ -1039,6 +1120,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
               message="Đại lý đang bị khóa giao dịch (SCRUM-85)"
               description={`Lý do: ${selectedCustomer?.lock_reason || "Chặn công nợ quá hạn"
                 }. Hệ thống chặn toàn bộ thao tác lên đơn hàng mới cho đại lý này.`}
+            />
+          )}
+
+          {hasBelowFloorPrice && (
+            <Alert
+              type="warning"
+              showIcon
+              icon={<WarningOutlined />}
+              message="Cảnh báo đơn giá thấp hơn giá sàn (SCRUM-7)"
+              description="Đơn hàng có một hoặc nhiều sản phẩm có đơn giá sửa thấp hơn giá sàn quy định. Đơn hàng sẽ tự động chuyển sang trạng thái 'Cần duyệt' (Pending Approval) để Quản lý kinh doanh phê duyệt trước khi giao hàng."
             />
           )}
 
