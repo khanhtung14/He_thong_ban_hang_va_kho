@@ -2150,6 +2150,9 @@ def _build_portal_order_dict(order: Order, db: Session, customer: Optional[Custo
         "note": order.note,
         "approval_reason": getattr(order, "approval_reason", None),
         "is_partially_delivered": has_partially_delivered,
+        "is_stock_reserved": getattr(order, "is_stock_reserved", False),
+        "approved_at": getattr(order, "approved_at", None),
+        "reservation_expires_at": getattr(order, "reservation_expires_at", None),
         "items": items_res,
     }
 

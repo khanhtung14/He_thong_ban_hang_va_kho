@@ -692,6 +692,7 @@ def test_concurrency_race_condition_pessimistic_locking():
 
         with ConcurrentSessionLocal() as db:
             inv_final = db.query(Inventory).first()
+            assert inv_final is not None
             assert inv_final.physical_qty == 10.0
             assert inv_final.reserved_qty == 8.0
             assert inv_final.available_qty == 2.0
@@ -973,7 +974,7 @@ def test_concurrent_schema_migration_safety():
             column_exists = False
             try:
                 # Giả lập inspect ném lỗi connection/timeout
-                raise OperationalError("lost connection during inspect", params=None, orig=None)
+                raise OperationalError("lost connection during inspect", params=None, orig=Exception("lost connection"))
             except Exception:
                 column_exists = False
 
@@ -986,3 +987,211 @@ def test_concurrent_schema_migration_safety():
         assert "is_stock_reserved" in str(thrown_exc) or "duplicate" in str(thrown_exc).lower(), "Phải re-raise lỗi gốc khi inspect thất bại"
 
     assert inspect_failure_raised is True, "Khi inspect thất bại, không thể xác nhận bằng chứng và phải raise lỗi"
+
+
+# ==============================================================================
+# TEST 13: ĐƠN CÓ NHIỀU DÒNG CÙNG SKU - TỔNG HỢP VÀ KIỂM TRA TỒN CHÍNH XÁC
+# ==============================================================================
+
+def test_order_with_duplicate_skus_reservation_aggregation(scrum32_env):
+    """Khi đơn có nhiều dòng cho cùng 1 SKU:
+    - Kho chỉ có 50 lon COKE khả dụng.
+    - Dòng 1: 30 lon; Dòng 2: 25 lon -> Tổng cần 55 lon (> 50 khả dụng).
+    - Phải bị từ chối duyệt ngay từ bước kiểm tra trước (Pessimistic check).
+    - Khi kho có đủ (ví dụ nâng lên 70), duyệt thành công và giữ chỗ chính xác 55 lon.
+    """
+    client, SessionLocal = scrum32_env
+    headers_manager = make_auth_header("Sales Manager", "sales_manager_01")
+
+    with SessionLocal() as db:
+        order = Order(
+            order_code="ORD-DUP-SKU-01",
+            customer_id=1,
+            warehouse_id=1,
+            status=OrderStatus.PENDING_APPROVAL,
+            total_amount=550000.0,
+            is_stock_reserved=False,
+        )
+        db.add(order)
+        db.flush()
+
+        it1 = OrderItem(order_id=order.id, product_id=1, sku="SKU-COKE", product_name="Coca Cola 330ml", quantity=30, unit_price=10000.0)
+        it2 = OrderItem(order_id=order.id, product_id=1, sku="SKU-COKE", product_name="Coca Cola 330ml", quantity=25, unit_price=10000.0)
+        db.add_all([it1, it2])
+
+        # Kho đang có: physical=100, reserved=50 -> available=50
+        inv = db.query(Inventory).filter(Inventory.product_id == 1, Inventory.warehouse_id == 1).first()
+        assert inv is not None
+        inv.physical_qty = 100.0
+        inv.reserved_qty = 50.0
+        inv.available_qty = 50.0
+        db.commit()
+        order_id = order.id
+
+    # Thử duyệt đơn: Cần 55, chỉ còn 50 -> Phải bị từ chối 400
+    res = client.post(f"/api/v1/orders/{order_id}/approve", headers=headers_manager)
+    assert res.status_code == 400
+    assert "cần 55, chỉ còn 50" in res.text
+
+    # Kiểm tra tồn kho không bị thay đổi sau rollback
+    with SessionLocal() as db:
+        inv = db.query(Inventory).filter(Inventory.product_id == 1, Inventory.warehouse_id == 1).first()
+        assert inv is not None
+        assert inv.reserved_qty == 50.0
+        assert inv.available_qty == 50.0
+
+    # Nâng tồn khả dụng: giảm reserved_qty xuống 30 -> available=70
+    with SessionLocal() as db:
+        inv = db.query(Inventory).filter(Inventory.product_id == 1, Inventory.warehouse_id == 1).first()
+        assert inv is not None
+        inv.reserved_qty = 30.0
+        inv.available_qty = 70.0
+        db.commit()
+
+    # Duyệt lại: Cần 55 <= 70 -> Thành công
+    res2 = client.post(f"/api/v1/orders/{order_id}/approve", headers=headers_manager)
+    assert res2.status_code == 200
+    assert res2.json()["status"] == "APPROVED"
+    assert res2.json()["is_stock_reserved"] is True
+
+    with SessionLocal() as db:
+        inv = db.query(Inventory).filter(Inventory.product_id == 1, Inventory.warehouse_id == 1).first()
+        assert inv is not None
+        # Đã giữ thêm đúng 55 lon (từ 30 lên 85)
+        assert inv.reserved_qty == 85.0
+        assert inv.available_qty == 15.0
+
+
+# ==============================================================================
+# TEST 14: ĐƠN ĐÃ GIỮ CHỖ TỪ TRƯỚC VẪN ĐƯỢC THIẾT LẬP THỜI GIAN KHI DUYỆT
+# ==============================================================================
+
+def test_approve_already_reserved_order_sets_timestamps(scrum32_env, monkeypatch):
+    """Đơn đã được giữ chỗ lúc tạo (is_stock_reserved=True):
+    - Khi duyệt đơn, KHÔNG được cộng dồn giữ chỗ lần 2 (idempotent).
+    - Nhưng approved_at và reservation_expires_at PHẢI được cập nhật chính xác.
+    """
+    monkeypatch.setenv("ORDER_RESERVATION_HOLD_HOURS", "48")
+    client, SessionLocal = scrum32_env
+    headers_manager = make_auth_header("Sales Manager", "sales_manager_01")
+
+    with SessionLocal() as db:
+        order = Order(
+            order_code="ORD-ALREADY-RES-01",
+            customer_id=1,
+            warehouse_id=1,
+            status=OrderStatus.PENDING_APPROVAL,
+            total_amount=100000.0,
+            is_stock_reserved=True,  # Đã giữ chỗ từ trước
+            approved_at=None,
+            reservation_expires_at=None,
+        )
+        db.add(order)
+        db.flush()
+
+        it = OrderItem(order_id=order.id, product_id=1, sku="SKU-COKE", quantity=10, unit_price=10000.0)
+        db.add(it)
+
+        inv = db.query(Inventory).filter(Inventory.product_id == 1, Inventory.warehouse_id == 1).first()
+        assert inv is not None
+        initial_reserved = inv.reserved_qty
+        initial_available = inv.available_qty
+        db.commit()
+        order_id = order.id
+
+    res = client.post(f"/api/v1/orders/{order_id}/approve", headers=headers_manager)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "APPROVED"
+    assert data["is_stock_reserved"] is True
+    assert data["approved_at"] is not None
+    assert data["reservation_expires_at"] is not None
+
+    # Tồn kho không bị trừ 2 lần
+    with SessionLocal() as db:
+        inv = db.query(Inventory).filter(Inventory.product_id == 1, Inventory.warehouse_id == 1).first()
+        assert inv is not None
+        assert inv.reserved_qty == initial_reserved
+        assert inv.available_qty == initial_available
+
+
+# ==============================================================================
+# TEST 15: TÍNH LUỸ ĐẲNG (IDEMPOTENCY) CỦA GIẢI PHÓNG TỒN KHO
+# ==============================================================================
+
+def test_release_order_stock_idempotency(scrum32_env):
+    """Gọi giải phóng tồn kho nhiều lần trên cùng một đơn hàng không làm trừ âm tồn kho."""
+    client, SessionLocal = scrum32_env
+    headers_manager = make_auth_header("Sales Manager", "sales_manager_01")
+
+    with SessionLocal() as db:
+        order = Order(
+            order_code="ORD-REL-IDEMP-01",
+            customer_id=1,
+            warehouse_id=1,
+            status=OrderStatus.APPROVED,
+            total_amount=100000.0,
+            is_stock_reserved=True,
+            reservation_expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        )
+        db.add(order)
+        db.flush()
+        it = OrderItem(order_id=order.id, product_id=1, sku="SKU-COKE", quantity=10, unit_price=10000.0)
+        db.add(it)
+
+        inv = db.query(Inventory).filter(Inventory.product_id == 1, Inventory.warehouse_id == 1).first()
+        assert inv is not None
+        inv.physical_qty = 50.0
+        inv.reserved_qty = 20.0
+        inv.available_qty = 30.0
+        db.commit()
+
+        # Giải phóng lần 1
+        release_order_stock_transactional(db, order)
+        assert not order.is_stock_reserved
+        assert order.reservation_expires_at is None
+        assert inv.reserved_qty == 10.0
+        assert inv.available_qty == 40.0
+
+        # Giải phóng lần 2 (lặp lại)
+        release_order_stock_transactional(db, order)
+        assert not order.is_stock_reserved
+        # Số lượng tồn không bị trừ thêm lần nào nữa
+        assert inv.reserved_qty == 10.0
+        assert inv.available_qty == 40.0
+
+
+# ==============================================================================
+# TEST 16: XỬ LÝ ĐƠN HÀNG KHÔNG TỒN TẠI VÀ ĐƠN HÀNG RỖNG
+# ==============================================================================
+
+def test_order_not_found_and_empty_items(scrum32_env):
+    """Kiểm tra xử lý biên: đơn hàng không tồn tại (404) và đơn không có mặt hàng nào."""
+    client, SessionLocal = scrum32_env
+    headers_manager = make_auth_header("Sales Manager", "sales_manager_01")
+
+    # Đơn không tồn tại: 404
+    res_approve = client.post("/api/v1/orders/999999/approve", headers=headers_manager)
+    assert res_approve.status_code == 404
+
+    res_cancel = client.post("/api/v1/orders/999999/cancel", headers=headers_manager)
+    assert res_cancel.status_code == 404
+
+    # Đơn rỗng (không có items)
+    with SessionLocal() as db:
+        order = Order(
+            order_code="ORD-EMPTY-01",
+            customer_id=1,
+            warehouse_id=1,
+            status=OrderStatus.PENDING_APPROVAL,
+            total_amount=0.0,
+            is_stock_reserved=False,
+        )
+        db.add(order)
+        db.commit()
+        order_id = order.id
+
+    res_empty = client.post(f"/api/v1/orders/{order_id}/approve", headers=headers_manager)
+    assert res_empty.status_code == 200
+    assert res_empty.json()["status"] == "APPROVED"
+    assert res_empty.json()["is_stock_reserved"] is True
