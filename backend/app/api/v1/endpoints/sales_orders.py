@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+from typing import List, Optional, Tuple
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -44,7 +44,7 @@ class DraftInput(BaseModel):
     delivery_point_id: int = Field(gt=0)
     desired_delivery_date: date
     note: Optional[str] = Field(default=None, max_length=2000)
-    items: list[DraftItemInput] = Field(default_factory=list, max_length=100)
+    items: List[DraftItemInput] = Field(default_factory=list, max_length=100)
 
 
 class SalesCustomerView(BaseModel):
@@ -84,8 +84,8 @@ class SalesProductView(BaseModel):
     name: str
     sale_price: float
     discount_percent: float
-    discount_tiers: list[DiscountTierView]
-    units: list[ProductUnitView]
+    discount_tiers: List[DiscountTierView]
+    units: List[ProductUnitView]
 
 
 class DraftItemView(BaseModel):
@@ -120,7 +120,7 @@ class DraftView(BaseModel):
     total_amount: float
     note: Optional[str] = None
     updated_at: Optional[datetime] = None
-    items: list[DraftItemView]
+    items: List[DraftItemView]
 
 
 def _sales_account(db: Session, actor: AuthenticatedUser) -> User:
@@ -154,7 +154,7 @@ def _require_customer(db: Session, account: User, customer_id: int) -> Customer:
     return customer
 
 
-def _discount_tiers(db: Session, product: Product) -> list[DiscountTier]:
+def _discount_tiers(db: Session, product: Product) -> List[DiscountTier]:
     targets = [
         and_(
             or_(DiscountPolicy.target_type == "PRODUCT", DiscountPolicy.target_type == "SKU"),
@@ -177,7 +177,7 @@ def _discount_tiers(db: Session, product: Product) -> list[DiscountTier]:
     )
 
 
-def _discount_for_quantity(tiers: list[DiscountTier], quantity: int) -> Decimal:
+def _discount_for_quantity(tiers: List[DiscountTier], quantity: int) -> Decimal:
     eligible = [tier for tier in tiers if tier.min_qty <= quantity]
     return Decimal(str(max(eligible, key=lambda tier: tier.min_qty).discount_percent)) if eligible else Decimal("0")
 
@@ -256,8 +256,8 @@ def _delivery_point(db: Session, customer_id: int, point_id: int) -> DeliveryAdd
 
 
 def _build_items(
-    db: Session, requested: list[DraftItemInput]
-) -> tuple[list[OrderItem], Decimal, Decimal]:
+    db: Session, requested: List[DraftItemInput]
+) -> Tuple[List[OrderItem], Decimal, Decimal]:
     product_ids = {row.product_id for row in requested}
     products = {
         product.id: product
@@ -272,7 +272,7 @@ def _build_items(
         for unit in db.query(ProductUnit).filter(ProductUnit.id.in_(unit_ids)).all()
     } if unit_ids else {}
 
-    items: list[OrderItem] = []
+    items: List[OrderItem] = []
     subtotal = Decimal("0")
     discounts = Decimal("0")
     for row in requested:
@@ -339,7 +339,7 @@ def _save_draft(
     return _load_owned_draft(db, account, order.id)
 
 
-@router.get("/customers", response_model=list[SalesCustomerView])
+@router.get("/customers", response_model=List[SalesCustomerView])
 def list_assigned_customers(
     db: Session = Depends(get_db),
     actor: AuthenticatedUser = Depends(require_roles("Sales Rep")),
@@ -357,7 +357,7 @@ def list_assigned_customers(
     ]
 
 
-@router.get("/delivery-points", response_model=list[DeliveryPointView])
+@router.get("/delivery-points", response_model=List[DeliveryPointView])
 def list_delivery_points(
     customer_id: int = Query(gt=0),
     db: Session = Depends(get_db),
@@ -394,7 +394,7 @@ def list_delivery_points(
     ]
 
 
-@router.get("/products", response_model=list[SalesProductView])
+@router.get("/products", response_model=List[SalesProductView])
 def search_sales_products(
     search: str = Query(default="", max_length=100),
     db: Session = Depends(get_db),
@@ -453,7 +453,7 @@ def search_sales_products(
     return response
 
 
-@router.get("/drafts", response_model=list[DraftView])
+@router.get("/drafts", response_model=List[DraftView])
 def list_sales_drafts(
     db: Session = Depends(get_db),
     actor: AuthenticatedUser = Depends(require_roles("Sales Rep")),

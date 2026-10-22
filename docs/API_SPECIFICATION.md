@@ -965,6 +965,71 @@
 - **Query Params:** `groupBy` (`sales_rep` | `region` | `customer` | `category`), `fromDate`, `toDate`
 - **Response Data:** Báo cáo doanh thu đa chiều theo tiêu chí gom nhóm.
 
+#### `GET /reports/sales-analytics`
+- **Story:** SCRUM-72 (Epic SCRUM-91: Báo cáo doanh số đa chiều & Biên lợi nhuận)
+- **Phân quyền:** Authenticated Staff (Sales Manager, Admin xem đầy đủ biên lợi nhuận; Sales Rep/NV khác bị ẩn giá vốn và biên lợi nhuận)
+- **Query Params:**
+  - `group_by` (hoặc `groupBy`): `staff` | `sales_rep` | `region` | `territory` | `customer` | `dealer` | `category` | `product` | `sku`
+  - `from_date` (hoặc `fromDate`): Ngày bắt đầu (YYYY-MM-DD)
+  - `to_date` (hoặc `toDate`): Ngày kết thúc (YYYY-MM-DD)
+  - `period`: `this_month` | `last_month` | `this_quarter` | `this_year` | `today`
+  - `compare_to`: `previous_period` | `previous_year` (So sánh cùng kỳ trước)
+- **Response Data:**
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "Lấy báo cáo doanh số đa chiều thành công",
+  "data": {
+    "group_by": "category",
+    "period": {
+      "from_date": "2026-10-01",
+      "to_date": "2026-10-31"
+    },
+    "comparison": {
+      "compare_to": "previous_period",
+      "from_date": "2026-09-01",
+      "to_date": "2026-09-30"
+    },
+    "summary": {
+      "total_revenue": 50000000.0,
+      "total_quantity": 2500,
+      "total_cogs": 35000000.0,
+      "gross_profit": 15000000.0,
+      "gross_margin": 30.0,
+      "previous_revenue": 40000000.0,
+      "previous_quantity": 2000,
+      "revenue_growth_rate": 25.0,
+      "quantity_growth_rate": 25.0
+    },
+    "items": [
+      {
+        "id": 1,
+        "code": "BEV",
+        "name": "Đồ uống",
+        "revenue": 30000000.0,
+        "quantity": 1500,
+        "cogs": 21000000.0,
+        "gross_profit": 9000000.0,
+        "gross_margin": 30.0,
+        "previous_revenue": 24000000.0,
+        "previous_quantity": 1200,
+        "revenue_growth_rate": 25.0,
+        "quantity_growth_rate": 25.0
+      }
+    ]
+  }
+}
+```
+
+#### `GET /reports/sales-analytics/export`
+- **Story:** SCRUM-72 (Xuất báo cáo doanh số đa chiều ra file Excel .xlsx)
+- **Phân quyền:** Authenticated Staff (Sales Manager, Admin, Sales Rep)
+- **Query Params:** Giống `GET /reports/sales-analytics`
+- **Content-Type:** `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+- **Response:** File Excel nhị phân tải về (.xlsx) kèm định dạng và công thức.
+
+
 #### `GET /reports/inventory-turnover`
 - **Story:** S8-07
 - **Phân quyền:** WH Manager

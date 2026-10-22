@@ -102,3 +102,274 @@ def get_sales_margin_report(
         "margin": f"{(gross_profit / total_revenue * 100):.1f}%" if total_revenue else "0%",
         "details": details,
     }
+
+
+# =============================================================================
+# SCRUM-72 (Epic SCRUM-91): Multi-dimensional Sales Analytics & Excel Export
+# =============================================================================
+from io import BytesIO
+from typing import Dict, Optional
+from fastapi import Query
+from fastapi.responses import StreamingResponse
+from app.api.v1.endpoints.rbac import get_current_user
+from app.services.sales_report_service import (
+    build_sales_analytics_report,
+    generate_sales_analytics_excel,
+)
+
+
+def _clean_str(val: Any) -> Optional[str]:
+    return str(val).strip() if isinstance(val, str) and str(val).strip() else None
+
+
+def _handle_sales_analytics(
+    group_by: Any,
+    groupBy: Any,
+    from_date: Any,
+    fromDate: Any,
+    to_date: Any,
+    toDate: Any,
+    period: Any,
+    compare_to: Any,
+    compareTo: Any,
+    compare_from: Any,
+    compare_to_date: Any,
+    user: AuthenticatedUser,
+    db: Session,
+) -> Dict[str, Any]:
+    eff_group = _clean_str(group_by) or _clean_str(groupBy)
+    eff_from = _clean_str(from_date) or _clean_str(fromDate)
+    eff_to = _clean_str(to_date) or _clean_str(toDate)
+    eff_period = _clean_str(period)
+    eff_cmp = _clean_str(compare_to) or _clean_str(compareTo)
+    eff_cmp_from = _clean_str(compare_from)
+    eff_cmp_to = _clean_str(compare_to_date)
+
+    return build_sales_analytics_report(
+        db=db,
+        user=user,
+        group_by_param=eff_group,
+        from_date_str=eff_from,
+        to_date_str=eff_to,
+        period=eff_period,
+        compare_to=eff_cmp,
+        compare_from_str=eff_cmp_from,
+        compare_to_str=eff_cmp_to,
+    )
+
+
+def _handle_sales_analytics_export(
+    group_by: Optional[str],
+    groupBy: Optional[str],
+    from_date: Optional[str],
+    fromDate: Optional[str],
+    to_date: Optional[str],
+    toDate: Optional[str],
+    period: Optional[str],
+    compare_to: Optional[str],
+    compareTo: Optional[str],
+    compare_from: Optional[str],
+    compare_to_date: Optional[str],
+    user: AuthenticatedUser,
+    db: Session,
+) -> StreamingResponse:
+    report = _handle_sales_analytics(
+        group_by=group_by,
+        groupBy=groupBy,
+        from_date=from_date,
+        fromDate=fromDate,
+        to_date=to_date,
+        toDate=toDate,
+        period=period,
+        compare_to=compare_to,
+        compareTo=compareTo,
+        compare_from=compare_from,
+        compare_to_date=compare_to_date,
+        user=user,
+        db=db,
+    )
+    excel_bytes = generate_sales_analytics_excel(report, user=user)
+    dimension = report.get("data", {}).get("group_by", "report")
+    filename = f"sales_analytics_{dimension}_{date.today().strftime('%Y%m%d')}.xlsx"
+
+    return StreamingResponse(
+        BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/sales-analytics", summary="Báo cáo phân tích doanh số đa chiều (SCRUM-72)")
+def get_sales_analytics(
+    group_by: Optional[str] = Query(None),
+    groupBy: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None),
+    fromDate: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    toDate: Optional[str] = Query(None),
+    period: Optional[str] = Query(None),
+    compare_to: Optional[str] = Query(None),
+    compareTo: Optional[str] = Query(None),
+    compare_from: Optional[str] = Query(None),
+    compareFrom: Optional[str] = Query(None),
+    compare_to_date: Optional[str] = Query(None),
+    compareToDate: Optional[str] = Query(None),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return _handle_sales_analytics(
+        group_by=group_by,
+        groupBy=groupBy,
+        from_date=from_date,
+        fromDate=fromDate,
+        to_date=to_date,
+        toDate=toDate,
+        period=period,
+        compare_to=compare_to,
+        compareTo=compareTo,
+        compare_from=compare_from or compareFrom,
+        compare_to_date=compare_to_date or compareToDate,
+        user=user,
+        db=db,
+    )
+
+
+@router.get("/sales", summary="Báo cáo doanh số đa chiều (Alias API_SPEC S8-06)")
+def get_sales_report_alias(
+    group_by: Optional[str] = Query(None),
+    groupBy: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None),
+    fromDate: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    toDate: Optional[str] = Query(None),
+    period: Optional[str] = Query(None),
+    compare_to: Optional[str] = Query(None),
+    compareTo: Optional[str] = Query(None),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return _handle_sales_analytics(
+        group_by=group_by,
+        groupBy=groupBy,
+        from_date=from_date,
+        fromDate=fromDate,
+        to_date=to_date,
+        toDate=toDate,
+        period=period,
+        compare_to=compare_to,
+        compareTo=compareTo,
+        compare_from=None,
+        compare_to_date=None,
+        user=user,
+        db=db,
+    )
+
+
+@router.get("/sales-analytics/export", summary="Xuất báo cáo doanh số đa chiều ra file Excel (SCRUM-72)")
+def export_sales_analytics(
+    group_by: Optional[str] = Query(None),
+    groupBy: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None),
+    fromDate: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    toDate: Optional[str] = Query(None),
+    period: Optional[str] = Query(None),
+    compare_to: Optional[str] = Query(None),
+    compareTo: Optional[str] = Query(None),
+    compare_from: Optional[str] = Query(None),
+    compareFrom: Optional[str] = Query(None),
+    compare_to_date: Optional[str] = Query(None),
+    compareToDate: Optional[str] = Query(None),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    return _handle_sales_analytics_export(
+        group_by=group_by,
+        groupBy=groupBy,
+        from_date=from_date,
+        fromDate=fromDate,
+        to_date=to_date,
+        toDate=toDate,
+        period=period,
+        compare_to=compare_to,
+        compareTo=compareTo,
+        compare_from=compare_from or compareFrom,
+        compare_to_date=compare_to_date or compareToDate,
+        user=user,
+        db=db,
+    )
+
+
+# Compatibility router for calls directly to /reports/* without /api/v1
+compat_router = APIRouter(prefix="/reports", tags=["Reports Compat"])
+
+
+@compat_router.get("/sales-analytics")
+def compat_get_sales_analytics(
+    group_by: Optional[str] = Query(None),
+    groupBy: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None),
+    fromDate: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    toDate: Optional[str] = Query(None),
+    period: Optional[str] = Query(None),
+    compare_to: Optional[str] = Query(None),
+    compareTo: Optional[str] = Query(None),
+    compare_from: Optional[str] = Query(None),
+    compareFrom: Optional[str] = Query(None),
+    compare_to_date: Optional[str] = Query(None),
+    compareToDate: Optional[str] = Query(None),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    return _handle_sales_analytics(
+        group_by=group_by,
+        groupBy=groupBy,
+        from_date=from_date,
+        fromDate=fromDate,
+        to_date=to_date,
+        toDate=toDate,
+        period=period,
+        compare_to=compare_to,
+        compareTo=compareTo,
+        compare_from=compare_from or compareFrom,
+        compare_to_date=compare_to_date or compareToDate,
+        user=user,
+        db=db,
+    )
+
+
+@compat_router.get("/sales-analytics/export")
+def compat_export_sales_analytics(
+    group_by: Optional[str] = Query(None),
+    groupBy: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None),
+    fromDate: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    toDate: Optional[str] = Query(None),
+    period: Optional[str] = Query(None),
+    compare_to: Optional[str] = Query(None),
+    compareTo: Optional[str] = Query(None),
+    compare_from: Optional[str] = Query(None),
+    compareFrom: Optional[str] = Query(None),
+    compare_to_date: Optional[str] = Query(None),
+    compareToDate: Optional[str] = Query(None),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    return _handle_sales_analytics_export(
+        group_by=group_by,
+        groupBy=groupBy,
+        from_date=from_date,
+        fromDate=fromDate,
+        to_date=to_date,
+        toDate=toDate,
+        period=period,
+        compare_to=compare_to,
+        compareTo=compareTo,
+        compare_from=compare_from or compareFrom,
+        compare_to_date=compare_to_date or compareToDate,
+        user=user,
+        db=db,
+    )
+

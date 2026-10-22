@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 import io
 import math
 import re
@@ -96,7 +96,7 @@ class ProductCreateRequest(BaseModel):
     imageUrl: Optional[str] = Field(None, alias="image_url")
     image_url: Optional[str] = Field(None, alias="imageUrl")
     status: str = "ACTIVE"
-    units: Optional[list[ProductUnitInput]] = None
+    units: Optional[List[ProductUnitInput]] = None
     description: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True)
@@ -158,7 +158,7 @@ class ProductUpdateRequest(BaseModel):
     imageUrl: Optional[str] = Field(None, alias="image_url")
     image_url: Optional[str] = Field(None, alias="imageUrl")
     status: Optional[str] = None
-    units: Optional[list[ProductUnitInput]] = None
+    units: Optional[List[ProductUnitInput]] = None
     description: Optional[str] = None
 
     model_config = ConfigDict(populate_by_name=True)
@@ -205,7 +205,7 @@ class ProductBase(BaseModel):
     costPrice: Optional[float] = None
     status: str
     imageUrl: Optional[str] = None
-    units: Optional[list[ProductUnitResponse]] = None
+    units: Optional[List[ProductUnitResponse]] = None
 
 class PaginationInfo(BaseModel):
     page: int
@@ -217,7 +217,7 @@ class ProductListResponse(BaseModel):
     success: bool
     code: int
     message: str
-    data: list[ProductBase]
+    data: List[ProductBase]
     pagination: PaginationInfo
 
 class ProductDetailResponse(BaseModel):
@@ -755,7 +755,7 @@ async def preview_product_import(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_IMPORT)),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Parse Excel file and return validation & preview list."""
     content = await _read_import_file(file)
     parsed_rows = _parse_import_workbook(content)
@@ -783,7 +783,7 @@ async def commit_product_import(
     request: Request,
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_IMPORT)),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Commit validated products into the database."""
     content_type = request.headers.get("content-type", "")
 
@@ -838,7 +838,7 @@ async def import_excel_direct(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_IMPORT)),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Direct Excel import endpoint matching API_SPECIFICATION.md POST /products/import-excel."""
     content = await _read_import_file(file)
     parsed_rows = _parse_import_workbook(content)
@@ -1170,7 +1170,7 @@ def list_product_units(
     product_id: int = PathParam(gt=0),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_VIEW)),
     db: Session = Depends(get_db),
-) -> list[dict[str, Any]]:
+) -> List[Dict[str, Any]]:
     """List configured conversion units for one product."""
     rows = (
         db.query(ProductUnit)
@@ -1197,7 +1197,7 @@ def upsert_product_unit(
     product_id: int = PathParam(gt=0),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_UNIT_MANAGE)),
     db: Session = Depends(get_db),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Create or update a unit; at most one unit per product can be the base."""
     conversion_rate = 1.0 if payload.is_base_unit else payload.conversion_rate
     try:
@@ -1596,7 +1596,7 @@ def create_product(
     payload: ProductCreateRequest,
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_MANAGE)),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     sku_clean = payload.sku.strip()
     if not sku_clean:
         raise HTTPException(
@@ -1757,7 +1757,7 @@ def update_product(
     payload: ProductUpdateRequest,
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_MANAGE)),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     if not is_sales_manager_or_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1908,7 +1908,7 @@ def toggle_product_status(
     payload: ProductStatusUpdateRequest,
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_MANAGE)),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     if not is_sales_manager_or_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1964,7 +1964,7 @@ def delete_product(
     id_or_sku: str,
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(require_permissions(PERM_PRODUCTS_MANAGE)),
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     if not is_sales_manager_or_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
