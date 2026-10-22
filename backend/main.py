@@ -41,10 +41,29 @@ from app.api.v1.endpoints.dealer_history import router as dealer_history_router
 
 
 
+async def order_reservation_expiration_checker(stop_event: asyncio.Event):
+    """Periodically scan and release expired reservations (SCRUM-32)."""
+    from app.core.database import SessionLocal
+    from app.services.inventory_service import auto_release_expired_reservations
+
+    while not stop_event.is_set():
+        try:
+            with SessionLocal() as db:
+                auto_release_expired_reservations(db)
+        except Exception:
+            pass
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=60)
+        except asyncio.TimeoutError:
+            continue
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     reminder_stop = asyncio.Event()
     reminder_task = None
+    reservation_stop = asyncio.Event()
+    reservation_task = None
     try:
         migrate_profile_schema()
     except Exception:
@@ -59,13 +78,17 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     reminder_task = asyncio.create_task(daily_reminder_scheduler(reminder_stop))
+    reservation_task = asyncio.create_task(order_reservation_expiration_checker(reservation_stop))
     try:
         yield
     finally:
         reminder_stop.set()
-        if reminder_task:
-            reminder_task.cancel()
-            await asyncio.gather(reminder_task, return_exceptions=True)
+        reservation_stop.set()
+        tasks_to_cancel = [t for t in (reminder_task, reservation_task) if t]
+        for t in tasks_to_cancel:
+            t.cancel()
+        if tasks_to_cancel:
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
 
 
 app = FastAPI(

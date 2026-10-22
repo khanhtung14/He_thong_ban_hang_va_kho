@@ -679,6 +679,10 @@ export interface OrderResponseItem {
   note?: string | null;
   created_at: string;
   is_partially_delivered?: boolean;
+  is_stock_reserved?: boolean;
+  isStockReserved?: boolean;
+  approved_at?: string | null;
+  reservation_expires_at?: string | null;
 }
 
 export async function fetchDeliveryAddresses(
@@ -885,13 +889,33 @@ export async function fetchOrdersPendingApproval(): Promise<OrderResponseItem[]>
   return res.json();
 }
 
-export async function approveOrder(orderId: number): Promise<OrderResponseItem> {
-  const res = await authenticatedFetch(`/api/v1/orders/${orderId}/approve`, {
+export async function approveOrder(orderId: number, overrideReason?: string): Promise<OrderResponseItem> {
+  const options: RequestInit = {
+    method: "POST",
+  };
+  if (overrideReason) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify({ overrideReason });
+  }
+  const res = await authenticatedFetch(`/api/v1/orders/${orderId}/approve`, options);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Không thể phê duyệt đơn hàng.");
+  }
+  return res.json();
+}
+
+export async function triggerReleaseExpiredReservations(): Promise<{
+  success: boolean;
+  count: number;
+  released_order_ids: number[];
+}> {
+  const res = await authenticatedFetch(`/api/v1/orders/release-expired-reservations`, {
     method: "POST",
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Không thể phê duyệt đơn hàng.");
+    throw new Error(err.detail || "Không thể giải phóng đơn quá hạn giữ chỗ.");
   }
   return res.json();
 }
