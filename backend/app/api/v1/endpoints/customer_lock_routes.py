@@ -93,6 +93,7 @@ except ImportError:  # pragma: no cover
     )
 
 from app.api.v1.endpoints.products import MOCK_PRODUCTS
+from app.services.credit_risk_service import CreditRiskService
 
 router = APIRouter(prefix="/api/v1", tags=["Customers & Orders (SCRUM-85)"])
 
@@ -150,6 +151,16 @@ class CustomerResponse(BaseModel):
     warning_threshold_percent: float = 80.0
     warning_threshold: float = 80.0
     overdue_days: int = 0
+    # SCRUM-42: Automated Credit Risk Evaluation fields
+    is_credit_flagged: bool = False
+    isCreditFlagged: bool = False
+    credit_flag_reason: Optional[str] = None
+    creditFlagReason: Optional[str] = None
+    credit_flagged_at: Optional[datetime] = None
+    credit_action_mode: str = "BLOCK"
+    creditActionMode: str = "BLOCK"
+    is_manually_locked: bool = False
+    isManuallyLocked: bool = False
     pending_orders_count: int = 0  # Số đơn hàng dở dang
     transactions_count: int = 0
     price_list: Optional[Any] = None
@@ -1098,6 +1109,7 @@ class CustomerCreditLimitRequest(BaseModel):
     new_credit_limit: float = Field(..., description="Hạn mức tiền mới phải >= 0", alias="newCreditLimit")
     new_max_debt_days: int = Field(default=30, description="Số ngày nợ tối đa mới phải >= 0", alias="newMaxDebtDays")
     reason: str = Field(..., min_length=1)
+    credit_action_mode: Optional[str] = Field(default=None, alias="creditActionMode")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -1153,6 +1165,12 @@ class CustomerCreditLimitRequest(BaseModel):
                     data["new_max_debt_days"] = data["maxDebtDays"]
                 elif "maxDueDays" in data:
                     data["new_max_debt_days"] = data["maxDueDays"]
+            # Fallback aliases for credit_action_mode
+            if "credit_action_mode" not in data and "creditActionMode" not in data:
+                if "action_mode" in data:
+                    data["credit_action_mode"] = data["action_mode"]
+                elif "actionMode" in data:
+                    data["credit_action_mode"] = data["actionMode"]
             # Fallback reason if empty in legacy calls
             if "reason" not in data or not str(data.get("reason", "")).strip():
                 data["reason"] = "Điều chỉnh hạn mức công nợ"
@@ -1216,7 +1234,14 @@ def update_customer_credit_limit(
     new_days_val = int(payload.new_max_debt_days)
     new_credit_limit = new_limit_val
     new_max_debt_days = new_days_val
-    if new_limit_val == old_credit_limit and new_days_val == old_max_debt_days:
+    mode_changed = False
+    if payload.credit_action_mode:
+        clean_mode = payload.credit_action_mode.strip().upper()
+        current_mode = (getattr(customer, "credit_action_mode", "BLOCK") or "BLOCK").upper()
+        if clean_mode in ("BLOCK", "REVIEW") and clean_mode != current_mode:
+            mode_changed = True
+
+    if new_limit_val == old_credit_limit and new_days_val == old_max_debt_days and not mode_changed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Không có thay đổi nào so với hạn mức hiện tại. Hạn mức tiền hoặc số ngày nợ mới phải khác với giá trị hiện tại.",
@@ -1226,6 +1251,10 @@ def update_customer_credit_limit(
     customer.credit_limit = new_limit_val
     customer.max_due_days = new_days_val
     customer.max_debt_days = new_days_val
+    if payload.credit_action_mode:
+        clean_mode = payload.credit_action_mode.strip().upper()
+        if clean_mode in ("BLOCK", "REVIEW"):
+            customer.credit_action_mode = clean_mode
 
     # Ghi nhận thông tin người thực hiện
     author_id = _user.id if _user else None
@@ -1247,6 +1276,10 @@ def update_customer_credit_limit(
     db.commit()
     db.refresh(customer)
     db.refresh(log_entry)
+
+    # SCRUM-42: Đánh giá lại rủi ro tín dụng ngay sau khi cập nhật hạn mức
+    eval_result = CreditRiskService.apply_evaluation(db, customer, commit=True)
+    db.refresh(customer)
 
     pending_count = (
         db.query(func.count(Order.id))
@@ -1283,6 +1316,10 @@ def update_customer_credit_limit(
             "max_debt_days": customer.max_debt_days,
             "maxDueDays": customer.max_due_days,
             "maxDebtDays": customer.max_debt_days,
+            "isCreditFlagged": customer.is_credit_flagged,
+            "creditFlagReason": customer.credit_flag_reason,
+            "creditActionMode": customer.credit_action_mode,
+            "creditEvaluation": eval_result.to_dict(),
             "log": {
                 "id": log_entry.id,
                 "old_credit_limit": log_entry.old_credit_limit,
@@ -1392,6 +1429,7 @@ def lock_customer(
     actor_user = db.query(User).filter(User.username == user.username).first()
 
     customer.is_locked = True
+    customer.is_manually_locked = True
     customer.lock_reason = clean_reason
     customer.locked_at = datetime.now(timezone.utc)
     customer.locked_by_id = actor_user.id if actor_user else None
@@ -1422,6 +1460,7 @@ def unlock_customer(
         raise HTTPException(status_code=404, detail="Không tìm thấy đại lý!")
 
     customer.is_locked = False
+    customer.is_manually_locked = False
     customer.lock_reason = None
     customer.locked_at = None
     customer.locked_by_id = None
@@ -1465,11 +1504,13 @@ def update_customer_transaction_status(
             )
         actor_user = db.query(User).filter(User.username == user.username).first()
         customer.is_locked = True
+        customer.is_manually_locked = True
         customer.lock_reason = clean_reason
         customer.locked_at = datetime.now(timezone.utc)
         customer.locked_by_id = actor_user.id if actor_user else None
     elif target_status in ("ACTIVE", "UNLOCKED"):
         customer.is_locked = False
+        customer.is_manually_locked = False
         customer.lock_reason = None
         customer.locked_at = None
         customer.locked_by_id = None
@@ -1504,6 +1545,87 @@ def get_agencies_debt_status(
 ):
     """Endpoint tương thích cho kế toán theo dõi công nợ và trạng thái khóa đại lý."""
     return list_customers(is_locked=None, search=None, assigned_rep_id=None, region_id=None, db=db, current_user=_user)
+
+
+class CreditActionModeRequest(BaseModel):
+    action_mode: str = Field(..., description="Chế độ xử lý rủi ro tín dụng: BLOCK hoặc REVIEW", alias="actionMode")
+    reason: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+@router.patch("/customers/{customer_id}/credit-action-mode", response_model=CustomerResponse)
+def update_customer_credit_action_mode(
+    customer_id: int,
+    payload: CreditActionModeRequest,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Accountant", "Sales Manager", "Admin")),
+):
+    """Cập nhật chế độ xử lý khi đại lý bị gắn cờ rủi ro tín dụng: BLOCK hoặc REVIEW (SCRUM-42 R2)."""
+    clean_mode = payload.action_mode.strip().upper()
+    if clean_mode not in ("BLOCK", "REVIEW"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chế độ xử lý không hợp lệ. Chỉ chấp nhận 'BLOCK' (chặn bán) hoặc 'REVIEW' (chuyển duyệt đơn).",
+        )
+    customer = db.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đại lý.")
+
+    customer.credit_action_mode = clean_mode
+    db.commit()
+    db.refresh(customer)
+
+    # Đánh giá lại rủi ro tín dụng để đồng bộ hóa trạng thái khóa theo chế độ mới
+    CreditRiskService.apply_evaluation(db, customer, commit=True)
+    db.refresh(customer)
+
+    pending_count = (
+        db.query(func.count(Order.id))
+        .filter(Order.customer_id == customer.id, Order.status.in_(INCOMPLETE_STATUSES))
+        .scalar()
+        or 0
+    )
+    res = CustomerResponse.model_validate(customer)
+    res.pending_orders_count = pending_count
+    return res
+
+
+@router.post("/customers/{customer_id}/reevaluate-credit-risk")
+def reevaluate_customer_credit_risk(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Accountant", "Sales Manager", "Admin")),
+):
+    """Đánh giá lại rủi ro tín dụng cho một đại lý theo yêu cầu (SCRUM-42)."""
+    customer = db.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đại lý.")
+    eval_result = CreditRiskService.apply_evaluation(db, customer, commit=True)
+    db.refresh(customer)
+    return {
+        "success": True,
+        "code": 200,
+        "message": f"Đánh giá rủi ro tín dụng cho đại lý '{customer.name}' thành công.",
+        "data": eval_result.to_dict(),
+    }
+
+
+@router.post("/debts/credit-risk/run-daily-job")
+@router.post("/credit-risk/run-daily-job")
+def run_daily_credit_risk_job(
+    db: Session = Depends(get_db),
+    _user: AuthenticatedUser = Depends(require_roles("Accountant", "Admin")),
+):
+    """Tác vụ định kỳ đánh giá lại rủi ro tín dụng cho tất cả đại lý (SCRUM-42 R3)."""
+    summary = CreditRiskService.reevaluate_all_dealers(db)
+    return {
+        "success": True,
+        "code": 200,
+        "message": "Hoàn tất tác vụ đánh giá lại rủi ro tín dụng hàng ngày cho toàn bộ đại lý.",
+        "data": summary,
+    }
+
 
 
 # ---------------------------------------------------------
@@ -1703,6 +1825,10 @@ def simulate_order(
             "creditLimit": credit_limit,
             "debtAfterOrder": debt_after,
             "isCreditLimitExceeded": is_exceeded,
+            "isCreditFlagged": bool(getattr(customer, "is_credit_flagged", False)),
+            "creditFlagReason": getattr(customer, "credit_flag_reason", None),
+            "creditActionMode": getattr(customer, "credit_action_mode", "BLOCK") or "BLOCK",
+            "isLocked": customer.is_locked,
             "warehouseId": serving_wh.id,
             "warehouseName": serving_wh.name,
             "itemsValidation": items_validation,
@@ -1729,7 +1855,7 @@ def create_order(
     if not customer:
         raise HTTPException(status_code=404, detail="Không tìm thấy đại lý tương ứng!")
 
-    # SCRUM-85 Validation Check: Chặn đại lý bị khóa
+    # SCRUM-85 Validation Check: Chặn đại lý bị khóa giao dịch
     if customer.is_locked:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1738,6 +1864,20 @@ def create_order(
                 f"không thể tạo đơn hàng mới! Lý do: {customer.lock_reason or 'Không xác định'}."
             ),
         )
+
+    # SCRUM-42 Validation Check: Kiểm tra cờ rủi ro tín dụng (BLOCK vs REVIEW)
+    is_credit_flagged = bool(getattr(customer, "is_credit_flagged", False))
+    credit_action_mode = (getattr(customer, "credit_action_mode", "BLOCK") or "BLOCK").upper()
+    if is_credit_flagged:
+        if credit_action_mode == "BLOCK":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Đại lý '{customer.name}' ({customer.code}) đã bị gắn cờ rủi ro tín dụng "
+                    f"và đang ở chế độ CHẶN BÁN (BLOCK)! Lý do: {customer.credit_flag_reason or 'Vượt hạn mức tín dụng hoặc nợ quá hạn cho phép'}."
+                ),
+            )
+        # Trong chế độ REVIEW, đơn hàng sẽ được phép tạo nhưng bắt buộc chuyển sang quy trình cần duyệt (PENDING_APPROVAL)
 
     serving_wh = get_customer_serving_warehouse(db, customer.id, payload.warehouse_id)
 
@@ -1929,6 +2069,9 @@ def create_order(
 
         if is_customer_account or payload.submit_for_approval or payload.status in [OrderStatus.PENDING_APPROVAL, "PENDING_APPROVAL"]:
             order_status = OrderStatus.PENDING_APPROVAL
+        elif is_credit_flagged and credit_action_mode == "REVIEW":
+            order_status = OrderStatus.PENDING_APPROVAL
+            approval_lines.append(f"Cảnh báo rủi ro tín dụng (Yêu cầu duyệt): {customer.credit_flag_reason or 'Đại lý vượt hạn mức hoặc quá hạn nợ'}")
         elif approval_lines:
             order_status = OrderStatus.PENDING
         elif payload.status is not None:

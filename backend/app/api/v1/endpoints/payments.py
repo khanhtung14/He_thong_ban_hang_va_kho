@@ -63,9 +63,30 @@ def create_payment(
         customer.current_debt = max(0.0, customer.current_debt - data.amount)
     db.commit()
     db.refresh(payment)
+
+    # SCRUM-42: Đánh giá lại rủi ro tín dụng sau mỗi lần ghi nhận thu tiền thành công
+    credit_eval_data = None
+    if customer:
+        try:
+            from app.services.credit_risk_service import CreditRiskService
+            eval_result = CreditRiskService.apply_evaluation(db, customer, commit=True)
+            credit_eval_data = eval_result.to_dict()
+        except Exception:
+            pass
+
+    response_data: dict[str, Any] = {
+        "id": payment.id,
+        "receiptNumber": f"PT-{payment.id:06d}",
+    }
+    if credit_eval_data:
+        response_data["creditEvaluation"] = credit_eval_data
+        response_data["isCreditFlagged"] = credit_eval_data.get("isFlagged", False)
+        response_data["creditFlagReason"] = credit_eval_data.get("breachSummary")
+        response_data["isLocked"] = credit_eval_data.get("isLocked", False)
+
     return {
         "success": True,
         "code": 201,
         "message": "Payment recorded",
-        "data": {"id": payment.id, "receiptNumber": f"PT-{payment.id:06d}"},
+        "data": response_data,
     }
