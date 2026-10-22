@@ -6,6 +6,7 @@ import ProfileModal from "../../components/ProfileModal";
 import { WarehouseStaffSidebar } from "../../components/Sidebar/WarehouseStaffSidebar";
 import { WarehouseStaffHeader } from "../../components/Header/WarehouseStaffHeader";
 import UnitConversionManager from "./UnitConversionManager";
+import DeliveryConfirmation from "./DeliveryConfirmation";
 
 import { logout } from "../../services/sessionService";
 import { fetchProfile, type UserProfile } from "../../services/apiClient";
@@ -113,6 +114,7 @@ export const WarehouseStaffDashboard: React.FC = () => {
           {selectedKey === "outbound" && (
             <div>Giao diện Thực hiện Xuất kho</div>
           )}
+          {selectedKey === "delivery-confirmation" && <DeliveryConfirmation />}
           {selectedKey === "stocktake-exec" && (
             <div>Giao diện Đếm hàng kiểm kê</div>
           )}

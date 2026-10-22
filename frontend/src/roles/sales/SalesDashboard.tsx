@@ -27,6 +27,7 @@ import ProfileModal from "../../components/ProfileModal";
 import { SalesSidebar } from "../../components/Sidebar/SalesSidebar";
 import { SalesHeader } from "../../components/Header/SalesHeader";
 import SalesOrderDraft from "./SalesOrderDraft";
+import DeliveryConfirmation from "../warehouse_staff/DeliveryConfirmation";
 
 // Auth & API
 import { logout } from "../../services/sessionService";
@@ -221,7 +222,9 @@ export const SalesDashboard: React.FC = () => {
             minWidth: 0,
           }}
         >
-          {selectedKey === "orders" ? (
+          {selectedKey === "delivery-confirmation" ? (
+            <DeliveryConfirmation />
+          ) : selectedKey === "orders" ? (
             <SalesOrderDraft />
           ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

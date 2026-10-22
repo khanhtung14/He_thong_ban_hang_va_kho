@@ -666,12 +666,30 @@
 - **Phân quyền:** WH Manager, Sales Manager
 - **Response Data:** Theo dõi chuyến hàng đang chạy, số điểm đã giao, số điểm còn lại.
 
+#### `GET /deliveries/pending-confirmations`
+- **Story:** S6-08 / SCRUM-51
+- **Phân quyền:** Warehouse, Sales Rep
+- **Query:** `limit` (tùy chọn, mặc định `100`, từ `1` đến `200`).
+- **Response Data:** Danh sách phiếu xuất có trạng thái `SHIPPED` và chưa có kết quả giao hàng; mỗi phần tử gồm `dispatchId` và `orderId`, sắp xếp mã phiếu mới nhất trước.
+
 #### `POST /deliveries/{dispatchId}/confirm-pod`
 - **Story:** S6-08
 - **Phân quyền:** Warehouse, Sales Rep
 - **Content-Type:** `multipart/form-data`
-- **Body:** `receiverName`, `receivedDate`, `note`, `proofImages` (ảnh biên bản bàn giao có chữ ký đại lý).
-- **Response Data:** Đơn hàng chuyển sang `DELIVERED`, đủ điều kiện phát hành hóa đơn bán lẻ.
+- **Body khi giao thành công:** `deliveryStatus=DELIVERED`, `receiverName`, `receivedDate` (ISO 8601), `note`, `proofImages` (ít nhất một ảnh JPG/PNG, tối đa 5 ảnh, mỗi ảnh tối đa 5 MB; ảnh được lưu cùng mã phiếu xuất).
+- **Body khi giao thất bại:** `deliveryStatus=FAILED`, `failureReason` (một trong `CUSTOMER_CLOSED`, `CUSTOMER_REFUSED`, `NO_CONTACT`, `ADDRESS_NOT_FOUND`, `OTHER`) và `returnWarehouseId`. Toàn bộ số lượng trên phiếu xuất được ghi nhận nhập lại kho nhận theo đúng lô; phát sinh giao dịch tồn kho loại `IN`.
+- **Quy tắc:** Mỗi phiếu xuất chỉ xác nhận kết quả một lần. Giao thành công chuyển phiếu và đơn hàng sang `DELIVERED`; chỉ dispatch đã giao thành công mới đủ điều kiện phát hành hóa đơn. Giao thất bại chuyển sang `DELIVERY_FAILED` và không đủ điều kiện phát hành hóa đơn.
+- **Response Data:** `dispatchId`, `orderId`, `deliveryStatus`, danh sách URL `proofImages` (rỗng khi thất bại), `returnWarehouseId` (rỗng khi thành công).
+
+#### `GET /deliveries/{dispatchId}/confirm-pod`
+- **Story:** S6-08
+- **Phân quyền:** Warehouse, Sales Rep
+- **Response Data:** Thông tin kết quả giao hàng đã lưu (`dispatchId`, `orderId`, `deliveryStatus`, `receiverName`, `receivedDate`, `note`, `failureReason`, `proofImages`, `returnWarehouseId`); trả `404` nếu phiếu xuất chưa có kết quả.
+
+#### `GET /deliveries/proofs/{filename}`
+- **Story:** S6-08
+- **Phân quyền:** Warehouse, Sales Rep
+- **Response:** Stream ảnh chứng từ `image/jpeg`; trả `404` nếu không tìm thấy tệp.
 
 #### `GET /deliveries/track/{orderId}`
 - **Story:** S6-09

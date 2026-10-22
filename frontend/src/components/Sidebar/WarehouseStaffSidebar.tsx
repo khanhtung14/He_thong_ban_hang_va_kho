@@ -5,6 +5,7 @@ import {
   BarcodeOutlined,
   ImportOutlined,
   ExportOutlined,
+  CheckCircleOutlined,
   CheckSquareOutlined,
   EnvironmentOutlined,
   LogoutOutlined,
@@ -49,6 +50,11 @@ export const WarehouseStaffSidebar: React.FC<WarehouseStaffSidebarProps> = ({
           key: "outbound",
           icon: <ExportOutlined />,
           label: "Thực hiện Xuất kho",
+        },
+        {
+          key: "delivery-confirmation",
+          icon: <CheckCircleOutlined />,
+          label: "Xác nhận giao hàng",
         },
         {
           key: "unit-conversion", // <-- Key mới cho chức năng này

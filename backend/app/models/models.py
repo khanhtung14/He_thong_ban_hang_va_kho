@@ -466,6 +466,8 @@ class OrderStatus(str, Enum):
     APPROVED = "APPROVED"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
+    DELIVERED = "DELIVERED"
+    DELIVERY_FAILED = "DELIVERY_FAILED"
     CANCELLED = "CANCELLED"
 
 
@@ -648,6 +650,27 @@ class Dispatch(Base):
     pick_list_id: Mapped[Optional[int]] = mapped_column(ForeignKey("pick_lists.id", ondelete="SET NULL"))
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="SHIPPED")
+
+
+class DeliveryConfirmation(Base):
+    __tablename__ = "delivery_confirmations"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    dispatch_id: Mapped[int] = mapped_column(ForeignKey("dispatches.id", ondelete="CASCADE"), unique=True, nullable=False)
+    result: Mapped[str] = mapped_column(String(20), nullable=False)
+    receiver_name: Mapped[Optional[str]] = mapped_column(String(150))
+    received_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    failure_reason: Mapped[Optional[str]] = mapped_column(String(40))
+    return_warehouse_id: Mapped[Optional[int]] = mapped_column(ForeignKey("warehouses.id", ondelete="RESTRICT"))
+    confirmed_by: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class DeliveryProofImage(Base):
+    __tablename__ = "delivery_proof_images"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    confirmation_id: Mapped[int] = mapped_column(ForeignKey("delivery_confirmations.id", ondelete="CASCADE"), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
 class DispatchItem(Base):

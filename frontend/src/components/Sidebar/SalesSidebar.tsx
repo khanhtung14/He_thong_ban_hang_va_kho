@@ -7,6 +7,7 @@ import {
   UsergroupAddOutlined,
   TagOutlined,
   FileDoneOutlined,
+  CheckCircleOutlined,
   TrophyOutlined,
   LogoutOutlined,
 } from "@ant-design/icons";
@@ -44,6 +45,11 @@ export const SalesSidebar: React.FC<SalesSidebarProps> = ({
           key: "orders",
           icon: <ShoppingOutlined />,
           label: "Tạo & Quản lý đơn",
+        },
+        {
+          key: "delivery-confirmation",
+          icon: <CheckCircleOutlined />,
+          label: "Xác nhận giao hàng",
         },
         {
           key: "customers",

@@ -9,7 +9,11 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.database import migrate_pricing_schema, migrate_sales_order_draft_schema
+from app.core.database import (
+    migrate_delivery_confirmation_schema,
+    migrate_pricing_schema,
+    migrate_sales_order_draft_schema,
+)
 from app.api.v1.endpoints.avatar import router as avatar_router
 from app.api.v1.endpoints.change_password import router as change_password_router
 from app.api.v1.endpoints.audit_logs import router as audit_logs_router
@@ -29,6 +33,7 @@ from app.api.v1.endpoints.users import compat_router as users_compat_router, rou
 from app.api.v1.endpoints.customer_lock_routes import router as customer_lock_router
 from app.api.v1.endpoints.import_users import router as import_users_router
 from app.api.v1.endpoints.sales_orders import router as sales_orders_router
+from app.api.v1.endpoints.deliveries import router as deliveries_router
 
 
 
@@ -47,6 +52,7 @@ def migrate_profile_database() -> None:
         pass
     migrate_pricing_schema()
     migrate_sales_order_draft_schema()
+    migrate_delivery_confirmation_schema()
     try:
         from app.api.v1.endpoints.warehouse import seed_default_warehouses_and_territories
         from app.core.database import SessionLocal
@@ -171,6 +177,7 @@ app.include_router(user_router)
 app.include_router(profile_router)
 app.include_router(customer_lock_router)
 app.include_router(sales_orders_router)
+app.include_router(deliveries_router)
 try:
     from app.api.v1.endpoints.warehouse import (
         router as warehouse_router,

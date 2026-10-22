@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.models.models import Invoice, Dispatch
+from app.models.models import Invoice, Dispatch, DeliveryConfirmation
 from app.api.v1.endpoints.rbac import AuthenticatedUser, require_permissions
 
 router = APIRouter(prefix="/api/v1/invoices", tags=["Invoices"])
@@ -52,6 +52,9 @@ def create_invoice_from_dispatch(
     dispatch = db.get(Dispatch, data.dispatch_id)
     if not dispatch:
         raise HTTPException(status_code=404, detail="Dispatch not found")
+    confirmation = db.query(DeliveryConfirmation).filter_by(dispatch_id=dispatch.id).first()
+    if dispatch.status != "DELIVERED" or confirmation is None or confirmation.result != "DELIVERED":
+        raise HTTPException(status_code=409, detail="Chỉ được phát hành hóa đơn sau khi xác nhận giao hàng thành công.")
         
     invoice = Invoice(
         dispatch_id=data.dispatch_id,

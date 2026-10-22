@@ -3,6 +3,105 @@ info:
   title: API He Thong Ban Hang
   version: 1.0.0
 paths:
+  /api/v1/deliveries/pending-confirmations:
+    get:
+      summary: Danh sách phiếu xuất chờ xác nhận giao hàng (SCRUM-51)
+      description: Trả các phiếu SHIPPED chưa có kết quả giao hàng, mới nhất trước.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+      responses:
+        '200':
+          description: Danh sách phiếu xuất đang chờ xác nhận
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingDispatchesResponse'
+        '401':
+          description: Chưa xác thực
+        '403':
+          description: Không đủ quyền
+        '422':
+          description: Tham số limit không hợp lệ
+  /api/v1/deliveries/{dispatch_id}/confirm-pod:
+    post:
+      summary: Xác nhận kết quả giao hàng (SCRUM-51)
+      description: Giao thành công lưu ảnh chứng từ; giao thất bại nhập toàn bộ hàng trong phiếu về kho được chọn. Chỉ dispatch giao thành công đủ điều kiện phát hành hóa đơn.
+      parameters:
+        - name: dispatch_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DeliveryConfirmationForm'
+      responses:
+        '200':
+          description: Kết quả giao hàng đã được ghi nhận
+        '401':
+          description: Chưa xác thực
+        '403':
+          description: Không đủ quyền hoặc ngoài phạm vi kho
+        '409':
+          description: Phiếu xuất không thể xác nhận ở trạng thái hiện tại
+        '422':
+          description: Dữ liệu xác nhận không hợp lệ
+    get:
+      summary: Tra cứu kết quả xác nhận giao hàng (SCRUM-51)
+      description: Trả thông tin giao nhận và URL ảnh chứng từ đã lưu cho dispatch.
+      parameters:
+        - name: dispatch_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Kết quả giao hàng đã lưu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryConfirmationRecordResponse'
+        '401':
+          description: Chưa xác thực
+        '403':
+          description: Không đủ quyền
+        '404':
+          description: Chưa có kết quả giao hàng
+  /api/v1/deliveries/proofs/{filename}:
+    get:
+      summary: Tải ảnh chứng từ giao hàng (SCRUM-51)
+      description: Trả ảnh JPEG được lưu khi xác nhận giao hàng thành công.
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ảnh chứng từ giao hàng
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Chưa xác thực
+        '403':
+          description: Không đủ quyền
+        '404':
+          description: Không tìm thấy ảnh chứng từ
   /products:
     get:
       summary: Danh sách sản phẩm
@@ -17,6 +116,103 @@ paths:
                   $ref: '#/components/schemas/Product'
 components:
   schemas:
+    PendingDispatchesResponse:
+      type: object
+      required: [success, code, data]
+      properties:
+        success:
+          type: boolean
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PendingDispatch'
+    PendingDispatch:
+      type: object
+      required: [dispatchId, orderId]
+      properties:
+        dispatchId:
+          type: integer
+        orderId:
+          type: integer
+    DeliveryConfirmationForm:
+      type: object
+      required:
+        - deliveryStatus
+      properties:
+        deliveryStatus:
+          type: string
+          enum: [DELIVERED, FAILED]
+          default: DELIVERED
+        receiverName:
+          type: string
+          maxLength: 150
+          description: Bắt buộc khi giao thành công.
+        receivedDate:
+          type: string
+          format: date-time
+          description: Bắt buộc khi giao thành công.
+        note:
+          type: string
+          maxLength: 2000
+        proofImages:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            format: binary
+          description: Ảnh JPG/PNG tối đa 5 MB mỗi ảnh; bắt buộc khi giao thành công.
+        failureReason:
+          type: string
+          enum: [CUSTOMER_CLOSED, CUSTOMER_REFUSED, NO_CONTACT, ADDRESS_NOT_FOUND, OTHER]
+          description: Bắt buộc khi deliveryStatus là FAILED.
+        returnWarehouseId:
+          type: integer
+          minimum: 1
+          description: Bắt buộc khi deliveryStatus là FAILED.
+    DeliveryConfirmationRecordResponse:
+      type: object
+      required: [success, code, data]
+      properties:
+        success:
+          type: boolean
+        code:
+          type: integer
+        data:
+          $ref: '#/components/schemas/DeliveryConfirmationRecord'
+    DeliveryConfirmationRecord:
+      type: object
+      required: [dispatchId, orderId, deliveryStatus, proofImages]
+      properties:
+        dispatchId:
+          type: integer
+        orderId:
+          type: integer
+        deliveryStatus:
+          type: string
+          enum: [DELIVERED, FAILED]
+        receiverName:
+          type: string
+          nullable: true
+        receivedDate:
+          type: string
+          format: date-time
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        failureReason:
+          type: string
+          nullable: true
+        proofImages:
+          type: array
+          items:
+            type: string
+            format: uri-reference
+        returnWarehouseId:
+          type: integer
+          nullable: true
     Product:
       type: object
       required:

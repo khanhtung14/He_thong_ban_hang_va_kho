@@ -155,3 +155,13 @@ def migrate_sales_order_draft_schema():
                     connection.execute(
                         text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
                     )
+
+
+def migrate_delivery_confirmation_schema():
+    """Create additive SCRUM-51 delivery evidence tables for existing installs."""
+    from app.models.models import Base, DeliveryConfirmation, DeliveryProofImage
+
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[DeliveryConfirmation.__table__, DeliveryProofImage.__table__],
+    )

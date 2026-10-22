@@ -1554,6 +1554,157 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sales-orders/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Assigned Customers */
+        get: operations["list_assigned_customers_api_v1_sales_orders_customers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/delivery-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Delivery Points */
+        get: operations["list_delivery_points_api_v1_sales_orders_delivery_points_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Sales Products */
+        get: operations["search_sales_products_api_v1_sales_orders_products_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sales Drafts */
+        get: operations["list_sales_drafts_api_v1_sales_orders_drafts_get"];
+        put?: never;
+        /** Create Sales Draft */
+        post: operations["create_sales_draft_api_v1_sales_orders_drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales-orders/drafts/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Sales Draft */
+        get: operations["get_sales_draft_api_v1_sales_orders_drafts__order_id__get"];
+        /** Update Sales Draft */
+        put: operations["update_sales_draft_api_v1_sales_orders_drafts__order_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/deliveries/{dispatch_id}/confirm-pod": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Delivery Confirmation
+         * @description Retrieve a persisted delivery result and its proof URLs by dispatch.
+         */
+        get: operations["get_delivery_confirmation_api_v1_deliveries__dispatch_id__confirm_pod_get"];
+        put?: never;
+        /**
+         * Confirm Delivery
+         * @description Confirm successful delivery or record a failed delivery and return goods.
+         */
+        post: operations["confirm_delivery_api_v1_deliveries__dispatch_id__confirm_pod_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/deliveries/pending-confirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pending Delivery Confirmations
+         * @description List shipped dispatches that are ready for a delivery result.
+         */
+        get: operations["list_pending_delivery_confirmations_api_v1_deliveries_pending_confirmations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/deliveries/proofs/{filename}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Delivery Proof
+         * @description Return a stored JPEG proof image for the URLs returned by confirm-pod.
+         */
+        get: operations["get_delivery_proof_api_v1_deliveries_proofs__filename__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/warehouse/receipts": {
         parameters: {
             query?: never;
@@ -1905,6 +2056,30 @@ export interface components {
              */
             happened_at: string;
         };
+        /** Body_confirm_delivery_api_v1_deliveries__dispatch_id__confirm_pod_post */
+        Body_confirm_delivery_api_v1_deliveries__dispatch_id__confirm_pod_post: {
+            /** Receivername */
+            receiverName?: string | null;
+            /** Receiveddate */
+            receivedDate?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Proofimages
+             * @default []
+             */
+            proofImages: string[];
+            /**
+             * Deliverystatus
+             * @default DELIVERED
+             * @enum {string}
+             */
+            deliveryStatus: "DELIVERED" | "FAILED";
+            /** Failurereason */
+            failureReason?: ("CUSTOMER_CLOSED" | "CUSTOMER_REFUSED" | "NO_CONTACT" | "ADDRESS_NOT_FOUND" | "OTHER") | null;
+            /** Returnwarehouseid */
+            returnWarehouseId?: number | null;
+        };
         /** Body_import_excel_direct_api_v1_products_import_excel_post */
         Body_import_excel_direct_api_v1_products_import_excel_post: {
             /** File */
@@ -2161,6 +2336,174 @@ export interface components {
              */
             reason?: string | null;
         };
+        /** DeliveryConfirmationData */
+        DeliveryConfirmationData: {
+            /** Dispatchid */
+            dispatchId: number;
+            /** Orderid */
+            orderId: number;
+            /**
+             * Deliverystatus
+             * @enum {string}
+             */
+            deliveryStatus: "DELIVERED" | "FAILED";
+            /** Proofimages */
+            proofImages: string[];
+            /** Returnwarehouseid */
+            returnWarehouseId: number | null;
+        };
+        /** DeliveryConfirmationRecord */
+        DeliveryConfirmationRecord: {
+            /** Dispatchid */
+            dispatchId: number;
+            /** Orderid */
+            orderId: number;
+            /**
+             * Deliverystatus
+             * @enum {string}
+             */
+            deliveryStatus: "DELIVERED" | "FAILED";
+            /** Receivername */
+            receiverName: string | null;
+            /** Receiveddate */
+            receivedDate: string | null;
+            /** Note */
+            note: string | null;
+            /** Failurereason */
+            failureReason: string | null;
+            /** Proofimages */
+            proofImages: string[];
+            /** Returnwarehouseid */
+            returnWarehouseId: number | null;
+        };
+        /** DeliveryConfirmationRecordResponse */
+        DeliveryConfirmationRecordResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            data: components["schemas"]["DeliveryConfirmationRecord"];
+        };
+        /** DeliveryConfirmationResponse */
+        DeliveryConfirmationResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            data: components["schemas"]["DeliveryConfirmationData"];
+        };
+        /** DeliveryPointView */
+        DeliveryPointView: {
+            /** Id */
+            id: number;
+            /** Customer Id */
+            customer_id: number;
+            /** Name */
+            name: string;
+            /** Address */
+            address: string;
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Contact Phone */
+            contact_phone?: string | null;
+            /** Is Default */
+            is_default: boolean;
+        };
+        /** DiscountTierView */
+        DiscountTierView: {
+            /** Minimum Quantity */
+            minimum_quantity: number;
+            /** Discount Percent */
+            discount_percent: number;
+        };
+        /** DraftInput */
+        DraftInput: {
+            /** Customer Id */
+            customer_id: number;
+            /** Delivery Point Id */
+            delivery_point_id: number;
+            /**
+             * Desired Delivery Date
+             * Format: date
+             */
+            desired_delivery_date: string;
+            /** Note */
+            note?: string | null;
+            /** Items */
+            items?: components["schemas"]["DraftItemInput"][];
+        };
+        /** DraftItemInput */
+        DraftItemInput: {
+            /** Product Id */
+            product_id: number;
+            /** Unit Id */
+            unit_id: number;
+            /** Quantity */
+            quantity: number;
+        };
+        /** DraftItemView */
+        DraftItemView: {
+            /** Id */
+            id: number;
+            /** Product Id */
+            product_id?: number | null;
+            /** Sku */
+            sku: string;
+            /** Product Name */
+            product_name: string;
+            /** Unit Id */
+            unit_id?: number | null;
+            /** Unit Code */
+            unit_code?: string | null;
+            /** Unit Name */
+            unit_name?: string | null;
+            /** Conversion Factor */
+            conversion_factor: number;
+            /** Quantity */
+            quantity: number;
+            /** Unit Price */
+            unit_price: number;
+            /** Discount Percent */
+            discount_percent: number;
+            /** Line Subtotal */
+            line_subtotal: number;
+            /** Discount Amount */
+            discount_amount: number;
+            /** Line Total */
+            line_total: number;
+        };
+        /** DraftView */
+        DraftView: {
+            /** Id */
+            id: number;
+            /** Order Code */
+            order_code: string;
+            /** Customer Id */
+            customer_id: number;
+            /** Customer Name */
+            customer_name: string;
+            /** Delivery Point Id */
+            delivery_point_id?: number | null;
+            /** Delivery Point Name */
+            delivery_point_name?: string | null;
+            /** Delivery Address */
+            delivery_address?: string | null;
+            /** Desired Delivery Date */
+            desired_delivery_date?: string | null;
+            status: components["schemas"]["OrderStatus"];
+            /** Subtotal Amount */
+            subtotal_amount: number;
+            /** Discount Amount */
+            discount_amount: number;
+            /** Total Amount */
+            total_amount: number;
+            /** Note */
+            note?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Items */
+            items: components["schemas"]["DraftItemView"][];
+        };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
             /**
@@ -2338,7 +2681,7 @@ export interface components {
          * OrderStatus
          * @enum {string}
          */
-        OrderStatus: "DRAFT" | "PENDING" | "PENDING_APPROVAL" | "APPROVED" | "PROCESSING" | "COMPLETED" | "CANCELLED";
+        OrderStatus: "DRAFT" | "PENDING" | "PENDING_APPROVAL" | "APPROVED" | "PROCESSING" | "COMPLETED" | "DELIVERED" | "DELIVERY_FAILED" | "CANCELLED";
         /** PaymentCreate */
         PaymentCreate: {
             /** Customer Id */
@@ -2353,6 +2696,22 @@ export interface components {
             invoice_ids: number[];
             /** Receipt Image */
             receipt_image?: string | null;
+        };
+        /** PendingDispatchData */
+        PendingDispatchData: {
+            /** Dispatchid */
+            dispatchId: number;
+            /** Orderid */
+            orderId: number;
+        };
+        /** PendingDispatchesResponse */
+        PendingDispatchesResponse: {
+            /** Success */
+            success: boolean;
+            /** Code */
+            code: number;
+            /** Data */
+            data: components["schemas"]["PendingDispatchData"][];
         };
         /** PriceLine */
         PriceLine: {
@@ -2494,6 +2853,19 @@ export interface components {
              */
             is_base_unit: boolean;
         };
+        /** ProductUnitView */
+        ProductUnitView: {
+            /** Id */
+            id: number;
+            /** Unit Code */
+            unit_code: string;
+            /** Unit Name */
+            unit_name: string;
+            /** Conversion Factor */
+            conversion_factor: number;
+            /** Is Base Unit */
+            is_base_unit: boolean;
+        };
         /** ProductUpdateRequest */
         ProductUpdateRequest: {
             /** Name */
@@ -2608,6 +2980,19 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** SalesCustomerView */
+        SalesCustomerView: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Is Locked */
+            is_locked: boolean;
+            /** Lock Reason */
+            lock_reason?: string | null;
+        };
         /** SalesMarginReportResponse */
         SalesMarginReportResponse: {
             /** Report Name */
@@ -2628,6 +3013,23 @@ export interface components {
             margin: string;
             /** Details */
             details: components["schemas"]["ProductMarginDetail"][];
+        };
+        /** SalesProductView */
+        SalesProductView: {
+            /** Id */
+            id: number;
+            /** Sku */
+            sku: string;
+            /** Name */
+            name: string;
+            /** Sale Price */
+            sale_price: number;
+            /** Discount Percent */
+            discount_percent: number;
+            /** Discount Tiers */
+            discount_tiers: components["schemas"]["DiscountTierView"][];
+            /** Units */
+            units: components["schemas"]["ProductUnitView"][];
         };
         /** TerritoryCreateSchema */
         TerritoryCreateSchema: {
@@ -5920,6 +6322,335 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assigned_customers_api_v1_sales_orders_customers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesCustomerView"][];
+                };
+            };
+        };
+    };
+    list_delivery_points_api_v1_sales_orders_delivery_points_get: {
+        parameters: {
+            query: {
+                customer_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryPointView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_sales_products_api_v1_sales_orders_products_get: {
+        parameters: {
+            query?: {
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesProductView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sales_drafts_api_v1_sales_orders_drafts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"][];
+                };
+            };
+        };
+    };
+    create_sales_draft_api_v1_sales_orders_drafts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sales_draft_api_v1_sales_orders_drafts__order_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_sales_draft_api_v1_sales_orders_drafts__order_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_delivery_confirmation_api_v1_deliveries__dispatch_id__confirm_pod_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dispatch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryConfirmationRecordResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_delivery_api_v1_deliveries__dispatch_id__confirm_pod_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dispatch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_confirm_delivery_api_v1_deliveries__dispatch_id__confirm_pod_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryConfirmationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pending_delivery_confirmations_api_v1_deliveries_pending_confirmations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingDispatchesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_delivery_proof_api_v1_deliveries_proofs__filename__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                filename: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
