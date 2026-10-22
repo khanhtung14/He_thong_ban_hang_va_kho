@@ -959,6 +959,63 @@
 }
 ```
 
+#### `GET /dashboard/executive`
+- **Story:** SCRUM-70 (Epic SCRUM-91) - Dashboard điều hành bán hàng và kho cho Quản lý kinh doanh
+- **Phân quyền:** Sales Manager, Admin (Role khác bị từ chối với HTTP 403 Forbidden, chưa đăng nhập trả về HTTP 401 Unauthorized)
+- **Query Params:** `as_of_date` (tùy chọn `YYYY-MM-DD`, mặc định ngày hiện tại)
+- **Response Data:**
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "Lấy dữ liệu dashboard điều hành thành công",
+  "data": {
+    "kpi_cards": {
+      "today_revenue": 15000000.0,
+      "month_revenue": 145000000.0,
+      "pending_approval_orders": 3,
+      "pending_dispatch_orders": 5,
+      "total_overdue_debt": 75000000.0,
+      "low_stock_sku_count": 2
+    },
+    "today_revenue": 15000000.0,
+    "month_revenue": 145000000.0,
+    "pending_approval_orders": 3,
+    "pending_dispatch_orders": 5,
+    "total_overdue_debt": 75000000.0,
+    "low_stock_sku_count": 2,
+    "daily_revenue_trend": [
+      {
+        "date": "2026-10-01",
+        "revenue": 12000000.0,
+        "order_count": 2
+      }
+    ],
+    "revenue_by_region": [
+      {
+        "region": "Miền Bắc",
+        "revenue": 85000000.0,
+        "percentage": 58.62
+      }
+    ],
+    "overdue_dealers": [
+      {
+        "id": 10,
+        "customer_id": 10,
+        "code": "DL001",
+        "name": "Đại lý Thăng Long",
+        "phone": "0912345678",
+        "overdue_amount": 50000000.0,
+        "current_debt": 60000000.0,
+        "credit_limit": 100000000.0,
+        "overdue_days": 15,
+        "region": "Miền Bắc"
+      }
+    ]
+  }
+}
+```
+
 #### `GET /reports/sales`
 - **Story:** S8-06
 - **Phân quyền:** Sales Manager

@@ -1,7 +1,8 @@
 """Return-order workflow for SCRUM-56 and the accounting credit note."""
+from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import AliasChoices, BaseModel, Field
@@ -48,14 +49,14 @@ class CreditNoteCreate(BaseModel):
     note: str = Field(min_length=1)
 
 
-def _delivered_quantities(db: Session, invoice: Invoice) -> dict[tuple[int, str], float]:
+def _delivered_quantities(db: Session, invoice: Invoice) -> Dict[Tuple[int, str], float]:
     if not invoice.dispatch_id:
         return {}
     rows = db.query(DispatchItem).filter(DispatchItem.dispatch_id == invoice.dispatch_id).all()
     return {(row.product_id, row.lot_number or ""): float(row.actual_qty or 0) for row in rows}
 
 
-def _sold_unit_prices(db: Session, invoice: Invoice) -> dict[int, float]:
+def _sold_unit_prices(db: Session, invoice: Invoice) -> Dict[int, float]:
     """Get the historical selling price per product from the original order."""
     if not invoice.dispatch_id:
         return {}

@@ -25,6 +25,7 @@ from app.api.v1.endpoints.price_lists import router as price_lists_router
 from app.api.v1.endpoints.debt_management import daily_reminder_scheduler, legacy_router as debt_management_legacy_router, router as debt_management_router
 from app.api.v1.endpoints.profile import migrate_profile_schema, router as profile_router
 from app.api.v1.endpoints.reports import router as reports_router
+from app.api.v1.endpoints.dashboard import router as dashboard_router, compat_router as dashboard_compat_router
 
 from app.api.v1.endpoints.user_assignment import router as user_assignment_router
 from app.api.v1.endpoints.sales_assignment import router as sales_assignment_router
@@ -216,6 +217,8 @@ app.include_router(products_compat_router)
 app.include_router(product_categories_router)
 app.include_router(price_lists_router)
 app.include_router(reports_router)
+app.include_router(dashboard_router)
+app.include_router(dashboard_compat_router)
 app.include_router(navigation_router)
 app.include_router(user_assignment_router)
 app.include_router(sales_assignment_router)
