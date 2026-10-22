@@ -1,8 +1,9 @@
 """Debt reminders and receipt download endpoints for SCRUM-54/55."""
+from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from io import BytesIO
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -41,7 +42,7 @@ def process_due_reminder(
     db: Session,
     customer_id: Optional[int] = None,
     invoice_id: Optional[int] = None,
-) -> list[dict[str, Any]]:
+) -> List[Dict[str, Any]]:
     query = db.query(Invoice).filter(Invoice.status != "PAID")
     if customer_id is not None:
         query = query.filter(Invoice.customer_id == customer_id)
@@ -49,7 +50,7 @@ def process_due_reminder(
         query = query.filter(Invoice.id == invoice_id)
 
     today = date.today()
-    results: list[dict[str, Any]] = []
+    results: List[Dict[str, Any]] = []
     for invoice in query.all():
         due_date = _due_date(invoice)
         if (due_date - today).days > 3:
