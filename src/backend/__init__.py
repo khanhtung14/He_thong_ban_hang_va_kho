@@ -32,6 +32,7 @@ from . import (
     suppliers,
     user_routes,
     users_service,
+    sales_targets,
 )
 
 app = main_module.app
@@ -55,6 +56,7 @@ sys.modules["src.backend.users_service"] = users_service
 sys.modules["src.backend.suppliers"] = suppliers
 sys.modules["src.backend.inventory"] = inventory
 sys.modules["src.backend.reports"] = reports
+sys.modules["src.backend.sales_targets"] = sales_targets
 sys.modules["src.backend.main"] = main_module
 
 __all__ = [
@@ -73,6 +75,7 @@ __all__ = [
     "products",
     "rbac",
     "reports",
+    "sales_targets",
     "security",
     "session",
     "suppliers",
